@@ -1823,3 +1823,716 @@ dot-man
      Create a backup:
        dot-man backup create -m "Description"
      
+     Backups are automatically created before:
+     • Switching branches
+     • Running sync --force-pull
+     ```
+
+**Exit Codes:**
+- 0: Success
+
+---
+
+### **3.16 `dot-man backup restore <backup-name>`**
+
+**Purpose:** Restore repository state from a backup.
+
+**Arguments:**
+- `backup-name` (required): Name of backup to restore (e.g., `backup_20251116_143022`)
+
+**Options:**
+- `--force, -f`: Skip confirmation prompt
+- `--preview`: Show what would be restored without doing it
+
+**Behavior:**
+
+1. **Backup Validation:**
+   - Check backup exists in `~/.config/dot-man/backups/`
+   - If not found:
+     - Error: "Backup '<name>' not found"
+     - Run `dot-man backup list` to show available
+     - Exit
+
+2. **Load Backup Metadata:**
+   - Read `metadata.json` from backup
+   - Display backup information:
+     ```
+     Backup Details
+     ═══════════════════════════════════════════════════
+     Name:         backup_20251116_143022
+     Created:      2025-11-16 14:30:22
+     Branch:       main
+     Message:      Before major restructure
+     Files:        12 tracked files
+     Size:         2.3 MB
+     ═══════════════════════════════════════════════════
+     ```
+
+3. **Preview Mode (if --preview):**
+   - Show what will be replaced:
+     ```
+     Restore Preview
+     ─────────────────────────────────────────────────────
+     Current State:
+     • Branch: work
+     • Last modified: 2025-11-17 10:00
+     • 15 tracked files
+     
+     Will restore to:
+     • Branch: main
+     • Backup date: 2025-11-16 14:30
+     • 12 tracked files
+     
+     Changes:
+     • 3 files will be removed
+     • 5 files will be replaced
+     • 4 files unchanged
+     ```
+   - Exit without restoring
+
+4. **Destructive Warning:**
+   - Display prominent warning:
+     ```
+     ⚠️  WARNING: Restore will OVERWRITE current repository!
+     
+     This will:
+     • Replace all files in the repository
+     • Reset to branch: main
+     • Lose ALL changes since: 2025-11-16 14:30
+     • Cannot be undone (unless you create a new backup now)
+     
+     Current state will be lost unless you backup first.
+     
+     Continue? [y/N]
+     ```
+   - Require explicit confirmation unless `--force`
+
+5. **Pre-Restore Safety Backup:**
+   - Automatically create backup of current state
+   - Message: "Auto-backup before restore"
+   - Display: "✓ Current state backed up to: backup_20251117_..."
+
+6. **Restore Process:**
+   - Stop any running operations
+   - Remove current `repo/` directory
+   - Copy backup contents to `repo/`
+   - Verify git repository integrity
+   - Load branch from backup metadata
+   - Update `global.conf` with restored branch
+
+7. **Post-Restore Verification:**
+   - Check git status
+   - Verify all expected files present
+   - Count files and compare to metadata
+   - If mismatch: Warn "Restore may be incomplete"
+
+8. **Deploy Restored Files:**
+   - Ask user: "Deploy restored configuration to home directory? [y/N]"
+   - If yes: Run deployment logic (like `deploy` command)
+   - If no: Display "Repository restored. Run 'dot-man switch <branch>' to deploy."
+
+9. **Success Report:**
+   ```
+   ✓ Restore completed successfully
+   
+   Restored from:    backup_20251116_143022
+   Current branch:   main
+   Files restored:   12
+   
+   Your repository has been restored to: 2025-11-16 14:30
+   
+   Next steps:
+   • Verify with: dot-man status
+   • Deploy files: dot-man switch main
+   ```
+
+**Error Handling:**
+- If backup corrupted: "Backup appears corrupted. Cannot restore."
+- If disk space insufficient: "Cannot restore: Insufficient disk space"
+- If restore fails mid-operation: "Restore failed. Attempting rollback..."
+
+**Exit Codes:**
+- 0: Success
+- 102: Backup not found
+- 103: Backup corrupted
+- 104: Restore failed
+
+---
+
+### **3.17 `dot-man conflicts list`**
+
+**Purpose:** List all files with merge conflicts after a failed sync.
+
+**Behavior:**
+
+1. **Detect Merge State:**
+   - Check if repository is in merge/rebase state
+   - If not: "No conflicts. Repository is clean."
+   - Exit early
+
+2. **Parse Git Status:**
+   - Execute: `git status --porcelain`
+   - Look for 'U' status codes (unmerged)
+   - Extract conflicted file paths
+
+3. **Categorize Conflicts:**
+   - **Both modified:** User and remote both changed same file
+   - **Deleted by us:** Remote deleted, local modified
+   - **Deleted by them:** Local deleted, remote modified
+   - **Both added:** Same file added in both places
+
+4. **Display Conflicts Table:**
+   ```
+   ⚠️  Merge Conflicts
+   ═══════════════════════════════════════════════════════════════
+   File                    Type              Modified By
+   ───────────────────────────────────────────────────────────────
+   .bashrc                BOTH MODIFIED     local + remote
+   .vimrc                 BOTH MODIFIED     local + remote
+   .gitconfig             DELETED BY THEM   local only
+   ═══════════════════════════════════════════════════════════════
+   3 conflicts detected
+   
+   Resolution Options:
+   1. Edit manually:       vim ~/.config/dot-man/repo/.bashrc
+   2. Keep local version:  dot-man conflicts resolve .bashrc --ours
+   3. Keep remote version: dot-man conflicts resolve .bashrc --theirs
+   4. After resolving all: dot-man sync --continue
+   ```
+
+5. **Show Conflict Markers:**
+   - For each conflicted file, show excerpt:
+     ```
+     File: .bashrc (lines 23-30)
+     ─────────────────────────────────────────────────────
+     <<<<<<< HEAD (local)
+     export PATH=/usr/local/bin:$PATH
+     =======
+     export PATH=/opt/homebrew/bin:$PATH
+     >>>>>>> origin/main (remote)
+     ─────────────────────────────────────────────────────
+     ```
+
+6. **Conflict Statistics:**
+   - Count total conflicts
+   - Count by type
+   - Estimate resolution effort (simple vs complex)
+
+**Exit Codes:**
+- 0: Conflicts listed successfully
+- 1: No conflicts found
+- 110: Not in merge state
+
+---
+
+### **3.18 `dot-man conflicts resolve <file>`**
+
+**Purpose:** Resolve a specific merge conflict interactively or automatically.
+
+**Arguments:**
+- `file` (required): Path to conflicted file (relative to repo)
+
+**Options:**
+- `--ours`: Keep local version (discard remote changes)
+- `--theirs`: Keep remote version (discard local changes)
+- `--edit`: Open file in editor for manual resolution
+- `--diff`: Show diff between versions before choosing
+
+**Behavior:**
+
+1. **Validate Conflict Exists:**
+   - Check file is in conflicted state
+   - If not: "File '<file>' is not conflicted"
+   - Exit
+
+2. **Show Conflict Context (if --diff):**
+   - Display side-by-side diff:
+     ```
+     Conflict in: .bashrc
+     
+     LOCAL (yours)              REMOTE (theirs)
+     ──────────────────────────────────────────────────────
+     export PATH=/local/bin     export PATH=/remote/bin
+     alias ll='ls -lah'         alias ll='ls -la'
+                                alias gs='git status'
+     ```
+
+3. **Automatic Resolution:**
+
+   **Option A: --ours (keep local)**
+   - Execute: `git checkout --ours <file>`
+   - Stage file: `git add <file>`
+   - Display: "✓ Kept local version of <file>"
+   - Show what was discarded:
+     ```
+     Discarded remote changes:
+     - Added alias gs='git status'
+     - Modified PATH to /remote/bin
+     ```
+
+   **Option B: --theirs (keep remote)**
+   - Execute: `git checkout --theirs <file>`
+   - Stage file: `git add <file>`
+   - Display: "✓ Kept remote version of <file>"
+   - Show what was discarded:
+     ```
+     Discarded local changes:
+     - alias ll was 'ls -lah', now 'ls -la'
+     ```
+
+4. **Manual Resolution (--edit or default):**
+   - Get editor from environment (EDITOR/VISUAL)
+   - Open file in editor
+   - File contains git conflict markers:
+     ```
+     <<<<<<< HEAD
+     export PATH=/local/bin
+     =======
+     export PATH=/remote/bin
+     >>>>>>> origin/main
+     ```
+   - Wait for editor to close
+   - After closing, check if markers still exist:
+     - If yes: "Conflict markers still present. Continue editing? [y/N]"
+     - If no: Stage file automatically
+
+5. **Verification:**
+   - After resolution, verify file is valid
+   - For config files: Parse to check syntax
+   - For shell scripts: Check for basic syntax errors
+   - Warn if suspicious: "File may have resolution errors"
+
+6. **Stage Resolved File:**
+   - Execute: `git add <file>`
+   - Display: "✓ Resolved and staged <file>"
+
+7. **Progress Tracking:**
+   - Count remaining conflicts
+   - Display:
+     ```
+     ✓ Resolved: .bashrc
+     
+     Remaining conflicts: 2
+     - .vimrc
+     - .gitconfig
+     
+     Continue resolving or run: dot-man sync --continue
+     ```
+
+8. **Interactive Mode (no flags):**
+   - Show options menu:
+     ```
+     Resolve conflict in: .bashrc
+     
+     Options:
+     1. Keep local version (--ours)
+     2. Keep remote version (--theirs)
+     3. Edit manually
+     4. Show diff
+     5. Skip for now
+     
+     Choose [1-5]:
+     ```
+   - Process choice
+   - Loop until resolved or skipped
+
+**Error Handling:**
+- If file doesn't exist: "File not found in repository"
+- If not in conflict: "File is not conflicted"
+- If editor fails: "Editor exited abnormally. File unchanged."
+
+**Exit Codes:**
+- 0: Success (conflict resolved)
+- 1: File not conflicted
+- 111: Editor failed
+- 112: Resolution invalid
+
+---
+
+## **4. Implementation Timeline (Detailed)**
+
+### **Phase 1: Core Foundation (Weeks 1-3)**
+
+**Week 1: Project Setup & Architecture**
+- **Developer 1:**
+  - Set up project structure (`dot_man/` package)
+  - Create `constants.py` with all paths and patterns
+  - Set up `pyproject.toml` with dependencies
+  - Configure dev tools (black, mypy, pre-commit)
+
+- **Developer 2:**
+  - Create `exceptions.py` with error hierarchy
+  - Write `config.py` for INI parsing
+  - Implement configuration validation
+  - Create unit tests for config module
+
+- **Developer 3:**
+  - Design and document configuration schemas
+  - Create example `dot-man.ini` files
+  - Write initial README and user guide
+  - Set up documentation structure
+
+**Week 2: File Operations**
+- **Developer 1:**
+  - Implement `files.py` module
+  - File discovery with `rglob()`
+  - Copy operations with permission handling
+  - Implement `.dotmanignore` support
+
+- **Developer 2:**
+  - Create `secrets.py` module
+  - Implement regex patterns for secret detection
+  - Write redaction logic
+  - Create comprehensive tests for edge cases
+
+- **Developer 3:**
+  - Build `utils.py` with helper functions
+  - Create test fixtures (mock filesystems)
+  - Write integration tests for file operations
+  - Document file handling logic
+
+**Week 3: Git Integration**
+- **Developer 1:**
+  - Implement `core.py` with GitPython wrappers
+  - Repository initialization
+  - Branch operations (create, checkout, delete)
+  - Commit operations
+
+- **Developer 2:**
+  - Implement git status checking
+  - Dirty state detection
+  - Branch listing and validation
+  - Error handling for git operations
+
+- **Developer 3:**
+  - Create `cli.py` skeleton with Click
+  - Set up command structure
+  - Implement help text and documentation
+  - Create integration tests for git operations
+
+**Deliverables Week 1-3:**
+- ✅ Complete project structure
+- ✅ Configuration parsing and validation
+- ✅ File operations with secret filtering
+- ✅ Git wrapper with error handling
+- ✅ Test suite with 50%+ coverage
+- ✅ Basic CLI structure
+
+---
+
+### **Phase 2: Core Commands (Weeks 4-5)**
+
+**Week 4: Primary Commands**
+- **Developer 1: `init` and `switch`**
+  - Implement `dot-man init` with full setup
+  - Implement Phase 1 of `switch` (save logic)
+  - Implement Phase 2 of `switch` (branch switching)
+  - Implement Phase 3 of `switch` (deployment)
+  - Write comprehensive tests
+
+- **Developer 2: `status` and `branch`**
+  - Implement `dot-man status` with diff analysis
+  - Implement dry-run comparison logic
+  - Implement `dot-man branch list`
+  - Implement `dot-man branch delete`
+  - Create rich table formatting
+
+- **Developer 3: `edit` and `deploy`**
+  - Implement `dot-man edit` with editor integration
+  - Add config validation on save
+  - Implement `dot-man deploy` for bootstrapping
+  - Write tests for editor edge cases
+
+**Week 5: Integration & Testing**
+- **All Developers:**
+  - Integration testing across commands
+  - Fix bugs discovered in testing
+  - Refactor duplicated code
+  - Add error handling edge cases
+  - Update documentation with examples
+  - Code review and quality improvements
+
+**Deliverables Week 4-5:**
+- ✅ Working `init`, `switch`, `status`, `branch`, `edit`, `deploy`
+- ✅ Rich formatting in all outputs
+- ✅ Comprehensive error handling
+- ✅ Test coverage 70%+
+- ✅ User guide with examples
+
+---
+
+### **Phase 3: Secrets & Security (Week 6)**
+
+**Developer 1: Secret Patterns & Detection**
+- Expand default secret patterns
+- Implement severity classification
+- Add false positive filtering
+- Create pattern testing suite
+
+**Developer 2: Audit Command**
+- Implement `dot-man audit`
+- Add `--strict` mode for CI/CD
+- Add `--fix` mode for auto-redaction
+- Create detailed reporting
+
+**Developer 3: Security Features**
+- Integrate secrets filtering into file operations
+- Add git history scanning (optional)
+- Implement custom pattern support
+- Add security documentation
+
+**Deliverables Week 6:**
+- ✅ Robust secret detection (6+ patterns)
+- ✅ `dot-man audit` command with reporting
+- ✅ Auto-redaction capability
+- ✅ Security best practices guide
+
+---
+
+### **Phase 4: Remote Sync (Week 7)**
+
+**Developer 1: Basic Sync**
+- Implement `dot-man sync` core logic
+- Add fetch/pull operations
+- Implement push operations
+- Add `--dry-run` mode
+
+**Developer 2: Conflict Detection**
+- Implement merge conflict detection
+- Add `dot-man conflicts list`
+- Create conflict categorization
+- Add detailed conflict reporting
+
+**Developer 3: Conflict Resolution**
+- Implement `dot-man conflicts resolve`
+- Add `--ours` and `--theirs` options
+- Create interactive resolution mode
+- Implement `sync --continue`
+
+**Week 7 Integration:**
+- Test sync across different scenarios
+- Handle edge cases (network failures, etc.)
+- Add `--force-pull` and `--force-push`
+- Implement `dot-man remote get/set`
+
+**Deliverables Week 7:**
+- ✅ Full sync capability
+- ✅ Conflict resolution tools
+- ✅ Remote configuration commands
+- ✅ Network error handling
+
+---
+
+### **Phase 5: Advanced Features (Week 8)**
+
+**Developer 1: Backup System**
+- Implement `dot-man backup create`
+- Implement `dot-man backup list`
+- Implement `dot-man backup restore`
+- Add automatic backup before risky operations
+- Add backup rotation (max 5)
+
+**Developer 2: Template System**
+- Implement `dot-man template`
+- Add variable storage (JSON)
+- Implement template substitution in deployment
+- Add system variable auto-population
+- Support default values syntax
+
+**Developer 3: Diagnostics**
+- Implement `dot-man doctor`
+- Add all 10 diagnostic checks
+- Implement `--fix` mode
+- Add verbose output
+- Create actionable recommendations
+
+**Deliverables Week 8:**
+- ✅ Backup/restore functionality
+- ✅ Template variable system
+- ✅ Comprehensive diagnostics
+- ✅ Auto-fix capabilities
+
+---
+
+### **Phase 6: Testing, Polish & Release (Weeks 9-10)**
+
+**Week 9: Testing & Documentation**
+- **Developer 1:**
+  - Achieve 80%+ test coverage
+  - Write integration tests for all workflows
+  - Test edge cases and error paths
+  - Performance testing with large repos
+
+- **Developer 2:**
+  - Complete user guide with examples
+  - Write architecture documentation
+  - Create troubleshooting guide
+  - Write API reference
+
+- **Developer 3:**
+  - Create tutorial/quickstart guide
+  - Record demo videos/GIFs
+  - Write migration guide (from similar tools)
+  - Create FAQ
+
+**Week 10: Polish & Release**
+- **All Developers:**
+  - Fix all known bugs
+  - Optimize performance bottlenecks
+  - Add shell completions (bash, zsh, fish)
+  - Set up CI/CD pipeline
+  - Create release checklist
+  - Tag v1.0.0 release
+  - Publish to PyPI
+  - Announce release
+
+**Deliverables Week 9-10:**
+- ✅ 80%+ test coverage
+- ✅ Complete documentation
+- ✅ Shell completions
+- ✅ CI/CD pipeline
+- ✅ v1.0.0 release on PyPI
+
+---
+
+## **5. Success Metrics & Validation**
+
+### **Functional Requirements (Must Pass)**
+1. **Core Operations:**
+   - ✅ Initialize repository successfully
+   - ✅ Switch between branches without data loss
+   - ✅ Save and restore configurations accurately
+   - ✅ Deploy to new machine from scratch
+   
+2. **Secret Protection:**
+   - ✅ Detect all 6 default secret types
+   - ✅ Redact secrets before committing
+   - ✅ No false negatives on critical secrets (API keys, private keys)
+   
+3. **Sync Reliability:**
+   - ✅ Sync with remote without data loss
+   - ✅ Handle merge conflicts gracefully
+   - ✅ Recover from network failures
+
+4. **Data Safety:**
+   - ✅ No data loss in normal operations
+   - ✅ Automatic backups before risky operations
+   - ✅ Clear warnings for destructive actions
+
+### **Quality Metrics**
+- **Test Coverage:** 80%+ lines covered
+- **Bug Density:** <5 critical bugs at release
+- **Documentation:** 100% of commands documented
+- **Performance:** Handle repos with 100+ files in <5 seconds
+
+### **User Experience Metrics**
+- **Onboarding:** New user can set up in <5 minutes
+- **Clarity:** Error messages are actionable
+- **Safety:** All destructive operations require confirmation
+- **Recovery:** Can recover from any failure state
+
+---
+
+## **6. Risk Mitigation Strategies**
+
+### **Technical Risks**
+
+**Risk: Merge conflicts too complex to handle**
+- **Mitigation:**
+  - Start with basic conflict detection
+  - Provide clear manual resolution path
+  - Add interactive resolution later if needed
+  - Document complex scenarios thoroughly
+
+**Risk: Secret patterns miss edge cases**
+- **Mitigation:**
+  - Start with conservative patterns (fewer false negatives)
+  - Allow user-defined custom patterns
+  - Regular pattern updates based on feedback
+  - Encourage strict mode in sensitive environments
+
+**Risk: GitPython performance issues**
+- **Mitigation:**
+  - Benchmark early with large repos
+  - Cache git operations where possible
+  - Provide progress indicators for slow operations
+  - Document performance characteristics
+
+### **Team Risks**
+
+**Risk: Developer unavailability**
+- **Mitigation:**
+  - 20% buffer in timeline (8-10 weeks not 8)
+  - Cross-training in Week 3
+  - Pair programming for critical features
+  - Clear code documentation
+
+**Risk: Scope creep**
+- **Mitigation:**
+  - Strict MVP definition (Phases 1-4)
+  - Move "nice-to-have" to v1.1/v2.0
+  - Weekly scope reviews
+  - Product owner approval for new features
+
+**Risk: Testing takes longer than expected**
+- **Mitigation:**
+  - Write tests starting Week 2 (not just Week 9)
+  - Require tests with each feature
+  - Automate testing in CI/CD
+  - Allocate full 2 weeks for testing phase
+
+---
+
+## **7. Post-Release Roadmap**
+
+### **v1.1 (1-2 months after v1.0)**
+- Shell completion improvements
+- Interactive conflict resolution UI
+- Windows support (WSL tested)
+- Performance optimizations
+- Community-requested patterns
+
+### **v2.0 (3-6 months after v1.0)**
+- Web UI for configuration management
+- Plugin system for extensibility
+- Cloud backup integration (optional)
+- Dotfile marketplace/sharing
+- Advanced templating (Jinja2)
+- Multi-user repository support
+
+### **Future Considerations**
+- Integration with configuration management (Ansible, Chef)
+- Encrypted repository support
+- Dotfile inheritance (base + machine-specific)
+- Auto-discovery of system configs
+- Migration tools from chezmoi, yadm, GNU Stow
+
+---
+
+## **8. Conclusion**
+
+This specification provides a **complete blueprint** for implementing `dot-man` over 8-10 weeks with a 3-person team. Each command is detailed with:
+
+- ✅ **Purpose and behavior**
+- ✅ **Options and arguments**
+- ✅ **Step-by-step logic**
+- ✅ **Error handling**
+- ✅ **Exit codes**
+- ✅ **User feedback patterns**
+
+### **Key Success Factors:**
+1. **Modular design** allows parallel development
+2. **Clear specifications** reduce ambiguity
+3. **Phased approach** enables early validation
+4. **Strong testing** ensures reliability
+5. **User-centric design** improves adoption
+
+### **Next Steps:**
+1. **Week 0:** Team review of this specification
+2. **Week 1:** Begin Phase 1 implementation
+3. **Weekly:** Sprint planning and retrospectives
+4. **Week 5:** Alpha release for internal testing
+5. **Week 7:** Beta release for select users
+6. **Week 10:** Public v1.0 release
+
+**The team is ready to build. Let's ship it! 🚀**
