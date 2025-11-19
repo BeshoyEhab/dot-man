@@ -1,388 +1,497 @@
-# **dot-man: Simplified Command Specifications**
+# dot-man: Development Specification
 
-## **1. Project Overview**
+## Project Overview
 
-A Python CLI tool for managing dotfiles with git versioning, secret filtering, and multi-machine sync.
+**Goal:** Python CLI tool for dotfiles management with git versioning, secret filtering, and multi-machine sync.
 
-**Team:** 3 developers | **Timeline:** 8-10 weeks | **Complexity:** Medium
+**Team:** 3 developers  
+**Timeline:** 8-10 weeks  
+**Tech Stack:** Python 3.8+, Click, GitPython, Rich, configparser
 
 ---
 
-## **2. Command Structure**
+## Command Structure
 
 ```
 dot-man
-├── init                    # Initialize repository
-├── switch <branch>        # Switch configurations
-├── status                 # Show current state
-├── sync                   # Push/pull with remote
-├── edit                   # Edit configuration
-├── deploy <branch>        # One-way deployment
-├── audit                  # Scan for secrets
-├── doctor                 # Health diagnostics
-├── template               # Manage variables
-├── branch
-│   ├── list              # List branches
-│   └── delete <branch>   # Delete branch
-├── remote
-│   ├── get               # Show remote URL
-│   └── set <url>         # Configure remote
-├── backup
-│   ├── create            # Create backup
-│   ├── list              # List backups
-│   └── restore <name>    # Restore backup
-└── conflicts
-    ├── list              # List conflicts
-    └── resolve <file>    # Resolve conflict
+├── init
+├── switch <branch>
+├── status
+├── sync
+├── edit
+├── deploy <branch>
+├── audit
+├── doctor
+├── template [--set/--unset/--list/--apply]
+├── branch [list/delete <branch>]
+├── remote [get/set <url>]
+├── backup [create/list/restore <name>]
+└── conflicts [list/resolve <file>]
 ```
 
 ---
 
-## **3. Core Commands**
+## Core Commands
 
-### **3.1 `init`** - Initialize Repository
+### 1. init
 
-**Purpose:** First-time setup of dot-man
+**Purpose:** Initialize dot-man repository structure
 
-**Process:**
-1. Create `~/.config/dot-man/` structure
-2. Initialize git repository
-3. Create default `global.conf` and `dot-man.ini`
-4. Make initial commit
+**Implementation Requirements:**
+- Create `~/.config/dot-man/{repo,backups}/`
+- Initialize git repo in `repo/`
+- Generate default `global.conf` and `dot-man.ini`
+- Make initial commit
+- Set permissions (0700 for security)
 
-**Default dot-man.ini:**
-```ini
-[DEFAULT]
-secrets_filter = true
-update_strategy = replace
-
-# Example configuration - uncomment and modify
-# [~/.bashrc]
-# local_path = ~/.bashrc
-# # repo_path is optional - defaults to "bashrc"
-# secrets_filter = false
-#
-# [~/.config/nvim/]
-# local_path = ~/.config/nvim/
-# # repo_path defaults to "nvim"
-# # Or specify custom: repo_path = editors/nvim
-```
-
-**Exit codes:** 0=success, 1=already exists, 2=git missing, 3=permission error
+**Exit Codes:** 0=success, 1=exists, 2=no git, 3=permission denied
 
 ---
 
-### **3.2 `switch <branch>`** - Switch Configurations
+### 2. switch <branch>
 
-**Purpose:** Save current state and deploy target branch
+**Purpose:** Save current state → switch branch → deploy new state
 
-**Options:** `--dry-run`, `--force`, `--no-backup`
+**Three Phases:**
 
-**Process:**
+**Phase 1 - Save Current:**
+- Parse `dot-man.ini` sections
+- For each section:
+  - Extract `local_path` (required)
+  - Extract or auto-generate `repo_path` (optional, defaults to filename)
+  - Copy `local_path` → `repo/<repo_path>`
+  - Apply secret filtering if `secrets_filter=true`
+- Detect changes (NEW/MODIFIED/DELETED/IDENTICAL)
+- Git commit with message: `Auto-save from '<branch>' before switch`
+- Create backup (unless `--no-backup`)
 
-**Phase 1: Save Current Branch**
-1. Load current branch config from `dot-man.ini`
-2. For each section:
-   - Extract `local_path` (e.g., `~/.bashrc`)
-   - Extract or generate `repo_path`:
-     - If specified: use as-is (e.g., `git/config-work`)
-     - If omitted: extract final path component (e.g., `~/.bashrc` → `bashrc`)
-   - Resolve full paths using `pathlib`
-3. Copy local files → repo (with secret filtering if enabled)
-4. Detect changes (NEW/MODIFIED/DELETED)
-5. Commit changes with auto-save message
-6. Create safety backup
+**Phase 2 - Switch:**
+- `git checkout <branch>` (create if doesn't exist)
+- Reload `dot-man.ini` from new branch
+
+**Phase 3 - Deploy:**
+- For each section in new config:
+  - Apply `update_strategy`:
+    - `replace` - overwrite (default)
+    - `rename_old` - backup as `.old`, then copy
+    - `ignore` - skip
+  - Replace template variables: `{{VAR}}` → actual value
+- Update `global.conf` current_branch
 
 **repo_path Auto-generation:**
 ```python
-# Examples:
-~/.bashrc           → bashrc
-~/.config/nvim/     → nvim
-~/.ssh/config       → config
-/etc/hosts          → hosts
-~/.gitconfig        → gitconfig
+# If repo_path not specified in config:
+~/.bashrc        → bashrc
+~/.config/nvim/  → nvim
+~/.ssh/config    → config
 ```
 
-**Phase 2: Switch Branch**
-7. Checkout target branch (create if doesn't exist)
-8. Reload new branch's `dot-man.ini`
+**Secret Filtering Patterns:**
+- `API_KEY=`, `password=`, `token=`
+- `-----BEGIN PRIVATE KEY-----`
+- `AKIA[0-9A-Z]{16}` (AWS)
+- `ghp_[a-zA-Z0-9]{36}` (GitHub)
 
-**Phase 3: Deploy New Files**
-9. Apply update strategy per file:
-   - **replace:** Delete old, copy new
-   - **rename_old:** Keep old as `.old`, deploy new
-   - **ignore:** Skip deployment
-10. Apply template substitutions ({{VAR}} → value)
-11. Update `global.conf` with new branch
+**Options:** `--dry-run`, `--force`, `--no-backup`
 
-**Secret Filtering:**
-- Redact patterns: `API_KEY=...`, `password=...`, private keys
-- If `strict_mode=true`: Abort if secrets detected
-
-**Exit codes:** 0=success, 5=git error, 6=file error, 10=secrets detected
+**Exit Codes:** 0=success, 5=git error, 6=file error, 10=secrets detected (strict mode)
 
 ---
 
-### **3.3 `status`** - Show Current State
+### 3. status
 
-**Purpose:** Display repository status and pending changes
+**Purpose:** Show current state and pending changes
 
-**Options:** `-v` (verbose), `--secrets`, `--remote`
+**Display:**
+1. Repository info (branch, last switch, remote status)
+2. File status table:
+   - NEW: local exists, repo doesn't
+   - MODIFIED: content differs
+   - DELETED: repo exists, local doesn't
+   - IDENTICAL: no changes
+3. Secret warnings (if `--secrets`)
+4. Actionable next steps
 
-**Shows:**
-- Current branch and last switch time
-- Remote sync status
-- File changes (NEW/MODIFIED/DELETED/IDENTICAL)
-- Secret detection warnings
-- What would happen on next `switch`
+**Implementation:**
+- Compare each `local_path` vs `repo_path` byte-by-byte
+- Calculate line diffs for MODIFIED files
+- Run secret detection patterns on NEW/MODIFIED
+- Query git remote status (if `--remote`)
 
-**Output example:**
-```
-Repository Status
-─────────────────────────────────────
-Current Branch:    main
-Last Switch:       2025-11-15 09:30
-Remote:            synced
-Local Changes:     3 modified, 1 new
+**Options:** `-v` (verbose with diffs), `--secrets`, `--remote`
 
-Tracked Files Status
-─────────────────────────────────────
-~/.bashrc          MODIFIED      +5 -2 lines
-~/.vimrc           IDENTICAL     
-~/.gitconfig       MODIFIED 🔒   Secret detected
-~/.zshrc           DELETED       
-```
-
-**Exit codes:** 0=success, 1=not initialized, 7=config error
+**Exit Codes:** 0=success, 1=not initialized, 7=config error
 
 ---
 
-### **3.4 `sync`** - Remote Synchronization
+### 4. sync
 
-**Purpose:** Push/pull changes with remote repository
+**Purpose:** Bidirectional sync with remote git repository
 
-**Options:** `--force-pull`, `--force-push`, `--continue`, `--dry-run`
+**Standard Flow:**
+1. Save local changes (Phase 1 of switch)
+2. `git fetch origin`
+3. Merge logic:
+   - Fast-forward if possible
+   - Three-way merge if diverged
+   - Detect conflicts if any
+4. `git push origin <branch>`
+5. Deploy merged files (Phase 3 of switch)
 
-**Standard Process:**
-1. Save local changes first
-2. Fetch from remote
-3. Merge (fast-forward if possible)
-4. Handle conflicts if any
-5. Push local commits
-6. Deploy merged files
+**Force Operations:**
 
-**Force Pull:** Discard local changes, pull from remote
-**Force Push:** Overwrite remote with local changes
+**--force-pull:**
+- Warning prompt (destructive)
+- Create backup
+- `git reset --hard origin/<branch>`
+- Deploy remote files
+
+**--force-push:**
+- Warning prompt (destructive)
+- `git push --force origin <branch>`
 
 **Conflict Handling:**
-- Detect conflicted files
-- Show resolution options
-- Use `dot-man conflicts` commands to resolve
-- Continue with `--continue` after fixing
+- Parse `git status --porcelain` for 'U' (unmerged)
+- Display table of conflicts
+- Exit with code 20
+- User resolves via `conflicts` commands
+- Resume with `--continue`
 
-**Exit codes:** 0=success, 15=network error, 20=conflicts, 21=push rejected
+**Options:** `--dry-run`, `--force-pull`, `--force-push`, `--continue`
 
----
-
-### **3.5 `edit`** - Edit Configuration
-
-**Purpose:** Open `dot-man.ini` in text editor
-
-**Options:** `--editor <name>`, `--global`, `--validate`
-
-**Process:**
-1. Select editor (flag > VISUAL > EDITOR > nano)
-2. Create backup of config
-3. Open in editor
-4. Validate syntax after editing
-5. Show errors or confirm success
-
-**Validates:**
-- INI syntax correctness
-- Required field `local_path` present
-- Optional field `repo_path` (defaults to filename if omitted)
-- Valid update strategies
-- Resolvable paths
-
-**Exit codes:** 0=success, 30=validation failed, 31=editor not found
+**Exit Codes:** 0=success, 15=network, 16=no remote, 20=conflicts, 21=push rejected
 
 ---
 
-### **3.6 `deploy <branch>`** - One-Way Deployment
+### 5. edit
 
-**Purpose:** Bootstrap new machine or recover from corruption
+**Purpose:** Edit config with validation and automatic repo reorganization
 
-**Options:** `--force`, `--dry-run`, `--strategy <name>`
+**Flow:**
+1. Select editor (flag → VISUAL → EDITOR → nano)
+2. Backup current config (`.pre-edit`)
+3. Store snapshot of current `repo_path` values
+4. Open editor, wait for close
+5. Validate INI syntax
+6. **Detect repo_path changes:**
+   - Compare old vs new `repo_path` for each section
+   - If changed: `git mv old_path new_path`
+   - Auto-commit: "Reorganized repository structure via edit"
+7. Delete backup if valid
 
-**Warning:** Destructive operation - overwrites local files without saving
+**repo_path Change Detection:**
+```python
+for section in config:
+    old_repo = old_config[section].get('repo_path', auto_generate())
+    new_repo = new_config[section].get('repo_path', auto_generate())
+    
+    if old_repo != new_repo:
+        if repo_file_exists(old_repo):
+            git_mv(old_repo, new_repo)
+        else:
+            warn(f"{old_repo} doesn't exist (created on next switch)")
+```
 
-**Process:**
-1. Show warning, require confirmation
-2. Checkout target branch
-3. Load config and generate repo_paths where needed
-4. Verify all repo files exist
-5. Deploy files (ignoring update_strategy by default)
-6. Apply template substitutions
-7. Update global config
+**Validation:**
+- INI syntax correct
+- Each section has `local_path`
+- `repo_path` valid (no `..`, no absolute paths)
+- `update_strategy` in [replace, rename_old, ignore]
+- No duplicate `repo_path` values
 
-**Use cases:** New machine setup, recovery from corruption
+**Edge Cases:**
+- Source doesn't exist: warn, skip move
+- Destination exists: prompt to overwrite
+- Multiple sections → same repo_path: error
+- Move fails: rollback with `git reset --hard`
 
-**Exit codes:** 0=success, 40=failed, 41=no disk space, 43=cancelled
+**Options:** `--editor`, `--global`, `--validate`
+
+**Exit Codes:** 0=success, 30=validation failed, 31=no editor, 32=move failed
 
 ---
 
-### **3.7 `audit`** - Security Scan
+### 6. deploy <branch>
 
-**Purpose:** Find accidentally committed secrets
+**Purpose:** One-way deployment (no save first) - for bootstrapping
+
+**Flow:**
+1. Warning prompt (destructive operation)
+2. `git checkout <branch>`
+3. Load `dot-man.ini`
+4. Check disk space
+5. Deploy all files (ignore `update_strategy`, always replace unless `--strategy` flag)
+6. Apply templates
+7. Update `global.conf`
+
+**Use Case:** New machine setup, recovery from corruption
+
+**Options:** `--dry-run`, `--force`, `--strategy`
+
+**Exit Codes:** 0=success, 40=failed, 41=no space, 43=cancelled
+
+---
+
+### 7. audit
+
+**Purpose:** Scan repository for secrets
+
+**Detection Patterns:**
+| Type | Pattern | Severity |
+|------|---------|----------|
+| API Keys | `api_key=`, `API_KEY=` | HIGH |
+| Passwords | `password=`, `passwd=` | HIGH |
+| Private Keys | `-----BEGIN.*PRIVATE KEY-----` | CRITICAL |
+| AWS | `AKIA[0-9A-Z]{16}` | CRITICAL |
+| GitHub | `ghp_[a-zA-Z0-9]{36}` | HIGH |
+| JWT | `eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+` | MEDIUM |
+
+**Implementation:**
+- Walk `repo/` directory (skip `.git/`)
+- Apply regex patterns to each line
+- Skip binary files
+- Categorize by severity
+- Record: (file, line, pattern, context)
+
+**Modes:**
+- Normal: Display findings, exit 0
+- `--strict`: Exit 50 if ANY secrets found (CI/CD)
+- `--fix`: Auto-redact secrets, commit changes
+
+**Redaction:** Replace matched text with `***REDACTED***`
 
 **Options:** `--strict`, `--fix`, `--patterns <file>`, `--exclude <pattern>`
 
-**Detects:**
-- API keys, tokens, passwords
-- Private keys (SSH, TLS)
-- AWS credentials
-- GitHub tokens
-- JWT tokens
-
-**Severity Levels:**
-- CRITICAL: Private keys, AWS credentials
-- HIGH: API tokens, plaintext passwords
-- MEDIUM: Potential tokens (ambiguous)
-- LOW: Suspicious patterns
-
-**Output example:**
-```
-🔒 Security Audit Results
-─────────────────────────────────────
-CRITICAL (2 findings):
-File: .ssh/config
-Line 15: -----BEGIN RSA PRIVATE KEY-----
-
-File: .env
-Line 3: AWS_SECRET_ACCESS_KEY=wJalr...
-
-Recommendations:
-1. Enable secrets_filter for affected files
-2. Move credentials to environment variables
-3. Rotate compromised credentials immediately
-```
-
-**Modes:**
-- `--strict`: Exit with error if ANY secrets found (CI/CD)
-- `--fix`: Auto-redact found secrets and commit
-
-**Exit codes:** 0=no secrets, 50=secrets found (strict), 52=fix failed
+**Exit Codes:** 0=clean, 50=secrets (strict), 52=fix failed
 
 ---
 
-### **3.8 `doctor`** - Health Diagnostics
+### 8. doctor
 
-**Purpose:** Detect and fix common issues
+**Purpose:** Health diagnostics with auto-fix
 
-**Options:** `--fix`, `-v` (verbose), `--check <category>`
+**10 Checks:**
+1. Repository initialized (`~/.config/dot-man/` exists)
+2. Git valid (`.git/` intact, HEAD valid)
+3. Config valid (INI parseable, required fields)
+4. Branch state (matches global.conf, no detached HEAD)
+5. Remote connectivity (`git ls-remote`)
+6. File permissions (readable/writable)
+7. Secret detection (quick scan)
+8. Disk space (>500MB available)
+9. Dependencies (Python 3.8+, git installed)
+10. Backup status (last backup age)
 
-**Checks:**
-1. Repository initialized and valid
-2. Git repository integrity
-3. Configuration file validity
-4. Current branch state
-5. Remote connectivity
-6. File system permissions
-7. Secret detection
-8. Disk space
-9. Dependencies (Python, git)
-10. Backup status
+**Display:**
+- ✓ Pass (green)
+- ⚠ Warning (yellow)
+- ✗ Error (red)
 
-**Output:**
-```
-dot-man Health Check Report
-───────────────────────────────────
-✓ Repository initialized
-✓ Git repository valid
-✓ Configuration valid (8 sections)
-⚠ Uncommitted changes (3 files)
-✓ Remote configured and reachable
-⚠ 2 files missing locally
-✓ Sufficient disk space (12 GB)
-✓ All dependencies satisfied
+**Auto-Fix (--fix):**
+- Fix permissions (chmod)
+- Clean old backups
+- Reset branch pointer
+- Create missing directories
 
-Summary: 7 passed, 2 warnings, 0 errors
+**Options:** `--fix`, `-v`, `--check <category>`
 
-Recommended Actions:
-1. Commit or revert uncommitted changes
-2. Review missing files: dot-man status
-```
-
-**Exit codes:** 0=passed, 60-64=specific errors
+**Exit Codes:** 0=passed, 60-64=specific errors
 
 ---
 
-### **3.9 `template`** - Variable Management
+### 9. template
 
-**Purpose:** Manage machine-specific template variables
-
-**Options:** `--set KEY=VALUE`, `--unset KEY`, `--list`, `--apply`
-
-**Concept:** Replace `{{VARIABLE}}` in configs with actual values
-
-**Example workflow:**
-```bash
-# On work laptop
-dot-man template --set EMAIL=john@work.com --set HOST=work-laptop
-dot-man switch work
-# Files now have actual values, not {{EMAIL}}
-
-# On personal laptop
-dot-man template --set EMAIL=john@personal.com --set HOST=home-pc
-dot-man switch personal
-# Same templates, different values
-```
-
-**Usage in configs:**
-```ini
-[~/.gitconfig]
-local_path = ~/.gitconfig
-# repo_path defaults to "gitconfig"
-template_vars = EMAIL, USERNAME
-```
+**Purpose:** Manage machine-specific variables
 
 **Storage:** `~/.config/dot-man/template_vars.json`
 
-**Exit codes:** 0=success, 70=invalid name, 71=file corrupted
+**Usage in config:**
+```ini
+[~/.gitconfig]
+local_path = ~/.gitconfig
+template_vars = EMAIL, USERNAME
+```
+
+**Substitution During Deployment:**
+```
+# In repo file:
+email = {{EMAIL}}
+
+# After deployment:
+email = john@work.com
+```
+
+**Operations:**
+- `--list` (default): Display all variables
+- `--set KEY=VALUE`: Store variable
+- `--unset KEY`: Remove variable
+- `--apply`: Re-process deployed files with current variables
+
+**Variable Validation:**
+- Must be UPPERCASE
+- Alphanumeric + underscore only
+- Start with letter
+- Max 50 characters
+
+**Exit Codes:** 0=success, 70=invalid name, 71=file corrupted
 
 ---
 
-## **4. Supporting Commands**
+### 10. branch list
 
-### **`branch list`** - List All Branches
-Shows all branches with active indicator and metadata
+**Purpose:** Display all branches
 
-### **`branch delete <branch>`** - Delete Branch
-Removes branch after safety checks and confirmation
+**Output:**
+```
+Branch          Active    Last Modified
+main            *         2025-11-15 14:30
+work                      2025-11-10 09:15
+```
 
-### **`remote get/set`** - Remote Configuration
-View or configure git remote URL
+**Options:** `-v` (show file count, commits), `--remote` (include origin branches)
 
-### **`backup create/list/restore`** - Backup Management
-- Create manual backups
-- List existing backups with metadata
-- Restore from backup (with warning)
-- Auto-backup before risky operations (max 5 kept)
-
-### **`conflicts list/resolve`** - Conflict Resolution
-- List files with merge conflicts
-- Resolve with `--ours`, `--theirs`, or manual edit
-- Continue sync after resolution
+**Exit Codes:** 0=success
 
 ---
 
-## **5. Configuration Files**
+### 11. branch delete <branch>
 
-### **`global.conf`** - System Configuration
+**Purpose:** Delete branch
+
+**Safety Checks:**
+- Cannot delete active branch
+- Check for unmerged commits
+- Confirmation prompt (unless `--force`)
+
+**Process:**
+1. Verify branch exists and not current
+2. `git branch -D <branch>`
+3. If `--remote`: `git push origin --delete <branch>`
+
+**Options:** `-f/--force`, `--remote`
+
+**Exit Codes:** 0=success, 1=active branch, 2=not found, 80=unmerged
+
+---
+
+### 12. remote get
+
+**Purpose:** Show configured remote
+
+**Display:**
+- URL, type (SSH/HTTPS), reachability status
+
+**Exit Codes:** 0=success
+
+---
+
+### 13. remote set <url>
+
+**Purpose:** Configure remote
+
+**Validation:**
+- Check URL format (SSH/HTTPS/local)
+- Test connectivity (optional with `--test`)
+
+**Process:**
+1. Validate URL
+2. If exists: prompt to replace (unless `--force`)
+3. `git remote add/set-url origin <url>`
+4. Update `global.conf`
+
+**Options:** `--test`, `--force`
+
+**Exit Codes:** 0=success, 91=invalid URL, 92=operation failed
+
+---
+
+### 14. backup create
+
+**Purpose:** Manual backup
+
+**Process:**
+1. Create timestamped dir: `backup_YYYYMMDD_HHMMSS`
+2. Copy `repo/` including `.git/`
+3. Create `metadata.json` with timestamp, branch, size
+4. Enforce limit (max 5 backups, delete oldest)
+
+**Options:** `-m <message>`, `--full`
+
+**Exit Codes:** 0=success, 100=no space, 101=failed
+
+---
+
+### 15. backup list
+
+**Purpose:** List all backups
+
+**Display Table:**
+- Name, date, branch, size
+- Sort by timestamp (newest first)
+
+**Exit Codes:** 0=success
+
+---
+
+### 16. backup restore <name>
+
+**Purpose:** Restore from backup
+
+**Process:**
+1. Load backup metadata
+2. Warning prompt (destructive)
+3. Create backup of current state
+4. Remove `repo/`, copy backup → `repo/`
+5. Update `global.conf`
+6. Optional: deploy files
+
+**Options:** `--force`, `--preview`
+
+**Exit Codes:** 0=success, 102=not found, 103=corrupted, 104=failed
+
+---
+
+### 17. conflicts list
+
+**Purpose:** Show merge conflicts
+
+**Implementation:**
+- Parse `git status --porcelain` for 'U' status
+- Categorize: both modified, deleted by us/them, both added
+- Show conflict markers excerpt
+
+**Exit Codes:** 0=success, 1=no conflicts
+
+---
+
+### 18. conflicts resolve <file>
+
+**Purpose:** Resolve specific conflict
+
+**Modes:**
+- `--ours`: `git checkout --ours <file>`, then `git add`
+- `--theirs`: `git checkout --theirs <file>`, then `git add`
+- `--edit`: Open in editor for manual resolution
+- `--diff`: Show side-by-side comparison
+- Interactive menu (default)
+
+**Validation After Edit:**
+- Check for remaining conflict markers
+- Verify file syntax if possible
+
+**Options:** `--ours`, `--theirs`, `--edit`, `--diff`
+
+**Exit Codes:** 0=success, 111=editor failed, 112=invalid resolution
+
+---
+
+## Configuration Files
+
+### global.conf
 ```ini
 [dot-man]
 current_branch = main
-initialized_date = 2025-11-16
+initialized_date = 2025-11-19
 version = 1.0.0
 
 [remote]
@@ -394,124 +503,191 @@ secrets_filter = true
 strict_mode = false
 ```
 
-### **`dot-man.ini`** - Dotfiles Configuration
+### dot-man.ini
 ```ini
 [DEFAULT]
 secrets_filter = true
 update_strategy = replace
 
-# Simple example - repo_path auto-generated
 [~/.bashrc]
 local_path = ~/.bashrc
-# repo_path = bashrc (auto-generated)
+# repo_path auto-generated as "bashrc"
 secrets_filter = false
 
-# Custom repo organization
-[~/.ssh/config]
-local_path = ~/.ssh/config
-repo_path = ssh/config           # Explicit custom path
-secrets_filter = true
-update_strategy = rename_old
-
-# Directory example
 [~/.config/nvim/]
 local_path = ~/.config/nvim/
-# repo_path = nvim (auto-generated)
-# Or custom: repo_path = editors/nvim
+repo_path = editors/nvim  # custom organization
 update_strategy = replace
 
-# Branch-specific config
 [~/.gitconfig]
 local_path = ~/.gitconfig
-repo_path = git/config-work      # Different per branch
+repo_path = git/config
 template_vars = EMAIL, USERNAME
 ```
 
-### **repo_path Auto-generation Logic**
+### template_vars.json
+```json
+{
+  "EMAIL": "john@work.com",
+  "USERNAME": "johndoe",
+  "HOSTNAME": "work-laptop"
+}
+```
 
-**Rule:** Extract the final component of `local_path`
+---
+
+## Implementation Details
+
+### repo_path Logic
 
 ```python
-from pathlib import Path
-
-def get_repo_path(local_path, config_repo_path=None):
+def get_repo_path(local_path: str, config_repo_path: Optional[str]) -> str:
     """
-    Get repository path - use explicit value or auto-generate.
-    
-    Args:
-        local_path: The local file/directory path
-        config_repo_path: Explicit repo_path from config (optional)
-    
-    Returns:
-        The path to use in repository
+    Determine repository path.
+    If config_repo_path specified: use it
+    Else: extract filename from local_path
     """
     if config_repo_path:
         return config_repo_path
     
-    # Auto-generate from local_path
-    path = Path(local_path).expanduser()
-    return path.name  # Just the final component
-
-# Examples:
-# ~/.bashrc           → bashrc
-# ~/.config/nvim/     → nvim
-# ~/.ssh/config       → config
-# /etc/hosts          → hosts
-# ~/.local/bin/script → script
+    from pathlib import Path
+    return Path(local_path).expanduser().name
 ```
 
-**Benefits:**
-- ✅ Less typing for 90% of configs
-- ✅ Clear, predictable behavior
-- ✅ Still allows custom organization when needed
-- ✅ Repository stays clean (no `.bashrc`, just `bashrc`)
+### Secret Filtering
 
-**When to specify explicit `repo_path`:**
-- Custom organization: `repo_path = editors/nvim`
-- Branch-specific: `repo_path = git/config-work` vs `git/config-personal`
-- Avoiding name conflicts: Multiple configs with same filename
-- Grouping by category: `terminals/alacritty.yml`, `terminals/kitty.conf`
+```python
+PATTERNS = [
+    (r'(api_key|API_KEY)\s*=\s*["\']?([^"\'\s]+)', 'API_KEY'),
+    (r'(password|passwd)\s*=\s*["\']([^"\']+)["\']', 'PASSWORD'),
+    (r'-----BEGIN\s+(?:RSA\s+)?PRIVATE\s+KEY-----', 'PRIVATE_KEY'),
+    (r'AKIA[0-9A-Z]{16}', 'AWS_KEY'),
+    (r'ghp_[a-zA-Z0-9]{36}', 'GITHUB_TOKEN'),
+]
+
+def filter_secrets(content: str, strict: bool = False) -> str:
+    for pattern, name in PATTERNS:
+        if re.search(pattern, content):
+            if strict:
+                raise SecretDetectedError(name)
+            content = re.sub(pattern, '***REDACTED***', content)
+    return content
+```
+
+### Template Substitution
+
+```python
+def apply_templates(content: str, variables: dict) -> str:
+    """Replace {{VAR}} with actual values"""
+    for key, value in variables.items():
+        content = content.replace(f'{{{{{key}}}}}', value)
+    return content
+```
+
+### Conflict Detection
+
+```python
+def detect_conflicts() -> List[str]:
+    """Return list of conflicted files"""
+    result = subprocess.run(
+        ['git', 'status', '--porcelain'],
+        capture_output=True, text=True
+    )
+    
+    conflicts = []
+    for line in result.stdout.splitlines():
+        if line.startswith('UU') or line.startswith('AA'):
+            conflicts.append(line[3:])
+    
+    return conflicts
+```
 
 ---
 
-## **6. Implementation Timeline**
+## Development Timeline
 
-### **Phase 1: Foundation (Weeks 1-3)**
-- Project setup, config parsing, file operations, git integration
-- Implement repo_path auto-generation logic
+### Phase 1: Foundation (Weeks 1-3)
+**Dev 1:** Project structure, constants, exceptions  
+**Dev 2:** Config parsing, validation, tests  
+**Dev 3:** Documentation, examples, schemas  
 
-### **Phase 2: Core Commands (Weeks 4-5)**
-- `init`, `switch`, `status`, `branch`, `edit`, `deploy`
-- Test with both explicit and auto-generated repo_paths
+**Deliverables:**
+- Complete project structure
+- Config parsing with tests
+- File operations module
+- Git wrapper with error handling
+- 50%+ test coverage
 
-### **Phase 3: Security (Week 6)**
-- Secret detection, `audit` command, filtering integration
+### Phase 2: Core Commands (Weeks 4-5)
+**Dev 1:** `init`, `switch` (all 3 phases)  
+**Dev 2:** `status`, `branch` commands  
+**Dev 3:** `edit` (with repo reorganization), `deploy`  
 
-### **Phase 4: Sync (Week 7)**
-- `sync`, `conflicts`, `remote` commands
+**Deliverables:**
+- 6 working commands with rich output
+- repo_path auto-generation
+- Automatic file moving on edit
+- 70%+ test coverage
 
-### **Phase 5: Advanced (Week 8)**
-- `backup`, `template`, `doctor` commands
+### Phase 3: Security (Week 6)
+**Dev 1:** Secret pattern library  
+**Dev 2:** `audit` command with all modes  
+**Dev 3:** Integration into switch/sync  
 
-### **Phase 6: Polish (Weeks 9-10)**
-- Testing (80%+ coverage), documentation, release
+**Deliverables:**
+- `audit` command functional
+- 6+ default patterns
+- Auto-redaction capability
+- Security documentation
+
+### Phase 4: Sync (Week 7)
+**Dev 1:** Basic sync, push/pull  
+**Dev 2:** Conflict detection  
+**Dev 3:** `conflicts` commands, resolution  
+
+**Deliverables:**
+- Full sync capability
+- Conflict detection and resolution
+- `remote` commands
+- Network error handling
+
+### Phase 5: Advanced (Week 8)
+**Dev 1:** `backup` commands (create/list/restore)  
+**Dev 2:** `template` command with substitution  
+**Dev 3:** `doctor` command with 10 checks  
+
+**Deliverables:**
+- Backup/restore system
+- Template variables
+- Health diagnostics
+- Auto-fix capabilities
+
+### Phase 6: Polish (Weeks 9-10)
+**All:** Testing, documentation, CI/CD, release  
+
+**Deliverables:**
+- 80%+ test coverage
+- Complete documentation
+- Shell completions
+- v1.0.0 release on PyPI
 
 ---
 
-## **7. Success Criteria**
+## Success Criteria
 
 **Functional:**
 - ✅ Initialize and switch branches without data loss
 - ✅ Auto-generate repo_path correctly
-- ✅ Detect and redact all critical secret types
+- ✅ Detect/redact all critical secrets
 - ✅ Sync reliably with remote
-- ✅ Automatic backups before risky operations
+- ✅ Auto-backup before risky operations
+- ✅ Handle conflicts gracefully
 
 **Quality:**
 - 80%+ test coverage
-- Clear error messages
 - <5 critical bugs at release
-- Complete documentation
+- Clear, actionable error messages
+- 100% commands documented
 
 **Performance:**
 - Handle 100+ files in <5 seconds
@@ -519,102 +695,92 @@ def get_repo_path(local_path, config_repo_path=None):
 
 ---
 
-## **8. Key Features Summary**
+## Technical Requirements
 
-| Feature | Description |
-|---------|-------------|
-| **Branch-based** | Different configs for work/personal/minimal |
-| **Auto repo_path** | Smart defaults - just specify `local_path` |
-| **Secret filtering** | Auto-redact sensitive data before commit |
-| **Remote sync** | Push/pull with conflict resolution |
-| **Templates** | Machine-specific variable substitution |
-| **Backups** | Auto-backup before destructive operations |
-| **Diagnostics** | Health checks with auto-fix |
-| **Safe operations** | Warnings and dry-run for all changes |
+### Dependencies
+```toml
+[tool.poetry.dependencies]
+python = "^3.8"
+click = "^8.1"
+GitPython = "^3.1"
+rich = "^13.0"
+```
+
+### Directory Structure
+```
+dot_man/
+├── __init__.py
+├── cli.py           # Click commands
+├── core.py          # Git operations
+├── config.py        # Config parsing
+├── files.py         # File operations
+├── secrets.py       # Secret detection
+├── templates.py     # Template substitution
+├── conflicts.py     # Conflict resolution
+├── utils.py         # Helpers
+├── constants.py     # Paths, patterns
+└── exceptions.py    # Custom exceptions
+
+tests/
+├── test_core.py
+├── test_config.py
+├── test_files.py
+└── ...
+```
+
+### Exit Code Conventions
+```
+0     - Success
+1-9   - General errors (not initialized, etc.)
+5-9   - Git errors
+10-19 - Security errors (secrets detected)
+20-29 - Sync/merge errors
+30-39 - Config/validation errors
+40-49 - Deployment errors
+50-59 - Audit errors
+60-69 - Doctor errors
+70-79 - Template errors
+80-89 - Branch errors
+90-99 - Remote errors
+100+  - Backup errors
+```
 
 ---
 
-## **9. Example Configurations**
+## Key Design Decisions
 
-### **Minimal Config (Most Common)**
-```ini
-[~/.bashrc]
-local_path = ~/.bashrc
-
-[~/.vimrc]
-local_path = ~/.vimrc
-
-[~/.config/nvim/]
-local_path = ~/.config/nvim/
-```
-All repo_paths auto-generated: `bashrc`, `vimrc`, `nvim`
-
-### **Organized Config (Power Users)**
-```ini
-[~/.bashrc]
-local_path = ~/.bashrc
-repo_path = shell/bashrc
-
-[~/.zshrc]
-local_path = ~/.zshrc
-repo_path = shell/zshrc
-
-[~/.config/nvim/]
-local_path = ~/.config/nvim/
-repo_path = editors/nvim
-
-[~/.config/alacritty/alacritty.yml]
-local_path = ~/.config/alacritty/alacritty.yml
-repo_path = terminals/alacritty.yml
-```
-
-### **Branch-Specific Configs**
-```ini
-# In "work" branch
-[~/.gitconfig]
-local_path = ~/.gitconfig
-repo_path = git/config-work
-template_vars = EMAIL
-
-# In "personal" branch
-[~/.gitconfig]
-local_path = ~/.gitconfig
-repo_path = git/config-personal
-template_vars = EMAIL
-```
-
-### **Reorganizing Your Repository**
-
-When you change `repo_path` values via `dot-man edit`, files are automatically moved:
-
-```bash
-# Step 1: Edit config
-dot-man edit
-
-# Step 2: Change repo_paths
-# Before:
-[~/.bashrc]
-local_path = ~/.bashrc
-# repo_path = bashrc (auto)
-
-# After:
-[~/.bashrc]
-local_path = ~/.bashrc
-repo_path = shell/bashrc
-
-# Step 3: dot-man auto-detects and moves files
-✓ Moved: bashrc → shell/bashrc
-✓ Committed changes automatically
-
-# Your repository structure is now updated!
-```
-
-**Benefits of repo reorganization:**
-- Group related configs: `shell/`, `editors/`, `terminals/`
-- Flatten nested structures: `~/.config/nvim/` → `nvim`
-- Branch-specific files: `git/config-work`, `git/config-personal`
-- No manual file moving needed - dot-man handles it!
+1. **repo_path is optional** - Auto-generate from filename for simplicity
+2. **Auto-reorganize on edit** - Move files when repo_path changes
+3. **Three-phase switch** - Save → Switch → Deploy for safety
+4. **Strict vs permissive modes** - Allow flexibility while protecting against secrets
+5. **Automatic backups** - Before all destructive operations
+6. **Rich CLI output** - Tables, colors, progress indicators
+7. **Rollback on failure** - Use git reset to recover from errors
 
 ---
 
-**Ready to build! 🚀**
+## Testing Strategy
+
+### Unit Tests
+- Config parsing edge cases
+- Secret detection patterns (false positives/negatives)
+- repo_path auto-generation
+- Template substitution
+- File operations with mocked filesystem
+
+### Integration Tests
+- Complete switch workflow
+- Sync with mocked remote
+- Conflict resolution flows
+- Backup/restore cycles
+- Edit with repo reorganization
+
+### E2E Tests
+- New machine setup scenario
+- Multi-machine sync scenario
+- Secret detection in real configs
+- Recovery from failures
+
+---
+
+This specification provides complete requirements for implementing dot-man. Each developer knows their responsibilities and deliverables for each phase. The focus is on **what to build** with enough detail on **how** where necessary for critical features.
