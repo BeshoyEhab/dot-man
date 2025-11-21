@@ -1,6 +1,6 @@
-## **3. Detailed Command Specifications**
+## **Detailed Command Specifications**
 
-### **3.1 `dot-man init`**
+### **1 `dot-man init`**
 
 **Purpose:** Initialize a new dot-man repository for the first time on a machine.
 
@@ -85,7 +85,7 @@
 
 ---
 
-### **3.2 `dot-man switch <branch-name>`**
+### **2 `dot-man switch <branch-name>`**
 
 **Purpose:** Switch between different dotfile configurations (e.g., work, personal, minimal) by saving current changes and deploying the target branch's files.
 
@@ -259,7 +259,7 @@
 
 ---
 
-### **3.3 `dot-man status`**
+### **3 `dot-man status`**
 
 **Purpose:** Display current state of dot-man repository and show what changes would be saved if you ran `switch` now.
 
@@ -388,7 +388,7 @@
 
 ---
 
-### **3.4 `dot-man sync`**
+### **4 `dot-man sync`**
 
 **Purpose:** Synchronize local repository with remote git repository (push/pull changes).
 
@@ -578,7 +578,7 @@
 
 ---
 
-### **3.5 `dot-man edit`**
+### **5 `dot-man edit`**
 
 **Purpose:** Open the current branch's configuration file in user's preferred text editor.
 
@@ -678,7 +678,7 @@
 
 ---
 
-### **3.6 `dot-man deploy <branch-name>`**
+### **6 `dot-man deploy <branch-name>`**
 
 **Purpose:** One-way deployment of a branch to local filesystem. Used for bootstrapping a new machine or recovering from corruption. Unlike `switch`, this doesn't save local changes first.
 
@@ -850,7 +850,7 @@
 
 ---
 
-### **3.7 `dot-man audit`**
+### **7 `dot-man audit`**
 
 **Purpose:** Scan repository for accidentally committed secrets or sensitive data.
 
@@ -1027,7 +1027,7 @@
 
 ---
 
-### **3.8 `dot-man doctor`**
+### **8 `dot-man doctor`**
 
 **Purpose:** Comprehensive diagnostic tool to detect and suggest fixes for common issues.
 
@@ -1205,7 +1205,7 @@
 
 ---
 
-### **3.9 `dot-man template`**
+### **9 `dot-man template`**
 
 **Purpose:** Manage template variables for machine-specific configuration values.
 
@@ -1370,7 +1370,7 @@
 
 ---
 
-### **3.10 `dot-man branch list`**
+### **10 `dot-man branch list`**
 
 **Purpose:** Display all branches in the dot-man repository.
 
@@ -1444,7 +1444,7 @@
 
 ---
 
-### **3.11 `dot-man branch delete <branch-name>`**
+### **11 `dot-man branch delete <branch-name>`**
 
 **Purpose:** Delete a branch from the dot-man repository.
 
@@ -1533,7 +1533,7 @@
 
 ---
 
-### **3.12 `dot-man remote get`**
+### **12 `dot-man remote get`**
 
 **Purpose:** Display currently configured remote repository URL.
 
@@ -1589,7 +1589,7 @@
 
 ---
 
-### **3.13 `dot-man remote set <url>`**
+### **13 `dot-man remote set <url>`**
 
 **Purpose:** Configure or update the remote repository URL.
 
@@ -1678,7 +1678,7 @@
 
 ---
 
-### **3.14 `dot-man backup create`**
+### **14 `dot-man backup create`**
 
 **Purpose:** Manually create a backup of current repository state.
 
@@ -1739,7 +1739,7 @@
 
 ---
 
-### **3.15 `dot-man backup list`**
+### **15 `dot-man backup list`**
 
 **Purpose:** Display all available backups.
 
@@ -1790,7 +1790,7 @@
 
 ---
 
-### **3.16 `dot-man backup restore <backup-name>`**
+### **16 `dot-man backup restore <backup-name>`**
 
 **Purpose:** Restore repository state from a backup.
 
@@ -1916,7 +1916,7 @@
 
 ---
 
-### **3.17 `dot-man conflicts list`**
+### **17 `dot-man conflicts list`**
 
 **Purpose:** List all files with merge conflicts after a failed sync.
 
@@ -1982,7 +1982,7 @@
 
 ---
 
-### **3.18 `dot-man conflicts resolve <file>`**
+### **18 `dot-man conflicts resolve <file>`**
 
 **Purpose:** Resolve a specific merge conflict interactively or automatically.
 
