@@ -402,7 +402,15 @@ def switch(branch: str, dry_run: bool, force: bool):
                         console.print(f"    [dim]Pre-hook:[/dim]  {pre_deploy}")
                     if post_deploy:
                         console.print(f"    [dim]Post-hook:[/dim] {post_deploy}")
+                else:
+                    console.print("    [dim](No changes needed)[/dim]")
             else:
+                if not will_change:
+                     # Optimization: Skip copy if identical
+                     console.print(f"  [dim]-[/dim] {local_path} (unchanged)")
+                     deployed_count += 1
+                     continue
+
                 if strategy == "rename_old" and local_path.exists():
                     backup_file(local_path)
 
@@ -610,6 +618,7 @@ def deploy(branch: str, force: bool, dry_run: bool):
         for section, will_change in sections_to_deploy:
             local_path = section["local_path"]
             repo_path = section["repo_path"]
+            strategy = section.get("update_strategy", "replace")
             post_deploy = section.get("post_deploy")
             pre_deploy = section.get("pre_deploy")
 
@@ -621,13 +630,25 @@ def deploy(branch: str, force: bool, dry_run: bool):
                         console.print(f"    [dim]Pre-hook:[/dim]  {pre_deploy}")
                     if post_deploy:
                         console.print(f"    [dim]Post-hook:[/dim] {post_deploy}")
-            else:
-                success_copy, _ = copy_file(repo_path, local_path, filter_secrets_enabled=False)
-                if success_copy:
-                    console.print(f"  [green]✓[/green] {local_path}")
-                    deployed += 1
                 else:
-                    console.print(f"  [red]✗[/red] {local_path}")
+                    console.print("    [dim](No changes needed)[/dim]")
+            else:
+                if not will_change:
+                     # Optimization: Skip copy if identical
+                     console.print(f"  [dim]-[/dim] {local_path} (unchanged)")
+                     deployed += 1 
+                     continue
+
+                if strategy == "rename_old" and local_path.exists():
+                    backup_file(local_path)
+
+                if strategy != "ignore":
+                    success_copy, _ = copy_file(repo_path, local_path, filter_secrets_enabled=False)
+                    if success_copy:
+                        console.print(f"  [green]✓[/green] {local_path}")
+                        deployed += 1
+                    else:
+                        console.print(f"  [red]✗[/red] {local_path}")
 
         # Run post-deploy hooks (only if not dry_run)
         if not dry_run and post_deploy_cmds:
