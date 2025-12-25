@@ -1,0 +1,33 @@
+[project]
+name = "{{name}}"
+version = "1.0.0"
+description = "Dotfiles managed with dot-man"
+type = "dotfiles"
+
+[dotfiles]
+branch = "main"
+auto_switch = false
+
+[tasks.status]
+command = "dot-man status"
+description = "Show dotfile status"
+
+[tasks.audit]
+command = "dot-man audit"
+description = "Scan for secrets"
+
+[tasks.switch]
+command = "dot-man switch"
+description = "Switch configuration branch"
+
+[tasks.deploy]
+command = "dot-man deploy main"
+description = "Deploy main configuration"
+
+[tasks.edit]
+command = "dot-man edit"
+description = "Edit dot-man.ini config"
+
+[tasks.branches]
+command = "dot-man branch list"
+description = "List all branches"

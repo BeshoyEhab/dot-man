@@ -13,26 +13,31 @@ Detailed specifications have been moved to the `docs/` directory:
 ## 🛠️ Development Setup
 
 ### Prerequisites
+
 - Python 3.8+
 - Git
 - `pip` or `poetry` (recommended)
 
 ### 1. Clone the Repository
+
 ```bash
-git clone https://github.com/yourusername/dot-man.git
+git clone https://github.com/BeshoyEhab/dot-man.git
 cd dot-man
 ```
 
 ### 2. Create a Virtual Environment
+
 ```bash
 python3 -m venv venv
 source venv/bin/activate
 ```
 
 ### 3. Install Dependencies
+
 ```bash
 pip install -e .[dev]
 ```
+
 This installs the package in editable mode along with development dependencies (pytest, black, mypy, etc.).
 
 ## 🧪 Running Tests
@@ -40,16 +45,19 @@ This installs the package in editable mode along with development dependencies (
 We use `pytest` for testing.
 
 ### Run All Tests
+
 ```bash
 pytest
 ```
 
 ### Run with Coverage
+
 ```bash
 pytest --cov=dot_man
 ```
 
 ### Run Specific Test File
+
 ```bash
 pytest tests/test_core.py
 ```
