@@ -36,6 +36,16 @@ from .exceptions import (
 console = Console()
 
 
+def complete_branches(ctx, param, incomplete):
+    """Shell completion callback for branches."""
+    try:
+        git = GitManager()
+        branches = git.list_branches()
+        return [b for b in branches if b.startswith(incomplete)]
+    except Exception:
+        return []
+
+
 def error(message: str, exit_code: int = 1) -> None:
     """Print error message and exit."""
     console.print(f"[red]✗ Error:[/red] {message}")
@@ -252,7 +262,7 @@ def status(verbose: bool, secrets: bool):
 
 
 @main.command()
-@click.argument("branch")
+@click.argument("branch", shell_complete=complete_branches)
 @click.option("--dry-run", is_flag=True, help="Show what would happen without making changes")
 @click.option("--force", is_flag=True, help="Skip confirmation prompts")
 @require_init
@@ -517,7 +527,7 @@ def edit(editor: str | None, edit_global: bool):
 
 
 @main.command()
-@click.argument("branch")
+@click.argument("branch", shell_complete=complete_branches)
 @click.option("--force", is_flag=True, help="Skip confirmation prompt")
 @click.option("--dry-run", is_flag=True, help="Show what would be deployed")
 @require_init
@@ -833,7 +843,7 @@ def branch_list():
 
 
 @branch.command("delete")
-@click.argument("name")
+@click.argument("name", shell_complete=complete_branches)
 @click.option("--force", "-f", is_flag=True, help="Force delete without confirmation")
 @require_init
 def branch_delete(name: str, force: bool):
