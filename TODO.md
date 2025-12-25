@@ -10,14 +10,22 @@
 - [x] Install script with shell completions
 - [x] Unit tests
 
-## v0.2.0 - Remote Sync
+## v0.2.0 (Current) ✅
+
+- [x] Hooks: `pre_deploy` and `post_deploy`
+- [x] Smart deployment (skip identical files)
+- [x] Directory recursion fix
+- [x] Interactive branch deletion
+- [x] Shell completions for branches
+
+## v0.3.0 - Remote Sync
 
 - [ ] `dot-man sync` - Push/pull with remote
 - [ ] `dot-man remote get/set` - Configure remote URL
 - [ ] Conflict detection and reporting
 - [ ] `--dry-run` for sync operations
 
-## v0.3.0 - Backup System
+## v0.4.0 - Backup System
 
 - [ ] `dot-man backup create` - Manual backups
 - [ ] `dot-man backup list` - Show available backups
@@ -25,7 +33,7 @@
 - [ ] Auto-backup before destructive operations
 - [ ] Backup rotation (max 5)
 
-## v0.4.0 - Template Variables
+## v0.5.0 - Template Variables
 
 - [ ] `dot-man template --set KEY=VALUE`
 - [ ] `dot-man template --list`
