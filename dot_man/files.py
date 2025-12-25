@@ -114,6 +114,18 @@ def compare_files(file1: Path, file2: Path) -> bool:
         return False
 
     try:
+        if file1.is_dir() and file2.is_dir():
+            # Compare directories
+            from filecmp import dircmp
+            dcmp = dircmp(file1, file2)
+            if dcmp.diff_files or dcmp.left_only or dcmp.right_only or dcmp.funny_files:
+                return False
+            # Recursively check subdirectories
+            for subdir in dcmp.common_dirs:
+                if not compare_files(file1 / subdir, file2 / subdir):
+                    return False
+            return True
+            
         return file1.read_bytes() == file2.read_bytes()
     except Exception:
         return False
