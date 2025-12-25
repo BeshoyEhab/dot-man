@@ -858,6 +858,20 @@ def branch_delete(name: str, force: bool):
         success(f"Deleted branch '{name}'")
 
     except DotManError as e:
+        # Import locally to avoid circular import issues if placed at top
+        from .exceptions import BranchNotMergedError
+        if isinstance(e, BranchNotMergedError):
+            if confirm(f"Branch '{name}' is not fully merged. Force delete?"):
+                 try:
+                     git.delete_branch(name, force=True)
+                     success(f"Deleted branch '{name}'")
+                     return
+                 except Exception as e2:
+                     error(f"Failed to force delete: {e2}")
+            else:
+                 console.print("Aborted.")
+                 return
+
         error(str(e), e.exit_code)
     except Exception as e:
         error(f"Failed to delete branch: {e}")

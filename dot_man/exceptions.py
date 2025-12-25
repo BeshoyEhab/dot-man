@@ -64,6 +64,12 @@ class BranchNotFoundError(DotManError):
     exit_code = 1
 
 
+class BranchNotMergedError(DotManError):
+    """Branch is not fully merged."""
+
+    exit_code = 1
+
+
 # ============================================================================
 # Configuration Errors (7, 30-35)
 # ============================================================================

@@ -180,6 +180,11 @@ class GitManager:
                 self.repo.delete_head(name, force=True)
             else:
                 self.repo.delete_head(name)
+        except GitCommandError as e:
+            if "not fully merged" in str(e.stderr):
+                from .exceptions import BranchNotMergedError
+                raise BranchNotMergedError(f"Branch '{name}' is not fully merged")
+            raise GitOperationError(f"Failed to delete branch '{name}': {e}")
         except Exception as e:
             raise GitOperationError(f"Failed to delete branch '{name}': {e}")
 
