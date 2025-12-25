@@ -116,6 +116,8 @@ class DotManConfig:
             f.write("# [~/.bashrc]\n")
             f.write("# local_path = ~/.bashrc\n")
             f.write("# repo_path = .bashrc\n")
+            f.write("# pre_deploy = echo 'Deploying bashrc...'\n")
+            f.write("# post_deploy = source ~/.bashrc\n")
 
     def get_sections(self) -> list[str]:
         """Get all section names (excluding DEFAULT)."""
@@ -148,6 +150,12 @@ class DotManConfig:
             )
         section["update_strategy"] = strategy
 
+        # Clean command strings
+        if "post_deploy" in section:
+            section["post_deploy"] = section["post_deploy"].strip()
+        if "pre_deploy" in section:
+            section["pre_deploy"] = section["pre_deploy"].strip()
+
         return section
 
     def add_section(
@@ -157,6 +165,8 @@ class DotManConfig:
         repo_path: str,
         secrets_filter: bool = True,
         update_strategy: str = "replace",
+        post_deploy: str = "",
+        pre_deploy: str = "",
     ) -> None:
         """Add a new section to the configuration."""
         if self._config.has_section(name):
@@ -167,6 +177,10 @@ class DotManConfig:
         self._config.set(name, "repo_path", repo_path)
         self._config.set(name, "secrets_filter", str(secrets_filter).lower())
         self._config.set(name, "update_strategy", update_strategy)
+        if post_deploy:
+            self._config.set(name, "post_deploy", post_deploy)
+        if pre_deploy:
+            self._config.set(name, "pre_deploy", pre_deploy)
 
     def validate(self) -> list[str]:
         """Validate the configuration file. Returns list of warnings."""

@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Git operations using GitPython
 - Commands: `init`, `status`, `switch`, `edit`, `deploy`, `audit`
 - Branch management: `branch list`, `branch delete`
+- **Hooks**: `pre_deploy` and `post_deploy` commands for automated tasks (e.g. reload config)
 - Secret detection with 10 default patterns:
   - Private keys (SSH, GPG)
   - AWS credentials

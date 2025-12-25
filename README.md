@@ -170,12 +170,14 @@ secrets_filter = true
 
 ### Options
 
-| Option            | Values                    | Description                |
-| ----------------- | ------------------------- | -------------------------- |
-| `local_path`      | path                      | Path on your filesystem    |
-| `repo_path`       | path                      | Path in the repository     |
-| `secrets_filter`  | true/false                | Redact secrets when saving |
-| `update_strategy` | replace/rename_old/ignore | How to deploy files        |
+| Option            | Values                    | Description                                   |
+| ----------------- | ------------------------- | --------------------------------------------- |
+| `local_path`      | path                      | Path on your filesystem                       |
+| `repo_path`       | path                      | Path in the repository                        |
+| `secrets_filter`  | true/false                | Redact secrets when saving                    |
+| `update_strategy` | replace/rename_old/ignore | How to deploy files                           |
+| `pre_deploy`      | command string            | Shell command to run _before_ file is changed |
+| `post_deploy`     | command string            | Shell command to run _after_ file is changed  |
 
 ---
 

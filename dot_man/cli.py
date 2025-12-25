@@ -1,6 +1,7 @@
 """dot-man CLI: Dotfile manager with git-powered branching."""
 
 import sys
+import subprocess
 from datetime import datetime
 from functools import wraps
 from pathlib import Path
@@ -21,7 +22,7 @@ from .constants import (
 )
 from .config import GlobalConfig, DotManConfig
 from .core import GitManager
-from .files import copy_file, get_file_status, backup_file
+from .files import copy_file, get_file_status, backup_file, compare_files
 from .secrets import SecretScanner, Severity
 from .utils import get_editor, open_in_editor, is_git_installed, confirm
 from .exceptions import (
@@ -346,17 +347,61 @@ def switch(branch: str, dry_run: bool, force: bool):
             dotman_config.load()
 
         deployed_count = 0
+        pre_deploy_cmds = []
+        post_deploy_cmds = []
+        sections_to_deploy = []
+
+        # Pass 1: Analyze changes and collect hooks
         for section_name in dotman_config.get_sections():
             section = dotman_config.get_section(section_name)
             local_path = section["local_path"]
             repo_path = section["repo_path"]
             strategy = section.get("update_strategy", "replace")
+            post_deploy = section.get("post_deploy")
+            pre_deploy = section.get("pre_deploy")
 
             if not repo_path.exists():
                 continue
 
+            # Check if file will change
+            will_change = not local_path.exists() or not compare_files(repo_path, local_path)
+            
+            if will_change:
+                if pre_deploy:
+                    pre_deploy_cmds.append(pre_deploy)
+                if post_deploy:
+                    post_deploy_cmds.append(post_deploy)
+            
+            sections_to_deploy.append((section, will_change))
+
+        # Run pre-deploy hooks
+        if not dry_run and pre_deploy_cmds:
+            console.print()
+            console.print("[bold]Running pre-deploy hooks...[/bold]")
+            unique_pre_cmds = list(dict.fromkeys(pre_deploy_cmds))
+            for cmd in unique_pre_cmds:
+                console.print(f"  Exec: [cyan]{cmd}[/cyan]")
+                try:
+                    subprocess.run(cmd, shell=True, check=False)
+                except Exception as e:
+                    warn(f"Failed to run command '{cmd}': {e}")
+            console.print()
+
+        # Pass 2: Deploy files
+        for section, will_change in sections_to_deploy:
+            local_path = section["local_path"]
+            repo_path = section["repo_path"]
+            strategy = section.get("update_strategy", "replace")
+            post_deploy = section.get("post_deploy")
+            pre_deploy = section.get("pre_deploy")
+
             if dry_run:
                 console.print(f"  Would deploy: {repo_path} -> {local_path}")
+                if will_change:
+                    if pre_deploy:
+                        console.print(f"    [dim]Pre-hook:[/dim]  {pre_deploy}")
+                    if post_deploy:
+                        console.print(f"    [dim]Post-hook:[/dim] {post_deploy}")
             else:
                 if strategy == "rename_old" and local_path.exists():
                     backup_file(local_path)
@@ -371,6 +416,19 @@ def switch(branch: str, dry_run: bool, force: bool):
             global_config.current_branch = branch
             global_config._config["dot-man"]["last_switch"] = datetime.now().isoformat()
             global_config.save()
+
+            # Run post-deploy hooks
+            if post_deploy_cmds:
+                console.print()
+                console.print("[bold]Running post-deploy hooks...[/bold]")
+                unique_post_cmds = list(dict.fromkeys(post_deploy_cmds))
+                
+                for cmd in unique_post_cmds:
+                    console.print(f"  Exec: [cyan]{cmd}[/cyan]")
+                    try:
+                        subprocess.run(cmd, shell=True, check=False)
+                    except Exception as e:
+                        warn(f"Failed to run command '{cmd}': {e}")
 
         # Summary
         console.print()
@@ -507,20 +565,62 @@ def deploy(branch: str, force: bool, dry_run: bool):
 
         deployed = 0
         skipped = 0
+        pre_deploy_cmds = []
+        post_deploy_cmds = []
+        sections_to_deploy = []
 
+        # Pass 1: Collect hooks and potential changes
         for section_name in sections:
             section = dotman_config.get_section(section_name)
             local_path = section["local_path"]
             repo_path = section["repo_path"]
+            post_deploy = section.get("post_deploy")
+            pre_deploy = section.get("pre_deploy")
 
             if not repo_path.exists():
                 console.print(f"  [dim]Skip:[/dim] {repo_path} (missing)")
                 skipped += 1
                 continue
 
+            # Check if file will change
+            will_change = not local_path.exists() or not compare_files(repo_path, local_path)
+            
+            if will_change:
+                if pre_deploy:
+                    pre_deploy_cmds.append(pre_deploy)
+                if post_deploy:
+                    post_deploy_cmds.append(post_deploy)
+            
+            sections_to_deploy.append((section, will_change))
+
+        # Run pre-deploy hooks
+        if not dry_run and pre_deploy_cmds:
+            console.print()
+            console.print("[bold]Running pre-deploy hooks...[/bold]")
+            unique_pre_cmds = list(dict.fromkeys(pre_deploy_cmds))
+            for cmd in unique_pre_cmds:
+                console.print(f"  Exec: [cyan]{cmd}[/cyan]")
+                try:
+                    subprocess.run(cmd, shell=True, check=False)
+                except Exception as e:
+                    warn(f"Failed to run command '{cmd}': {e}")
+            console.print()
+
+        # Pass 2: Deploy files
+        for section, will_change in sections_to_deploy:
+            local_path = section["local_path"]
+            repo_path = section["repo_path"]
+            post_deploy = section.get("post_deploy")
+            pre_deploy = section.get("pre_deploy")
+
             if dry_run:
                 action = "OVERWRITE" if local_path.exists() else "CREATE"
                 console.print(f"  Would {action}: {local_path}")
+                if will_change:
+                    if pre_deploy:
+                        console.print(f"    [dim]Pre-hook:[/dim]  {pre_deploy}")
+                    if post_deploy:
+                        console.print(f"    [dim]Post-hook:[/dim] {post_deploy}")
             else:
                 success_copy, _ = copy_file(repo_path, local_path, filter_secrets_enabled=False)
                 if success_copy:
@@ -528,6 +628,18 @@ def deploy(branch: str, force: bool, dry_run: bool):
                     deployed += 1
                 else:
                     console.print(f"  [red]✗[/red] {local_path}")
+
+        # Run post-deploy hooks (only if not dry_run)
+        if not dry_run and post_deploy_cmds:
+            console.print()
+            console.print("[bold]Running post-deploy hooks...[/bold]")
+            unique_cmds = list(dict.fromkeys(post_deploy_cmds))
+            for cmd in unique_cmds:
+                console.print(f"  Exec: [cyan]{cmd}[/cyan]")
+                try:
+                    subprocess.run(cmd, shell=True, check=False)
+                except Exception as e:
+                    warn(f"Failed to run command '{cmd}': {e}")
 
         # Update global config
         if not dry_run:
