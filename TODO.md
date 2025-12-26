@@ -27,13 +27,17 @@
 - [x] TUI Command Palette (access all commands)
 - [x] `dot-man repo` and `dot-man shell` utilities
 
-## v0.4.0 - Backup System
+## v0.4.0 - Backup & Stash System
 
 - [ ] `dot-man backup create` - Manual backups
 - [ ] `dot-man backup list` - Show available backups
 - [ ] `dot-man backup restore` - Restore from backup
 - [ ] Auto-backup before destructive operations
 - [ ] Backup rotation (max 5)
+- [ ] `dot-man stash` - Temporarily stash current changes
+- [ ] `dot-man stash pop` - Restore stashed changes
+- [ ] `dot-man switch --stash` - Stash changes instead of committing on switch
+- [ ] `dot-man switch --save-to <branch>` - Save changes to a new branch before switching
 
 ## v0.5.0 - Template Variables
 
@@ -47,9 +51,12 @@
 
 - [ ] `dot-man diff` - Show changes between branches
 - [ ] `dot-man diff <file>` - Show local vs repo diff
-- [ ] `dot-man log` - Show commit history
+- [ ] `dot-man log` - Show commit history with files changed
 - [ ] `dot-man log <file>` - Show file-specific history
+- [ ] `dot-man log --interactive` - Interactive log browser (select commit to view diff)
 - [ ] `dot-man restore <file> <commit>` - Restore from history
+- [ ] TUI: Log viewer with commit list, file changes, and diff preview
+- [ ] CLI: `dot-man show <commit>` - View full diff for a specific commit
 
 ## v0.7.0 - Multi-Machine Profiles
 
