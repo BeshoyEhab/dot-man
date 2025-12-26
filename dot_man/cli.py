@@ -888,6 +888,256 @@ def branch_delete(name: str, force: bool):
 
 
 # ============================================================================
+# remote Commands
+# ============================================================================
+
+
+@main.group()
+def remote():
+    """Manage remote repository connection."""
+    pass
+
+
+@remote.command("set")
+@click.argument("url")
+@require_init
+def remote_set(url: str):
+    """Set the remote repository URL.
+    
+    Example: dot-man remote set https://github.com/user/dotfiles.git
+    """
+    try:
+        git = GitManager()
+        git.set_remote(url)
+        success(f"Remote set to: {url}")
+    except DotManError as e:
+        error(str(e), e.exit_code)
+    except Exception as e:
+        error(f"Failed to set remote: {e}")
+
+
+@remote.command("get")
+@require_init
+def remote_get():
+    """Show the current remote repository URL."""
+    try:
+        git = GitManager()
+        url = git.get_remote_url()
+        if url:
+            console.print(f"Remote URL: [cyan]{url}[/cyan]")
+        else:
+            console.print("[dim]No remote configured[/dim]")
+            console.print("Use: [cyan]dot-man remote set <url>[/cyan]")
+    except DotManError as e:
+        error(str(e), e.exit_code)
+    except Exception as e:
+        error(f"Failed to get remote: {e}")
+
+
+# ============================================================================
+# sync Command
+# ============================================================================
+
+
+@main.command()
+@click.option("--push-only", is_flag=True, help="Only push, don't pull")
+@click.option("--pull-only", is_flag=True, help="Only pull, don't push")
+@require_init
+def sync(push_only: bool, pull_only: bool):
+    """Sync with remote repository.
+    
+    Pulls changes from remote (with rebase), then pushes local changes.
+    Use this to keep dotfiles in sync across multiple machines.
+    
+    Example: dot-man sync
+    """
+    try:
+        git = GitManager()
+        
+        if not git.has_remote():
+            error("No remote configured. Use 'dot-man remote set <url>' first.")
+        
+        current = git.current_branch()
+        console.print(f"Syncing branch [bold]{current}[/bold] with remote...")
+        console.print()
+        
+        # Pull first (unless push-only)
+        if not push_only:
+            console.print("[bold]Fetching...[/bold]")
+            git.fetch()
+            
+            console.print("[bold]Pulling...[/bold]")
+            pull_result = git.pull(rebase=True)
+            console.print(f"  {pull_result}")
+            console.print()
+        
+        # Push (unless pull-only)
+        if not pull_only:
+            console.print("[bold]Pushing...[/bold]")
+            push_result = git.push()
+            console.print(f"  {push_result}")
+            console.print()
+        
+        success("Sync complete!")
+        
+    except DotManError as e:
+        error(str(e), e.exit_code)
+    except Exception as e:
+        error(f"Sync failed: {e}")
+
+
+# ============================================================================
+# tui Command
+# ============================================================================
+
+
+@main.command()
+@require_init
+def tui():
+    """Interactive TUI for managing dotfiles.
+    
+    Navigate with arrow keys, press Enter to switch branches.
+    
+    Keys:
+        Enter - Switch to selected branch
+        s     - Sync with remote
+        d     - Deploy selected branch
+        r     - Refresh
+        q     - Quit
+    
+    Requires: pip install dot-man[tui]
+    """
+    try:
+        from .tui import run_tui
+    except ImportError:
+        console.print("[yellow]TUI requires the 'textual' package.[/yellow]")
+        console.print()
+        console.print("Install with:")
+        console.print("  [cyan]pipx inject dot-man textual[/cyan]")
+        console.print("  or")
+        console.print("  [cyan]pip install dot-man[tui][/cyan]")
+        return
+    
+    try:
+        result = run_tui()
+        
+        if result:
+            action, branch = result
+            
+            if action == "switch" and branch:
+                ctx = click.Context(switch)
+                ctx.invoke(switch, branch=branch, dry_run=False, force=True)
+                
+            elif action == "sync":
+                ctx = click.Context(sync)
+                ctx.invoke(sync, push_only=False, pull_only=False)
+                
+            elif action == "deploy" and branch:
+                ctx = click.Context(deploy)
+                ctx.invoke(deploy, branch=branch, force=True, dry_run=False)
+                
+    except DotManError as e:
+        error(str(e), e.exit_code)
+    except Exception as e:
+        error(f"TUI error: {e}")
+
+
+# ============================================================================
+# setup Command
+# ============================================================================
+
+
+@main.command()
+@require_init
+def setup():
+    """Set up remote repository for syncing.
+    
+    Guides you through creating a GitHub repository and connecting it.
+    Supports GitHub CLI (gh) for automatic creation.
+    """
+    import shutil
+    
+    git = GitManager()
+    
+    # Check if remote already configured
+    if git.has_remote():
+        url = git.get_remote_url()
+        console.print(f"Remote already configured: [cyan]{url}[/cyan]")
+        if not confirm("Replace with a new remote?"):
+            return
+    
+    console.print()
+    console.print("[bold]🔧 Remote Setup[/bold]")
+    console.print()
+    
+    # Check for GitHub CLI
+    gh_available = shutil.which("gh") is not None
+    
+    if gh_available:
+        console.print("[green]✓[/green] GitHub CLI (gh) detected")
+        console.print()
+        
+        if confirm("Create a new private GitHub repository?"):
+            repo_name = click.prompt("Repository name", default="dotfiles")
+            
+            try:
+                # Create repo with gh
+                result = subprocess.run(
+                    ["gh", "repo", "create", repo_name, "--private", "--source=.", "--remote=origin", "--push"],
+                    cwd=REPO_DIR,
+                    capture_output=True,
+                    text=True
+                )
+                
+                if result.returncode == 0:
+                    success(f"Created and connected to GitHub repository: {repo_name}")
+                    console.print()
+                    console.print("You can now use [cyan]dot-man sync[/cyan] to sync your dotfiles!")
+                    return
+                else:
+                    warn(f"gh command failed: {result.stderr}")
+                    console.print("Falling back to manual setup...")
+                    console.print()
+            except Exception as e:
+                warn(f"Error running gh: {e}")
+                console.print("Falling back to manual setup...")
+                console.print()
+    else:
+        console.print("[dim]GitHub CLI not found. Install with: https://cli.github.com[/dim]")
+        console.print()
+    
+    # Manual setup instructions
+    console.print("[bold]Manual Setup Steps:[/bold]")
+    console.print()
+    console.print("1. Create a new repository on GitHub:")
+    console.print("   [cyan]https://github.com/new[/cyan]")
+    console.print()
+    console.print("2. Copy the repository URL (SSH or HTTPS)")
+    console.print()
+    
+    url = click.prompt("Enter the repository URL (or 'skip' to exit)", default="skip")
+    
+    if url.lower() == "skip":
+        console.print()
+        console.print("You can set the remote later with:")
+        console.print("  [cyan]dot-man remote set <url>[/cyan]")
+        return
+    
+    try:
+        git.set_remote(url)
+        success(f"Remote set to: {url}")
+        
+        if confirm("Push current dotfiles to remote?"):
+            console.print("Pushing...")
+            git.push()
+            success("Pushed to remote!")
+            console.print()
+            console.print("You can now use [cyan]dot-man sync[/cyan] to sync your dotfiles!")
+    except Exception as e:
+        error(f"Failed to set remote: {e}")
+
+
+# ============================================================================
 # Entry Point
 # ============================================================================
 

@@ -207,3 +207,132 @@ class GitManager:
                 self.repo.create_remote("origin", url)
         except Exception as e:
             raise GitOperationError(f"Failed to set remote: {e}")
+
+    def fetch(self) -> None:
+        """Fetch from origin remote."""
+        if not self.has_remote():
+            raise GitOperationError("No remote configured. Use 'dot-man remote set <url>' first.")
+        try:
+            self.repo.remotes.origin.fetch()
+        except Exception as e:
+            raise GitOperationError(f"Failed to fetch: {e}")
+
+    def pull(self, rebase: bool = True) -> str:
+        """Pull from origin remote.
+        
+        Returns:
+            Summary message of what happened.
+        """
+        if not self.has_remote():
+            raise GitOperationError("No remote configured. Use 'dot-man remote set <url>' first.")
+        try:
+            current = self.current_branch()
+            # Check if remote branch exists
+            remote_refs = [ref.name for ref in self.repo.remotes.origin.refs]
+            remote_branch = f"origin/{current}"
+            
+            if remote_branch not in remote_refs:
+                return f"Remote branch '{current}' not found. Nothing to pull."
+            
+            if rebase:
+                result = self.repo.git.pull("--rebase", "origin", current)
+            else:
+                result = self.repo.git.pull("origin", current)
+            return result if result else "Already up to date."
+        except GitCommandError as e:
+            if "CONFLICT" in str(e.stdout) or "conflict" in str(e.stderr):
+                raise GitOperationError(
+                    "Merge conflict detected. Please resolve conflicts in:\n"
+                    f"  {self._repo_path}\n"
+                    "Then run 'git rebase --continue' or 'git rebase --abort'"
+                )
+            raise GitOperationError(f"Failed to pull: {e.stderr}")
+        except Exception as e:
+            raise GitOperationError(f"Failed to pull: {e}")
+
+    def push(self, set_upstream: bool = True) -> str:
+        """Push to origin remote.
+        
+        Returns:
+            Summary message of what happened.
+        """
+        if not self.has_remote():
+            raise GitOperationError("No remote configured. Use 'dot-man remote set <url>' first.")
+        try:
+            current = self.current_branch()
+            if set_upstream:
+                result = self.repo.git.push("-u", "origin", current)
+            else:
+                result = self.repo.git.push("origin", current)
+            return result if result else "Pushed successfully."
+        except GitCommandError as e:
+            if "rejected" in str(e.stderr):
+                raise GitOperationError(
+                    "Push rejected. Remote has changes. Run 'dot-man sync' to pull first."
+                )
+            raise GitOperationError(f"Failed to push: {e.stderr}")
+        except Exception as e:
+            raise GitOperationError(f"Failed to push: {e}")
+
+    def get_branch_stats(self, branch_name: str) -> dict:
+        """Get stats for a specific branch.
+        
+        Returns:
+            Dictionary with: commit_count, last_commit_date, last_commit_msg, file_count
+        """
+        try:
+            branch = self.repo.heads[branch_name]
+            commits = list(self.repo.iter_commits(branch, max_count=100))
+            
+            last_commit = commits[0] if commits else None
+            
+            # Count files in branch
+            tree = branch.commit.tree
+            file_count = sum(1 for _ in tree.traverse() if _.type == 'blob')
+            
+            return {
+                "commit_count": len(commits),
+                "last_commit_date": last_commit.committed_datetime.strftime("%Y-%m-%d %H:%M") if last_commit else "N/A",
+                "last_commit_msg": last_commit.message.strip().split("\n")[0][:50] if last_commit else "N/A",
+                "file_count": file_count,
+            }
+        except Exception:
+            return {
+                "commit_count": 0,
+                "last_commit_date": "N/A",
+                "last_commit_msg": "N/A",
+                "file_count": 0,
+            }
+
+    def get_sync_status(self) -> dict:
+        """Get sync status with remote.
+        
+        Returns:
+            Dictionary with: ahead, behind, remote_configured
+        """
+        if not self.has_remote():
+            return {"ahead": 0, "behind": 0, "remote_configured": False}
+        
+        try:
+            self.fetch()
+            current = self.current_branch()
+            remote_branch = f"origin/{current}"
+            
+            # Check if remote branch exists
+            remote_refs = [ref.name for ref in self.repo.remotes.origin.refs]
+            if remote_branch not in remote_refs:
+                return {"ahead": 0, "behind": 0, "remote_configured": True, "remote_branch_exists": False}
+            
+            # Count ahead/behind
+            ahead = len(list(self.repo.iter_commits(f"{remote_branch}..{current}")))
+            behind = len(list(self.repo.iter_commits(f"{current}..{remote_branch}")))
+            
+            return {
+                "ahead": ahead,
+                "behind": behind,
+                "remote_configured": True,
+                "remote_branch_exists": True,
+            }
+        except Exception:
+            return {"ahead": 0, "behind": 0, "remote_configured": True, "error": True}
+
