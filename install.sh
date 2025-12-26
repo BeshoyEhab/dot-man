@@ -19,7 +19,7 @@ print_error() { echo -e "${RED}✗${NC} $1"; }
 print_info() { echo -e "${CYAN}→${NC} $1"; }
 
 # Default install locations
-INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
+INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/share/bin}"
 COMPLETIONS_BASH="${COMPLETIONS_BASH:-$HOME/.local/share/bash-completion/completions}"
 COMPLETIONS_ZSH="${COMPLETIONS_ZSH:-$HOME/.local/share/zsh/site-functions}"
 COMPLETIONS_FISH="${COMPLETIONS_FISH:-$HOME/.config/fish/completions}"
