@@ -67,10 +67,12 @@ pytest tests/test_core.py
 ```
 dot-man/
 ├── dot_man/              # Source code
-│   ├── __init__.py
-│   ├── cli.py            # Entry point and Click commands
+│   ├── __init__.py       # Package version
+│   ├── cli.py            # Click commands (~1200 lines)
+│   ├── tui.py            # Interactive TUI (textual)
 │   ├── core.py           # Git operations and core logic
 │   ├── config.py         # Configuration parsing (INI)
+│   ├── constants.py      # Paths, defaults, patterns
 │   ├── files.py          # File operations (copy, move)
 │   ├── secrets.py        # Secret detection logic
 │   ├── utils.py          # Helper functions
@@ -78,16 +80,18 @@ dot-man/
 │
 ├── tests/                # Test suite
 │   ├── conftest.py       # Pytest fixtures
-│   ├── test_cli.py
-│   ├── test_core.py
-│   └── ...
+│   └── test_core.py      # Core module tests
 │
 ├── docs/                 # Documentation
-│   ├── specs/            # Detailed specifications
-│   └── roadmap.md        # Project roadmap
+│   ├── roadmap.md        # Project roadmap
+│   └── specs/            # Detailed specifications
+│       ├── commands.md   # Command specifications
+│       └── security.md   # Security specifications
 │
 ├── README.md             # User-facing overview
+├── CONTRIBUTING.md       # Contributor guidelines
 ├── DEVELOPMENT.md        # This file
+├── CHANGELOG.md          # Version history
 └── pyproject.toml        # Project metadata and dependencies
 ```
 

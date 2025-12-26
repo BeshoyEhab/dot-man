@@ -27,7 +27,8 @@ pytest tests/ -v
 dot-man/
 ├── dot_man/              # Main package
 │   ├── __init__.py       # Package version
-│   ├── cli.py            # Click commands (740 lines)
+│   ├── cli.py            # Click commands (~1200 lines)
+│   ├── tui.py            # Interactive TUI (textual)
 │   ├── core.py           # Git operations wrapper
 │   ├── config.py         # INI file parsing
 │   ├── secrets.py        # Secret detection patterns
