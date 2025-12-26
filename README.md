@@ -172,6 +172,38 @@ dot-man switch main  # Saves work, deploys main
 | `dot-man repo`  | Print repository path for direct access      |
 | `dot-man shell` | Open a shell in the repository directory     |
 
+### Interactive TUI
+
+Launch with `dot-man tui` for a visual dashboard:
+
+```
+┌─ dot-man ───────────────────────────────────────────────────┐
+│  Branches     │  Switch Preview      │  Files (3)           │
+│  ✓ main       │  Switch: main → work │  ~/.bashrc    ✓      │
+│    work       │  Actions:            │  ~/.gitconfig ✓      │
+│    server     │  1. Save to 'main'   │  ~/.vimrc     modified│
+│               │  2. Deploy 'work'    │                      │
+└───────────────────────────────────────────────────────────────┘
+```
+
+**Keybindings:**
+
+| Key     | Action                              |
+| ------- | ----------------------------------- |
+| `Enter` | Switch to selected branch           |
+| `c`     | Open command palette (all commands) |
+| `s`     | Sync with remote                    |
+| `d`     | Deploy selected branch              |
+| `e`     | Edit config file                    |
+| `a`     | Run security audit                  |
+| `r`     | Refresh display                     |
+| `?`     | Show help                           |
+| `q`     | Quit                                |
+
+**Command Palette** (`c` key): Search and execute any dot-man command:
+
+- `status`, `audit`, `branch list`, `remote get/set`, `sync`, `setup`, `repo`
+
 ### Options
 
 ```bash

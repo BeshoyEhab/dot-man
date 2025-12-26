@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Remote Sync**: `dot-man sync` command to push/pull dotfiles with remote repository
 - **Remote Management**: `dot-man remote set/get` commands for configuring remote URL
 - **Interactive TUI**: `dot-man tui` for visual branch management (optional, install with `[tui]` extra)
+- **TUI Command Palette**: Press `c` in TUI to access all commands with search/filter
+- **TUI Quick Keys**: `e` (edit), `a` (audit), `?` (help) for fast access
 - **Setup Wizard**: `dot-man setup` guides you through GitHub repo creation (supports `gh` CLI)
 - **Repo Access**: `dot-man repo` shows repo path, `dot-man shell` opens shell in repo directory
 

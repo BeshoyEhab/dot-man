@@ -1000,9 +1000,13 @@ def tui():
     
     Keys:
         Enter - Switch to selected branch
+        c     - Open command palette
         s     - Sync with remote
         d     - Deploy selected branch
+        e     - Edit config file
+        a     - Run security audit
         r     - Refresh
+        ?     - Show help
         q     - Quit
     
     Requires: pip install dot-man[tui]
@@ -1022,19 +1026,26 @@ def tui():
         result = run_tui()
         
         if result:
-            action, branch = result
+            action, data = result
             
-            if action == "switch" and branch:
+            if action == "switch" and data:
                 ctx = click.Context(switch)
-                ctx.invoke(switch, branch=branch, dry_run=False, force=True)
+                ctx.invoke(switch, branch=data, dry_run=False, force=True)
                 
             elif action == "sync":
                 ctx = click.Context(sync)
                 ctx.invoke(sync, push_only=False, pull_only=False)
                 
-            elif action == "deploy" and branch:
+            elif action == "deploy" and data:
                 ctx = click.Context(deploy)
-                ctx.invoke(deploy, branch=branch, force=True, dry_run=False)
+                ctx.invoke(deploy, branch=data, force=True, dry_run=False)
+                
+            elif action == "run" and data:
+                # Run arbitrary dot-man command
+                subprocess.run(
+                    [sys.executable, "-m", "dot_man.cli"] + data,
+                    check=False
+                )
                 
     except DotManError as e:
         error(str(e), e.exit_code)
