@@ -1138,6 +1138,46 @@ def setup():
 
 
 # ============================================================================
+# repo Command
+# ============================================================================
+
+
+@main.command()
+@require_init
+def repo():
+    """Show the repository path for direct git access.
+    
+    Use this to run git commands directly in the dot-man repository.
+    
+    Example:
+        cd $(dot-man repo)
+        git remote add origin <url>
+    """
+    console.print(str(REPO_DIR))
+
+
+@main.command()
+@require_init  
+def shell():
+    """Open a shell in the repository directory.
+    
+    Useful for running git commands directly.
+    """
+    import os
+    
+    console.print(f"Opening shell in [cyan]{REPO_DIR}[/cyan]")
+    console.print("[dim]Type 'exit' to return[/dim]")
+    console.print()
+    
+    # Get user's shell
+    user_shell = os.environ.get("SHELL", "/bin/bash")
+    
+    # Change to repo dir and exec shell
+    os.chdir(REPO_DIR)
+    os.execlp(user_shell, user_shell)
+
+
+# ============================================================================
 # Entry Point
 # ============================================================================
 

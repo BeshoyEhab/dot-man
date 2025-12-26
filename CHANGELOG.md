@@ -5,6 +5,21 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2025-12-26
+
+### Added
+
+- **Remote Sync**: `dot-man sync` command to push/pull dotfiles with remote repository
+- **Remote Management**: `dot-man remote set/get` commands for configuring remote URL
+- **Interactive TUI**: `dot-man tui` for visual branch management (optional, install with `[tui]` extra)
+- **Setup Wizard**: `dot-man setup` guides you through GitHub repo creation (supports `gh` CLI)
+- **Repo Access**: `dot-man repo` shows repo path, `dot-man shell` opens shell in repo directory
+
+### Changed
+
+- TUI is now an optional dependency (install with `pip install dot-man[tui]`)
+- TUI now shows files with dirty status, switch preview, and actions
+
 ## [0.2.0] - 2025-12-26
 
 ### Added
