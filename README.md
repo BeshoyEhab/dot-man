@@ -34,6 +34,9 @@ dot-man audit --strict
 - 🌿 **Git-powered branching** - Each config is a branch, easy to sync
 - 🔐 **Secret detection** - Automatically redacts API keys, passwords, tokens
 - 🔄 **Save & deploy** - One command to save current state and switch configs
+- ☁️ **Remote sync** - Push/pull dotfiles across machines with `dot-man sync`
+- 🖥️ **Interactive TUI** - Visual dashboard for branch management (optional)
+- ⚡ **Pre/Post hooks** - Run commands before/after deploying (e.g., reload config)
 - 📝 **Edit in place** - Opens your `$EDITOR` for quick changes
 - 🛡️ **Dry-run mode** - Preview changes before making them
 - 🐚 **Shell completions** - Bash, Zsh, and Fish support
@@ -134,22 +137,48 @@ dot-man switch main  # Saves work, deploys main
 
 ## Commands
 
-| Command                        | Description                                   |
-| ------------------------------ | --------------------------------------------- |
-| `dot-man init`                 | Initialize repository at `~/.config/dot-man/` |
-| `dot-man status`               | Show tracked files and their status           |
-| `dot-man switch <branch>`      | Save current config, switch to branch, deploy |
-| `dot-man edit`                 | Open `dot-man.ini` in your editor             |
-| `dot-man deploy <branch>`      | One-way deploy (for new machines)             |
-| `dot-man audit`                | Scan repository for secrets                   |
-| `dot-man branch list`          | List all configuration branches               |
-| `dot-man branch delete <name>` | Delete a branch                               |
+### Core Commands
+
+| Command                   | Description                                   |
+| ------------------------- | --------------------------------------------- |
+| `dot-man init`            | Initialize repository at `~/.config/dot-man/` |
+| `dot-man status`          | Show tracked files and their status           |
+| `dot-man switch <branch>` | Save current config, switch to branch, deploy |
+| `dot-man edit`            | Open `dot-man.ini` in your editor             |
+| `dot-man deploy <branch>` | One-way deploy (for new machines)             |
+| `dot-man audit`           | Scan repository for secrets                   |
+
+### Remote & Sync
+
+| Command                    | Description                                    |
+| -------------------------- | ---------------------------------------------- |
+| `dot-man sync`             | Push/pull dotfiles with remote repository      |
+| `dot-man remote set <url>` | Set remote repository URL                      |
+| `dot-man remote get`       | Show current remote URL                        |
+| `dot-man setup`            | Guided setup for GitHub remote (supports `gh`) |
+
+### Branch Management
+
+| Command                        | Description                           |
+| ------------------------------ | ------------------------------------- |
+| `dot-man branch list`          | List all configuration branches       |
+| `dot-man branch delete <name>` | Delete a branch (prompts if unmerged) |
+
+### Utilities
+
+| Command         | Description                                  |
+| --------------- | -------------------------------------------- |
+| `dot-man tui`   | Interactive TUI dashboard (requires `[tui]`) |
+| `dot-man repo`  | Print repository path for direct access      |
+| `dot-man shell` | Open a shell in the repository directory     |
 
 ### Options
 
 ```bash
 dot-man switch work --dry-run   # Preview without changes
 dot-man switch work --force     # Skip confirmation
+dot-man sync --push-only        # Only push, don't pull
+dot-man sync --pull-only        # Only pull, don't push
 dot-man audit --strict          # Exit with error if secrets found
 dot-man audit --fix             # Auto-redact detected secrets
 dot-man status --secrets        # Highlight files with secrets
