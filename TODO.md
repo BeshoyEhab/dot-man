@@ -103,3 +103,9 @@
 - [ ] Dotfile sharing/marketplace
 - [ ] CI/CD integration for dotfile testing
 - [ ] Cloud sync backends (S3, Dropbox, etc.)
+- [ ] Universal Setup Wizard (`dot-man setup` overhaul)
+  - [ ] Interactive menu: remote, dotfiles, secrets, hooks, completions
+  - [ ] Auto-scan and track common dotfile locations
+  - [ ] Import from existing repos (`--from github.com/user/dotfiles`)
+  - [ ] Health check mode (verify files, config, remote)
+  - [ ] Branch structure scaffolding (work/home/minimal)
