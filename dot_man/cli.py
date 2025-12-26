@@ -909,6 +909,13 @@ def remote_set(url: str):
     try:
         git = GitManager()
         git.set_remote(url)
+        
+        # Also save to global.conf
+        global_config = GlobalConfig()
+        global_config.load()
+        global_config.remote_url = url
+        global_config.save()
+        
         success(f"Remote set to: {url}")
     except DotManError as e:
         error(str(e), e.exit_code)
@@ -1101,6 +1108,15 @@ def setup():
                 )
                 
                 if result.returncode == 0:
+                    # Get the remote URL that gh configured
+                    remote_url = git.get_remote_url()
+                    if remote_url:
+                        # Save to global.conf
+                        global_config = GlobalConfig()
+                        global_config.load()
+                        global_config.remote_url = remote_url
+                        global_config.save()
+                    
                     success(f"Created and connected to GitHub repository: {repo_name}")
                     console.print()
                     console.print("You can now use [cyan]dot-man sync[/cyan] to sync your dotfiles!")
@@ -1136,6 +1152,13 @@ def setup():
     
     try:
         git.set_remote(url)
+        
+        # Also save to global.conf
+        global_config = GlobalConfig()
+        global_config.load()
+        global_config.remote_url = url
+        global_config.save()
+        
         success(f"Remote set to: {url}")
         
         if confirm("Push current dotfiles to remote?"):

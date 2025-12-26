@@ -71,6 +71,13 @@ class GlobalConfig:
         """Get the remote URL."""
         return self._config.get("remote", "url", fallback="")
 
+    @remote_url.setter
+    def remote_url(self, value: str) -> None:
+        """Set the remote URL."""
+        if "remote" not in self._config:
+            self._config["remote"] = {}
+        self._config["remote"]["url"] = value
+
     @property
     def secrets_filter_enabled(self) -> bool:
         """Check if secrets filter is enabled."""

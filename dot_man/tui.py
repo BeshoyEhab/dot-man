@@ -272,9 +272,12 @@ class CommandPalette(ModalScreen):
             ))
     
     def _update_selection(self) -> None:
-        for i, item in enumerate(self.query(".command-item")):
+        items = list(self.query(".command-item"))
+        for i, item in enumerate(items):
             if i == self.selected_index:
                 item.add_class("selected")
+                # Scroll the selected item into view
+                item.scroll_visible()
             else:
                 item.remove_class("selected")
     

@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Remote URL Persistence**: `dot-man setup` and `dot-man remote set` now correctly save the remote URL to `global.conf`
+- **Install Script PATH**: `install.sh` now auto-detects the installation directory and offers to add it to your shell config (bash, zsh, fish)
+- **TUI Command Palette**: Selected command now scrolls into view when navigating with arrow keys
+
 ## [0.3.0] - 2025-12-26
 
 ### Added
