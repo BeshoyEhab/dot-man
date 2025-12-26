@@ -1,0 +1,37 @@
+[project]
+name = "dot-man"
+version = "0.3.0"
+description = "Dotfile manager with git-powered branching"
+
+[tasks.test]
+command = "python -m pytest tests/ -v"
+description = "Run tests"
+watch_dirs = ["dot_man/", "tests/"]
+
+[tasks.lint]
+command = "python -m black --check ."
+description = "Check code formatting"
+
+[tasks.format]
+command = "python -m black ."
+description = "Format code with black"
+
+[tasks.install]
+command = "pipx install . --force"
+description = "Install dot-man locally"
+
+[tasks.install-tui]
+command = "pipx install '.[tui]' --force"
+description = "Install dot-man with TUI"
+
+[tasks.dev]
+command = "pip install -e '.[dev,tui]'"
+description = "Install in development mode"
+
+[tasks.release]
+command = "git add -A && git commit -m 'chore: release' && git push"
+description = "Commit and push changes"
+
+[tasks.tag]
+command = "git tag v$(grep version pyproject.toml | cut -d'\"' -f2) && git push --tags"
+description = "Create and push version tag"
