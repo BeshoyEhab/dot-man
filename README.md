@@ -42,7 +42,19 @@ dot-man audit --strict
 
 ## Installation
 
-### Quick Install (Recommended)
+### With pipx (Recommended)
+
+```bash
+# Basic install
+pipx install git+https://github.com/BeshoyEhab/dot-man.git
+
+# With interactive TUI (recommended)
+pipx install "dot-man[tui]" --pip-args="git+https://github.com/BeshoyEhab/dot-man.git"
+# Or after basic install:
+pipx inject dot-man textual
+```
+
+### From Source
 
 ```bash
 git clone https://github.com/BeshoyEhab/dot-man.git
@@ -50,17 +62,20 @@ cd dot-man
 ./install.sh
 ```
 
-This installs dot-man to `~/.local/bin/` and sets up shell completions.
-
-### Manual Install
+### With pip
 
 ```bash
-pip install -e .
+pip install git+https://github.com/BeshoyEhab/dot-man.git
+
+# With TUI:
+pip install "git+https://github.com/BeshoyEhab/dot-man.git#egg=dot-man[tui]"
 ```
 
 ### Uninstall
 
 ```bash
+pipx uninstall dot-man
+# or
 ./uninstall.sh
 ```
 
