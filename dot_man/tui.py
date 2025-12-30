@@ -363,50 +363,84 @@ class HelpScreen(ModalScreen):
 
 
 class FilesPanel(Static):
-    """Widget to display tracked files and their status."""
+    """Widget to display tracked files and their status grouped by section."""
     
-    def update_files(self, sections: list, config: DotManConfig, current_branch: str):
+    def update_files(self, section_names: list, config, current_branch: str):
         table = Table(show_header=True, header_style="bold", expand=True, box=None)
-        table.add_column("File", style="cyan", no_wrap=True)
-        table.add_column("Status", justify="center", width=8)
-        table.add_column("Hooks", style="dim", width=10)
+        table.add_column("Section / Path", style="cyan", no_wrap=True)
+        table.add_column("Status", justify="center", width=10)
+        table.add_column("Hooks", style="dim", width=8)
         
-        for section_name in sections[:8]:  # Limit for space
+        total_paths = 0
+        shown_sections = 0
+        max_sections = 6
+        
+        for section_name in section_names:
+            if shown_sections >= max_sections:
+                break
+            
             try:
                 section = config.get_section(section_name)
-                local_path = section["local_path"]
-                repo_path = section["repo_path"]
+                paths = section.paths
+                total_paths += len(paths)
                 
-                # Determine status
-                if not local_path.exists():
-                    status = "[red]missing[/red]"
-                elif not repo_path.exists():
-                    status = "[yellow]new[/yellow]"
-                elif compare_files(local_path, repo_path):
-                    status = "[green]✓[/green]"
-                else:
-                    status = "[yellow]modified[/yellow]"
+                # Section header row
+                hooks_str = ""
+                if section.pre_deploy:
+                    hooks_str += "pre "
+                if section.post_deploy:
+                    hooks_str += "post"
                 
-                # Hooks
-                hooks = []
-                if section.get("pre_deploy"):
-                    hooks.append("pre")
-                if section.get("post_deploy"):
-                    hooks.append("post")
+                table.add_row(
+                    f"[bold magenta][{section_name}][/bold magenta]",
+                    "",
+                    hooks_str.strip() or "-"
+                )
                 
-                # Shorten path for display
-                display_path = str(local_path).replace(str(Path.home()), "~")
-                if len(display_path) > 30:
-                    display_path = "..." + display_path[-27:]
+                # Show paths under section (limit to 3 per section)
+                for i, local_path in enumerate(paths[:3]):
+                    # Icon based on type
+                    if local_path.is_dir():
+                        icon = "📁"
+                    elif local_path.is_file():
+                        icon = "📄"
+                    else:
+                        icon = "❓"
+                    
+                    # Get repo path
+                    repo_path = section.get_repo_path(local_path, config._repo_path)
+                    
+                    # Determine status
+                    if not local_path.exists():
+                        status = "[red]missing[/red]"
+                    elif not repo_path.exists():
+                        status = "[blue]new[/blue]"
+                    elif compare_files(local_path, repo_path):
+                        status = "[green]✓[/green]"
+                    else:
+                        status = "[yellow]modified[/yellow]"
+                    
+                    # Shorten path for display
+                    display_path = str(local_path).replace(str(Path.home()), "~")
+                    if len(display_path) > 28:
+                        display_path = "..." + display_path[-25:]
+                    
+                    table.add_row(f"  {icon} {display_path}", status, "")
                 
-                table.add_row(display_path, status, ", ".join(hooks) or "-")
+                if len(paths) > 3:
+                    table.add_row(f"  [dim]... +{len(paths) - 3} more[/dim]", "", "")
+                
+                shown_sections += 1
+                
             except Exception:
                 pass
         
-        if len(sections) > 8:
-            table.add_row(f"... +{len(sections) - 8} more", "", "")
+        remaining = len(section_names) - shown_sections
+        if remaining > 0:
+            table.add_row(f"[dim]... +{remaining} more sections[/dim]", "", "")
         
-        self.update(Panel(table, title=f"Files ({len(sections)})", border_style="magenta"))
+        title = f"Sections ({len(section_names)}) • Paths ({total_paths})"
+        self.update(Panel(table, title=title, border_style="magenta"))
 
 
 class SwitchPreview(Static):
@@ -432,8 +466,8 @@ class SwitchPreview(Static):
         text.append(f"'{to_branch}'\n", style="green")
         
         # Count hooks
-        pre_hooks = sum(1 for s in sections if config.get_section(s).get("pre_deploy"))
-        post_hooks = sum(1 for s in sections if config.get_section(s).get("post_deploy"))
+        pre_hooks = sum(1 for s in sections if config.get_section(s).pre_deploy)
+        post_hooks = sum(1 for s in sections if config.get_section(s).post_deploy)
         
         if pre_hooks or post_hooks:
             text.append("\nHooks:\n", style="bold")
@@ -448,10 +482,15 @@ class SwitchPreview(Static):
 
 
 class SyncStatus(Static):
-    """Widget to display sync status."""
+    """Widget to display sync status with optional audit badge."""
     
-    def update_status(self, status: dict):
+    def update_status(self, status: dict, audit_count: int = 0):
         text = Text()
+        
+        # Audit badge first if issues found
+        if audit_count > 0:
+            text.append(f"🔒 {audit_count} ", style="red bold")
+        
         if not status.get("remote_configured"):
             text.append("⚠ No remote\n", style="yellow")
             text.append("Use: remote set <url>", style="dim")
@@ -465,7 +504,9 @@ class SyncStatus(Static):
                     text.append(f"↑ {ahead} ", style="green")
                 if behind > 0:
                     text.append(f"↓ {behind}", style="yellow")
-        self.update(Panel(text, title="Sync", border_style="green"))
+        
+        title = "Sync" + (" • Audit" if audit_count > 0 else "")
+        self.update(Panel(text, title=title, border_style="green" if audit_count == 0 else "red"))
 
 
 class DotManApp(App):
@@ -519,10 +560,10 @@ class DotManApp(App):
         self.git = GitManager()
         self.global_config = GlobalConfig()
         self.global_config.load()
-        self.dotman_config = DotManConfig()
+        self.dotman_config = DotManConfig(global_config=self.global_config)
         self.dotman_config.load()
         self.current_branch = self.global_config.current_branch
-        self.sections = self.dotman_config.get_sections()
+        self.sections = self.dotman_config.get_section_names()
         
     def compose(self) -> ComposeResult:
         yield Header()
@@ -567,15 +608,106 @@ class DotManApp(App):
             table.move_cursor(row=idx)
             self._update_preview(self.current_branch)
     
-    def _update_files(self) -> None:
+    def _update_files(self, branch_name: str | None = None) -> None:
+        """Update files panel, optionally for a specific branch."""
         files_widget = self.query_one("#files-panel", FilesPanel)
-        files_widget.update_files(self.sections, self.dotman_config, self.current_branch)
+        
+        # For the current branch, use loaded config
+        if branch_name is None or branch_name == self.current_branch:
+            files_widget.update_files(self.sections, self.dotman_config, self.current_branch)
+        else:
+            # For other branches, read the config using git show
+            try:
+                from .constants import DOT_MAN_TOML, DOT_MAN_INI
+                import sys
+                if sys.version_info >= (3, 11):
+                    import tomllib
+                else:
+                    import tomli as tomllib
+                
+                # Try reading TOML config from the branch
+                config_content = self.git.get_file_from_branch(branch_name, DOT_MAN_TOML)
+                
+                if config_content is None:
+                    # Try old INI format
+                    config_content = self.git.get_file_from_branch(branch_name, DOT_MAN_INI)
+                    if config_content:
+                        # Parse INI and show sections
+                        import configparser
+                        config = configparser.ConfigParser()
+                        config.read_string(config_content)
+                        sections = [s for s in config.sections() if s != "DEFAULT"]
+                        
+                        table = Table(show_header=True, header_style="bold", expand=True, box=None)
+                        table.add_column("Section / Path", style="cyan", no_wrap=True)
+                        table.add_column("Status", justify="center", width=10)
+                        
+                        for section in sections[:8]:
+                            local_path = config.get(section, "local_path", fallback="")
+                            display_path = local_path.replace("~/", "")
+                            table.add_row(f"📁 {display_path}", "[dim]branch[/dim]")
+                        
+                        if len(sections) > 8:
+                            table.add_row(f"[dim]... +{len(sections) - 8} more[/dim]", "")
+                        
+                        files_widget.update(Panel(table, title=f"Files ({branch_name})", border_style="blue"))
+                        return
+                
+                if config_content:
+                    # Parse TOML config
+                    data = tomllib.loads(config_content)
+                    sections = [k for k in data.keys() if k != "templates"]
+                    
+                    table = Table(show_header=True, header_style="bold", expand=True, box=None)
+                    table.add_column("Section / Path", style="cyan", no_wrap=True)
+                    table.add_column("Tracked", justify="center", width=10)
+                    
+                    for section_name in sections[:8]:
+                        section_data = data.get(section_name, {})
+                        paths = section_data.get("paths", [])
+                        
+                        # Section header
+                        table.add_row(f"[bold magenta][{section_name}][/bold magenta]", f"{len(paths)} paths")
+                        
+                        # Show paths
+                        for path in paths[:3]:
+                            display = path.replace("~/.config/", "").replace("~/", "")
+                            table.add_row(f"  📁 {display}", "")
+                        
+                        if len(paths) > 3:
+                            table.add_row(f"  [dim]... +{len(paths) - 3} more[/dim]", "")
+                    
+                    if len(sections) > 8:
+                        table.add_row(f"[dim]... +{len(sections) - 8} more sections[/dim]", "")
+                    
+                    files_widget.update(Panel(table, title=f"Sections ({branch_name})", border_style="blue"))
+                else:
+                    files_widget.update(Panel(
+                        Text("No config file in this branch", style="dim"),
+                        title=f"Files ({branch_name})",
+                        border_style="dim"
+                    ))
+            except Exception as e:
+                files_widget.update(Panel(
+                    Text(f"Could not load branch config: {e}", style="red"),
+                    title="Files",
+                    border_style="red"
+                ))
     
     def _update_sync_status(self) -> None:
         sync_widget = self.query_one("#sync-status", SyncStatus)
         try:
             status = self.git.get_sync_status()
-            sync_widget.update_status(status)
+            # Get audit count for badge
+            audit_count = 0
+            try:
+                from .operations import get_operations
+                ops = get_operations()
+                audit_results = ops.audit()
+                audit_count = sum(len(matches) for _, matches in audit_results)
+            except Exception:
+                pass
+            sync_widget.update_status(status, audit_count)
         except Exception:
             sync_widget.update_status({"remote_configured": False})
     
@@ -592,6 +724,8 @@ class DotManApp(App):
         if event.row_key:
             branch_name = str(event.row_key.value)
             self._update_preview(branch_name)
+            # Update files panel to show that we can't preview other branch files
+            self._update_files(branch_name)
     
     def _run_command(self, args: list, title: str = "Command Output") -> None:
         """Run a dot-man command and show output in modal."""

@@ -60,24 +60,46 @@ def copy_file(
         return False, detected_secrets
 
 
+def matches_patterns(path: Path, patterns: list[str]) -> bool:
+    """Check if a path matches any of the given glob patterns."""
+    from fnmatch import fnmatch
+    
+    name = path.name
+    rel_str = str(path)
+    
+    for pattern in patterns:
+        # Match against filename
+        if fnmatch(name, pattern):
+            return True
+        # Match against relative path
+        if fnmatch(rel_str, pattern):
+            return True
+    return False
+
+
 def copy_directory(
     source: Path,
     destination: Path,
     filter_secrets_enabled: bool = True,
-    ignore_patterns: list[str] | None = None,
+    include_patterns: list[str] | None = None,
+    exclude_patterns: list[str] | None = None,
+    ignore_patterns: list[str] | None = None,  # Deprecated, use exclude_patterns
 ) -> tuple[int, int, list[SecretMatch]]:
-    """Copy a directory recursively.
+    """Copy a directory recursively with pattern filtering.
 
     Args:
         source: Source directory path
         destination: Destination directory path
         filter_secrets_enabled: Whether to filter secrets
-        ignore_patterns: File patterns to ignore
+        include_patterns: Only include files matching these patterns (if specified)
+        exclude_patterns: Exclude files matching these patterns
+        ignore_patterns: Deprecated alias for exclude_patterns
 
     Returns:
         Tuple of (files_copied, files_failed, detected_secrets)
     """
-    ignore_patterns = ignore_patterns or []
+    include_patterns = include_patterns or []
+    exclude_patterns = exclude_patterns or ignore_patterns or []
     files_copied = 0
     files_failed = 0
     all_secrets: list[SecretMatch] = []
@@ -86,9 +108,14 @@ def copy_directory(
         if src_path.is_dir():
             continue
 
-        # Check ignore patterns
         relative = src_path.relative_to(source)
-        if any(src_path.match(pattern) for pattern in ignore_patterns):
+        
+        # Check exclude patterns first
+        if exclude_patterns and matches_patterns(relative, exclude_patterns):
+            continue
+        
+        # Check include patterns (if specified, file must match at least one)
+        if include_patterns and not matches_patterns(relative, include_patterns):
             continue
 
         dest_path = destination / relative

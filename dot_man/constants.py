@@ -16,9 +16,15 @@ REPO_DIR = DOT_MAN_DIR / "repo"
 BACKUPS_DIR = DOT_MAN_DIR / "backups"
 
 # Global configuration file
+GLOBAL_TOML = DOT_MAN_DIR / "global.toml"
+
+# Legacy config file (for migration)
 GLOBAL_CONF = DOT_MAN_DIR / "global.conf"
 
 # Branch-specific configuration file (inside repo)
+DOT_MAN_TOML = "dot-man.toml"
+
+# Legacy config file (for migration)  
 DOT_MAN_INI = "dot-man.ini"
 
 # Template variables storage

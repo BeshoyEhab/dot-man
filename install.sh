@@ -29,7 +29,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo ""
 echo "╔══════════════════════════════════════╗"
-echo "║       dot-man Installer v0.1.0       ║"
+echo "║       dot-man Installer v0.4.0       ║"
 echo "╚══════════════════════════════════════╝"
 echo ""
 
@@ -162,11 +162,14 @@ cat > "$COMPLETIONS_FISH/dot-man.fish" << 'EOF'
 function __fish_dot_man_complete
     set -l response (env _DOT_MAN_COMPLETE=fish_complete COMP_WORDS=(commandline -cp) COMP_CWORD=(commandline -t) dot-man 2>/dev/null)
     for completion in $response
-        set -l metadata (string split "," -- $completion)
-        if test (count $metadata) -eq 1
-            echo $metadata[1]
-        else
-            echo -e "$metadata[1]\t$metadata[2]"
+        # Click outputs "type,value" - we only want the value
+        set -l parts (string split "," -- $completion)
+        if test (count $parts) -ge 2
+            # First part is type (plain, file, dir), second is value
+            echo $parts[2]
+        else if test (count $parts) -eq 1
+            # Just the value
+            echo $parts[1]
         end
     end
 end
@@ -181,10 +184,18 @@ complete -c dot-man -n "__fish_use_subcommand" -a "edit" -d "Edit config"
 complete -c dot-man -n "__fish_use_subcommand" -a "deploy" -d "Deploy branch"
 complete -c dot-man -n "__fish_use_subcommand" -a "audit" -d "Audit secrets"
 complete -c dot-man -n "__fish_use_subcommand" -a "branch" -d "Manage branches"
+complete -c dot-man -n "__fish_use_subcommand" -a "sync" -d "Sync with remote"
+complete -c dot-man -n "__fish_use_subcommand" -a "remote" -d "Manage remote"
+complete -c dot-man -n "__fish_use_subcommand" -a "add" -d "Add file to tracking"
+complete -c dot-man -n "__fish_use_subcommand" -a "tui" -d "Open TUI"
 
 # Branch subcommands
 complete -c dot-man -n "__fish_seen_subcommand_from branch" -a "list" -d "List branches"
 complete -c dot-man -n "__fish_seen_subcommand_from branch" -a "delete" -d "Delete branch"
+
+# Remote subcommands
+complete -c dot-man -n "__fish_seen_subcommand_from remote" -a "get" -d "Get remote URL"
+complete -c dot-man -n "__fish_seen_subcommand_from remote" -a "set" -d "Set remote URL"
 
 # Options
 complete -c dot-man -l help -d "Show help"

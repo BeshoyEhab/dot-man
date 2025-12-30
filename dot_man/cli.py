@@ -143,12 +143,134 @@ def init(force: bool):
         console.print()
         console.print("[dim]Next steps:[/dim]")
         console.print("  1. Edit configuration: [cyan]dot-man edit[/cyan]")
-        console.print("  2. Add your dotfiles to dot-man.ini")
+        console.print("  2. Add your dotfiles to dot-man.toml")
         console.print("  3. Save configuration: [cyan]dot-man switch main[/cyan]")
         console.print("  4. View status: [cyan]dot-man status[/cyan]")
 
     except Exception as e:
         error(f"Initialization failed: {e}")
+
+
+# ============================================================================
+# add Command
+# ============================================================================
+
+
+@main.command()
+@click.argument("path", type=click.Path(exists=True))
+@click.option("--section", "-s", help="Section name (default: auto-generated from path)")
+@click.option("--repo-base", "-r", help="Base directory in repo (default: section name)")
+@click.option("--exclude", "-e", multiple=True, help="Patterns to exclude (can be specified multiple times)")
+@click.option("--include", "-i", multiple=True, help="Patterns to include (can be specified multiple times)")
+@click.option("--inherits", "-t", multiple=True, help="Templates to inherit from (can be specified multiple times)")
+@click.option("--post-deploy", help="Command to run after deploying")
+@click.option("--pre-deploy", help="Command to run before deploying")
+@require_init
+def add(
+    path: str,
+    section: str | None,
+    repo_base: str | None,
+    exclude: tuple,
+    include: tuple,
+    inherits: tuple,
+    post_deploy: str | None,
+    pre_deploy: str | None,
+):
+    """Add a file or directory to be tracked.
+
+    Adds the specified path to the dot-man.toml configuration and copies
+    the content to the repository.
+
+    Examples:
+        dot-man add ~/.bashrc
+        dot-man add ~/.config/fish --section fish --exclude "*.log"
+        dot-man add ~/.config/hypr --inherits linux-gui --post-deploy "hyprctl reload"
+    """
+    try:
+        from .files import copy_file, copy_directory
+        
+        local_path = Path(path).expanduser().resolve()
+        
+        # Auto-generate section name if not provided
+        if not section:
+            # Use parent dir name for config dirs, or filename for single files
+            if local_path.is_dir() and str(local_path).startswith(str(Path.home() / ".config")):
+                section = local_path.name
+            else:
+                section = local_path.stem or local_path.name
+        
+        repo_base = repo_base or section
+        
+        # Load config
+        global_config = GlobalConfig()
+        global_config.load()
+        
+        dotman_config = DotManConfig(global_config=global_config)
+        try:
+            dotman_config.load()
+        except Exception:
+            # Config might not exist yet, create it
+            dotman_config.create_default()
+            dotman_config.load()
+        
+        # Check for duplicates
+        existing_sections = dotman_config.get_section_names()
+        if section in existing_sections:
+            error(f"Section '{section}' already exists. Use a different --section name.")
+        
+        # Add section to config
+        dotman_config.add_section(
+            name=section,
+            paths=[str(local_path)],
+            repo_base=repo_base,
+            exclude=list(exclude) if exclude else None,
+            include=list(include) if include else None,
+            inherits=list(inherits) if inherits else None,
+            post_deploy=post_deploy,
+            pre_deploy=pre_deploy,
+        )
+        dotman_config.save()
+        
+        # Copy content to repo
+        repo_dest = REPO_DIR / repo_base
+        
+        if local_path.is_file():
+            repo_dest = repo_dest / local_path.name
+            success_copy, secrets = copy_file(local_path, repo_dest, filter_secrets_enabled=True)
+            if success_copy:
+                success(f"Added file: {local_path}")
+                console.print(f"  Section: [cyan][{section}][/cyan]")
+                console.print(f"  Repo path: [dim]{repo_dest}[/dim]")
+                if secrets:
+                    warn(f"{len(secrets)} secrets were redacted")
+            else:
+                error(f"Failed to copy file: {local_path}")
+        else:
+            copied, failed, secrets = copy_directory(
+                local_path, 
+                repo_dest,
+                filter_secrets_enabled=True,
+                exclude_patterns=list(exclude) if exclude else None,
+                include_patterns=list(include) if include else None,
+            )
+            success(f"Added directory: {local_path}")
+            console.print(f"  Section: [cyan][{section}][/cyan]")
+            console.print(f"  Repo path: [dim]{repo_dest}[/dim]")
+            console.print(f"  Files: {copied} copied, {failed} failed")
+            if secrets:
+                warn(f"{len(secrets)} secrets were redacted")
+        
+        # Show info about templates
+        if inherits:
+            console.print(f"  Inherits: {', '.join(inherits)}")
+        
+        console.print()
+        console.print("[dim]Run 'dot-man switch <branch>' to commit changes.[/dim]")
+        
+    except DotManError as e:
+        error(str(e), e.exit_code)
+    except Exception as e:
+        error(f"Failed to add: {e}")
 
 
 # ============================================================================
@@ -167,18 +289,13 @@ def status(verbose: bool, secrets: bool):
     that would be saved on the next switch.
     """
     try:
-        # Load configurations
-        global_config = GlobalConfig()
-        global_config.load()
-
-        dotman_config = DotManConfig()
-        dotman_config.load()
-
-        git = GitManager()
-
+        from .operations import get_operations
+        
+        ops = get_operations()
+        
         # Repository info panel
-        branch = global_config.current_branch
-        remote = global_config.remote_url or "[dim]Not configured[/dim]"
+        branch = ops.current_branch
+        remote = ops.global_config.remote_url or "[dim]Not configured[/dim]"
 
         info_table = Table(show_header=False, box=None, padding=(0, 2))
         info_table.add_column(style="cyan")
@@ -190,14 +307,16 @@ def status(verbose: bool, secrets: bool):
         console.print(Panel(info_table, title="[bold]Repository Status[/bold]", border_style="blue"))
         console.print()
 
-        # File status table
-        sections = dotman_config.get_sections()
-        if not sections:
-            console.print("[dim]No files tracked. Run 'dot-man edit' to add files.[/dim]")
+        # Get status summary
+        summary = ops.get_status_summary()
+        
+        section_names = ops.get_sections()
+        if not section_names:
+            console.print("[dim]No sections tracked. Run 'dot-man add <path>' to add files.[/dim]")
             return
 
-        file_table = Table(title="Tracked Files")
-        file_table.add_column("File", style="cyan")
+        file_table = Table(title=f"Tracked Sections ({len(section_names)})")
+        file_table.add_column("Section / Path", style="cyan")
         file_table.add_column("Status")
         file_table.add_column("Details", style="dim")
 
@@ -211,34 +330,60 @@ def status(verbose: bool, secrets: bool):
         scanner = SecretScanner() if secrets else None
         secrets_found = []
 
-        for section_name in sections:
-            section = dotman_config.get_section(section_name)
-            local_path = section["local_path"]
-            repo_path = section["repo_path"]
-
-            file_status = get_file_status(local_path, repo_path)
-            color = status_colors.get(file_status, "white")
-
-            details = ""
-            if file_status == "MODIFIED" and verbose:
-                # Could show line diff here
-                details = "Content differs"
-
-            # Check for secrets
-            secret_indicator = ""
-            if secrets and local_path.exists() and local_path.is_file():
-                matches = list(scanner.scan_file(local_path))
-                if matches:
-                    secret_indicator = " [red]🔒[/red]"
-                    secrets_found.extend(matches)
-
+        for section_name in section_names[:10]:  # Limit display
+            section = ops.get_section(section_name)
+            
+            # Section header
             file_table.add_row(
-                str(local_path) + secret_indicator,
-                f"[{color}]{file_status}[/{color}]",
-                details,
+                f"[bold magenta][{section_name}][/bold magenta]",
+                "",
+                f"inherits: {', '.join(section.inherits)}" if section.inherits else ""
             )
+            
+            # Files under section
+            path_count = 0
+            for local_path, repo_path, file_status in ops.iter_section_paths(section):
+                if path_count >= 5:  # Limit per section
+                    file_table.add_row("  [dim]... more files[/dim]", "", "")
+                    break
+                
+                color = status_colors.get(file_status, "white")
+                
+                # Icon
+                icon = "📁" if local_path.is_dir() else "📄"
+                
+                # Shorten path
+                display_path = str(local_path).replace(str(Path.home()), "~")
+                if len(display_path) > 35:
+                    display_path = "..." + display_path[-32:]
+                
+                details = ""
+                if file_status == "MODIFIED" and verbose:
+                    details = "Content differs"
+
+                # Check for secrets
+                secret_indicator = ""
+                if secrets and local_path.exists() and local_path.is_file():
+                    matches = list(scanner.scan_file(local_path))
+                    if matches:
+                        secret_indicator = " [red]🔒[/red]"
+                        secrets_found.extend(matches)
+
+                file_table.add_row(
+                    f"  {icon} {display_path}{secret_indicator}",
+                    f"[{color}]{file_status}[/{color}]",
+                    details,
+                )
+                path_count += 1
+
+        if len(section_names) > 10:
+            file_table.add_row(f"[dim]... +{len(section_names) - 10} more sections[/dim]", "", "")
 
         console.print(file_table)
+
+        # Summary
+        console.print()
+        console.print(f"[dim]Summary: {summary['modified']} modified, {summary['new']} new, {summary['deleted']} deleted, {summary['identical']} identical[/dim]")
 
         # Secrets warning
         if secrets_found:
@@ -246,7 +391,7 @@ def status(verbose: bool, secrets: bool):
             warn(f"{len(secrets_found)} potential secrets detected. Run 'dot-man audit' for details.")
 
         # Git status
-        if git.is_dirty():
+        if ops.git.is_dirty():
             console.print()
             console.print("[yellow]Repository has uncommitted changes.[/yellow]")
 
@@ -275,15 +420,10 @@ def switch(branch: str, dry_run: bool, force: bool):
     Example: dot-man switch work
     """
     try:
-        global_config = GlobalConfig()
-        global_config.load()
-
-        dotman_config = DotManConfig()
-        dotman_config.load()
-
-        git = GitManager()
-
-        current_branch = global_config.current_branch
+        from .operations import get_operations
+        
+        ops = get_operations()
+        current_branch = ops.current_branch
 
         # Check if already on target branch
         if current_branch == branch and not dry_run:
@@ -297,151 +437,106 @@ def switch(branch: str, dry_run: bool, force: bool):
         # Phase 1: Save current branch state
         console.print(f"[bold]Phase 1:[/bold] Saving current branch '{current_branch}'...")
 
-        sections = dotman_config.get_sections()
-        saved_count = 0
-        secrets_detected = []
-
-        for section_name in sections:
-            section = dotman_config.get_section(section_name)
-            local_path = section["local_path"]
-            repo_path = section["repo_path"]
-            filter_secrets = section.get("secrets_filter", True)
-
-            if not local_path.exists():
-                if repo_path.exists() and not dry_run:
-                    # File deleted locally - remove from repo
-                    repo_path.unlink()
-                continue
-
-            if dry_run:
-                file_status = get_file_status(local_path, repo_path)
-                console.print(f"  Would save: {local_path} [{file_status}]")
-            else:
-                success_copy, secrets = copy_file(local_path, repo_path, filter_secrets)
-                if success_copy:
-                    saved_count += 1
-                secrets_detected.extend(secrets)
-
-        if secrets_detected:
-            warn(f"{len(secrets_detected)} secrets were redacted during save")
-
-        if not dry_run:
-            # Commit changes
+        if dry_run:
+            # Show what would be saved
+            for section_name in ops.get_sections():
+                section = ops.get_section(section_name)
+                for local_path, repo_path, status in ops.iter_section_paths(section):
+                    if status != "IDENTICAL":
+                        console.print(f"  Would save: {local_path} [{status}]")
+        else:
+            saved_count, secrets = ops.save_all()
+            if secrets:
+                warn(f"{len(secrets)} secrets were redacted during save")
+            
+            # Commit
             commit_msg = f"Auto-save from '{current_branch}' before switch to '{branch}'"
-            commit_sha = git.commit(commit_msg)
+            commit_sha = ops.git.commit(commit_msg)
             if commit_sha:
                 console.print(f"  Committed: [dim]{commit_sha[:7]}[/dim]")
+            console.print(f"  Saved {saved_count} files")
 
         # Phase 2: Switch branch
         console.print()
         console.print(f"[bold]Phase 2:[/bold] Switching to branch '{branch}'...")
 
-        branch_exists = git.branch_exists(branch)
+        branch_exists = ops.git.branch_exists(branch)
         if dry_run:
             if branch_exists:
                 console.print(f"  Would checkout existing branch: {branch}")
             else:
                 console.print(f"  Would create new branch: {branch}")
         else:
-            git.checkout(branch, create=not branch_exists)
-
+            ops.git.checkout(branch, create=not branch_exists)
+            
             if not branch_exists:
                 console.print(f"  Created new branch: [cyan]{branch}[/cyan]")
+            
+            # Reload config for new branch (IMPORTANT for per-branch configs)
+            ops.reload_config()
 
         # Phase 3: Deploy new branch files
         console.print()
         console.print(f"[bold]Phase 3:[/bold] Deploying '{branch}' configuration...")
 
-        # Reload config for new branch
-        if not dry_run:
-            dotman_config.load()
-
-        deployed_count = 0
-        pre_deploy_cmds = []
-        post_deploy_cmds = []
-        sections_to_deploy = []
-
-        # Pass 1: Analyze changes and collect hooks
-        for section_name in dotman_config.get_sections():
-            section = dotman_config.get_section(section_name)
-            local_path = section["local_path"]
-            repo_path = section["repo_path"]
-            strategy = section.get("update_strategy", "replace")
-            post_deploy = section.get("post_deploy")
-            pre_deploy = section.get("pre_deploy")
-
-            if not repo_path.exists():
-                continue
-
-            # Check if file will change
-            will_change = not local_path.exists() or not compare_files(repo_path, local_path)
+        if dry_run:
+            # Show what would be deployed
+            for section_name in ops.get_sections():
+                section = ops.get_section(section_name)
+                for local_path, repo_path, _ in ops.iter_section_paths(section):
+                    if repo_path.exists():
+                        will_change = not local_path.exists() or not compare_files(repo_path, local_path)
+                        console.print(f"  Would deploy: {local_path}")
+                        if will_change:
+                            if section.pre_deploy:
+                                console.print(f"    [dim]Pre-hook:[/dim] {section.pre_deploy}")
+                            if section.post_deploy:
+                                console.print(f"    [dim]Post-hook:[/dim] {section.post_deploy}")
+                        else:
+                            console.print("    [dim](No changes needed)[/dim]")
+        else:
+            # Collect hooks
+            pre_hooks: list[str] = []
+            post_hooks: list[str] = []
             
-            if will_change:
-                if pre_deploy:
-                    pre_deploy_cmds.append(pre_deploy)
-                if post_deploy:
-                    post_deploy_cmds.append(post_deploy)
+            for section_name in ops.get_sections():
+                section = ops.get_section(section_name)
+                for local_path in section.paths:
+                    repo_path = section.get_repo_path(local_path, REPO_DIR)
+                    if repo_path.exists():
+                        will_change = not local_path.exists() or not compare_files(repo_path, local_path)
+                        if will_change:
+                            if section.pre_deploy:
+                                pre_hooks.append(section.pre_deploy)
+                            if section.post_deploy:
+                                post_hooks.append(section.post_deploy)
             
-            sections_to_deploy.append((section, will_change))
-
-        # Run pre-deploy hooks
-        if not dry_run and pre_deploy_cmds:
-            console.print()
-            console.print("[bold]Running pre-deploy hooks...[/bold]")
-            unique_pre_cmds = list(dict.fromkeys(pre_deploy_cmds))
-            for cmd in unique_pre_cmds:
-                console.print(f"  Exec: [cyan]{cmd}[/cyan]")
-                try:
-                    subprocess.run(cmd, shell=True, check=False)
-                except Exception as e:
-                    warn(f"Failed to run command '{cmd}': {e}")
-            console.print()
-
-        # Pass 2: Deploy files
-        for section, will_change in sections_to_deploy:
-            local_path = section["local_path"]
-            repo_path = section["repo_path"]
-            strategy = section.get("update_strategy", "replace")
-            post_deploy = section.get("post_deploy")
-            pre_deploy = section.get("pre_deploy")
-
-            if dry_run:
-                console.print(f"  Would deploy: {repo_path} -> {local_path}")
-                if will_change:
-                    if pre_deploy:
-                        console.print(f"    [dim]Pre-hook:[/dim]  {pre_deploy}")
-                    if post_deploy:
-                        console.print(f"    [dim]Post-hook:[/dim] {post_deploy}")
-                else:
-                    console.print("    [dim](No changes needed)[/dim]")
-            else:
-                if not will_change:
-                     # Optimization: Skip copy if identical
-                     console.print(f"  [dim]-[/dim] {local_path} (unchanged)")
-                     deployed_count += 1
-                     continue
-
-                if strategy == "rename_old" and local_path.exists():
-                    backup_file(local_path)
-
-                if strategy != "ignore":
-                    success_copy, _ = copy_file(repo_path, local_path, filter_secrets_enabled=False)
-                    if success_copy:
-                        deployed_count += 1
-
-        # Update global config
-        if not dry_run:
-            global_config.current_branch = branch
-            global_config._config["dot-man"]["last_switch"] = datetime.now().isoformat()
-            global_config.save()
-
+            # Run pre-deploy hooks
+            pre_hooks = list(dict.fromkeys(pre_hooks))
+            if pre_hooks:
+                console.print()
+                console.print("[bold]Running pre-deploy hooks...[/bold]")
+                for cmd in pre_hooks:
+                    console.print(f"  Exec: [cyan]{cmd}[/cyan]")
+                    try:
+                        subprocess.run(cmd, shell=True, check=False)
+                    except Exception as e:
+                        warn(f"Failed to run command '{cmd}': {e}")
+                console.print()
+            
+            # Deploy
+            deployed_count, _, _ = ops.deploy_all()
+            
+            # Update global config
+            ops.global_config.current_branch = branch
+            ops.global_config.save()
+            
             # Run post-deploy hooks
-            if post_deploy_cmds:
+            post_hooks = list(dict.fromkeys(post_hooks))
+            if post_hooks:
                 console.print()
                 console.print("[bold]Running post-deploy hooks...[/bold]")
-                unique_post_cmds = list(dict.fromkeys(post_deploy_cmds))
-                
-                for cmd in unique_post_cmds:
+                for cmd in post_hooks:
                     console.print(f"  Exec: [cyan]{cmd}[/cyan]")
                     try:
                         subprocess.run(cmd, shell=True, check=False)
@@ -455,7 +550,6 @@ def switch(branch: str, dry_run: bool, force: bool):
         else:
             success(f"Switched to '{branch}'")
             console.print()
-            console.print(f"  • Saved {saved_count} files from '{current_branch}'")
             console.print(f"  • Deployed {deployed_count} files for '{branch}'")
             console.print()
             console.print("Run [cyan]dot-man status[/cyan] to verify.")
@@ -472,28 +566,37 @@ def switch(branch: str, dry_run: bool, force: bool):
 
 
 @main.command()
-@click.option("--editor", help="Editor to use (default: $VISUAL or $EDITOR)")
+@click.option("--editor", help="Editor to use (default: config or $VISUAL or $EDITOR)")
 @click.option("--global", "edit_global", is_flag=True, help="Edit global configuration")
 @require_init
 def edit(editor: str | None, edit_global: bool):
     """Open the configuration file in your text editor.
 
-    By default, opens the dot-man.ini file for the current branch.
+    By default, opens the dot-man.toml file for the current branch.
     Use --global to edit the global configuration.
     """
     try:
+        from .constants import GLOBAL_TOML, DOT_MAN_TOML
+        
         if edit_global:
-            from .constants import GLOBAL_CONF
-            target = GLOBAL_CONF
+            target = GLOBAL_TOML
             desc = "global configuration"
         else:
-            target = REPO_DIR / "dot-man.ini"
-            desc = "dot-man.ini"
+            target = REPO_DIR / DOT_MAN_TOML
+            desc = "dot-man.toml"
 
         if not target.exists():
             error(f"Configuration file not found: {target}")
 
-        editor_cmd = editor or get_editor()
+        # Priority: CLI flag > global config > environment > fallback
+        global_config = GlobalConfig()
+        try:
+            global_config.load()
+            config_editor = global_config.editor
+        except Exception:
+            config_editor = None
+        
+        editor_cmd = editor or config_editor or get_editor()
         console.print(f"Opening {desc} in [cyan]{editor_cmd}[/cyan]...")
 
         if not open_in_editor(target, editor_cmd):
@@ -501,7 +604,7 @@ def edit(editor: str | None, edit_global: bool):
 
         # Validate after edit
         if not edit_global:
-            dotman_config = DotManConfig()
+            dotman_config = DotManConfig(global_config=global_config)
             try:
                 dotman_config.load()
                 warnings = dotman_config.validate()
@@ -541,7 +644,10 @@ def deploy(branch: str, force: bool, dry_run: bool):
     Example: dot-man deploy main
     """
     try:
-        git = GitManager()
+        from .operations import get_operations
+        
+        ops = get_operations()
+        git = ops.git
 
         # Check branch exists
         if not git.branch_exists(branch):
@@ -567,13 +673,11 @@ def deploy(branch: str, force: bool, dry_run: bool):
         # Checkout branch
         if not dry_run:
             git.checkout(branch)
+            ops.reload_config()
 
-        # Load config
-        dotman_config = DotManConfig()
-        dotman_config.load()
-
-        sections = dotman_config.get_sections()
-        if not sections:
+        # Get sections
+        section_names = ops.get_sections()
+        if not section_names:
             warn("No files configured in this branch")
             return
 
@@ -583,40 +687,39 @@ def deploy(branch: str, force: bool, dry_run: bool):
 
         deployed = 0
         skipped = 0
-        pre_deploy_cmds = []
-        post_deploy_cmds = []
+        pre_hooks: list[str] = []
+        post_hooks: list[str] = []
         sections_to_deploy = []
 
         # Pass 1: Collect hooks and potential changes
-        for section_name in sections:
-            section = dotman_config.get_section(section_name)
-            local_path = section["local_path"]
-            repo_path = section["repo_path"]
-            post_deploy = section.get("post_deploy")
-            pre_deploy = section.get("pre_deploy")
-
-            if not repo_path.exists():
-                console.print(f"  [dim]Skip:[/dim] {repo_path} (missing)")
-                skipped += 1
-                continue
-
-            # Check if file will change
-            will_change = not local_path.exists() or not compare_files(repo_path, local_path)
+        for section_name in section_names:
+            section = ops.get_section(section_name)
             
-            if will_change:
-                if pre_deploy:
-                    pre_deploy_cmds.append(pre_deploy)
-                if post_deploy:
-                    post_deploy_cmds.append(post_deploy)
-            
-            sections_to_deploy.append((section, will_change))
+            for local_path in section.paths:
+                repo_path = section.get_repo_path(local_path, REPO_DIR)
+
+                if not repo_path.exists():
+                    console.print(f"  [dim]Skip:[/dim] {repo_path} (missing)")
+                    skipped += 1
+                    continue
+
+                # Check if file will change
+                will_change = not local_path.exists() or not compare_files(repo_path, local_path)
+                
+                if will_change:
+                    if section.pre_deploy:
+                        pre_hooks.append(section.pre_deploy)
+                    if section.post_deploy:
+                        post_hooks.append(section.post_deploy)
+                
+                sections_to_deploy.append((section, local_path, repo_path, will_change))
 
         # Run pre-deploy hooks
-        if not dry_run and pre_deploy_cmds:
+        pre_hooks = list(dict.fromkeys(pre_hooks))
+        if not dry_run and pre_hooks:
             console.print()
             console.print("[bold]Running pre-deploy hooks...[/bold]")
-            unique_pre_cmds = list(dict.fromkeys(pre_deploy_cmds))
-            for cmd in unique_pre_cmds:
+            for cmd in pre_hooks:
                 console.print(f"  Exec: [cyan]{cmd}[/cyan]")
                 try:
                     subprocess.run(cmd, shell=True, check=False)
@@ -625,21 +728,15 @@ def deploy(branch: str, force: bool, dry_run: bool):
             console.print()
 
         # Pass 2: Deploy files
-        for section, will_change in sections_to_deploy:
-            local_path = section["local_path"]
-            repo_path = section["repo_path"]
-            strategy = section.get("update_strategy", "replace")
-            post_deploy = section.get("post_deploy")
-            pre_deploy = section.get("pre_deploy")
-
+        for section, local_path, repo_path, will_change in sections_to_deploy:
             if dry_run:
                 action = "OVERWRITE" if local_path.exists() else "CREATE"
                 console.print(f"  Would {action}: {local_path}")
                 if will_change:
-                    if pre_deploy:
-                        console.print(f"    [dim]Pre-hook:[/dim]  {pre_deploy}")
-                    if post_deploy:
-                        console.print(f"    [dim]Post-hook:[/dim] {post_deploy}")
+                    if section.pre_deploy:
+                        console.print(f"    [dim]Pre-hook:[/dim]  {section.pre_deploy}")
+                    if section.post_deploy:
+                        console.print(f"    [dim]Post-hook:[/dim] {section.post_deploy}")
                 else:
                     console.print("    [dim](No changes needed)[/dim]")
             else:
@@ -649,10 +746,10 @@ def deploy(branch: str, force: bool, dry_run: bool):
                      deployed += 1 
                      continue
 
-                if strategy == "rename_old" and local_path.exists():
+                if section.update_strategy == "rename_old" and local_path.exists():
                     backup_file(local_path)
 
-                if strategy != "ignore":
+                if section.update_strategy != "ignore":
                     success_copy, _ = copy_file(repo_path, local_path, filter_secrets_enabled=False)
                     if success_copy:
                         console.print(f"  [green]✓[/green] {local_path}")
@@ -661,11 +758,11 @@ def deploy(branch: str, force: bool, dry_run: bool):
                         console.print(f"  [red]✗[/red] {local_path}")
 
         # Run post-deploy hooks (only if not dry_run)
-        if not dry_run and post_deploy_cmds:
+        post_hooks = list(dict.fromkeys(post_hooks))
+        if not dry_run and post_hooks:
             console.print()
             console.print("[bold]Running post-deploy hooks...[/bold]")
-            unique_cmds = list(dict.fromkeys(post_deploy_cmds))
-            for cmd in unique_cmds:
+            for cmd in post_hooks:
                 console.print(f"  Exec: [cyan]{cmd}[/cyan]")
                 try:
                     subprocess.run(cmd, shell=True, check=False)
@@ -674,14 +771,12 @@ def deploy(branch: str, force: bool, dry_run: bool):
 
         # Update global config
         if not dry_run:
-            global_config = GlobalConfig()
-            global_config.load()
-            global_config.current_branch = branch
-            global_config.save()
+            ops.global_config.current_branch = branch
+            ops.global_config.save()
 
         console.print()
         if dry_run:
-            console.print(f"[dim]Dry run: {len(sections) - skipped} files would be deployed[/dim]")
+            console.print(f"[dim]Dry run: {len(sections_to_deploy)} files would be deployed[/dim]")
         else:
             success(f"Deployed {deployed} files from '{branch}'")
 

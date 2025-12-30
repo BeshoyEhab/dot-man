@@ -220,11 +220,16 @@ class GitManager:
     def pull(self, rebase: bool = True) -> str:
         """Pull from origin remote.
         
+        Automatically stashes uncommitted changes before pulling and
+        restores them after.
+        
         Returns:
             Summary message of what happened.
         """
         if not self.has_remote():
             raise GitOperationError("No remote configured. Use 'dot-man remote set <url>' first.")
+        
+        stashed = False
         try:
             current = self.current_branch()
             # Check if remote branch exists
@@ -234,12 +239,39 @@ class GitManager:
             if remote_branch not in remote_refs:
                 return f"Remote branch '{current}' not found. Nothing to pull."
             
+            # Stash uncommitted changes if dirty
+            if self.is_dirty():
+                self.repo.git.stash("save", "dot-man-auto-stash")
+                stashed = True
+            
+            # Perform the pull
             if rebase:
                 result = self.repo.git.pull("--rebase", "origin", current)
             else:
                 result = self.repo.git.pull("origin", current)
+            
+            # Restore stashed changes
+            if stashed:
+                try:
+                    self.repo.git.stash("pop")
+                except GitCommandError as stash_error:
+                    # Stash pop failed - likely a conflict
+                    return (
+                        f"{result if result else 'Pulled successfully.'}\n"
+                        f"⚠ Warning: Stash pop failed. Your changes are in 'git stash'. "
+                        f"Run 'git stash pop' manually to restore them.\n"
+                        f"Error: {stash_error.stderr}"
+                    )
+            
             return result if result else "Already up to date."
         except GitCommandError as e:
+            # Restore stash even on error
+            if stashed:
+                try:
+                    self.repo.git.stash("pop")
+                except Exception:
+                    pass  # Best effort
+            
             if "CONFLICT" in str(e.stdout) or "conflict" in str(e.stderr):
                 raise GitOperationError(
                     "Merge conflict detected. Please resolve conflicts in:\n"
@@ -248,6 +280,12 @@ class GitManager:
                 )
             raise GitOperationError(f"Failed to pull: {e.stderr}")
         except Exception as e:
+            # Restore stash even on error
+            if stashed:
+                try:
+                    self.repo.git.stash("pop")
+                except Exception:
+                    pass  # Best effort
             raise GitOperationError(f"Failed to pull: {e}")
 
     def push(self, set_upstream: bool = True) -> str:
@@ -335,4 +373,23 @@ class GitManager:
             }
         except Exception:
             return {"ahead": 0, "behind": 0, "remote_configured": True, "error": True}
+
+    def get_file_from_branch(self, branch: str, file_path: str) -> str | None:
+        """Read a file's content from a specific branch without checkout.
+        
+        Args:
+            branch: Branch name to read from
+            file_path: Relative path within the repo
+            
+        Returns:
+            File content as string, or None if file doesn't exist
+        """
+        try:
+            # Use git show to read file from branch
+            return self.repo.git.show(f"{branch}:{file_path}")
+        except GitCommandError:
+            # File doesn't exist in that branch
+            return None
+        except Exception:
+            return None
 
