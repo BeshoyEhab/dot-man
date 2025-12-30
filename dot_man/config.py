@@ -51,10 +51,14 @@ def _write_toml(path: Path, data: dict) -> None:
             for key, value in section.items():
                 if isinstance(value, dict):
                     continue  # Handle nested dicts separately
+                elif value is None:
+                    continue
                 elif isinstance(value, bool):
                     lines.append(f"{key} = {str(value).lower()}")
                 elif isinstance(value, str):
                     lines.append(f"{key} = {escape_string(value)}")
+                elif isinstance(value, datetime):
+                    lines.append(f"{key} = {value.isoformat()}")
                 elif isinstance(value, list):
                     items = ", ".join(
                         escape_string(v) if isinstance(v, str) else str(v) 
@@ -70,19 +74,25 @@ def _write_toml(path: Path, data: dict) -> None:
                 if isinstance(value, dict):
                     write_section(key, value, full_name)
         
+        # Collect top-level values first
+        top_level_lines = []
+        
         for name, section in data.items():
             if isinstance(section, dict):
                 write_section(name, section)
             else:
                 # Top-level simple value
                 if isinstance(section, bool):
-                    lines.insert(0, f"{name} = {str(section).lower()}")
+                    top_level_lines.append(f"{name} = {str(section).lower()}")
                 elif isinstance(section, str):
-                    lines.insert(0, f"{name} = {escape_string(section)}")
+                    top_level_lines.append(f"{name} = {escape_string(section)}")
                 else:
-                    lines.insert(0, f"{name} = {section}")
+                    top_level_lines.append(f"{name} = {section}")
         
-        path.write_text("\n".join(lines))
+        # Prepend top-level values
+        if top_level_lines:
+            top_level_lines.append("")
+        path.write_text("\n".join(top_level_lines + lines))
 
 
 class GlobalConfig:
@@ -318,6 +328,11 @@ class DotManConfig:
         self._path = self._repo_path / DOT_MAN_TOML
         self._global_config = global_config
 
+    @property
+    def repo_path(self) -> Path:
+        """Get the repository path."""
+        return self._repo_path
+
     def load(self) -> None:
         """Load the dot-man.toml configuration file.
         
@@ -371,10 +386,24 @@ class DotManConfig:
             
             # Convert secrets_filter boolean
             if "secrets_filter" in section_data:
-                new_section["secrets_filter"] = section_data["secrets_filter"].lower() == "true"
+                value = section_data["secrets_filter"].lower()
+                if value in ("true", "false"):
+                    new_section["secrets_filter"] = value == "true"
             
-            # Create a clean section name (remove path-like names)
-            clean_name = section_name.replace("~/.", "").replace("~/.config/", "").replace("/", "-")
+            # More robust name generation to avoid collisions
+            clean_name = section_name
+            for prefix in ["~/.", "~/.config/", "~/", "/"]:
+                if clean_name.startswith(prefix):
+                    clean_name = clean_name[len(prefix):]
+            clean_name = clean_name.replace("/", "-").replace(".", "-")
+            
+            # Ensure uniqueness
+            base_name = clean_name
+            counter = 1
+            while clean_name in self._data:
+                clean_name = f"{base_name}_{counter}"
+                counter += 1
+            
             self._data[clean_name] = new_section
         
         # Backup old file
@@ -479,6 +508,11 @@ class DotManConfig:
         if isinstance(paths_raw, str):
             paths_raw = [paths_raw]
         paths = [Path(p).expanduser() for p in paths_raw]
+
+        if not paths:
+            raise ConfigValidationError(
+                f"Section [{name}] must have at least one path"
+            )
         
         # Validate update_strategy
         strategy = settings.get("update_strategy", "replace")
@@ -514,6 +548,24 @@ class DotManConfig:
         if name in self._data:
             raise ConfigurationError(f"Section already exists: {name}")
 
+        if not paths:
+            raise ConfigurationError("Section must have at least one path")
+        
+        # Validate paths
+        cleaned_paths = []
+        for p in paths:
+            if not isinstance(p, str) or not p.strip():
+                raise ConfigurationError("Paths must be non-empty strings")
+            
+            clean_p = p.strip()
+            if Path(clean_p).is_absolute():
+                raise ConfigurationError(f"Paths must be relative (to home or checkout): {clean_p}")
+            cleaned_paths.append(clean_p)
+        paths = cleaned_paths
+        
+        if name == "templates":
+            raise ConfigurationError("'templates' is a reserved section name")
+
         section_data = {
             "paths": paths,
             "repo_base": repo_base or name,
@@ -542,7 +594,10 @@ class DotManConfig:
                 
                 # Check inherits resolve
                 for template in section.inherits:
-                    if not self._resolve_template(template):
+                    # Check if template exists (empty template is valid)
+                    local_templates = self.get_local_templates()
+                    global_templates = self._global_config.get_all_templates() if self._global_config else {}
+                    if template not in local_templates and template not in global_templates:
                         warnings.append(f"[{name}]: Template not found: {template}")
                         
             except Exception as e:

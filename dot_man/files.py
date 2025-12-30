@@ -99,7 +99,7 @@ def copy_directory(
         Tuple of (files_copied, files_failed, detected_secrets)
     """
     include_patterns = include_patterns or []
-    exclude_patterns = exclude_patterns or ignore_patterns or []
+    exclude_patterns = exclude_patterns if exclude_patterns is not None else (ignore_patterns or [])
     files_copied = 0
     files_failed = 0
     all_secrets: list[SecretMatch] = []

@@ -1,6 +1,7 @@
 """dot-man CLI: Dotfile manager with git-powered branching."""
 
 import sys
+import os
 import subprocess
 from datetime import datetime
 from functools import wraps
@@ -208,7 +209,7 @@ def add(
         dotman_config = DotManConfig(global_config=global_config)
         try:
             dotman_config.load()
-        except Exception:
+        except (FileNotFoundError, DotManError):
             # Config might not exist yet, create it
             dotman_config.create_default()
             dotman_config.load()
@@ -218,10 +219,16 @@ def add(
         if section in existing_sections:
             error(f"Section '{section}' already exists. Use a different --section name.")
         
+        # Convert to home-relative path for config
+        path_str = str(local_path)
+        home = str(Path.home())
+        if path_str.startswith(home):
+            path_str = path_str.replace(home, "~", 1)
+            
         # Add section to config
         dotman_config.add_section(
             name=section,
-            paths=[str(local_path)],
+            paths=[path_str],
             repo_base=repo_base,
             exclude=list(exclude) if exclude else None,
             include=list(include) if include else None,
@@ -236,15 +243,20 @@ def add(
         
         if local_path.is_file():
             repo_dest = repo_dest / local_path.name
-            success_copy, secrets = copy_file(local_path, repo_dest, filter_secrets_enabled=True)
-            if success_copy:
-                success(f"Added file: {local_path}")
-                console.print(f"  Section: [cyan][{section}][/cyan]")
-                console.print(f"  Repo path: [dim]{repo_dest}[/dim]")
-                if secrets:
-                    warn(f"{len(secrets)} secrets were redacted")
-            else:
-                error(f"Failed to copy file: {local_path}")
+            try:
+                success_copy, secrets = copy_file(local_path, repo_dest, filter_secrets_enabled=True)
+                if success_copy:
+                    success(f"Added file: {local_path}")
+                    console.print(f"  Section: [cyan][{section}][/cyan]")
+                    console.print(f"  Repo path: [dim]{repo_dest}[/dim]")
+                    if secrets:
+                        warn(f"{len(secrets)} secrets were redacted")
+                else:
+                    error(f"Failed to copy file: {local_path}")
+            except (FileNotFoundError, OSError) as e:
+                error(f"Failed to access file {local_path}: {e}")
+            except Exception as e:
+                error(f"Error copying file {local_path}: {e}")
         else:
             copied, failed, secrets = copy_directory(
                 local_path, 
@@ -519,7 +531,8 @@ def switch(branch: str, dry_run: bool, force: bool):
                 for cmd in pre_hooks:
                     console.print(f"  Exec: [cyan]{cmd}[/cyan]")
                     try:
-                        subprocess.run(cmd, shell=True, check=False)
+                        shell = os.environ.get("SHELL", "/bin/sh")
+                        subprocess.run([shell, "-c", cmd], check=False)
                     except Exception as e:
                         warn(f"Failed to run command '{cmd}': {e}")
                 console.print()
@@ -539,7 +552,8 @@ def switch(branch: str, dry_run: bool, force: bool):
                 for cmd in post_hooks:
                     console.print(f"  Exec: [cyan]{cmd}[/cyan]")
                     try:
-                        subprocess.run(cmd, shell=True, check=False)
+                        shell = os.environ.get("SHELL", "/bin/sh")
+                        subprocess.run([shell, "-c", cmd], check=False)
                     except Exception as e:
                         warn(f"Failed to run command '{cmd}': {e}")
 
@@ -593,7 +607,7 @@ def edit(editor: str | None, edit_global: bool):
         try:
             global_config.load()
             config_editor = global_config.editor
-        except Exception:
+        except (FileNotFoundError, DotManError):
             config_editor = None
         
         editor_cmd = editor or config_editor or get_editor()

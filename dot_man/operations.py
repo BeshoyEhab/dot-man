@@ -96,6 +96,12 @@ class DotManOperations:
                         if repo_file.is_file():
                             rel = repo_file.relative_to(repo_path)
                             local_file = local_path / rel
+                            
+                            if section.exclude and self._matches_patterns(rel, section.exclude):
+                                continue
+                            if section.include and not self._matches_patterns(rel, section.include):
+                                continue
+                                
                             if not local_file.exists():
                                 yield local_file, repo_file, "DELETED"
             else:
@@ -160,18 +166,14 @@ class DotManOperations:
         
         for local_path in section.paths:
             repo_path = section.get_repo_path(local_path, REPO_DIR)
-            
-            if not repo_path.exists():
-                continue
-            
-            # Check if will change
-            will_change = not local_path.exists() or not compare_files(repo_path, local_path)
-            if will_change:
-                had_changes = True
-            
             # Handle update strategy
             if section.update_strategy == "ignore" and local_path.exists():
                 continue
+            
+            # Check if will change (after strategy filtering)
+            will_change = not local_path.exists() or not compare_files(repo_path, local_path)
+            if will_change:
+                had_changes = True
             
             if section.update_strategy == "rename_old" and local_path.exists():
                 backup_file(local_path)

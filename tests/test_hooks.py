@@ -41,7 +41,7 @@ def test_config_parses_hooks(mock_config):
     
     config.add_section(
         "test_section", 
-        [str(mock_config["local_file"])], 
+        ["~/test_file.txt"], 
         "test_file.txt",
         pre_deploy="echo pre",
         post_deploy="echo post"

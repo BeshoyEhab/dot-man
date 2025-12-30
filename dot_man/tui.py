@@ -4,6 +4,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+if sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
+
 from textual.app import App, ComposeResult
 from textual.widgets import Header, Footer, DataTable, Static, Input, Label, Button
 from textual.containers import Container, Horizontal, Vertical, VerticalScroll
@@ -365,7 +370,7 @@ class HelpScreen(ModalScreen):
 class FilesPanel(Static):
     """Widget to display tracked files and their status grouped by section."""
     
-    def update_files(self, section_names: list, config, current_branch: str):
+    def update_files(self, section_names: list, config: DotManConfig, current_branch: str):
         table = Table(show_header=True, header_style="bold", expand=True, box=None)
         table.add_column("Section / Path", style="cyan", no_wrap=True)
         table.add_column("Status", justify="center", width=10)
@@ -408,7 +413,7 @@ class FilesPanel(Static):
                         icon = "❓"
                     
                     # Get repo path
-                    repo_path = section.get_repo_path(local_path, config._repo_path)
+                    repo_path = section.get_repo_path(local_path, config.repo_path)
                     
                     # Determine status
                     if not local_path.exists():
@@ -619,11 +624,6 @@ class DotManApp(App):
             # For other branches, read the config using git show
             try:
                 from .constants import DOT_MAN_TOML, DOT_MAN_INI
-                import sys
-                if sys.version_info >= (3, 11):
-                    import tomllib
-                else:
-                    import tomli as tomllib
                 
                 # Try reading TOML config from the branch
                 config_content = self.git.get_file_from_branch(branch_name, DOT_MAN_TOML)
