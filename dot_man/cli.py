@@ -1321,6 +1321,132 @@ def shell():
 
 
 # ============================================================================
+# config Command
+# ============================================================================
+
+
+@main.group()
+def config():
+    """Manage global configuration."""
+    pass
+
+
+@config.command("list")
+def config_list():
+    """List all global configuration values."""
+    try:
+        config = GlobalConfig()
+        config.load()
+        
+        # Flattener helper
+        def flatten(d, parent_key='', sep='.'):
+            items = []
+            for k, v in d.items():
+                new_key = f"{parent_key}{sep}{k}" if parent_key else k
+                if isinstance(v, dict):
+                    items.extend(flatten(v, new_key, sep=sep).items())
+                else:
+                    items.append((new_key, v))
+            return dict(items)
+
+        # Access private _data for full listing, or use specific properties?
+        # Using _data is easiest to show everything.
+        flat_data = flatten(config._data)
+        
+        table = Table(title="Global Configuration")
+        table.add_column("Key", style="cyan")
+        table.add_column("Value")
+        
+        for k, v in sorted(flat_data.items()):
+            table.add_row(k, str(v))
+            
+        console.print(table)
+            
+    except Exception as e:
+        error(f"Failed to list config: {e}")
+
+
+@config.command("get")
+@click.argument("key")
+def config_get(key: str):
+    """Get a configuration value.
+    
+    Example: dot-man config get dot-man.editor
+    """
+    try:
+        config = GlobalConfig()
+        config.load()
+        
+        # Traverse keys
+        parts = key.split(".")
+        current = config._data
+        
+        for part in parts:
+            if isinstance(current, dict) and part in current:
+                current = current[part]
+            else:
+                error(f"Key not found: {key}")
+        
+        # If result is a dict, print it nicely? Or just error that it's a section?
+        if isinstance(current, dict):
+             console.print(f"[dim]Section '{key}' contains:[/dim]")
+             import json
+             console.print(json.dumps(current, indent=2))
+        else:
+             console.print(str(current))
+             
+    except Exception as e:
+        error(f"Failed to get config: {e}")
+
+
+@config.command("set")
+@click.argument("key")
+@click.argument("value")
+def config_set(key: str, value: str):
+    """Set a configuration value.
+    
+    Example: dot-man config set dot-man.editor nvim
+    """
+    try:
+        config = GlobalConfig()
+        try:
+            config.load()
+        except Exception:
+            # If load fails (e.g. no file), we assume empty default or create new
+            config.create_default()
+            
+        # Handle specific known keys via properties for safety/validation if needed
+        # But generic access is more flexible.
+        
+        # Special handling for boolean values from CLI string
+        if value.lower() == "true":
+            val = True
+        elif value.lower() == "false":
+            val = False
+        else:
+            val = value
+
+        # Set value
+        parts = key.split(".")
+        current = config._data
+        
+        for i, part in enumerate(parts[:-1]):
+            if part not in current:
+                current[part] = {}
+            current = current[part]
+            if not isinstance(current, dict):
+                error(f"Key path conflict: '{'.'.join(parts[:i+1])}' is not a section")
+        
+        current[parts[-1]] = val
+        config.save()
+        
+        success(f"Set '{key}' to '{val}'")
+        
+    except Exception as e:
+        error(f"Failed to set config: {e}")
+
+
+# ============================================================================
 # Entry Point
 # ============================================================================
 
