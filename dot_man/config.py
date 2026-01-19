@@ -26,7 +26,7 @@ from .constants import (
     DOT_MAN_TOML,
     DEFAULT_BRANCH,
     VALID_UPDATE_STRATEGIES,
-    HOOK_ALISES,
+    HOOK_ALIASES,
 )
 from .exceptions import ConfigurationError, ConfigValidationError
 
