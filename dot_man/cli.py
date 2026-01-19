@@ -98,11 +98,12 @@ def main():
 
 @main.command()
 @click.option("--force", is_flag=True, help="Reinitialize even if already exists")
-def init(force: bool):
+@click.option("--no-wizard", is_flag=True, help="Skip interactive setup wizard")
+def init(force: bool, no_wizard: bool):
     """Initialize a new dot-man repository.
 
-    Creates the repository structure at ~/.config/dot-man/ and sets up
-    git for version control of your dotfiles.
+    By default, runs an interactive setup wizard to detect and add
+    common dotfiles. Use --no-wizard for manual setup.
     """
     # Pre-checks
     if not is_git_installed():
@@ -131,7 +132,7 @@ def init(force: bool):
         global_config = GlobalConfig()
         global_config.create_default()
 
-        # Create default dot-man.ini
+        # Create minimal dot-man.toml
         dotman_config = DotManConfig()
         dotman_config.create_default()
 
@@ -140,17 +141,174 @@ def init(force: bool):
 
         # Success message
         console.print()
-        success("dot-man initialized successfully!")
+        console.print("╭─────────────────────────────────────────────────╮", style="green")
+        console.print("│  🎉 dot-man initialized successfully!           │", style="green bold")
+        console.print("╰─────────────────────────────────────────────────╯", style="green")
         console.print()
-        console.print("[dim]Next steps:[/dim]")
-        console.print("  1. Edit configuration: [cyan]dot-man edit[/cyan]")
-        console.print("  2. Add your dotfiles to dot-man.toml")
-        console.print("  3. Save configuration: [cyan]dot-man switch main[/cyan]")
-        console.print("  4. View status: [cyan]dot-man status[/cyan]")
+
+        # Run wizard by default (unless --no-wizard)
+        if not no_wizard:
+            run_setup_wizard(global_config, dotman_config, git)
+        else:
+            show_quick_start()
 
     except Exception as e:
         error(f"Initialization failed: {e}")
 
+
+def run_setup_wizard(global_config: GlobalConfig, dotman_config: DotManConfig, git: GitManager):
+    """Interactive setup wizard for new users."""
+    console.print("[bold cyan]🧙 Setup Wizard[/bold cyan]")
+    console.print()
+    console.print("Let's get your dotfiles set up! I'll detect common files automatically.")
+    console.print()
+    
+    # Detect common dotfiles
+    console.print("[bold]Detecting dotfiles...[/bold]")
+    console.print()
+    
+    common_files = [
+        ("~/.bashrc", "Bash shell", "bashrc"),
+        ("~/.zshrc", "Zsh shell", "zshrc"),
+        ("~/.gitconfig", "Git config", "gitconfig"),
+        ("~/.vimrc", "Vim editor", "vimrc"),
+        ("~/.config/nvim", "Neovim", "nvim"),
+        ("~/.config/fish", "Fish shell", "fish"),
+        ("~/.config/kitty", "Kitty terminal", "kitty"),
+        ("~/.config/alacritty", "Alacritty terminal", "alacritty"),
+        ("~/.config/hypr", "Hyprland WM", "hypr"),
+        ("~/.config/i3", "i3 WM", "i3"),
+        ("~/.tmux.conf", "tmux", "tmux"),
+        ("~/.ssh/config", "SSH config", "ssh-config"),
+    ]
+    
+    files_to_add = []
+    found_count = 0
+    
+    for path_str, desc, section_name in common_files:
+        path = Path(path_str).expanduser()
+        if path.exists():
+            found_count += 1
+            console.print(f"  [green]✓[/green] Found: [cyan]{path_str}[/cyan] ({desc})")
+            if confirm(f"    Track this?", default=True):
+                files_to_add.append((path_str, section_name))
+    
+    if found_count == 0:
+        console.print("  [dim]No common dotfiles detected in default locations[/dim]")
+        console.print()
+    else:
+        console.print()
+    
+    # Offer to add custom files
+    if confirm("Add custom files not in the list?", default=False):
+        console.print()
+        while True:
+            custom_path = click.prompt(
+                "Path to track (or press Enter to finish)",
+                default="",
+                show_default=False
+            )
+            
+            if not custom_path:
+                break
+            
+            path = Path(custom_path).expanduser()
+            if not path.exists():
+                warn(f"Path doesn't exist: {custom_path}")
+                continue
+            
+            # Auto-generate section name from path
+            if path.name.startswith('.'):
+                default_section = path.name[1:] if path.suffix else path.name[1:]
+            else:
+                default_section = path.stem or path.name
+            
+            section_name = click.prompt("Section name", default=default_section)
+            files_to_add.append((custom_path, section_name))
+    
+    # Add files to config
+    if files_to_add:
+        console.print()
+        console.print(f"[bold]Adding {len(files_to_add)} files...[/bold]")
+        console.print()
+        
+        for path_str, section_name in files_to_add:
+            try:
+                # Minimal config - only path needed!
+                dotman_config.add_section(
+                    name=section_name,
+                    paths=[path_str],
+                    # repo_base auto-generated
+                    # secrets_filter uses default (true)
+                )
+                console.print(f"  [green]✓[/green] [{section_name}]: {path_str}")
+            except Exception as e:
+                warn(f"Could not add {path_str}: {e}")
+        
+        dotman_config.save()
+        
+        # Commit the initial config
+        git.add_all()
+        git.commit("Add initial dotfiles configuration")
+        
+        console.print()
+        success(f"Added {len(files_to_add)} files to configuration")
+        console.print()
+        
+        # Show what was configured
+        console.print("[bold]Your dotfiles are now tracked:[/bold]")
+        for path_str, section_name in files_to_add[:5]:
+            console.print(f"  • [{section_name}] {path_str}")
+        if len(files_to_add) > 5:
+            console.print(f"  ... and {len(files_to_add) - 5} more")
+    
+    console.print()
+    
+    # Offer remote setup
+    if confirm("Set up remote repository for syncing? (optional)", default=False):
+        console.print()
+        ctx = click.Context(setup)
+        ctx.invoke(setup)
+    
+    # Final instructions
+    console.print()
+    console.print("╭─────────────────────────────────────────────────╮", style="cyan")
+    console.print("│            🎉 Setup Complete!                   │", style="cyan bold")
+    console.print("╰─────────────────────────────────────────────────╯", style="cyan")
+    console.print()
+    
+    if files_to_add:
+        console.print("[bold]Next steps:[/bold]")
+        console.print("  1. [cyan]dot-man status[/cyan]       - View your tracked files")
+        console.print("  2. [cyan]dot-man switch work[/cyan]  - Create a work configuration branch")
+        console.print("  3. [cyan]dot-man add <path>[/cyan]   - Track more files")
+    else:
+        console.print("[bold]Get started:[/bold]")
+        console.print("  [cyan]dot-man add ~/.bashrc[/cyan]   - Add files to track")
+        console.print("  [cyan]dot-man edit[/cyan]            - Edit config file")
+        console.print("  [cyan]dot-man status[/cyan]          - View status")
+    
+    console.print()
+    console.print("[dim]💡 Run 'dot-man --help' to see all commands[/dim]")
+    console.print()
+
+
+def show_quick_start():
+    """Display quick start guide (for --no-wizard users)."""
+    console.print("[bold]📚 Quick Start Guide:[/bold]")
+    console.print()
+    console.print("[bold cyan]Adding files to track:[/bold cyan]")
+    console.print("  dot-man add ~/.bashrc              [dim]# Single file[/dim]")
+    console.print("  dot-man add ~/.config/nvim         [dim]# Directory[/dim]")
+    console.print("  dot-man edit                       [dim]# Edit config manually[/dim]")
+    console.print()
+    console.print("[bold cyan]Managing configurations:[/bold cyan]")
+    console.print("  dot-man status                     [dim]# View tracked files[/dim]")
+    console.print("  dot-man switch main                [dim]# Save current state[/dim]")
+    console.print("  dot-man switch work                [dim]# Create work branch[/dim]")
+    console.print()
+    console.print("[dim]💡 Tip: Config is at ~/.config/dot-man/repo/dot-man.toml[/dim]")
+    console.print()
 
 # ============================================================================
 # add Command

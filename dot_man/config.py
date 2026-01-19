@@ -26,6 +26,7 @@ from .constants import (
     DOT_MAN_TOML,
     DEFAULT_BRANCH,
     VALID_UPDATE_STRATEGIES,
+    HOOK_ALISES,
 )
 from .exceptions import ConfigurationError, ConfigValidationError
 
@@ -258,16 +259,16 @@ class GlobalConfig:
 
 
 class Section:
-    """Represents a resolved configuration section."""
+    """Represents a resolved configuration section with smart defaults."""
 
     def __init__(
         self,
         name: str,
         paths: list[Path],
-        repo_base: str,
+        repo_base: str | None = None,  # NOW OPTIONAL!
         repo_path: str | None = None,
-        secrets_filter: bool = True,
-        update_strategy: str = "replace",
+        secrets_filter: bool | None = None,  # None = use default
+        update_strategy: str | None = None,  # None = use default
         include: list[str] | None = None,
         exclude: list[str] | None = None,
         pre_deploy: str | None = None,
@@ -276,15 +277,79 @@ class Section:
     ):
         self.name = name
         self.paths = paths
-        self.repo_base = repo_base
-        self.repo_path = repo_path  # Override for single-file sections
-        self.secrets_filter = secrets_filter
-        self.update_strategy = update_strategy
+        self.repo_path = repo_path
+        
+        # Smart repo_base generation if not provided
+        if repo_base is None and not repo_path:
+            self.repo_base = self._generate_repo_base()
+        else:
+            self.repo_base = repo_base or name
+        
+        # Use provided values or defaults (None means "use global default")
+        self.secrets_filter = secrets_filter if secrets_filter is not None else True
+        self.update_strategy = update_strategy or "replace"
+        
         self.include = include or []
         self.exclude = exclude or []
-        self.pre_deploy = pre_deploy
-        self.post_deploy = post_deploy
+        
+        # Resolve hook aliases
+        self.pre_deploy = self._resolve_hook(pre_deploy)
+        self.post_deploy = self._resolve_hook(post_deploy)
+        
         self.inherits = inherits or []
+
+    def _generate_repo_base(self) -> str:
+        """Auto-generate repo_base from first path.
+        
+        Examples:
+            ~/.bashrc → "bashrc"
+            ~/.config/nvim → "nvim"
+            ~/.ssh/config → "ssh/config"
+        """
+        if not self.paths:
+            return self.name
+        
+        first_path = self.paths[0]
+        
+        # Handle dotfiles: ~/.bashrc → "bashrc"
+        if first_path.name.startswith('.') and first_path.suffix:
+            # .bashrc → bashrc, .vimrc → vimrc
+            return first_path.name[1:]
+        
+        if first_path.name.startswith('.') and not first_path.suffix:
+            # .vim → vim, .ssh → ssh
+            return first_path.name[1:]
+        
+        # Handle .config directories: ~/.config/nvim → "nvim"
+        if '.config' in first_path.parts:
+            return first_path.name
+        
+        # Handle subdirectories: ~/.ssh/config → "ssh/config"
+        if len(first_path.parts) > 1 and first_path.is_file():
+            parent_name = first_path.parent.name
+            if parent_name.startswith('.'):
+                parent_name = parent_name[1:]
+            return f"{parent_name}/{first_path.name}"
+        
+        # Fallback: use stem or name
+        return first_path.stem or first_path.name
+
+    def _resolve_hook(self, hook: str | None) -> str | None:
+        """Resolve hook aliases to actual commands.
+        
+        Examples:
+            "shell_reload" → "source ~/.bashrc || ..."
+            "nvim_sync" → "nvim --headless +PackerSync +qa"
+            "echo hello" → "echo hello" (unchanged)
+        """
+        if not hook:
+            return None
+        
+        # Check if it's an alias
+        if hook in HOOK_ALIASES:
+            return HOOK_ALIASES[hook]
+        
+        return hook
 
     def get_repo_path(self, local_path: Path, repo_dir: Path) -> Path:
         """Get the repository path for a local path."""
@@ -295,16 +360,21 @@ class Section:
         return repo_dir / self.repo_base / local_path.name
 
     def to_dict(self) -> dict:
-        """Convert section to dictionary."""
+        """Convert section to dictionary (only non-default values)."""
         result = {
             "paths": [str(p) for p in self.paths],
-            "repo_base": self.repo_base,
         }
+        
+        # Only include if non-default or explicitly set
         if self.repo_path:
             result["repo_path"] = self.repo_path
-        if self.secrets_filter is not True:
+        elif self.repo_base != self._generate_repo_base():
+            # Only save repo_base if it differs from auto-generated
+            result["repo_base"] = self.repo_base
+            
+        if self.secrets_filter is not True:  # Only if NOT default
             result["secrets_filter"] = self.secrets_filter
-        if self.update_strategy != "replace":
+        if self.update_strategy != "replace":  # Only if NOT default
             result["update_strategy"] = self.update_strategy
         if self.include:
             result["include"] = self.include
@@ -317,7 +387,6 @@ class Section:
         if self.inherits:
             result["inherits"] = self.inherits
         return result
-
 
 class DotManConfig:
     """Parser for the dot-man.toml configuration file."""
@@ -424,26 +493,85 @@ class DotManConfig:
         _write_toml(self._path, self._data)
 
     def create_default(self) -> None:
-        """Create a default dot-man.toml configuration."""
-        self._data = {
-            "templates": {
-                "default": {
-                    "secrets_filter": True,
-                    "update_strategy": "replace",
-                }
-            },
-            # Example section (commented in output)
-        }
+        """Create minimal default config with helpful examples."""
+        self._data = {}
         self.save()
         
-        # Append example as comments
+        # Append minimal, friendly template
         with open(self._path, "a") as f:
-            f.write("\n# Example section - uncomment and modify:\n")
-            f.write("# [bashrc]\n")
-            f.write('# paths = ["~/.bashrc"]\n')
-            f.write('# repo_base = "shell"\n')
-            f.write('# post_deploy = "source ~/.bashrc"\n')
+            f.write("""# dot-man Configuration
+#
+# Quick Start:
+#   1. List files to track in [sections]
+#   2. Run: dot-man switch main
+#
+# That's it! Smart defaults apply automatically.
+# Override them per-section only when needed.
+#
+# ============================================================================
+# Examples
+# ============================================================================
 
+# Example 1: Single file (simplest form)
+# [bashrc]
+# paths = ["~/.bashrc"]
+
+# Example 2: Directory with exclusions
+# [nvim]
+# paths = ["~/.config/nvim"]
+# exclude = ["*.log", "plugin/packer_compiled.lua"]
+# post_deploy = "nvim_sync"  # Alias for: nvim --headless +PackerSync +qa
+
+# Example 3: Multiple files in one section
+# [shell-configs]
+# paths = ["~/.bashrc", "~/.zshrc", "~/.profile"]
+# post_deploy = "shell_reload"  # Alias for: source ~/.bashrc || source ~/.zshrc
+
+# Example 4: Override defaults when needed
+# [ssh-config]
+# paths = ["~/.ssh/config"]
+# secrets_filter = true  # Default is true, but being explicit
+# update_strategy = "rename_old"  # Backup before overwrite (default: replace)
+
+# Example 5: Git config (auto-filters secrets)
+# [gitconfig]
+# paths = ["~/.gitconfig"]
+
+# ============================================================================
+# Available Hook Aliases
+# ============================================================================
+#
+# Instead of writing full commands, use these short aliases:
+#   shell_reload   → source ~/.bashrc || source ~/.zshrc
+#   nvim_sync      → nvim --headless +PackerSync +qa
+#   hyprland_reload → hyprctl reload
+#   fish_reload    → source ~/.config/fish/config.fish
+#   tmux_reload    → tmux source-file ~/.tmux.conf
+#   kitty_reload   → killall -SIGUSR1 kitty
+#
+# Or write custom commands:
+#   post_deploy = "systemctl --user restart some-service"
+#
+# ============================================================================
+# Advanced Features
+# ============================================================================
+#
+# Templates (for shared settings):
+#   [templates.linux-desktop]
+#   post_deploy = "notify-send 'Config updated'"
+#
+#   [hyprland]
+#   paths = ["~/.config/hypr"]
+#   inherits = ["linux-desktop"]
+#
+# Include patterns (only track specific files):
+#   include = ["*.conf", "*.lua"]
+#
+# Pre-deploy hooks (run before copying):
+#   pre_deploy = "backup-existing-config"
+#
+# Full docs: https://github.com/BeshoyEhab/dot-man#configuration
+""")
     def get_section_names(self) -> list[str]:
         """Get all section names (excluding templates)."""
         return [
