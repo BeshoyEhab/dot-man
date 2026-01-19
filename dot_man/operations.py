@@ -1,7 +1,8 @@
 """Core operations for dot-man - modular business logic."""
 
 from pathlib import Path
-from typing import Iterator
+from pathlib import Path
+from typing import Iterator, Callable
 
 from .config import GlobalConfig, DotManConfig, Section
 from .core import GitManager
@@ -118,7 +119,11 @@ class DotManOperations:
                 return True
         return False
     
-    def save_section(self, section: Section) -> tuple[int, list[SecretMatch]]:
+    def save_section(
+        self, 
+        section: Section,
+        secret_handler: Callable[[SecretMatch], str] | None = None
+    ) -> tuple[int, list[SecretMatch]]:
         """
         Save a section from local to repo.
         
@@ -137,7 +142,8 @@ class DotManOperations:
             if local_path.is_file():
                 success, secrets = copy_file(
                     local_path, repo_path, 
-                    filter_secrets_enabled=section.secrets_filter
+                    filter_secrets_enabled=section.secrets_filter,
+                    secret_handler=secret_handler
                 )
                 if success:
                     saved += 1
@@ -148,6 +154,7 @@ class DotManOperations:
                     filter_secrets_enabled=section.secrets_filter,
                     include_patterns=section.include,
                     exclude_patterns=section.exclude,
+                    secret_handler=secret_handler,
                 )
                 saved += files_copied
                 all_secrets.extend(secrets)
@@ -193,14 +200,17 @@ class DotManOperations:
         
         return deployed, had_changes
     
-    def save_all(self) -> tuple[int, list[SecretMatch]]:
+    def save_all(
+        self,
+        secret_handler: Callable[[SecretMatch], str] | None = None
+    ) -> tuple[int, list[SecretMatch]]:
         """Save all sections from local to repo."""
         total_saved = 0
         all_secrets: list[SecretMatch] = []
         
         for section_name in self.get_sections():
             section = self.get_section(section_name)
-            saved, secrets = self.save_section(section)
+            saved, secrets = self.save_section(section, secret_handler)
             total_saved += saved
             all_secrets.extend(secrets)
         
@@ -230,7 +240,12 @@ class DotManOperations:
         
         return total_deployed, list(dict.fromkeys(pre_hooks)), list(dict.fromkeys(post_hooks))
     
-    def switch_branch(self, target_branch: str, dry_run: bool = False) -> dict:
+    def switch_branch(
+        self, 
+        target_branch: str, 
+        dry_run: bool = False,
+        secret_handler: Callable[[SecretMatch], str] | None = None
+    ) -> dict:
         """
         Switch to a different branch.
         
@@ -257,7 +272,7 @@ class DotManOperations:
         
         # Phase 1: Save current branch
         if not dry_run:
-            saved, secrets = self.save_all()
+            saved, secrets = self.save_all(secret_handler)
             result["saved_count"] = saved
             result["secrets_redacted"] = len(secrets)
             

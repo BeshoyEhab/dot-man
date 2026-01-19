@@ -4,9 +4,160 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import Iterator
+from pathlib import Path
+from typing import Iterator, Callable
 
 from .constants import SECRET_REDACTION_TEXT, DOTMAN_REDACTION_TEXT
+
+import json
+import hashlib
+from datetime import datetime
+from typing import TypedDict
+
+
+class AllowedSecret(TypedDict):
+    """Structure for an allowed secret entry."""
+
+    file_path: str
+    secret_hash: str
+    pattern_name: str
+    added_at: str
+
+
+class SecretGuard:
+    """Manages the list of allowed (skipped) secrets."""
+
+    def __init__(self, config_dir: Path | None = None, path: Path | None = None):
+        self.config_dir = config_dir or Path.home() / ".config" / "dot-man"
+        self.allow_list_path = path or (
+            self.config_dir / ".dotman-allowed-secrets.json"
+        )
+        self._allowed_secrets: list[AllowedSecret] = self._load()
+
+    def _load(self) -> list[AllowedSecret]:
+        """Load allowed secrets from disk."""
+        if not self.allow_list_path.exists():
+            return []
+        try:
+            content = self.allow_list_path.read_text(encoding="utf-8")
+            return json.loads(content)
+        except Exception:
+            return []
+
+    def save(self) -> None:
+        """Save allowed secrets to disk."""
+        try:
+            # Ensure directory exists
+            self.allow_list_path.parent.mkdir(parents=True, exist_ok=True)
+
+            content = json.dumps(self._allowed_secrets, indent=2)
+            self.allow_list_path.write_text(content, encoding="utf-8")
+        except Exception:
+            pass
+
+    def _compute_hash(self, content: str) -> str:
+        """Compute SHA256 hash of the content."""
+        return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+    def is_allowed(
+        self, file_path: Path | str, line_content: str, pattern_name: str
+    ) -> bool:
+        """Check if a secret is in the allow list."""
+        path_str = str(file_path)
+        content_hash = self._compute_hash(line_content)
+
+        for secret in self._allowed_secrets:
+            if (
+                secret["file_path"] == path_str
+                and secret["secret_hash"] == content_hash
+                and secret["pattern_name"] == pattern_name
+            ):
+                return True
+        return False
+
+    def add_allowed(
+        self, file_path: Path | str, line_content: str, pattern_name: str
+    ) -> None:
+        """Add a secret to the allow list."""
+        if self.is_allowed(file_path, line_content, pattern_name):
+            return
+
+        entry: AllowedSecret = {
+            "file_path": str(file_path),
+            "secret_hash": self._compute_hash(line_content),
+            "pattern_name": pattern_name,
+            "added_at": datetime.now().isoformat(),
+        }
+        self._allowed_secrets.append(entry)
+        self.save()
+
+
+class PermanentRedactGuard:
+    """Manages the list of secrets that should always be redacted."""
+
+    def __init__(self, config_dir: Path | None = None, path: Path | None = None):
+        self.config_dir = config_dir or Path.home() / ".config" / "dot-man"
+        self.redact_list_path = path or (
+            self.config_dir / ".dotman-permanent-redact.json"
+        )
+        self._redact_secrets: list[AllowedSecret] = self._load()
+
+    def _load(self) -> list[AllowedSecret]:
+        """Load permanent redact secrets from disk."""
+        if not self.redact_list_path.exists():
+            return []
+        try:
+            content = self.redact_list_path.read_text(encoding="utf-8")
+            return json.loads(content)
+        except Exception:
+            return []
+
+    def save(self) -> None:
+        """Save permanent redact secrets to disk."""
+        try:
+            # Ensure directory exists
+            self.redact_list_path.parent.mkdir(parents=True, exist_ok=True)
+
+            content = json.dumps(self._redact_secrets, indent=2)
+            self.redact_list_path.write_text(content, encoding="utf-8")
+        except Exception:
+            pass
+
+    def _compute_hash(self, content: str) -> str:
+        """Compute SHA256 hash of the content."""
+        return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+    def should_redact(
+        self, file_path: Path | str, line_content: str, pattern_name: str
+    ) -> bool:
+        """Check if a secret should be permanently redacted."""
+        path_str = str(file_path)
+        content_hash = self._compute_hash(line_content)
+
+        for secret in self._redact_secrets:
+            if (
+                secret["file_path"] == path_str
+                and secret["secret_hash"] == content_hash
+                and secret["pattern_name"] == pattern_name
+            ):
+                return True
+        return False
+
+    def add_permanent_redact(
+        self, file_path: Path | str, line_content: str, pattern_name: str
+    ) -> None:
+        """Add a secret to the permanent redact list."""
+        if self.should_redact(file_path, line_content, pattern_name):
+            return
+
+        entry: AllowedSecret = {
+            "file_path": str(file_path),
+            "secret_hash": self._compute_hash(line_content),
+            "pattern_name": pattern_name,
+            "added_at": datetime.now().isoformat(),
+        }
+        self._redact_secrets.append(entry)
+        self.save()
 
 
 class Severity(Enum):
@@ -48,7 +199,9 @@ DEFAULT_PATTERNS: list[SecretPattern] = [
     # CRITICAL - System/Cloud compromise
     SecretPattern(
         name="Private Key",
-        pattern=re.compile(r"-----BEGIN\s+(?:RSA|DSA|EC|OPENSSH|PGP)?\s*PRIVATE KEY-----"),
+        pattern=re.compile(
+            r"-----BEGIN\s+(?:RSA|DSA|EC|OPENSSH|PGP)?\s*PRIVATE KEY-----"
+        ),
         severity=Severity.CRITICAL,
         description="SSH/GPG private key header detected",
     ),
@@ -73,13 +226,17 @@ DEFAULT_PATTERNS: list[SecretPattern] = [
     ),
     SecretPattern(
         name="Generic API Key",
-        pattern=re.compile(r"(?:api[_-]?key|apikey)\s*[=:]\s*['\"]?[\w-]{20,}['\"]?", re.IGNORECASE),
+        pattern=re.compile(
+            r"(?:api[_-]?key|apikey)\s*[=:]\s*['\"]?[\w-]{20,}['\"]?", re.IGNORECASE
+        ),
         severity=Severity.HIGH,
         description="Generic API key assignment",
     ),
     SecretPattern(
         name="Password Assignment",
-        pattern=re.compile(r"(?:password|passwd|pwd)\s*[=:]\s*['\"]?.+['\"]?", re.IGNORECASE),
+        pattern=re.compile(
+            r"(?:password|passwd|pwd)\s*[=:]\s*['\"]?.+['\"]?", re.IGNORECASE
+        ),
         severity=Severity.HIGH,
         description="Password assignment detected",
     ),
@@ -91,7 +248,9 @@ DEFAULT_PATTERNS: list[SecretPattern] = [
     ),
     SecretPattern(
         name="Auth Token",
-        pattern=re.compile(r"(?:auth[_-]?token|token)\s*[=:]\s*['\"]?[\w-]{20,}['\"]?", re.IGNORECASE),
+        pattern=re.compile(
+            r"(?:auth[_-]?token|token)\s*[=:]\s*['\"]?[\w-]{20,}['\"]?", re.IGNORECASE
+        ),
         severity=Severity.HIGH,
         description="Authentication token assignment",
     ),
@@ -104,7 +263,9 @@ DEFAULT_PATTERNS: list[SecretPattern] = [
     ),
     SecretPattern(
         name="Generic Secret",
-        pattern=re.compile(r"(?:secret|credential)\s*[=:]\s*['\"]?.+['\"]?", re.IGNORECASE),
+        pattern=re.compile(
+            r"(?:secret|credential)\s*[=:]\s*['\"]?.+['\"]?", re.IGNORECASE
+        ),
         severity=Severity.MEDIUM,
         description="Generic secret assignment",
     ),
@@ -201,33 +362,86 @@ class SecretScanner:
 
             yield from self.scan_file(path)
 
-    def redact_content(self, content: str) -> tuple[str, int]:
-        """Redact secrets from content. Returns (redacted_content, count)."""
-        redacted = content
-        count = 0
+    def redact_content(
+        self,
+        content: str,
+        callback: Callable[[SecretMatch], str] | None = None,
+        file_path: Path | None = None,
+    ) -> tuple[str, int]:
+        """
+        Redact secrets from content. Returns (redacted_content, count).
 
-        for line_number, line in enumerate(content.splitlines()):
+        Args:
+            content: Text content to redact
+            callback: Optional function that takes a SecretMatch and returns "REDACT" or "KEEP".
+                      If None, all secrets are redacted.
+            file_path: Path to the file being scanned (for context in callback)
+        """
+        redacted_lines = []
+        count = 0
+        file_path = file_path or Path("<string>")
+
+        for line_number, line in enumerate(content.splitlines(), start=1):
+            # precise matching logic needed to handle multiple secrets in one line appropriately
+            # checking for false positives first
             if self.is_false_positive(line):
+                redacted_lines.append(line)
                 continue
 
+            current_line = line
+            line_modified = False
+
             for pattern in self.patterns:
-                match = pattern.pattern.search(line)
+                # We need to find all matches in the line
+                # But simple substitution might mess up indices if we have multiple secrets
+                # For now, let's assume one secret per line or just handle the first one effectively
+                # or strictly use regex sub with a callback if possible, but we need SecretMatch context
+
+                # Simpler approach: Check if line matches, if so, ask user.
+                # If they say Redact, we redact the WHOLE pattern match.
+
+                match = pattern.pattern.search(current_line)
                 if match:
-                    # Replace the matched text with redaction
-                    redacted_line = pattern.pattern.sub(SECRET_REDACTION_TEXT, line)
-                    redacted = redacted.replace(line, redacted_line, 1)
-                    count += 1
+                    should_redact = True
+                    if callback:
+                        secret_match = SecretMatch(
+                            file=file_path,
+                            line_number=line_number,
+                            line_content=line.strip(),
+                            pattern_name=pattern.name,
+                            severity=pattern.severity,
+                            matched_text=match.group(0),
+                        )
+                        action = callback(secret_match)
+                        should_redact = action == "REDACT"
 
-        return redacted, count
+                    if should_redact:
+                        # Replace the matched text with redaction
+                        current_line = pattern.pattern.sub(
+                            SECRET_REDACTION_TEXT, current_line
+                        )
+                        count += 1
+                        line_modified = True
+
+            redacted_lines.append(current_line)
+
+        return "\n".join(redacted_lines), count
 
 
-def filter_secrets(content: str) -> tuple[str, list[SecretMatch]]:
+def filter_secrets(
+    content: str,
+    callback: Callable[[SecretMatch], str] | None = None,
+    file_path: Path | None = None,
+) -> tuple[str, list[SecretMatch]]:
     """Filter secrets from content before saving.
 
     Returns:
         Tuple of (filtered_content, list_of_matches)
     """
     scanner = SecretScanner()
-    matches = list(scanner.scan_content(content))
-    filtered_content, _ = scanner.redact_content(content)
+    # Note: We aren't returning the matches list here perfectly if we use the callback
+    # because the callback might Skip/Ignore them.
+    # But usually we return the list of *detected* secrets for logging.
+    matches = list(scanner.scan_content(content, file_path))
+    filtered_content, _ = scanner.redact_content(content, callback, file_path)
     return filtered_content, matches

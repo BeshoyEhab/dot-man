@@ -2,7 +2,8 @@
 
 import shutil
 from pathlib import Path
-from typing import Iterator
+from pathlib import Path
+from typing import Iterator, Callable
 
 from .constants import REPO_DIR
 from .secrets import filter_secrets, SecretMatch
@@ -18,6 +19,7 @@ def copy_file(
     source: Path,
     destination: Path,
     filter_secrets_enabled: bool = True,
+    secret_handler: Callable[[SecretMatch], str] | None = None,
 ) -> tuple[bool, list[SecretMatch]]:
     """Copy a file from source to destination.
 
@@ -39,7 +41,9 @@ def copy_file(
             # Read and filter content
             try:
                 content = source.read_text(encoding="utf-8")
-                filtered_content, secrets = filter_secrets(content)
+                filtered_content, secrets = filter_secrets(
+                    content, callback=secret_handler, file_path=source
+                )
                 detected_secrets = secrets
                 destination.write_text(filtered_content, encoding="utf-8")
             except UnicodeDecodeError:
@@ -63,10 +67,10 @@ def copy_file(
 def matches_patterns(path: Path, patterns: list[str]) -> bool:
     """Check if a path matches any of the given glob patterns."""
     from fnmatch import fnmatch
-    
+
     name = path.name
     rel_str = str(path)
-    
+
     for pattern in patterns:
         # Match against filename
         if fnmatch(name, pattern):
@@ -84,6 +88,7 @@ def copy_directory(
     include_patterns: list[str] | None = None,
     exclude_patterns: list[str] | None = None,
     ignore_patterns: list[str] | None = None,  # Deprecated, use exclude_patterns
+    secret_handler: Callable[[SecretMatch], str] | None = None,
 ) -> tuple[int, int, list[SecretMatch]]:
     """Copy a directory recursively with pattern filtering.
 
@@ -99,7 +104,9 @@ def copy_directory(
         Tuple of (files_copied, files_failed, detected_secrets)
     """
     include_patterns = include_patterns or []
-    exclude_patterns = exclude_patterns if exclude_patterns is not None else (ignore_patterns or [])
+    exclude_patterns = (
+        exclude_patterns if exclude_patterns is not None else (ignore_patterns or [])
+    )
     files_copied = 0
     files_failed = 0
     all_secrets: list[SecretMatch] = []
@@ -109,18 +116,22 @@ def copy_directory(
             continue
 
         relative = src_path.relative_to(source)
-        
+
         # Check exclude patterns first
         if exclude_patterns and matches_patterns(relative, exclude_patterns):
             continue
-        
+
         # Check include patterns (if specified, file must match at least one)
         if include_patterns and not matches_patterns(relative, include_patterns):
             continue
 
         dest_path = destination / relative
 
-        success, secrets = copy_file(src_path, dest_path, filter_secrets_enabled)
+        dest_path = destination / relative
+
+        success, secrets = copy_file(
+            src_path, dest_path, filter_secrets_enabled, secret_handler=secret_handler
+        )
         all_secrets.extend(secrets)
 
         if success:
@@ -144,6 +155,7 @@ def compare_files(file1: Path, file2: Path) -> bool:
         if file1.is_dir() and file2.is_dir():
             # Compare directories
             from filecmp import dircmp
+
             dcmp = dircmp(file1, file2)
             if dcmp.diff_files or dcmp.left_only or dcmp.right_only or dcmp.funny_files:
                 return False
@@ -152,15 +164,13 @@ def compare_files(file1: Path, file2: Path) -> bool:
                 if not compare_files(file1 / subdir, file2 / subdir):
                     return False
             return True
-            
+
         return file1.read_bytes() == file2.read_bytes()
     except Exception:
         return False
 
 
-def get_file_status(
-    local_path: Path, repo_path: Path
-) -> str:
+def get_file_status(local_path: Path, repo_path: Path) -> str:
     """Get the status of a file compared to repo.
 
     Returns:

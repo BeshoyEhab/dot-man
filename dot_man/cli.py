@@ -6,6 +6,7 @@ import subprocess
 from datetime import datetime
 from functools import wraps
 from pathlib import Path
+from typing import Callable
 
 import click
 from rich.console import Console
@@ -31,10 +32,83 @@ from .exceptions import (
     NotInitializedError,
     AlreadyInitializedError,
     GitNotFoundError,
+    GitNotFoundError,
     SecretsDetectedError,
+)
+from .secrets import (
+    SecretScanner,
+    Severity,
+    SecretGuard,
+    SecretMatch,
+    PermanentRedactGuard,
 )
 
 console = Console()
+
+
+def get_secret_handler() -> Callable[[SecretMatch], str]:
+    """Get a secret handler that prompts the user for action."""
+    guard = SecretGuard()
+    permanent_guard = PermanentRedactGuard()
+
+    def handle_secret(match: SecretMatch) -> str:
+        # Check if should be permanently redacted
+        if permanent_guard.should_redact(
+            match.file, match.line_content, match.pattern_name
+        ):
+            return "REDACT"
+
+        # Check if already in skip list
+        if guard.is_allowed(match.file, match.line_content, match.pattern_name):
+            return "IGNORE"
+
+        # Show the secret to user
+        console.print()
+        console.print(f"[red]⚠️  Potential secret detected![/red]")
+        console.print(f"File: [cyan]{match.file}[/cyan]")
+        console.print(f"Line {match.line_number}: {match.line_content[:80]}...")
+        console.print(
+            f"Pattern: {match.pattern_name} (severity: {match.severity.value})"
+        )
+        console.print()
+
+        # Options
+        console.print("Choose how to handle this secret:")
+        console.print("  1. [dim]Ignore (skip it this time)[/dim]")
+        console.print(
+            "  2. [yellow]Protect (replace with ***REDACTED*** this time)[/yellow]"
+        )
+        console.print("  3. [blue]Add to skip list (skip this line every time)[/blue]")
+        console.print("  4. [red]Protect forever (always replace in repo)[/red]")
+        console.print()
+
+        while True:
+            try:
+                choice = click.prompt("Enter choice (1-4)", type=int, default=2)
+                if choice not in (1, 2, 3, 4):
+                    console.print("[red]Invalid choice. Please enter 1-4.[/red]")
+                    continue
+
+                if choice == 1:
+                    return "IGNORE"
+                elif choice == 2:
+                    return "REDACT"
+                elif choice == 3:
+                    guard.add_allowed(
+                        match.file, match.line_content, match.pattern_name
+                    )
+                    console.print("[blue]Added to skip list.[/blue]")
+                    return "IGNORE"
+                elif choice == 4:
+                    permanent_guard.add_permanent_redact(
+                        match.file, match.line_content, match.pattern_name
+                    )
+                    console.print("[red]Will always redact this secret.[/red]")
+                    return "REDACT"
+            except (ValueError, click.Abort):
+                console.print("[red]Invalid input. Please enter a number 1-4.[/red]")
+
+    return handle_secret
 
 
 def complete_branches(ctx, param, incomplete):
@@ -110,11 +184,14 @@ def init(force: bool, no_wizard: bool):
         error("Git not found. Please install git first.", exit_code=2)
 
     if DOT_MAN_DIR.exists() and not force:
-        if not confirm("Repository already initialized. Reinitialize? (This will DELETE all data)"):
+        if not confirm(
+            "Repository already initialized. Reinitialize? (This will DELETE all data)"
+        ):
             console.print("Aborted.")
             sys.exit(1)
 
         import shutil
+
         shutil.rmtree(DOT_MAN_DIR)
 
     try:
@@ -141,9 +218,15 @@ def init(force: bool, no_wizard: bool):
 
         # Success message
         console.print()
-        console.print("╭─────────────────────────────────────────────────╮", style="green")
-        console.print("│  🎉 dot-man initialized successfully!           │", style="green bold")
-        console.print("╰─────────────────────────────────────────────────╯", style="green")
+        console.print(
+            "╭─────────────────────────────────────────────────╮", style="green"
+        )
+        console.print(
+            "│  🎉 dot-man initialized successfully!           │", style="green bold"
+        )
+        console.print(
+            "╰─────────────────────────────────────────────────╯", style="green"
+        )
         console.print()
 
         # Run wizard by default (unless --no-wizard)
@@ -156,17 +239,21 @@ def init(force: bool, no_wizard: bool):
         error(f"Initialization failed: {e}")
 
 
-def run_setup_wizard(global_config: GlobalConfig, dotman_config: DotManConfig, git: GitManager):
+def run_setup_wizard(
+    global_config: GlobalConfig, dotman_config: DotManConfig, git: GitManager
+):
     """Interactive setup wizard for new users."""
     console.print("[bold cyan]🧙 Setup Wizard[/bold cyan]")
     console.print()
-    console.print("Let's get your dotfiles set up! I'll detect common files automatically.")
+    console.print(
+        "Let's get your dotfiles set up! I'll detect common files automatically."
+    )
     console.print()
-    
+
     # Detect common dotfiles
     console.print("[bold]Detecting dotfiles...[/bold]")
     console.print()
-    
+
     common_files = [
         ("~/.bashrc", "Bash shell", "bashrc"),
         ("~/.zshrc", "Zsh shell", "zshrc"),
@@ -181,10 +268,10 @@ def run_setup_wizard(global_config: GlobalConfig, dotman_config: DotManConfig, g
         ("~/.tmux.conf", "tmux", "tmux"),
         ("~/.ssh/config", "SSH config", "ssh-config"),
     ]
-    
+
     files_to_add = []
     found_count = 0
-    
+
     for path_str, desc, section_name in common_files:
         path = Path(path_str).expanduser()
         if path.exists():
@@ -192,13 +279,13 @@ def run_setup_wizard(global_config: GlobalConfig, dotman_config: DotManConfig, g
             console.print(f"  [green]✓[/green] Found: [cyan]{path_str}[/cyan] ({desc})")
             if confirm(f"    Track this?", default=True):
                 files_to_add.append((path_str, section_name))
-    
+
     if found_count == 0:
         console.print("  [dim]No common dotfiles detected in default locations[/dim]")
         console.print()
     else:
         console.print()
-    
+
     # Offer to add custom files
     if confirm("Add custom files not in the list?", default=False):
         console.print()
@@ -206,32 +293,32 @@ def run_setup_wizard(global_config: GlobalConfig, dotman_config: DotManConfig, g
             custom_path = click.prompt(
                 "Path to track (or press Enter to finish)",
                 default="",
-                show_default=False
+                show_default=False,
             )
-            
+
             if not custom_path:
                 break
-            
+
             path = Path(custom_path).expanduser()
             if not path.exists():
                 warn(f"Path doesn't exist: {custom_path}")
                 continue
-            
+
             # Auto-generate section name from path
-            if path.name.startswith('.'):
+            if path.name.startswith("."):
                 default_section = path.name[1:] if path.suffix else path.name[1:]
             else:
                 default_section = path.stem or path.name
-            
+
             section_name = click.prompt("Section name", default=default_section)
             files_to_add.append((custom_path, section_name))
-    
+
     # Add files to config
     if files_to_add:
         console.print()
         console.print(f"[bold]Adding {len(files_to_add)} files...[/bold]")
         console.print()
-        
+
         for path_str, section_name in files_to_add:
             try:
                 # Minimal config - only path needed!
@@ -244,50 +331,56 @@ def run_setup_wizard(global_config: GlobalConfig, dotman_config: DotManConfig, g
                 console.print(f"  [green]✓[/green] [{section_name}]: {path_str}")
             except Exception as e:
                 warn(f"Could not add {path_str}: {e}")
-        
+
         dotman_config.save()
-        
+
         # Commit the initial config
         git.add_all()
         git.commit("Add initial dotfiles configuration")
-        
+
         console.print()
         success(f"Added {len(files_to_add)} files to configuration")
         console.print()
-        
+
         # Show what was configured
         console.print("[bold]Your dotfiles are now tracked:[/bold]")
         for path_str, section_name in files_to_add[:5]:
             console.print(f"  • [{section_name}] {path_str}")
         if len(files_to_add) > 5:
             console.print(f"  ... and {len(files_to_add) - 5} more")
-    
+
     console.print()
-    
+
     # Offer remote setup
     if confirm("Set up remote repository for syncing? (optional)", default=False):
         console.print()
         ctx = click.Context(setup)
         ctx.invoke(setup)
-    
+
     # Final instructions
     console.print()
     console.print("╭─────────────────────────────────────────────────╮", style="cyan")
-    console.print("│            🎉 Setup Complete!                   │", style="cyan bold")
+    console.print(
+        "│            🎉 Setup Complete!                   │", style="cyan bold"
+    )
     console.print("╰─────────────────────────────────────────────────╯", style="cyan")
     console.print()
-    
+
     if files_to_add:
         console.print("[bold]Next steps:[/bold]")
-        console.print("  1. [cyan]dot-man status[/cyan]       - View your tracked files")
-        console.print("  2. [cyan]dot-man switch work[/cyan]  - Create a work configuration branch")
+        console.print(
+            "  1. [cyan]dot-man status[/cyan]       - View your tracked files"
+        )
+        console.print(
+            "  2. [cyan]dot-man switch work[/cyan]  - Create a work configuration branch"
+        )
         console.print("  3. [cyan]dot-man add <path>[/cyan]   - Track more files")
     else:
         console.print("[bold]Get started:[/bold]")
         console.print("  [cyan]dot-man add ~/.bashrc[/cyan]   - Add files to track")
         console.print("  [cyan]dot-man edit[/cyan]            - Edit config file")
         console.print("  [cyan]dot-man status[/cyan]          - View status")
-    
+
     console.print()
     console.print("[dim]💡 Run 'dot-man --help' to see all commands[/dim]")
     console.print()
@@ -300,15 +393,24 @@ def show_quick_start():
     console.print("[bold cyan]Adding files to track:[/bold cyan]")
     console.print("  dot-man add ~/.bashrc              [dim]# Single file[/dim]")
     console.print("  dot-man add ~/.config/nvim         [dim]# Directory[/dim]")
-    console.print("  dot-man edit                       [dim]# Edit config manually[/dim]")
+    console.print(
+        "  dot-man edit                       [dim]# Edit config manually[/dim]"
+    )
     console.print()
     console.print("[bold cyan]Managing configurations:[/bold cyan]")
-    console.print("  dot-man status                     [dim]# View tracked files[/dim]")
-    console.print("  dot-man switch main                [dim]# Save current state[/dim]")
-    console.print("  dot-man switch work                [dim]# Create work branch[/dim]")
+    console.print(
+        "  dot-man status                     [dim]# View tracked files[/dim]"
+    )
+    console.print(
+        "  dot-man switch main                [dim]# Save current state[/dim]"
+    )
+    console.print(
+        "  dot-man switch work                [dim]# Create work branch[/dim]"
+    )
     console.print()
     console.print("[dim]💡 Tip: Config is at ~/.config/dot-man/repo/dot-man.toml[/dim]")
     console.print()
+
 
 # ============================================================================
 # add Command
@@ -317,11 +419,30 @@ def show_quick_start():
 
 @main.command()
 @click.argument("path", type=click.Path(exists=True))
-@click.option("--section", "-s", help="Section name (default: auto-generated from path)")
-@click.option("--repo-base", "-r", help="Base directory in repo (default: section name)")
-@click.option("--exclude", "-e", multiple=True, help="Patterns to exclude (can be specified multiple times)")
-@click.option("--include", "-i", multiple=True, help="Patterns to include (can be specified multiple times)")
-@click.option("--inherits", "-t", multiple=True, help="Templates to inherit from (can be specified multiple times)")
+@click.option(
+    "--section", "-s", help="Section name (default: auto-generated from path)"
+)
+@click.option(
+    "--repo-base", "-r", help="Base directory in repo (default: section name)"
+)
+@click.option(
+    "--exclude",
+    "-e",
+    multiple=True,
+    help="Patterns to exclude (can be specified multiple times)",
+)
+@click.option(
+    "--include",
+    "-i",
+    multiple=True,
+    help="Patterns to include (can be specified multiple times)",
+)
+@click.option(
+    "--inherits",
+    "-t",
+    multiple=True,
+    help="Templates to inherit from (can be specified multiple times)",
+)
 @click.option("--post-deploy", help="Command to run after deploying")
 @click.option("--pre-deploy", help="Command to run before deploying")
 @require_init
@@ -347,23 +468,25 @@ def add(
     """
     try:
         from .files import copy_file, copy_directory
-        
+
         local_path = Path(path).expanduser().resolve()
-        
+
         # Auto-generate section name if not provided
         if not section:
             # Use parent dir name for config dirs, or filename for single files
-            if local_path.is_dir() and str(local_path).startswith(str(Path.home() / ".config")):
+            if local_path.is_dir() and str(local_path).startswith(
+                str(Path.home() / ".config")
+            ):
                 section = local_path.name
             else:
                 section = local_path.stem or local_path.name
-        
+
         repo_base = repo_base or section
-        
+
         # Load config
         global_config = GlobalConfig()
         global_config.load()
-        
+
         dotman_config = DotManConfig(global_config=global_config)
         try:
             dotman_config.load()
@@ -371,18 +494,20 @@ def add(
             # Config might not exist yet, create it
             dotman_config.create_default()
             dotman_config.load()
-        
+
         # Check for duplicates
         existing_sections = dotman_config.get_section_names()
         if section in existing_sections:
-            error(f"Section '{section}' already exists. Use a different --section name.")
-        
+            error(
+                f"Section '{section}' already exists. Use a different --section name."
+            )
+
         # Convert to home-relative path for config
         path_str = str(local_path)
         home = str(Path.home())
         if path_str.startswith(home):
             path_str = path_str.replace(home, "~", 1)
-            
+
         # Add section to config
         dotman_config.add_section(
             name=section,
@@ -395,14 +520,20 @@ def add(
             pre_deploy=pre_deploy,
         )
         dotman_config.save()
-        
+
         # Copy content to repo
         repo_dest = REPO_DIR / repo_base
-        
+
         if local_path.is_file():
             repo_dest = repo_dest / local_path.name
             try:
-                success_copy, secrets = copy_file(local_path, repo_dest, filter_secrets_enabled=True)
+                secret_handler = get_secret_handler()
+                success_copy, secrets = copy_file(
+                    local_path,
+                    repo_dest,
+                    filter_secrets_enabled=True,
+                    secret_handler=secret_handler,
+                )
                 if success_copy:
                     success(f"Added file: {local_path}")
                     console.print(f"  Section: [cyan][{section}][/cyan]")
@@ -416,12 +547,14 @@ def add(
             except Exception as e:
                 error(f"Error copying file {local_path}: {e}")
         else:
+            secret_handler = get_secret_handler()
             copied, failed, secrets = copy_directory(
-                local_path, 
+                local_path,
                 repo_dest,
                 filter_secrets_enabled=True,
                 exclude_patterns=list(exclude) if exclude else None,
                 include_patterns=list(include) if include else None,
+                secret_handler=secret_handler,
             )
             success(f"Added directory: {local_path}")
             console.print(f"  Section: [cyan][{section}][/cyan]")
@@ -429,14 +562,14 @@ def add(
             console.print(f"  Files: {copied} copied, {failed} failed")
             if secrets:
                 warn(f"{len(secrets)} secrets were redacted")
-        
+
         # Show info about templates
         if inherits:
             console.print(f"  Inherits: {', '.join(inherits)}")
-        
+
         console.print()
         console.print("[dim]Run 'dot-man switch <branch>' to commit changes.[/dim]")
-        
+
     except DotManError as e:
         error(str(e), e.exit_code)
     except Exception as e:
@@ -460,9 +593,9 @@ def status(verbose: bool, secrets: bool):
     """
     try:
         from .operations import get_operations
-        
+
         ops = get_operations()
-        
+
         # Repository info panel
         branch = ops.current_branch
         remote = ops.global_config.remote_url or "[dim]Not configured[/dim]"
@@ -474,15 +607,21 @@ def status(verbose: bool, secrets: bool):
         info_table.add_row("Remote:", remote)
         info_table.add_row("Repository:", str(REPO_DIR))
 
-        console.print(Panel(info_table, title="[bold]Repository Status[/bold]", border_style="blue"))
+        console.print(
+            Panel(
+                info_table, title="[bold]Repository Status[/bold]", border_style="blue"
+            )
+        )
         console.print()
 
         # Get status summary
         summary = ops.get_status_summary()
-        
+
         section_names = ops.get_sections()
         if not section_names:
-            console.print("[dim]No sections tracked. Run 'dot-man add <path>' to add files.[/dim]")
+            console.print(
+                "[dim]No sections tracked. Run 'dot-man add <path>' to add files.[/dim]"
+            )
             return
 
         file_table = Table(title=f"Tracked Sections ({len(section_names)})")
@@ -502,31 +641,31 @@ def status(verbose: bool, secrets: bool):
 
         for section_name in section_names[:10]:  # Limit display
             section = ops.get_section(section_name)
-            
+
             # Section header
             file_table.add_row(
                 f"[bold magenta][{section_name}][/bold magenta]",
                 "",
-                f"inherits: {', '.join(section.inherits)}" if section.inherits else ""
+                f"inherits: {', '.join(section.inherits)}" if section.inherits else "",
             )
-            
+
             # Files under section
             path_count = 0
             for local_path, repo_path, file_status in ops.iter_section_paths(section):
                 if path_count >= 5:  # Limit per section
                     file_table.add_row("  [dim]... more files[/dim]", "", "")
                     break
-                
+
                 color = status_colors.get(file_status, "white")
-                
+
                 # Icon
                 icon = "📁" if local_path.is_dir() else "📄"
-                
+
                 # Shorten path
                 display_path = str(local_path).replace(str(Path.home()), "~")
                 if len(display_path) > 35:
                     display_path = "..." + display_path[-32:]
-                
+
                 details = ""
                 if file_status == "MODIFIED" and verbose:
                     details = "Content differs"
@@ -547,18 +686,24 @@ def status(verbose: bool, secrets: bool):
                 path_count += 1
 
         if len(section_names) > 10:
-            file_table.add_row(f"[dim]... +{len(section_names) - 10} more sections[/dim]", "", "")
+            file_table.add_row(
+                f"[dim]... +{len(section_names) - 10} more sections[/dim]", "", ""
+            )
 
         console.print(file_table)
 
         # Summary
         console.print()
-        console.print(f"[dim]Summary: {summary['modified']} modified, {summary['new']} new, {summary['deleted']} deleted, {summary['identical']} identical[/dim]")
+        console.print(
+            f"[dim]Summary: {summary['modified']} modified, {summary['new']} new, {summary['deleted']} deleted, {summary['identical']} identical[/dim]"
+        )
 
         # Secrets warning
         if secrets_found:
             console.print()
-            warn(f"{len(secrets_found)} potential secrets detected. Run 'dot-man audit' for details.")
+            warn(
+                f"{len(secrets_found)} potential secrets detected. Run 'dot-man audit' for details."
+            )
 
         # Git status
         if ops.git.is_dirty():
@@ -578,7 +723,9 @@ def status(verbose: bool, secrets: bool):
 
 @main.command()
 @click.argument("branch", shell_complete=complete_branches)
-@click.option("--dry-run", is_flag=True, help="Show what would happen without making changes")
+@click.option(
+    "--dry-run", is_flag=True, help="Show what would happen without making changes"
+)
 @click.option("--force", is_flag=True, help="Skip confirmation prompts")
 @require_init
 def switch(branch: str, dry_run: bool, force: bool):
@@ -591,7 +738,7 @@ def switch(branch: str, dry_run: bool, force: bool):
     """
     try:
         from .operations import get_operations
-        
+
         ops = get_operations()
         current_branch = ops.current_branch
 
@@ -605,7 +752,9 @@ def switch(branch: str, dry_run: bool, force: bool):
             console.print()
 
         # Phase 1: Save current branch state
-        console.print(f"[bold]Phase 1:[/bold] Saving current branch '{current_branch}'...")
+        console.print(
+            f"[bold]Phase 1:[/bold] Saving current branch '{current_branch}'..."
+        )
 
         if dry_run:
             # Show what would be saved
@@ -615,12 +764,15 @@ def switch(branch: str, dry_run: bool, force: bool):
                     if status != "IDENTICAL":
                         console.print(f"  Would save: {local_path} [{status}]")
         else:
-            saved_count, secrets = ops.save_all()
+            secret_handler = get_secret_handler()
+            saved_count, secrets = ops.save_all(secret_handler)
             if secrets:
                 warn(f"{len(secrets)} secrets were redacted during save")
-            
+
             # Commit
-            commit_msg = f"Auto-save from '{current_branch}' before switch to '{branch}'"
+            commit_msg = (
+                f"Auto-save from '{current_branch}' before switch to '{branch}'"
+            )
             commit_sha = ops.git.commit(commit_msg)
             if commit_sha:
                 console.print(f"  Committed: [dim]{commit_sha[:7]}[/dim]")
@@ -638,10 +790,10 @@ def switch(branch: str, dry_run: bool, force: bool):
                 console.print(f"  Would create new branch: {branch}")
         else:
             ops.git.checkout(branch, create=not branch_exists)
-            
+
             if not branch_exists:
                 console.print(f"  Created new branch: [cyan]{branch}[/cyan]")
-            
+
             # Reload config for new branch (IMPORTANT for per-branch configs)
             ops.reload_config()
 
@@ -655,32 +807,40 @@ def switch(branch: str, dry_run: bool, force: bool):
                 section = ops.get_section(section_name)
                 for local_path, repo_path, _ in ops.iter_section_paths(section):
                     if repo_path.exists():
-                        will_change = not local_path.exists() or not compare_files(repo_path, local_path)
+                        will_change = not local_path.exists() or not compare_files(
+                            repo_path, local_path
+                        )
                         console.print(f"  Would deploy: {local_path}")
                         if will_change:
                             if section.pre_deploy:
-                                console.print(f"    [dim]Pre-hook:[/dim] {section.pre_deploy}")
+                                console.print(
+                                    f"    [dim]Pre-hook:[/dim] {section.pre_deploy}"
+                                )
                             if section.post_deploy:
-                                console.print(f"    [dim]Post-hook:[/dim] {section.post_deploy}")
+                                console.print(
+                                    f"    [dim]Post-hook:[/dim] {section.post_deploy}"
+                                )
                         else:
                             console.print("    [dim](No changes needed)[/dim]")
         else:
             # Collect hooks
             pre_hooks: list[str] = []
             post_hooks: list[str] = []
-            
+
             for section_name in ops.get_sections():
                 section = ops.get_section(section_name)
                 for local_path in section.paths:
                     repo_path = section.get_repo_path(local_path, REPO_DIR)
                     if repo_path.exists():
-                        will_change = not local_path.exists() or not compare_files(repo_path, local_path)
+                        will_change = not local_path.exists() or not compare_files(
+                            repo_path, local_path
+                        )
                         if will_change:
                             if section.pre_deploy:
                                 pre_hooks.append(section.pre_deploy)
                             if section.post_deploy:
                                 post_hooks.append(section.post_deploy)
-            
+
             # Run pre-deploy hooks
             pre_hooks = list(dict.fromkeys(pre_hooks))
             if pre_hooks:
@@ -694,14 +854,14 @@ def switch(branch: str, dry_run: bool, force: bool):
                     except Exception as e:
                         warn(f"Failed to run command '{cmd}': {e}")
                 console.print()
-            
+
             # Deploy
             deployed_count, _, _ = ops.deploy_all()
-            
+
             # Update global config
             ops.global_config.current_branch = branch
             ops.global_config.save()
-            
+
             # Run post-deploy hooks
             post_hooks = list(dict.fromkeys(post_hooks))
             if post_hooks:
@@ -749,7 +909,7 @@ def edit(editor: str | None, edit_global: bool):
     """
     try:
         from .constants import GLOBAL_TOML, DOT_MAN_TOML
-        
+
         if edit_global:
             target = GLOBAL_TOML
             desc = "global configuration"
@@ -767,7 +927,7 @@ def edit(editor: str | None, edit_global: bool):
             config_editor = global_config.editor
         except (FileNotFoundError, DotManError):
             config_editor = None
-        
+
         editor_cmd = editor or config_editor or get_editor()
         console.print(f"Opening {desc} in [cyan]{editor_cmd}[/cyan]...")
 
@@ -817,7 +977,7 @@ def deploy(branch: str, force: bool, dry_run: bool):
     """
     try:
         from .operations import get_operations
-        
+
         ops = get_operations()
         git = ops.git
 
@@ -827,16 +987,18 @@ def deploy(branch: str, force: bool, dry_run: bool):
             error(f"Branch '{branch}' not found. Available: {available}")
 
         if not force and not dry_run:
-            console.print(Panel(
-                "[yellow]WARNING: Deploy will OVERWRITE local files![/yellow]\n\n"
-                "This will:\n"
-                f"• Deploy '{branch}' configuration\n"
-                "• Overwrite existing dotfiles\n"
-                "• Local changes will be LOST\n\n"
-                "[dim]Typical use: Setting up a new machine[/dim]",
-                title="⚠️  Destructive Operation",
-                border_style="yellow"
-            ))
+            console.print(
+                Panel(
+                    "[yellow]WARNING: Deploy will OVERWRITE local files![/yellow]\n\n"
+                    "This will:\n"
+                    f"• Deploy '{branch}' configuration\n"
+                    "• Overwrite existing dotfiles\n"
+                    "• Local changes will be LOST\n\n"
+                    "[dim]Typical use: Setting up a new machine[/dim]",
+                    title="⚠️  Destructive Operation",
+                    border_style="yellow",
+                )
+            )
 
             if not confirm("Continue?"):
                 console.print("Aborted.")
@@ -866,7 +1028,7 @@ def deploy(branch: str, force: bool, dry_run: bool):
         # Pass 1: Collect hooks and potential changes
         for section_name in section_names:
             section = ops.get_section(section_name)
-            
+
             for local_path in section.paths:
                 repo_path = section.get_repo_path(local_path, REPO_DIR)
 
@@ -876,14 +1038,16 @@ def deploy(branch: str, force: bool, dry_run: bool):
                     continue
 
                 # Check if file will change
-                will_change = not local_path.exists() or not compare_files(repo_path, local_path)
-                
+                will_change = not local_path.exists() or not compare_files(
+                    repo_path, local_path
+                )
+
                 if will_change:
                     if section.pre_deploy:
                         pre_hooks.append(section.pre_deploy)
                     if section.post_deploy:
                         post_hooks.append(section.post_deploy)
-                
+
                 sections_to_deploy.append((section, local_path, repo_path, will_change))
 
         # Run pre-deploy hooks
@@ -908,21 +1072,25 @@ def deploy(branch: str, force: bool, dry_run: bool):
                     if section.pre_deploy:
                         console.print(f"    [dim]Pre-hook:[/dim]  {section.pre_deploy}")
                     if section.post_deploy:
-                        console.print(f"    [dim]Post-hook:[/dim] {section.post_deploy}")
+                        console.print(
+                            f"    [dim]Post-hook:[/dim] {section.post_deploy}"
+                        )
                 else:
                     console.print("    [dim](No changes needed)[/dim]")
             else:
                 if not will_change:
-                     # Optimization: Skip copy if identical
-                     console.print(f"  [dim]-[/dim] {local_path} (unchanged)")
-                     deployed += 1 
-                     continue
+                    # Optimization: Skip copy if identical
+                    console.print(f"  [dim]-[/dim] {local_path} (unchanged)")
+                    deployed += 1
+                    continue
 
                 if section.update_strategy == "rename_old" and local_path.exists():
                     backup_file(local_path)
 
                 if section.update_strategy != "ignore":
-                    success_copy, _ = copy_file(repo_path, local_path, filter_secrets_enabled=False)
+                    success_copy, _ = copy_file(
+                        repo_path, local_path, filter_secrets_enabled=False
+                    )
                     if success_copy:
                         console.print(f"  [green]✓[/green] {local_path}")
                         deployed += 1
@@ -948,7 +1116,9 @@ def deploy(branch: str, force: bool, dry_run: bool):
 
         console.print()
         if dry_run:
-            console.print(f"[dim]Dry run: {len(sections_to_deploy)} files would be deployed[/dim]")
+            console.print(
+                f"[dim]Dry run: {len(sections_to_deploy)} files would be deployed[/dim]"
+            )
         else:
             success(f"Deployed {deployed} files from '{branch}'")
 
@@ -964,7 +1134,9 @@ def deploy(branch: str, force: bool, dry_run: bool):
 
 
 @main.command()
-@click.option("--strict", is_flag=True, help="Exit with error if secrets found (for CI/CD)")
+@click.option(
+    "--strict", is_flag=True, help="Exit with error if secrets found (for CI/CD)"
+)
 @click.option("--fix", is_flag=True, help="Automatically redact found secrets")
 @require_init
 def audit(strict: bool, fix: bool):
@@ -977,13 +1149,25 @@ def audit(strict: bool, fix: bool):
     """
     try:
         scanner = SecretScanner()
+        guard = SecretGuard()
+        permanent_guard = PermanentRedactGuard()
 
         console.print("🔒 [bold]Security Audit[/bold]")
         console.print()
         console.print(f"Scanning [cyan]{REPO_DIR}[/cyan]...")
         console.print()
 
-        matches = list(scanner.scan_directory(REPO_DIR))
+        all_matches = list(scanner.scan_directory(REPO_DIR))
+
+        # Filter out allowed or permanently redacted secrets
+        matches = [
+            match
+            for match in all_matches
+            if not guard.is_allowed(match.file, match.line_content, match.pattern_name)
+            and not permanent_guard.should_redact(
+                match.file, match.line_content, match.pattern_name
+            )
+        ]
 
         if not matches:
             success("No secrets detected. Repository is clean!")
@@ -1019,18 +1203,24 @@ def audit(strict: bool, fix: bool):
             for match in items:
                 rel_path = match.file.relative_to(REPO_DIR)
                 console.print(f"  File: [cyan]{rel_path}[/cyan]")
-                console.print(f"  Line {match.line_number}: {match.line_content[:60]}...")
+                console.print(
+                    f"  Line {match.line_number}: {match.line_content[:60]}..."
+                )
                 console.print(f"  Pattern: {match.pattern_name}")
                 console.print()
 
         # Summary
         console.print("─" * 50)
-        console.print(f"[bold]Total:[/bold] {len(matches)} secrets in {len(set(m.file for m in matches))} files")
+        console.print(
+            f"[bold]Total:[/bold] {len(matches)} secrets in {len(set(m.file for m in matches))} files"
+        )
         console.print()
 
         # Recommendations
         console.print("[bold]Recommendations:[/bold]")
-        console.print("  1. Enable [cyan]secrets_filter = true[/cyan] for affected files")
+        console.print(
+            "  1. Enable [cyan]secrets_filter = true[/cyan] for affected files"
+        )
         console.print("  2. Move credentials to environment variables")
         console.print("  3. Run [cyan]dot-man audit --fix[/cyan] to auto-redact")
 
@@ -1051,7 +1241,9 @@ def audit(strict: bool, fix: bool):
                 if count > 0:
                     match.file.write_text(redacted)
                     fixed_files.add(match.file)
-                    console.print(f"  [green]✓[/green] Redacted {count} secrets in {match.file.name}")
+                    console.print(
+                        f"  [green]✓[/green] Redacted {count} secrets in {match.file.name}"
+                    )
 
             # Commit changes
             git = GitManager()
@@ -1137,17 +1329,18 @@ def branch_delete(name: str, force: bool):
     except DotManError as e:
         # Import locally to avoid circular import issues if placed at top
         from .exceptions import BranchNotMergedError
+
         if isinstance(e, BranchNotMergedError):
             if confirm(f"Branch '{name}' is not fully merged. Force delete?"):
-                 try:
-                     git.delete_branch(name, force=True)
-                     success(f"Deleted branch '{name}'")
-                     return
-                 except Exception as e2:
-                     error(f"Failed to force delete: {e2}")
+                try:
+                    git.delete_branch(name, force=True)
+                    success(f"Deleted branch '{name}'")
+                    return
+                except Exception as e2:
+                    error(f"Failed to force delete: {e2}")
             else:
-                 console.print("Aborted.")
-                 return
+                console.print("Aborted.")
+                return
 
         error(str(e), e.exit_code)
     except Exception as e:
@@ -1170,19 +1363,19 @@ def remote():
 @require_init
 def remote_set(url: str):
     """Set the remote repository URL.
-    
+
     Example: dot-man remote set https://github.com/user/dotfiles.git
     """
     try:
         git = GitManager()
         git.set_remote(url)
-        
+
         # Also save to global.conf
         global_config = GlobalConfig()
         global_config.load()
         global_config.remote_url = url
         global_config.save()
-        
+
         success(f"Remote set to: {url}")
     except DotManError as e:
         error(str(e), e.exit_code)
@@ -1219,41 +1412,41 @@ def remote_get():
 @require_init
 def sync(push_only: bool, pull_only: bool):
     """Sync with remote repository.
-    
+
     Pulls changes from remote (with rebase), then pushes local changes.
     Use this to keep dotfiles in sync across multiple machines.
-    
+
     Example: dot-man sync
     """
     try:
         git = GitManager()
-        
+
         if not git.has_remote():
             error("No remote configured. Use 'dot-man remote set <url>' first.")
-        
+
         current = git.current_branch()
         console.print(f"Syncing branch [bold]{current}[/bold] with remote...")
         console.print()
-        
+
         # Pull first (unless push-only)
         if not push_only:
             console.print("[bold]Fetching...[/bold]")
             git.fetch()
-            
+
             console.print("[bold]Pulling...[/bold]")
             pull_result = git.pull(rebase=True)
             console.print(f"  {pull_result}")
             console.print()
-        
+
         # Push (unless pull-only)
         if not pull_only:
             console.print("[bold]Pushing...[/bold]")
             push_result = git.push()
             console.print(f"  {push_result}")
             console.print()
-        
+
         success("Sync complete!")
-        
+
     except DotManError as e:
         error(str(e), e.exit_code)
     except Exception as e:
@@ -1269,9 +1462,9 @@ def sync(push_only: bool, pull_only: bool):
 @require_init
 def tui():
     """Interactive TUI for managing dotfiles.
-    
+
     Navigate with arrow keys, press Enter to switch branches.
-    
+
     Keys:
         Enter - Switch to selected branch
         c     - Open command palette
@@ -1282,7 +1475,7 @@ def tui():
         r     - Refresh
         ?     - Show help
         q     - Quit
-    
+
     Requires: pip install dot-man[tui]
     """
     try:
@@ -1295,32 +1488,31 @@ def tui():
         console.print("  or")
         console.print("  [cyan]pip install dot-man[tui][/cyan]")
         return
-    
+
     try:
         result = run_tui()
-        
+
         if result:
             action, data = result
-            
+
             if action == "switch" and data:
                 ctx = click.Context(switch)
                 ctx.invoke(switch, branch=data, dry_run=False, force=True)
-                
+
             elif action == "sync":
                 ctx = click.Context(sync)
                 ctx.invoke(sync, push_only=False, pull_only=False)
-                
+
             elif action == "deploy" and data:
                 ctx = click.Context(deploy)
                 ctx.invoke(deploy, branch=data, force=True, dry_run=False)
-                
+
             elif action == "run" and data:
                 # Run arbitrary dot-man command
                 subprocess.run(
-                    [sys.executable, "-m", "dot_man.cli"] + data,
-                    check=False
+                    [sys.executable, "-m", "dot_man.cli"] + data, check=False
                 )
-                
+
     except DotManError as e:
         error(str(e), e.exit_code)
     except Exception as e:
@@ -1336,44 +1528,53 @@ def tui():
 @require_init
 def setup():
     """Set up remote repository for syncing.
-    
+
     Guides you through creating a GitHub repository and connecting it.
     Supports GitHub CLI (gh) for automatic creation.
     """
     import shutil
-    
+
     git = GitManager()
-    
+
     # Check if remote already configured
     if git.has_remote():
         url = git.get_remote_url()
         console.print(f"Remote already configured: [cyan]{url}[/cyan]")
         if not confirm("Replace with a new remote?"):
             return
-    
+
     console.print()
     console.print("[bold]🔧 Remote Setup[/bold]")
     console.print()
-    
+
     # Check for GitHub CLI
     gh_available = shutil.which("gh") is not None
-    
+
     if gh_available:
         console.print("[green]✓[/green] GitHub CLI (gh) detected")
         console.print()
-        
+
         if confirm("Create a new private GitHub repository?"):
             repo_name = click.prompt("Repository name", default="dotfiles")
-            
+
             try:
                 # Create repo with gh
                 result = subprocess.run(
-                    ["gh", "repo", "create", repo_name, "--private", "--source=.", "--remote=origin", "--push"],
+                    [
+                        "gh",
+                        "repo",
+                        "create",
+                        repo_name,
+                        "--private",
+                        "--source=.",
+                        "--remote=origin",
+                        "--push",
+                    ],
                     cwd=REPO_DIR,
                     capture_output=True,
-                    text=True
+                    text=True,
                 )
-                
+
                 if result.returncode == 0:
                     # Get the remote URL that gh configured
                     remote_url = git.get_remote_url()
@@ -1383,10 +1584,12 @@ def setup():
                         global_config.load()
                         global_config.remote_url = remote_url
                         global_config.save()
-                    
+
                     success(f"Created and connected to GitHub repository: {repo_name}")
                     console.print()
-                    console.print("You can now use [cyan]dot-man sync[/cyan] to sync your dotfiles!")
+                    console.print(
+                        "You can now use [cyan]dot-man sync[/cyan] to sync your dotfiles!"
+                    )
                     return
                 else:
                     warn(f"gh command failed: {result.stderr}")
@@ -1397,9 +1600,11 @@ def setup():
                 console.print("Falling back to manual setup...")
                 console.print()
     else:
-        console.print("[dim]GitHub CLI not found. Install with: https://cli.github.com[/dim]")
+        console.print(
+            "[dim]GitHub CLI not found. Install with: https://cli.github.com[/dim]"
+        )
         console.print()
-    
+
     # Manual setup instructions
     console.print("[bold]Manual Setup Steps:[/bold]")
     console.print()
@@ -1408,32 +1613,34 @@ def setup():
     console.print()
     console.print("2. Copy the repository URL (SSH or HTTPS)")
     console.print()
-    
+
     url = click.prompt("Enter the repository URL (or 'skip' to exit)", default="skip")
-    
+
     if url.lower() == "skip":
         console.print()
         console.print("You can set the remote later with:")
         console.print("  [cyan]dot-man remote set <url>[/cyan]")
         return
-    
+
     try:
         git.set_remote(url)
-        
+
         # Also save to global.conf
         global_config = GlobalConfig()
         global_config.load()
         global_config.remote_url = url
         global_config.save()
-        
+
         success(f"Remote set to: {url}")
-        
+
         if confirm("Push current dotfiles to remote?"):
             console.print("Pushing...")
             git.push()
             success("Pushed to remote!")
             console.print()
-            console.print("You can now use [cyan]dot-man sync[/cyan] to sync your dotfiles!")
+            console.print(
+                "You can now use [cyan]dot-man sync[/cyan] to sync your dotfiles!"
+            )
     except Exception as e:
         error(f"Failed to set remote: {e}")
 
@@ -1447,9 +1654,9 @@ def setup():
 @require_init
 def repo():
     """Show the repository path for direct git access.
-    
+
     Use this to run git commands directly in the dot-man repository.
-    
+
     Example:
         cd $(dot-man repo)
         git remote add origin <url>
@@ -1458,21 +1665,21 @@ def repo():
 
 
 @main.command()
-@require_init  
+@require_init
 def shell():
     """Open a shell in the repository directory.
-    
+
     Useful for running git commands directly.
     """
     import os
-    
+
     console.print(f"Opening shell in [cyan]{REPO_DIR}[/cyan]")
     console.print("[dim]Type 'exit' to return[/dim]")
     console.print()
-    
+
     # Get user's shell
     user_shell = os.environ.get("SHELL", "/bin/bash")
-    
+
     # Change to repo dir and exec shell
     os.chdir(REPO_DIR)
     os.execlp(user_shell, user_shell)
@@ -1495,9 +1702,9 @@ def config_list():
     try:
         config = GlobalConfig()
         config.load()
-        
+
         # Flattener helper
-        def flatten(d, parent_key='', sep='.'):
+        def flatten(d, parent_key="", sep="."):
             items = []
             for k, v in d.items():
                 new_key = f"{parent_key}{sep}{k}" if parent_key else k
@@ -1510,16 +1717,16 @@ def config_list():
         # Access private _data for full listing, or use specific properties?
         # Using _data is easiest to show everything.
         flat_data = flatten(config._data)
-        
+
         table = Table(title="Global Configuration")
         table.add_column("Key", style="cyan")
         table.add_column("Value")
-        
+
         for k, v in sorted(flat_data.items()):
             table.add_row(k, str(v))
-            
+
         console.print(table)
-            
+
     except Exception as e:
         error(f"Failed to list config: {e}")
 
@@ -1528,31 +1735,32 @@ def config_list():
 @click.argument("key")
 def config_get(key: str):
     """Get a configuration value.
-    
+
     Example: dot-man config get dot-man.editor
     """
     try:
         config = GlobalConfig()
         config.load()
-        
+
         # Traverse keys
         parts = key.split(".")
         current = config._data
-        
+
         for part in parts:
             if isinstance(current, dict) and part in current:
                 current = current[part]
             else:
                 error(f"Key not found: {key}")
-        
+
         # If result is a dict, print it nicely? Or just error that it's a section?
         if isinstance(current, dict):
-             console.print(f"[dim]Section '{key}' contains:[/dim]")
-             import json
-             console.print(json.dumps(current, indent=2))
+            console.print(f"[dim]Section '{key}' contains:[/dim]")
+            import json
+
+            console.print(json.dumps(current, indent=2))
         else:
-             console.print(str(current))
-             
+            console.print(str(current))
+
     except Exception as e:
         error(f"Failed to get config: {e}")
 
@@ -1562,7 +1770,7 @@ def config_get(key: str):
 @click.argument("value")
 def config_set(key: str, value: str):
     """Set a configuration value.
-    
+
     Example: dot-man config set dot-man.editor nvim
     """
     try:
@@ -1572,10 +1780,10 @@ def config_set(key: str, value: str):
         except Exception:
             # If load fails (e.g. no file), we assume empty default or create new
             config.create_default()
-            
+
         # Handle specific known keys via properties for safety/validation if needed
         # But generic access is more flexible.
-        
+
         # Special handling for boolean values from CLI string
         if value.lower() == "true":
             val = True
@@ -1587,19 +1795,21 @@ def config_set(key: str, value: str):
         # Set value
         parts = key.split(".")
         current = config._data
-        
+
         for i, part in enumerate(parts[:-1]):
             if part not in current:
                 current[part] = {}
             current = current[part]
             if not isinstance(current, dict):
-                error(f"Key path conflict: '{'.'.join(parts[:i+1])}' is not a section")
-        
+                error(
+                    f"Key path conflict: '{'.'.join(parts[: i + 1])}' is not a section"
+                )
+
         current[parts[-1]] = val
         config.save()
-        
+
         success(f"Set '{key}' to '{val}'")
-        
+
     except Exception as e:
         error(f"Failed to set config: {e}")
 
