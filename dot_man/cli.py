@@ -673,7 +673,7 @@ def status(verbose: bool, secrets: bool):
                 # Check for secrets
                 secret_indicator = ""
                 if secrets and local_path.exists() and local_path.is_file():
-                    matches = list(scanner.scan_file(local_path))
+                    matches = list(scanner.scan_file(local_path))  # type: ignore
                     if matches:
                         secret_indicator = " [red]🔒[/red]"
                         secrets_found.extend(matches)
@@ -801,6 +801,7 @@ def switch(branch: str, dry_run: bool, force: bool):
         console.print()
         console.print(f"[bold]Phase 3:[/bold] Deploying '{branch}' configuration...")
 
+        deployed_count = 0
         if dry_run:
             # Show what would be deployed
             for section_name in ops.get_sections():
@@ -1333,7 +1334,7 @@ def branch_delete(name: str, force: bool):
         if isinstance(e, BranchNotMergedError):
             if confirm(f"Branch '{name}' is not fully merged. Force delete?"):
                 try:
-                    git.delete_branch(name, force=True)
+                    git.delete_branch(name, force=True)  # type: ignore
                     success(f"Deleted branch '{name}'")
                     return
                 except Exception as e2:
