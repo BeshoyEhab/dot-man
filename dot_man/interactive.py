@@ -1,9 +1,6 @@
 """Interactive CLI wizards for dot-man."""
 
 from pathlib import Path
-from typing import Optional
-
-import click
 import questionary
 from questionary import Validator, ValidationError
 
@@ -71,7 +68,8 @@ def run_section_wizard(config: DotManConfig, section_name: str):
                     post_deploy=section.post_deploy,
                     include=section.include,
                     exclude=section.exclude,
-                    inherits=section.inherits
+                    inherits=section.inherits,
+                    overwrite=True,
                 )
                 config.save()
                 success(f"Section '{section_name}' updated.")

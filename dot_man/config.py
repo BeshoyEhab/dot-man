@@ -709,10 +709,11 @@ class DotManConfig:
         name: str,
         paths: list[str],
         repo_base: str | None = None,
+        overwrite: bool = False,
         **kwargs,
     ) -> None:
         """Add a new section to the configuration."""
-        if name in self._data:
+        if name in self._data and not overwrite:
             raise ConfigurationError(f"Section already exists: {name}")
 
         if not paths:
