@@ -11,6 +11,16 @@ from .config import DotManConfig, GlobalConfig, Section
 from .ui import console, print_banner, success, error, warn
 
 
+# ANSI Colors for Questionary choices
+COLOR_EDIT = "\033[36m"   # Cyan
+COLOR_TOGGLE = "\033[33m" # Yellow
+COLOR_SAVE = "\033[32m"   # Green
+COLOR_ADD = "\033[32m"    # Green
+COLOR_CANCEL = "\033[31m" # Red
+COLOR_DELETE = "\033[31m" # Red
+COLOR_RESET = "\033[0m"
+
+
 class PathValidator(Validator):
     def validate(self, document):
         if not document.text:
@@ -64,16 +74,16 @@ def run_section_wizard(config: DotManConfig, section_name: str):
         console.print()
         
         choices = [
-            questionary.Choice("Edit Paths", value="paths"),
-            questionary.Choice("Edit Repo Base", value="repo_base"),
-            questionary.Choice("Edit Update Strategy", value="update_strategy"),
-            questionary.Choice("Toggle Secrets Filter", value="secrets_filter"),
-            questionary.Choice("Edit Inherits", value="inherits"),
-            questionary.Choice("Edit Pre-deploy Hook", value="pre_deploy"),
-            questionary.Choice("Edit Post-deploy Hook", value="post_deploy"),
+            questionary.Choice(f"{COLOR_EDIT}Edit Paths{COLOR_RESET}", value="paths"),
+            questionary.Choice(f"{COLOR_EDIT}Edit Repo Base{COLOR_RESET}", value="repo_base"),
+            questionary.Choice(f"{COLOR_EDIT}Edit Update Strategy{COLOR_RESET}", value="update_strategy"),
+            questionary.Choice(f"{COLOR_TOGGLE}Toggle Secrets Filter{COLOR_RESET}", value="secrets_filter"),
+            questionary.Choice(f"{COLOR_EDIT}Edit Inherits{COLOR_RESET}", value="inherits"),
+            questionary.Choice(f"{COLOR_EDIT}Edit Pre-deploy Hook{COLOR_RESET}", value="pre_deploy"),
+            questionary.Choice(f"{COLOR_EDIT}Edit Post-deploy Hook{COLOR_RESET}", value="post_deploy"),
             questionary.Separator(),
-            questionary.Choice("Save & Return", value="save", shortcut_key="s"),
-            questionary.Choice("Cancel", value="cancel", shortcut_key="q"),
+            questionary.Choice(f"{COLOR_SAVE}Save & Return{COLOR_RESET}", value="save", shortcut_key="s"),
+            questionary.Choice(f"{COLOR_CANCEL}Cancel{COLOR_RESET}", value="cancel", shortcut_key="q"),
         ]
         
         field = questionary.select("Select action:", choices=choices).ask()
@@ -183,12 +193,12 @@ def run_global_wizard(config: GlobalConfig):
         console.print()
         
         choices = [
-            questionary.Choice("Edit Default Editor", value="editor"),
-            questionary.Choice("Edit Remote URL", value="remote_url"),
-            questionary.Choice("Toggle Default Secrets Filter", value="secrets_filter"),
+            questionary.Choice(f"{COLOR_EDIT}Edit Default Editor{COLOR_RESET}", value="editor"),
+            questionary.Choice(f"{COLOR_EDIT}Edit Remote URL{COLOR_RESET}", value="remote_url"),
+            questionary.Choice(f"{COLOR_TOGGLE}Toggle Default Secrets Filter{COLOR_RESET}", value="secrets_filter"),
             questionary.Separator(),
-            questionary.Choice("Save & Return", value="save", shortcut_key="s"),
-            questionary.Choice("Cancel", value="cancel", shortcut_key="q"),
+            questionary.Choice(f"{COLOR_SAVE}Save & Return{COLOR_RESET}", value="save", shortcut_key="s"),
+            questionary.Choice(f"{COLOR_CANCEL}Cancel{COLOR_RESET}", value="cancel", shortcut_key="q"),
         ]
         
         field = questionary.select("Select action:", choices=choices).ask()
@@ -247,11 +257,11 @@ def run_templates_wizard(config: DotManConfig):
         choices = []
         if templates:
             for name in templates:
-                choices.append(questionary.Choice(f"Edit {name}", value=name))
+                choices.append(questionary.Choice(f"{COLOR_EDIT}Edit {name}{COLOR_RESET}", value=name))
         
         choices.append(questionary.Separator())
-        choices.append(questionary.Choice("Add New Template", value="add_new"))
-        choices.append(questionary.Choice("Back", value="back", shortcut_key="q"))
+        choices.append(questionary.Choice(f"{COLOR_ADD}Add New Template{COLOR_RESET}", value="add_new"))
+        choices.append(questionary.Choice(f"{COLOR_CANCEL}Back{COLOR_RESET}", value="back", shortcut_key="q"))
         
         selection = questionary.select("Manage Templates:", choices=choices, use_shortcuts=True).ask()
         
@@ -295,12 +305,12 @@ def edit_template(config: DotManConfig, name: str):
         console.print()
         
         choices = [
-            questionary.Choice("Edit Pre-deploy Hook", value="pre_deploy"),
-            questionary.Choice("Edit Post-deploy Hook", value="post_deploy"),
-            questionary.Choice("Edit Update Strategy", value="update_strategy"),
+            questionary.Choice(f"{COLOR_EDIT}Edit Pre-deploy Hook{COLOR_RESET}", value="pre_deploy"),
+            questionary.Choice(f"{COLOR_EDIT}Edit Post-deploy Hook{COLOR_RESET}", value="post_deploy"),
+            questionary.Choice(f"{COLOR_EDIT}Edit Update Strategy{COLOR_RESET}", value="update_strategy"),
             questionary.Separator(),
-            questionary.Choice("Save & Return", value="save", shortcut_key="s"),
-            questionary.Choice("Delete Template", value="delete"),
+            questionary.Choice(f"{COLOR_SAVE}Save & Return{COLOR_RESET}", value="save", shortcut_key="s"),
+            questionary.Choice(f"{COLOR_DELETE}Delete Template{COLOR_RESET}", value="delete"),
         ]
         
         field = questionary.select("Edit Template Field:", choices=choices, use_shortcuts=True).ask()
