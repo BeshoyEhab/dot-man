@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Callable
 
 import click
+import questionary
 from rich.table import Table
 from rich.panel import Panel
 from rich.syntax import Syntax
@@ -897,8 +898,9 @@ def edit(editor: str | None, edit_global: bool, raw: bool):
     Use --global to edit the global configuration.
     """
     try:
-        from .constants import GLOBAL_TOML, DOT_MAN_TOML
+        from .constants import GLOBAL_TOML, DOT_MAN_TOML, DOT_MAN_DIR
 
+        # 1. Determine target file path for "raw" editing
         if edit_global:
             target = GLOBAL_TOML
             desc = "global configuration"
@@ -906,153 +908,356 @@ def edit(editor: str | None, edit_global: bool, raw: bool):
             target = REPO_DIR / DOT_MAN_TOML
             desc = "dot-man.toml"
 
-        if not target.exists():
-            error(f"Configuration file not found: {target}")
+        # 2. If --raw flag is passed, skip interactive mode
+        #    Also skip if the target file doesn't exist yet (though init should have created it)
+        if raw:
+            if not target.exists():
+                error(f"Configuration file not found: {target}")
+            
+            _open_raw_editor(target, desc, editor)
+            return
 
-        if not edit_global and not raw:
-            try:
-                from .operations import get_operations
-                
-                # Load config
-                ops = get_operations()
+        # 3. Interactive Mode
+        from .operations import get_operations
+        
+        try:
+            ops = get_operations()
+            
+            while True:
+                # Refresh config each time
+                ops.reload_config()
                 sections = ops.get_sections()
                 
-                if not sections:
-                    ui.console.print("[dim]No sections to edit. Opening raw file...[/dim]")
+                # Main Menu Options
+                choices = []
+                
+                # Global Config Option
+                choices.append(questionary.Choice("⚙️  Global Configuration", value="global"))
+                
+                # Section Options
+                if sections:
+                    choices.append(questionary.Separator("--- Sections ---"))
+                    for name in sections:
+                        choices.append(questionary.Choice(f"📄 {name}", value=f"section:{name}"))
                 else:
-                    # Interactive CLI Menu
-                    ui.console.print("[bold cyan]Configuration Editor[/bold cyan]")
-                    ui.console.print()
-                    ui.console.print(f"Select a section to configure:")
-                    
-                    for i, name in enumerate(sections, 1):
-                        ui.console.print(f"  {i}. {name}")
-                    ui.console.print("  r. Raw File (Advanced)")
-                    ui.console.print("  q. Quit")
-                    ui.console.print()
-                    
-                    choice = click.prompt("Selection", default="q")
-                    
-                    if choice.lower() == "q":
-                        return
-                        
-                    if choice.lower() == "r":
-                        # Proceed to raw editor
-                        pass
-                    elif choice.isdigit():
-                        idx = int(choice) - 1
-                        if 0 <= idx < len(sections):
-                            selected_section = sections[idx]
-                            _run_section_wizard(ops.dotman_config, selected_section)
-                            return
-                        else:
-                             ui.console.print("[red]Invalid selection[/red]")
-                    else:
-                         ui.console.print("[red]Invalid selection[/red]")
+                     choices.append(questionary.Separator("--- No Sections ---"))
 
-            except Exception as e:
-                warn(f"Interactive menu error: {e}")
-                ui.console.print("Falling back to raw editor...")
+                choices.append(questionary.Separator("--- Actions ---"))
+                choices.append(questionary.Choice("➕ Add New Section", value="add_new"))
+                choices.append(questionary.Choice("📝 Edit Templates", value="templates"))
+                choices.append(questionary.Choice("📝 Open Raw File (Advanced)", value="raw"))
+                choices.append(questionary.Choice("🚪 Quit", value="quit"))
 
-        # Priority: CLI flag > global config > environment > fallback
-        global_config = GlobalConfig()
-        try:
-            global_config.load()
-            config_editor = global_config.editor
-        except (FileNotFoundError, DotManError):
-            config_editor = None
+                selection = questionary.select(
+                    "What would you like to configure?",
+                    choices=choices,
+                    use_shortcuts=True
+                ).ask()
 
-        editor_cmd = editor or config_editor or get_editor()
-        ui.console.print(f"Opening {desc} in [cyan]{editor_cmd}[/cyan]...")
+                if not selection or selection == "quit":
+                    break
+                
+                if selection == "global":
+                    _run_global_wizard(ops.global_config)
+                
+                elif selection == "raw":
+                     _open_raw_editor(target, desc, editor)
+                     break # Exit loop after raw edit as user might have changed structure
+                
+                elif selection == "add_new":
+                    # Simple prompt to add a new file (wraps 'dot-man add' conceptually)
+                    path_str = questionary.path("Path to file or directory:").ask()
+                    if path_str:
+                        # We delegate to the 'add' logic or recreate it here. 
+                        # To keep it simple, we just call the add command logic or similar.
+                        # For now, let's just guide them to use 'dot-man add' or implement a simple adder.
+                        # Implementing simple adder:
+                         try:
+                             path = Path(path_str).expanduser()
+                             if not path.exists():
+                                 warn(f"Path does not exist: {path}")
+                                 continue
+                             
+                             section_name = questionary.text("Section Name:", default=path.stem).ask()
+                             if section_name:
+                                from .cli import add
+                                # Using click's context to invoke add is cleaner but tricky inside a loop.
+                                # Let's just use the config object directly.
+                                ctx = click.get_current_context()
+                                ctx.invoke(add, path=str(path), section=section_name, repo_base=None, exclude=(), include=(), inherits=(), post_deploy=None, pre_deploy=None)
+                                ui.console.print()
+                                ui.console.print("Press Enter to continue...")
+                                input()
 
-        if not open_in_editor(target, editor_cmd):
-            error(f"Editor '{editor_cmd}' exited with error")
+                         except Exception as e:
+                             warn(f"Error adding section: {e}")
 
-        # Validate after edit
-        if not edit_global:
-            dotman_config = DotManConfig(global_config=global_config)
-            try:
-                dotman_config.load()
-                warnings = dotman_config.validate()
-                if warnings:
-                    ui.console.print()
-                    warn("Configuration has warnings:")
-                    for w in warnings:
-                        ui.console.print(f"  • {w}")
-                else:
-                    success("Configuration updated and validated")
-            except Exception as e:
-                warn(f"Configuration may have errors: {e}")
-        else:
-            success("Global configuration updated")
+                elif selection == "templates":
+                     _run_templates_wizard(ops.dotman_config)
+
+                elif selection.startswith("section:"):
+                    section_name = selection.split(":", 1)[1]
+                    _run_section_wizard(ops.dotman_config, section_name)
+
+        except KeyboardInterrupt:
+            return
+        except Exception as e:
+            warn(f"Interactive menu error: {e}")
+            ui.console.print("Falling back to raw editor...")
+            _open_raw_editor(target, desc, editor)
 
     except DotManError as e:
         error(str(e), e.exit_code)
+
+
+def _open_raw_editor(target: Path, desc: str, editor: str | None = None):
+    """Helper to open raw editor."""
+    from .utils import get_editor, open_in_editor
+    
+    # Priority: CLI flag > global config > environment > fallback
+    global_config = GlobalConfig()
+    try:
+        global_config.load()
+        config_editor = global_config.editor
+    except (FileNotFoundError, DotManError):
+        config_editor = None
+
+    editor_cmd = editor or config_editor or get_editor()
+    ui.console.print(f"Opening {desc} in [cyan]{editor_cmd}[/cyan]...")
+
+    if not open_in_editor(target, editor_cmd):
+        error(f"Editor '{editor_cmd}' exited with error")
+    
+    success(f"Edited {desc}")
+
 
 
 def _run_section_wizard(config: DotManConfig, section_name: str):
     """Run interactive wizard to edit a section."""
     section = config.get_section(section_name)
     
-    ui.console.print()
-    ui.console.print(f"[bold]Editing section: {section_name}[/bold]")
-    ui.console.print("Press Enter to keep current value.")
-    ui.console.print()
-    
-    # 1. Paths
-    current_paths = ", ".join(str(p) for p in section.paths)
-    new_paths = click.prompt(f"Paths", default=current_paths, show_default=True)
-    if new_paths != current_paths:
-        paths_list = [p.strip() for p in new_paths.split(",") if p.strip()]
-    else:
-        paths_list = [str(p) for p in section.paths]
+    while True:
+        ui.console.clear()
+        ui.print_banner(f"Editing Section: {section_name}")
+        ui.console.print(f"Path: {', '.join(str(p) for p in section.paths)}")
+        ui.console.print()
         
-    # 2. Repo Base
-    new_base = click.prompt("Repo Base", default=section.repo_base)
-    
-    # 3. Update Strategy
-    current_strategy = section.update_strategy
-    new_strategy = click.prompt(
-        "Update Strategy (replace/rename_old/ignore)", 
-        default=current_strategy
-    )
-    
-    # 4. Secrets Filter
-    current_secrets = section.secrets_filter
-    new_secrets = ui.confirm("Filter Secrets?", default=current_secrets)
-    
-    # 5. Hooks
-    new_pre = click.prompt("Pre-deploy hook", default=section.pre_deploy or "")
-    new_post = click.prompt("Post-deploy hook", default=section.post_deploy or "")
-    
-    # Save
-    ui.console.print()
-    if ui.confirm("Save changes?"):
-        # Since we don't have a direct 'update_section' method that accepts partials easily in public API yet
-        # We re-add it (add_section handles overwrite if exists)
-        # Or better, modify internal dict like we did in TUI
+        choices = [
+            questionary.Choice(f"Paths ({', '.join(str(p) for p in section.paths)})", value="paths"),
+            questionary.Choice(f"Repo Base ({section.repo_base})", value="repo_base"),
+            questionary.Choice(f"Update Strategy ({section.update_strategy})", value="update_strategy"),
+            questionary.Choice(f"Secrets Filter ({'Enabled' if section.secrets_filter else 'Disabled'})", value="secrets_filter"),
+            questionary.Choice(f"Inherits ({', '.join(section.inherits) if section.inherits else 'None'})", value="inherits"),
+            questionary.Choice(f"Pre-deploy Hook ({section.pre_deploy or 'None'})", value="pre_deploy"),
+            questionary.Choice(f"Post-deploy Hook ({section.post_deploy or 'None'})", value="post_deploy"),
+            questionary.Separator(),
+            questionary.Choice("💾 Save & Return", value="save"),
+            questionary.Choice("🔙 Cancel", value="cancel"),
+        ]
         
-        try:
-             # We can use add_section to overwrite
-             config.add_section(
-                 name=section_name,
-                 paths=paths_list,
-                 repo_base=new_base,
-                 update_strategy=new_strategy,
-                 secrets_filter=new_secrets,
-                 pre_deploy=new_pre if new_pre else None,
-                 post_deploy=new_post if new_post else None,
-                 # Preserve others
-                 include=section.include,
-                 exclude=section.exclude,
-                 inherits=section.inherits
-             )
-             config.save()
-             success(f"Section '{section_name}' updated.")
-        except Exception as e:
-            error(f"Failed to save: {e}")
-    else:
-        ui.console.print("Changes discarded.")
+        field = questionary.select("Select field to edit:", choices=choices).ask()
+        
+        if not field or field == "cancel":
+            return
+            
+        if field == "save":
+            try:
+                # Re-add section to save changes (updates existing)
+                config.add_section(
+                    name=section_name,
+                    paths=[str(p) for p in section.paths],
+                    repo_base=section.repo_base,
+                    update_strategy=section.update_strategy,
+                    secrets_filter=section.secrets_filter,
+                    pre_deploy=section.pre_deploy,
+                    post_deploy=section.post_deploy,
+                    include=section.include,
+                    exclude=section.exclude,
+                    inherits=section.inherits
+                )
+                config.save()
+                success(f"Section '{section_name}' updated.")
+                return
+            except Exception as e:
+                error(f"Failed to save: {e}")
+                input("Press Enter to continue...")
+                continue
+        
+        # Field Editing
+        if field == "paths":
+            current = ", ".join(str(p) for p in section.paths)
+            val = questionary.text("Paths (comma separated):", default=current).ask()
+            if val:
+                section.paths = [Path(p.strip()) for p in val.split(",") if p.strip()]
+        
+        elif field == "repo_base":
+            val = questionary.text("Repo Base Directory:", default=section.repo_base).ask()
+            if val:
+                section.repo_base = val
+                
+        elif field == "update_strategy":
+            val = questionary.select(
+                "Update Strategy:",
+                choices=["replace", "rename_old", "ignore"],
+                default=section.update_strategy
+            ).ask()
+            if val:
+                section.update_strategy = val
+                
+        elif field == "secrets_filter":
+            val = questionary.confirm("Enable Secrets Filter?", default=section.secrets_filter).ask()
+            section.secrets_filter = val
+            
+        elif field == "inherits":
+            current = ", ".join(section.inherits)
+            val = questionary.text("Inherits templates (comma separated):", default=current).ask()
+            if val is not None:
+                section.inherits = [t.strip() for t in val.split(",") if t.strip()]
+                
+        elif field == "pre_deploy":
+            val = questionary.text("Pre-deploy Hook:", default=section.pre_deploy or "").ask()
+            section.pre_deploy = val if val else None
+            
+        elif field == "post_deploy":
+            val = questionary.text("Post-deploy Hook:", default=section.post_deploy or "").ask()
+            section.post_deploy = val if val else None
+
+def _run_global_wizard(config: GlobalConfig):
+    """Edit global configuration."""
+    while True:
+        ui.console.clear()
+        ui.print_banner("Global Configuration")
+        ui.console.print()
+        
+        defaults = config.get_defaults()
+        
+        choices = [
+            questionary.Choice(f"Default Editor ({config.editor or 'System Default'})", value="editor"),
+            questionary.Choice(f"Remote URL ({config.remote_url or 'Not Set'})", value="remote_url"),
+            questionary.Choice(f"Default Secrets Filter ({'Enabled' if config.secrets_filter_enabled else 'Disabled'})", value="secrets_filter"),
+            questionary.Separator(),
+            questionary.Choice("💾 Save & Return", value="save"),
+            questionary.Choice("🔙 Cancel", value="cancel"),
+        ]
+        
+        field = questionary.select("Select setting to edit:", choices=choices).ask()
+        
+        if not field or field == "cancel":
+            return
+            
+        if field == "save":
+            config.save()
+            success("Global config updated.")
+            return
+
+        if field == "editor":
+            val = questionary.text("Editor Command:", default=config.editor or "").ask()
+            config.editor = val if val else None
+            
+        elif field == "remote_url":
+            val = questionary.text("Remote URL:", default=config.remote_url).ask()
+            config.remote_url = val if val else ""
+            
+        elif field == "secrets_filter":
+             # We need to update the deeply nested 'defaults' dict
+             current = config.secrets_filter_enabled
+             val = questionary.confirm("Enable Secrets Filter by default?", default=current).ask()
+             if "defaults" not in config._data:
+                 config._data["defaults"] = {}
+             config._data["defaults"]["secrets_filter"] = val
+
+def _run_templates_wizard(config: DotManConfig):
+    """Add or edit templates."""
+    # We need access to global templates too ideally, but let's stick to local config for now
+    # as DotManConfig mainly manages dot-man.toml.
+    # Actually wait, templates can be in dot-man.toml or global.toml. 
+    # Let's focus on dot-man.toml templates for now.
+    
+    while True:
+        templates = config.get_local_templates()
+        
+        choices = []
+        if templates:
+            for name in templates:
+                choices.append(questionary.Choice(f"📝 {name}", value=name))
+        
+        choices.append(questionary.Separator())
+        choices.append(questionary.Choice("➕ Add New Template", value="add_new"))
+        choices.append(questionary.Choice("🔙 Back", value="back"))
+        
+        selection = questionary.select("Manage Templates:", choices=choices).ask()
+        
+        if not selection or selection == "back":
+            return
+            
+        if selection == "add_new":
+            name = questionary.text("Template Name:").ask()
+            if name:
+                if name in templates:
+                    warn("Template already exists!")
+                else:
+                    if "templates" not in config._data:
+                        config._data["templates"] = {}
+                    config._data["templates"][name] = {}
+                    _edit_template(config, name)
+        else:
+            _edit_template(config, selection)
+
+def _edit_template(config: DotManConfig, name: str):
+    """Edit a specific template."""
+    template = config._data["templates"][name]
+    
+    while True:
+        ui.console.clear()
+        ui.print_banner(f"Template: {name}")
+        
+        current_pre = template.get("pre_deploy", "None")
+        current_post = template.get("post_deploy", "None")
+        current_strategy = template.get("update_strategy", "Default")
+        
+        choices = [
+            questionary.Choice(f"Pre-deploy Hook ({current_pre})", value="pre_deploy"),
+            questionary.Choice(f"Post-deploy Hook ({current_post})", value="post_deploy"),
+            questionary.Choice(f"Update Strategy ({current_strategy})", value="update_strategy"),
+            questionary.Separator(),
+            questionary.Choice("💾 Save & Return", value="save"),
+            questionary.Choice("🗑️  Delete Template", value="delete"),
+        ]
+        
+        field = questionary.select("Edit Template Field:", choices=choices).ask()
+        
+        if not field or field == "save":
+            config.save()
+            return
+            
+        if field == "delete":
+            if questionary.confirm(f"Delete template '{name}'?").ask():
+                del config._data["templates"][name]
+                config.save()
+                return
+
+        if field == "pre_deploy":
+            val = questionary.text("Pre-deploy Hook:", default=template.get("pre_deploy", "")).ask()
+            if val:
+                template["pre_deploy"] = val
+            elif "pre_deploy" in template:
+                del template["pre_deploy"]
+
+        elif field == "post_deploy":
+            val = questionary.text("Post-deploy Hook:", default=template.get("post_deploy", "")).ask()
+            if val:
+                template["post_deploy"] = val
+            elif "post_deploy" in template:
+                del template["post_deploy"]
+
+        elif field == "update_strategy":
+            val = questionary.select(
+                "Update Strategy:",
+                choices=["replace", "rename_old", "ignore"],
+                default=template.get("update_strategy", "replace")
+            ).ask()
+            if val:
+                template["update_strategy"] = val
 
 
 # ============================================================================

@@ -31,6 +31,7 @@ dependencies = [
     "textual>=0.73.0",
     "tomli>=2.0; python_version < '3.11'",
     "tomli_w>=1.0",
+    "questionary>=2.0.0",
 ]
 
 [project.optional-dependencies]

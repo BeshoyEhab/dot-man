@@ -228,7 +228,7 @@ class GlobalConfig:
         return self._data.get("dot-man", {}).get("editor")
 
     @editor.setter
-    def editor(self, value: str) -> None:
+    def editor(self, value: Optional[str]) -> None:
         """Set the editor."""
         if "dot-man" not in self._data:
             self._data["dot-man"] = {}
