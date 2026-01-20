@@ -4,10 +4,9 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from pathlib import Path
-from typing import Iterator, Callable
+from typing import Iterator, Callable, Generator
 
-from .constants import SECRET_REDACTION_TEXT, DOTMAN_REDACTION_TEXT
+from .constants import SECRET_REDACTION_TEXT
 
 import json
 import hashlib
@@ -307,12 +306,19 @@ class SecretScanner:
             return True
 
     def scan_content(
-        self, content: str, file_path: Path | None = None
+        self, content: str | Generator[str, None, None], file_path: Path | None = None
     ) -> Iterator[SecretMatch]:
-        """Scan content for secrets."""
+        """Scan content for secrets.
+
+        Args:
+            content: Text content or generator yielding lines
+            file_path: Optional path for context
+        """
         file_path = file_path or Path("<string>")
 
-        for line_number, line in enumerate(content.splitlines(), start=1):
+        iterator = content.splitlines() if isinstance(content, str) else content
+
+        for line_number, line in enumerate(iterator, start=1):
             # Skip likely false positives
             if self.is_false_positive(line):
                 continue
@@ -330,13 +336,18 @@ class SecretScanner:
                     )
 
     def scan_file(self, path: Path) -> Iterator[SecretMatch]:
-        """Scan a file for secrets."""
+        """Scan a file for secrets using streaming to save memory."""
         if self.is_binary_file(path):
             return
 
         try:
-            content = path.read_text(encoding="utf-8", errors="ignore")
-            yield from self.scan_content(content, path)
+            # Use a generator to read lines lazily
+            def line_generator():
+                with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                    for line in f:
+                        yield line
+
+            yield from self.scan_content(line_generator(), path)
         except Exception:
             # Skip files we can't read
             pass
@@ -362,52 +373,48 @@ class SecretScanner:
 
             yield from self.scan_file(path)
 
-    def redact_content(
+    def redact_content_stream(
         self,
-        content: str,
+        line_generator: Iterator[str],
         callback: Callable[[SecretMatch], str] | None = None,
         file_path: Path | None = None,
-    ) -> tuple[str, int]:
+    ) -> Generator[tuple[str, int], None, None]:
         """
-        Redact secrets from content. Returns (redacted_content, count).
-
-        Args:
-            content: Text content to redact
-            callback: Optional function that takes a SecretMatch and returns "REDACT" or "KEEP".
-                      If None, all secrets are redacted.
-            file_path: Path to the file being scanned (for context in callback)
+        Redact secrets from content stream. Yields (redacted_line, count_in_line).
         """
-        redacted_lines = []
-        count = 0
         file_path = file_path or Path("<string>")
+        line_number = 0
 
-        for line_number, line in enumerate(content.splitlines(), start=1):
-            # precise matching logic needed to handle multiple secrets in one line appropriately
-            # checking for false positives first
+        for line in line_generator:
+            line_number += 1
+
+            # Skip likely false positives (but preserve line)
             if self.is_false_positive(line):
-                redacted_lines.append(line)
+                yield line, 0
                 continue
 
             current_line = line
+            count_in_line = 0
+
+            # Remove newline for processing, add back later if needed?
+            # Usually line iteration includes newline. Pattern matching might be sensitive.
+            # Let's strip newline for matching but keep it conceptually or rebuild it.
+            # Standard 'for line in f' includes \n.
+
+            # Clean line for regex matching
+            line_stripped = current_line.rstrip('\n')
+
             line_modified = False
 
             for pattern in self.patterns:
-                # We need to find all matches in the line
-                # But simple substitution might mess up indices if we have multiple secrets
-                # For now, let's assume one secret per line or just handle the first one effectively
-                # or strictly use regex sub with a callback if possible, but we need SecretMatch context
-
-                # Simpler approach: Check if line matches, if so, ask user.
-                # If they say Redact, we redact the WHOLE pattern match.
-
-                match = pattern.pattern.search(current_line)
+                match = pattern.pattern.search(line_stripped)
                 if match:
                     should_redact = True
                     if callback:
                         secret_match = SecretMatch(
                             file=file_path,
                             line_number=line_number,
-                            line_content=line.strip(),
+                            line_content=line_stripped.strip(),
                             pattern_name=pattern.name,
                             severity=pattern.severity,
                             matched_text=match.group(0),
@@ -420,12 +427,35 @@ class SecretScanner:
                         current_line = pattern.pattern.sub(
                             SECRET_REDACTION_TEXT, current_line
                         )
-                        count += 1
+                        count_in_line += 1
                         line_modified = True
 
-            redacted_lines.append(current_line)
+            yield current_line, count_in_line
 
-        return "\n".join(redacted_lines), count
+
+    def redact_content(
+        self,
+        content: str,
+        callback: Callable[[SecretMatch], str] | None = None,
+        file_path: Path | None = None,
+    ) -> tuple[str, int]:
+        """
+        Redact secrets from content (string version).
+        Kept for backward compatibility but uses streaming internally.
+        """
+        redacted_lines = []
+        total_count = 0
+
+        # Split keeping newlines helps reconstruction, but splitlines() discards them usually
+        # Let's use splitlines(keepends=True) or just simple join later
+
+        iterator = content.splitlines(keepends=True)
+
+        for line, count in self.redact_content_stream(iterator, callback, file_path):
+            redacted_lines.append(line)
+            total_count += count
+
+        return "".join(redacted_lines), total_count
 
 
 def filter_secrets(
@@ -433,15 +463,14 @@ def filter_secrets(
     callback: Callable[[SecretMatch], str] | None = None,
     file_path: Path | None = None,
 ) -> tuple[str, list[SecretMatch]]:
-    """Filter secrets from content before saving.
+    """Filter secrets from content string (Legacy/Memory based).
 
-    Returns:
-        Tuple of (filtered_content, list_of_matches)
+    Warning: Loads everything into memory.
     """
     scanner = SecretScanner()
-    # Note: We aren't returning the matches list here perfectly if we use the callback
-    # because the callback might Skip/Ignore them.
-    # But usually we return the list of *detected* secrets for logging.
+    # We re-scan for matches separately from redaction because we need the full list
+    # for the return value, although scanning twice is inefficient.
+    # But since this function signature returns matches list, we must.
     matches = list(scanner.scan_content(content, file_path))
     filtered_content, _ = scanner.redact_content(content, callback, file_path)
     return filtered_content, matches

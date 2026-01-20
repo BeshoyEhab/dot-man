@@ -45,7 +45,30 @@ GIT_IGNORE_PATTERNS = [
     "*~",
     "*.pyc",
     "__pycache__/",
+    ".venv/",
+    "node_modules/",
+    ".git/",
+    "venv/",
+    "env/",
 ]
+
+# Directories to skip during traversal for performance
+IGNORED_DIRECTORIES = {
+    ".git",
+    "node_modules",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "env",
+    ".idea",
+    ".vscode",
+    ".mypy_cache",
+    ".pytest_cache",
+    "target", # Rust
+    "dist",
+    "build",
+}
+
 
 # ============================================================================
 # Configuration Defaults

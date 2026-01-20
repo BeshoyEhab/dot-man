@@ -2,11 +2,11 @@
 
 import shutil
 from pathlib import Path
-from pathlib import Path
 from typing import Iterator, Callable
+import filecmp
 
-from .constants import REPO_DIR
-from .secrets import filter_secrets, SecretMatch
+from .constants import REPO_DIR, IGNORED_DIRECTORIES
+from .secrets import filter_secrets, SecretMatch, SecretScanner
 
 
 def ensure_directory(path: Path, mode: int = 0o755) -> None:
@@ -38,17 +38,29 @@ def copy_file(
         ensure_directory(destination.parent)
 
         if filter_secrets_enabled and source.is_file():
-            # Read and filter content
-            try:
-                content = source.read_text(encoding="utf-8")
-                filtered_content, secrets = filter_secrets(
-                    content, callback=secret_handler, file_path=source
-                )
-                detected_secrets = secrets
-                destination.write_text(filtered_content, encoding="utf-8")
-            except UnicodeDecodeError:
-                # Binary file - copy without filtering
+            # Use streaming redactor
+            scanner = SecretScanner()
+            if scanner.is_binary_file(source):
                 shutil.copy2(source, destination)
+            else:
+                try:
+                    # Intercept callback to capture detected secrets
+                    def capturing_handler(match: SecretMatch) -> str:
+                        detected_secrets.append(match)
+                        if secret_handler:
+                            return secret_handler(match)
+                        return "REDACT"  # Default if no handler provided
+
+                    # Stream read and write
+                    with open(source, "r", encoding="utf-8", errors="ignore") as src_f:
+                        with open(destination, "w", encoding="utf-8") as dest_f:
+                            for line, count in scanner.redact_content_stream(
+                                src_f, callback=capturing_handler, file_path=source
+                            ):
+                                dest_f.write(line)
+                except Exception as e:
+                    # If streaming fails (e.g. encoding), fallback or fail
+                    return False, []
         else:
             # Direct copy
             if source.is_file():
@@ -111,39 +123,43 @@ def copy_directory(
     files_failed = 0
     all_secrets: list[SecretMatch] = []
 
-    for src_path in source.rglob("*"):
-        if src_path.is_dir():
-            continue
+    # Use walk to prune ignored directories efficiently
+    import os
+    for root, dirs, files in os.walk(source):
+        # Prune ignored directories in-place
+        dirs[:] = [d for d in dirs if d not in IGNORED_DIRECTORIES]
 
-        relative = src_path.relative_to(source)
+        root_path = Path(root)
 
-        # Check exclude patterns first
-        if exclude_patterns and matches_patterns(relative, exclude_patterns):
-            continue
+        for file in files:
+            src_path = root_path / file
+            relative = src_path.relative_to(source)
 
-        # Check include patterns (if specified, file must match at least one)
-        if include_patterns and not matches_patterns(relative, include_patterns):
-            continue
+            # Check exclude patterns
+            if exclude_patterns and matches_patterns(relative, exclude_patterns):
+                continue
 
-        dest_path = destination / relative
+            # Check include patterns
+            if include_patterns and not matches_patterns(relative, include_patterns):
+                continue
 
-        dest_path = destination / relative
+            dest_path = destination / relative
 
-        success, secrets = copy_file(
-            src_path, dest_path, filter_secrets_enabled, secret_handler=secret_handler
-        )
-        all_secrets.extend(secrets)
+            success, secrets = copy_file(
+                src_path, dest_path, filter_secrets_enabled, secret_handler=secret_handler
+            )
+            all_secrets.extend(secrets)
 
-        if success:
-            files_copied += 1
-        else:
-            files_failed += 1
+            if success:
+                files_copied += 1
+            else:
+                files_failed += 1
 
     return files_copied, files_failed, all_secrets
 
 
 def compare_files(file1: Path, file2: Path) -> bool:
-    """Compare two files for equality.
+    """Compare two files for equality using efficient chunked reading or filecmp.
 
     Returns:
         True if files are identical, False otherwise
@@ -154,9 +170,7 @@ def compare_files(file1: Path, file2: Path) -> bool:
     try:
         if file1.is_dir() and file2.is_dir():
             # Compare directories
-            from filecmp import dircmp
-
-            dcmp = dircmp(file1, file2)
+            dcmp = filecmp.dircmp(file1, file2)
             if dcmp.diff_files or dcmp.left_only or dcmp.right_only or dcmp.funny_files:
                 return False
             # Recursively check subdirectories
@@ -165,7 +179,8 @@ def compare_files(file1: Path, file2: Path) -> bool:
                     return False
             return True
 
-        return file1.read_bytes() == file2.read_bytes()
+        # Use filecmp.cmp for efficient file comparison (checks stat signature first then content)
+        return filecmp.cmp(file1, file2, shallow=False)
     except Exception:
         return False
 

@@ -1,14 +1,13 @@
 """Core operations for dot-man - modular business logic."""
 
 from pathlib import Path
-from pathlib import Path
-from typing import Iterator, Callable
+from typing import Iterator, Callable, Generator
 
 from .config import GlobalConfig, DotManConfig, Section
 from .core import GitManager
 from .files import copy_file, copy_directory, compare_files, get_file_status, backup_file
 from .secrets import SecretScanner, SecretMatch
-from .constants import REPO_DIR
+from .constants import REPO_DIR, IGNORED_DIRECTORIES
 from .exceptions import DotManError, ConfigurationError
 
 
@@ -72,14 +71,22 @@ class DotManOperations:
         Yields:
             (local_path, repo_path, status)
         """
+        import os
         for local_path in section.paths:
             repo_path = section.get_repo_path(local_path, REPO_DIR)
             
             if local_path.is_dir():
                 # For directories, iterate over files inside
                 if local_path.exists():
-                    for local_file in local_path.rglob("*"):
-                        if local_file.is_file():
+                    # Optimized walk with pruning
+                    for root, dirs, files in os.walk(local_path):
+                        # Prune ignored directories in-place
+                        dirs[:] = [d for d in dirs if d not in IGNORED_DIRECTORIES]
+
+                        root_path = Path(root)
+                        for file in files:
+                            local_file = root_path / file
+
                             # Apply include/exclude patterns
                             rel = local_file.relative_to(local_path)
                             if section.exclude and self._matches_patterns(rel, section.exclude):
@@ -93,8 +100,13 @@ class DotManOperations:
                 
                 # Also check repo for files that might be deleted locally
                 if repo_path.exists():
-                    for repo_file in repo_path.rglob("*"):
-                        if repo_file.is_file():
+                    # Iterate repo similarly (pruning ignored)
+                    for root, dirs, files in os.walk(repo_path):
+                        dirs[:] = [d for d in dirs if d not in IGNORED_DIRECTORIES]
+                        root_path = Path(root)
+
+                        for file in files:
+                            repo_file = root_path / file
                             rel = repo_file.relative_to(repo_path)
                             local_file = local_path / rel
                             
@@ -119,47 +131,67 @@ class DotManOperations:
                 return True
         return False
     
-    def save_section(
-        self, 
+    def _process_section(
+        self,
         section: Section,
+        operation: str, # "save" or "deploy"
         secret_handler: Callable[[SecretMatch], str] | None = None
     ) -> tuple[int, list[SecretMatch]]:
-        """
-        Save a section from local to repo.
-        
-        Returns:
-            (files_saved, secrets_detected)
-        """
-        saved = 0
+        """Unified internal method for processing sections."""
+        processed_count = 0
         all_secrets: list[SecretMatch] = []
         
         for local_path in section.paths:
-            if not local_path.exists():
-                continue
-            
             repo_path = section.get_repo_path(local_path, REPO_DIR)
             
-            if local_path.is_file():
+            src = local_path if operation == "save" else repo_path
+            dst = repo_path if operation == "save" else local_path
+
+            if not src.exists():
+                # For deploy, we might want to skip if missing in repo,
+                # but "deleted" status handling is usually separate or implicit via sync/copy.
+                continue
+
+            if operation == "deploy":
+                if section.update_strategy == "ignore" and dst.exists():
+                    continue
+                if section.update_strategy == "rename_old" and dst.exists():
+                    backup_file(dst)
+
+            # Determine filter setting
+            # During save, we respect section.secrets_filter
+            # During deploy, we usually don't filter (we trust repo content, or it's already redacted)
+            filter_enabled = section.secrets_filter if operation == "save" else False
+
+            if src.is_file():
                 success, secrets = copy_file(
-                    local_path, repo_path, 
-                    filter_secrets_enabled=section.secrets_filter,
+                    src, dst,
+                    filter_secrets_enabled=filter_enabled,
                     secret_handler=secret_handler
                 )
                 if success:
-                    saved += 1
+                    processed_count += 1
                 all_secrets.extend(secrets)
             else:
-                files_copied, _, secrets = copy_directory(
-                    local_path, repo_path,
-                    filter_secrets_enabled=section.secrets_filter,
+                copied, _, secrets = copy_directory(
+                    src, dst,
+                    filter_secrets_enabled=filter_enabled,
                     include_patterns=section.include,
                     exclude_patterns=section.exclude,
                     secret_handler=secret_handler,
                 )
-                saved += files_copied
+                processed_count += copied
                 all_secrets.extend(secrets)
-        
-        return saved, all_secrets
+
+        return processed_count, all_secrets
+
+    def save_section(
+        self,
+        section: Section,
+        secret_handler: Callable[[SecretMatch], str] | None = None
+    ) -> tuple[int, list[SecretMatch]]:
+        """Save a section from local to repo."""
+        return self._process_section(section, "save", secret_handler)
     
     def deploy_section(self, section: Section) -> tuple[int, bool]:
         """
@@ -168,16 +200,27 @@ class DotManOperations:
         Returns:
             (files_deployed, had_changes)
         """
+        # Note: deploy_section signature in original was (int, bool) returning had_changes
+        # _process_section returns (int, list[SecretMatch])
+        # We need to maintain compatibility or update callers.
+        # "had_changes" calculation was done separately in original deploy_section.
+
+        # Let's keep original logic structure but use reusable parts if possible,
+        # or just acknowledge that deploy has special "had_changes" / "hooks" logic that "save" doesn't need.
+        # So maybe full unification is overkill if logic differs significantly.
+        # "Simplicity" goal: reduce duplication.
+        # But deploy needs "compare_files" before copy to determine hooks/changes.
+
         deployed = 0
         had_changes = False
         
         for local_path in section.paths:
             repo_path = section.get_repo_path(local_path, REPO_DIR)
-            # Handle update strategy
+
             if section.update_strategy == "ignore" and local_path.exists():
                 continue
             
-            # Check if will change (after strategy filtering)
+            # Check if will change
             will_change = not local_path.exists() or not compare_files(repo_path, local_path)
             if will_change:
                 had_changes = True
@@ -185,6 +228,7 @@ class DotManOperations:
             if section.update_strategy == "rename_old" and local_path.exists():
                 backup_file(local_path)
             
+            # Use copy logic
             if repo_path.is_file():
                 success, _ = copy_file(repo_path, local_path, filter_secrets_enabled=False)
                 if success:
