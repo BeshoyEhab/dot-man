@@ -731,15 +731,15 @@ def switch(branch: str, dry_run: bool, force: bool):
 
         # Check if already on target branch
         if current_branch == branch and not dry_run:
-            console.print(f"Already on branch '[bold]{branch}[/bold]'")
+            ui.console.print(f"Already on branch '[bold]{branch}[/bold]'")
             return
 
         if dry_run:
-            console.print("[dim]Dry run - no changes will be made[/dim]")
-            console.print()
+            ui.console.print("[dim]Dry run - no changes will be made[/dim]")
+            ui.console.print()
 
         # Phase 1: Save current branch state
-        console.print(
+        ui.console.print(
             f"[bold]Phase 1:[/bold] Saving current branch '{current_branch}'..."
         )
 
@@ -749,7 +749,7 @@ def switch(branch: str, dry_run: bool, force: bool):
                 section = ops.get_section(section_name)
                 for local_path, repo_path, status in ops.iter_section_paths(section):
                     if status != "IDENTICAL":
-                        console.print(f"  Would save: {local_path} [{status}]")
+                        ui.console.print(f"  Would save: {local_path} [{status}]")
         else:
             secret_handler = get_secret_handler()
             saved_count, secrets = ops.save_all(secret_handler)
@@ -762,31 +762,31 @@ def switch(branch: str, dry_run: bool, force: bool):
             )
             commit_sha = ops.git.commit(commit_msg)
             if commit_sha:
-                console.print(f"  Committed: [dim]{commit_sha[:7]}[/dim]")
-            console.print(f"  Saved {saved_count} files")
+                ui.console.print(f"  Committed: [dim]{commit_sha[:7]}[/dim]")
+            ui.console.print(f"  Saved {saved_count} files")
 
         # Phase 2: Switch branch
-        console.print()
-        console.print(f"[bold]Phase 2:[/bold] Switching to branch '{branch}'...")
+        ui.console.print()
+        ui.console.print(f"[bold]Phase 2:[/bold] Switching to branch '{branch}'...")
 
         branch_exists = ops.git.branch_exists(branch)
         if dry_run:
             if branch_exists:
-                console.print(f"  Would checkout existing branch: {branch}")
+                ui.console.print(f"  Would checkout existing branch: {branch}")
             else:
-                console.print(f"  Would create new branch: {branch}")
+                ui.console.print(f"  Would create new branch: {branch}")
         else:
             ops.git.checkout(branch, create=not branch_exists)
 
             if not branch_exists:
-                console.print(f"  Created new branch: [cyan]{branch}[/cyan]")
+                ui.console.print(f"  Created new branch: [cyan]{branch}[/cyan]")
 
             # Reload config for new branch (IMPORTANT for per-branch configs)
             ops.reload_config()
 
         # Phase 3: Deploy new branch files
-        console.print()
-        console.print(f"[bold]Phase 3:[/bold] Deploying '{branch}' configuration...")
+        ui.console.print()
+        ui.console.print(f"[bold]Phase 3:[/bold] Deploying '{branch}' configuration...")
 
         deployed_count = 0
         if dry_run:
@@ -798,18 +798,18 @@ def switch(branch: str, dry_run: bool, force: bool):
                         will_change = not local_path.exists() or not compare_files(
                             repo_path, local_path
                         )
-                        console.print(f"  Would deploy: {local_path}")
+                        ui.console.print(f"  Would deploy: {local_path}")
                         if will_change:
                             if section.pre_deploy:
-                                console.print(
+                                ui.console.print(
                                     f"    [dim]Pre-hook:[/dim] {section.pre_deploy}"
                                 )
                             if section.post_deploy:
-                                console.print(
+                                ui.console.print(
                                     f"    [dim]Post-hook:[/dim] {section.post_deploy}"
                                 )
                         else:
-                            console.print("    [dim](No changes needed)[/dim]")
+                            ui.console.print("    [dim](No changes needed)[/dim]")
         else:
             # Collect hooks
             pre_hooks: list[str] = []
@@ -832,16 +832,16 @@ def switch(branch: str, dry_run: bool, force: bool):
             # Run pre-deploy hooks
             pre_hooks = list(dict.fromkeys(pre_hooks))
             if pre_hooks:
-                console.print()
-                console.print("[bold]Running pre-deploy hooks...[/bold]")
+                ui.console.print()
+                ui.console.print("[bold]Running pre-deploy hooks...[/bold]")
                 for cmd in pre_hooks:
-                    console.print(f"  Exec: [cyan]{cmd}[/cyan]")
+                    ui.console.print(f"  Exec: [cyan]{cmd}[/cyan]")
                     try:
                         shell = os.environ.get("SHELL", "/bin/sh")
                         subprocess.run([shell, "-c", cmd], check=False)
                     except Exception as e:
                         warn(f"Failed to run command '{cmd}': {e}")
-                console.print()
+                ui.console.print()
 
             # Deploy
             deployed_count, _, _ = ops.deploy_all()
@@ -853,10 +853,10 @@ def switch(branch: str, dry_run: bool, force: bool):
             # Run post-deploy hooks
             post_hooks = list(dict.fromkeys(post_hooks))
             if post_hooks:
-                console.print()
-                console.print("[bold]Running post-deploy hooks...[/bold]")
+                ui.console.print()
+                ui.console.print("[bold]Running post-deploy hooks...[/bold]")
                 for cmd in post_hooks:
-                    console.print(f"  Exec: [cyan]{cmd}[/cyan]")
+                    ui.console.print(f"  Exec: [cyan]{cmd}[/cyan]")
                     try:
                         shell = os.environ.get("SHELL", "/bin/sh")
                         subprocess.run([shell, "-c", cmd], check=False)
@@ -864,15 +864,15 @@ def switch(branch: str, dry_run: bool, force: bool):
                         warn(f"Failed to run command '{cmd}': {e}")
 
         # Summary
-        console.print()
+        ui.console.print()
         if dry_run:
-            console.print("[dim]Dry run complete. No changes were made.[/dim]")
+            ui.console.print("[dim]Dry run complete. No changes were made.[/dim]")
         else:
             success(f"Switched to '{branch}'")
-            console.print()
-            console.print(f"  • Deployed {deployed_count} files for '{branch}'")
-            console.print()
-            console.print("Run [cyan]dot-man status[/cyan] to verify.")
+            ui.console.print()
+            ui.console.print(f"  • Deployed {deployed_count} files for '{branch}'")
+            ui.console.print()
+            ui.console.print("Run [cyan]dot-man status[/cyan] to verify.")
 
     except DotManError as e:
         error(str(e), e.exit_code)
@@ -918,18 +918,18 @@ def edit(editor: str | None, edit_global: bool, raw: bool):
                 sections = ops.get_sections()
                 
                 if not sections:
-                    console.print("[dim]No sections to edit. Opening raw file...[/dim]")
+                    ui.console.print("[dim]No sections to edit. Opening raw file...[/dim]")
                 else:
                     # Interactive CLI Menu
-                    console.print("[bold cyan]Configuration Editor[/bold cyan]")
-                    console.print()
-                    console.print(f"Select a section to configure:")
+                    ui.console.print("[bold cyan]Configuration Editor[/bold cyan]")
+                    ui.console.print()
+                    ui.console.print(f"Select a section to configure:")
                     
                     for i, name in enumerate(sections, 1):
-                        console.print(f"  {i}. {name}")
-                    console.print("  r. Raw File (Advanced)")
-                    console.print("  q. Quit")
-                    console.print()
+                        ui.console.print(f"  {i}. {name}")
+                    ui.console.print("  r. Raw File (Advanced)")
+                    ui.console.print("  q. Quit")
+                    ui.console.print()
                     
                     choice = click.prompt("Selection", default="q")
                     
@@ -946,13 +946,13 @@ def edit(editor: str | None, edit_global: bool, raw: bool):
                             _run_section_wizard(ops.dotman_config, selected_section)
                             return
                         else:
-                             console.print("[red]Invalid selection[/red]")
+                             ui.console.print("[red]Invalid selection[/red]")
                     else:
-                         console.print("[red]Invalid selection[/red]")
+                         ui.console.print("[red]Invalid selection[/red]")
 
             except Exception as e:
                 warn(f"Interactive menu error: {e}")
-                console.print("Falling back to raw editor...")
+                ui.console.print("Falling back to raw editor...")
 
         # Priority: CLI flag > global config > environment > fallback
         global_config = GlobalConfig()
@@ -963,7 +963,7 @@ def edit(editor: str | None, edit_global: bool, raw: bool):
             config_editor = None
 
         editor_cmd = editor or config_editor or get_editor()
-        console.print(f"Opening {desc} in [cyan]{editor_cmd}[/cyan]...")
+        ui.console.print(f"Opening {desc} in [cyan]{editor_cmd}[/cyan]...")
 
         if not open_in_editor(target, editor_cmd):
             error(f"Editor '{editor_cmd}' exited with error")
@@ -975,10 +975,10 @@ def edit(editor: str | None, edit_global: bool, raw: bool):
                 dotman_config.load()
                 warnings = dotman_config.validate()
                 if warnings:
-                    console.print()
+                    ui.console.print()
                     warn("Configuration has warnings:")
                     for w in warnings:
-                        console.print(f"  • {w}")
+                        ui.console.print(f"  • {w}")
                 else:
                     success("Configuration updated and validated")
             except Exception as e:
@@ -994,10 +994,10 @@ def _run_section_wizard(config: DotManConfig, section_name: str):
     """Run interactive wizard to edit a section."""
     section = config.get_section(section_name)
     
-    console.print()
-    console.print(f"[bold]Editing section: {section_name}[/bold]")
-    console.print("Press Enter to keep current value.")
-    console.print()
+    ui.console.print()
+    ui.console.print(f"[bold]Editing section: {section_name}[/bold]")
+    ui.console.print("Press Enter to keep current value.")
+    ui.console.print()
     
     # 1. Paths
     current_paths = ", ".join(str(p) for p in section.paths)
@@ -1019,15 +1019,15 @@ def _run_section_wizard(config: DotManConfig, section_name: str):
     
     # 4. Secrets Filter
     current_secrets = section.secrets_filter
-    new_secrets = confirm("Filter Secrets?", default=current_secrets)
+    new_secrets = ui.confirm("Filter Secrets?", default=current_secrets)
     
     # 5. Hooks
     new_pre = click.prompt("Pre-deploy hook", default=section.pre_deploy or "")
     new_post = click.prompt("Post-deploy hook", default=section.post_deploy or "")
     
     # Save
-    console.print()
-    if confirm("Save changes?"):
+    ui.console.print()
+    if ui.confirm("Save changes?"):
         # Since we don't have a direct 'update_section' method that accepts partials easily in public API yet
         # We re-add it (add_section handles overwrite if exists)
         # Or better, modify internal dict like we did in TUI
@@ -1052,7 +1052,7 @@ def _run_section_wizard(config: DotManConfig, section_name: str):
         except Exception as e:
             error(f"Failed to save: {e}")
     else:
-        console.print("Changes discarded.")
+        ui.console.print("Changes discarded.")
 
 
 # ============================================================================
@@ -1961,8 +1961,8 @@ def config_create(with_examples: bool, minimal: bool, force: bool):
 
         # Check if file exists
         if config_path.exists() and not force:
-            if not confirm(f"Config file already exists at {config_path}. Overwrite?"):
-                console.print("Cancelled.")
+            if not ui.confirm(f"Config file already exists at {config_path}. Overwrite?"):
+                ui.console.print("Cancelled.")
                 return
 
         # Create the config
@@ -1972,13 +1972,13 @@ def config_create(with_examples: bool, minimal: bool, force: bool):
             # Create minimal config without examples
             dotman_config._data = {}
             dotman_config.save()
-            console.print(f"Created minimal config at {config_path}")
+            ui.console.print(f"Created minimal config at {config_path}")
         else:
             # Create config with examples (default behavior)
             dotman_config.create_default()
-            console.print(f"Created config with examples at {config_path}")
+            ui.console.print(f"Created config with examples at {config_path}")
 
-        console.print("Tip: Use 'dot-man edit' to open the config in your editor")
+        ui.console.print("Tip: Use 'dot-man edit' to open the config in your editor")
 
     except Exception as e:
         error(f"Failed to create config: {e}")
@@ -2019,8 +2019,8 @@ def config_tutorial(section: str | None, interactive: bool):
         return
 
     # Show interactive overview with all sections
-    console.print()
-    console.print(
+    ui.console.print()
+    ui.console.print(
         Panel.fit(
             "[bold blue]dot-man Configuration Tutorial[/bold blue]\n\n"
             "This tutorial shows you how to configure dot-man to track your dotfiles.\n"
@@ -2029,8 +2029,8 @@ def config_tutorial(section: str | None, interactive: bool):
         )
     )
 
-    console.print("\n[bold]What would you like to learn about?[/bold]")
-    console.print()
+    ui.console.print("\n[bold]What would you like to learn about?[/bold]")
+    ui.console.print()
 
     # Interactive menu options
     menu_options = [
@@ -2048,11 +2048,11 @@ def config_tutorial(section: str | None, interactive: bool):
 
     for key, title, desc in menu_options:
         if key in ["I", "C", "Q"]:
-            console.print(f"  [yellow]{key}[/yellow] - [bold]{title}[/bold] - {desc}")
+            ui.console.print(f"  [yellow]{key}[/yellow] - [bold]{title}[/bold] - {desc}")
         else:
-            console.print(f"  [cyan]{key}[/cyan] - [bold]{title}[/bold] - {desc}")
+            ui.console.print(f"  [cyan]{key}[/cyan] - [bold]{title}[/bold] - {desc}")
 
-    console.print()
+    ui.console.print()
 
     # Get user choice
     choice = Prompt.ask(
@@ -2312,8 +2312,8 @@ def _run_interactive_tutorial():
     from rich.text import Text
     from rich.columns import Columns
 
-    console.print()
-    console.print(
+    ui.console.print()
+    ui.console.print(
         Panel.fit(
             "[bold green]🎓 Interactive dot-man Configuration Tutorial[/bold green]\n\n"
             "This interactive tutorial will guide you through configuring dot-man.\n"
