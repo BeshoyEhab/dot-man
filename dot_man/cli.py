@@ -1906,48 +1906,76 @@ def config_tutorial(section: str | None, interactive: bool):
         _show_section_examples(section)
         return
 
-    # Show overview with all sections
+    # Show interactive overview with all sections
     console.print()
     console.print(
         Panel.fit(
             "[bold blue]dot-man Configuration Tutorial[/bold blue]\n\n"
             "This tutorial shows you how to configure dot-man to track your dotfiles.\n"
-            "Use the options below to explore different configuration aspects.",
+            "Choose from the options below or use --interactive for guided learning.",
             title="🎯 Tutorial Overview",
         )
     )
 
-    console.print("\n[bold]Available sections:[/bold]")
-    table = Table()
-    table.add_column("Section", style="cyan")
-    table.add_column("Description")
-    table.add_column("Command")
+    console.print("\n[bold]What would you like to learn about?[/bold]")
+    console.print()
 
-    sections = [
-        ("basic", "Basic file tracking", "dot-man config tutorial --section basic"),
-        (
-            "directories",
-            "Directory tracking",
-            "dot-man config tutorial --section directories",
-        ),
-        ("hooks", "Pre/post deploy hooks", "dot-man config tutorial --section hooks"),
-        (
-            "templates",
-            "Reusable templates",
-            "dot-man config tutorial --section templates",
-        ),
-        ("advanced", "Advanced options", "dot-man config tutorial --section advanced"),
-        ("secrets", "Secret filtering", "dot-man config tutorial --section secrets"),
+    # Interactive menu options
+    menu_options = [
+        ("1", "Basic file tracking", "paths, sections, simple examples"),
+        ("2", "Directory tracking", "include/exclude patterns, wildcards"),
+        ("3", "Update strategies", "replace, rename_old, ignore strategies"),
+        ("4", "Hooks & automation", "pre/post deploy commands, aliases"),
+        ("5", "Templates & inheritance", "reusable configs, organization"),
+        ("6", "Advanced features", "custom paths, overrides, limits"),
+        ("7", "Security & secrets", "automatic filtering, best practices"),
+        ("I", "Interactive tutorial", "step-by-step guided learning"),
+        ("C", "Create config", "generate config file with examples"),
+        ("Q", "Quit", "exit tutorial"),
     ]
 
-    for name, desc, cmd in sections:
-        table.add_row(name, desc, f"[dim]{cmd}[/dim]")
+    for key, title, desc in menu_options:
+        if key in ["I", "C", "Q"]:
+            console.print(f"  [yellow]{key}[/yellow] - [bold]{title}[/bold] - {desc}")
+        else:
+            console.print(f"  [cyan]{key}[/cyan] - [bold]{title}[/bold] - {desc}")
 
-    console.print(table)
+    console.print()
 
-    console.print(
-        "\n[dim]Tip: Run 'dot-man config create' to generate a config file with examples[/dim]"
-    )
+    # Get user choice
+    choice = Prompt.ask(
+        "Enter your choice",
+        choices=["1", "2", "3", "4", "5", "6", "7", "I", "C", "Q"],
+        default="I",
+    ).upper()
+
+    # Handle choice
+    if choice == "1":
+        _show_section_examples("basic")
+    elif choice == "2":
+        _show_section_examples("directories")
+    elif choice == "3":
+        _show_section_examples("hooks")  # Update strategies are in hooks section
+    elif choice == "4":
+        _show_section_examples("hooks")
+    elif choice == "5":
+        _show_section_examples("templates")
+    elif choice == "6":
+        _show_section_examples("advanced")
+    elif choice == "7":
+        _show_section_examples("secrets")
+    elif choice == "I":
+        _run_interactive_tutorial()
+    elif choice == "C":
+        console.print(
+            "\n[dim]Tip: Run 'dot-man config create' to generate a config file with examples[/dim]"
+        )
+    elif choice == "Q":
+        console.print(
+            "\n[dim]Goodbye! Run 'dot-man config tutorial' anytime to return.[/dim]"
+        )
+
+    return
     console.print("[dim]Tip: Use --interactive for step-by-step guidance[/dim]")
 
 
@@ -2182,62 +2210,74 @@ def _run_interactive_tutorial():
         )
     )
 
+    # Track user configurations for final summary
+    user_configs = []
+
     # Step 1: Basic files
     console.print("\n[bold cyan]📁 Step 1: Basic File Tracking[/bold cyan]")
     console.print(
         "Every configuration section starts with [section-name] and defines what files to track."
     )
 
-    if Confirm.ask(
-        "Do you want to track your shell configuration (~/.bashrc, ~/.zshrc)?"
-    ):
-        console.print("\n[bold green]✅ Here's what this config does:[/bold green]")
-        console.print()
+    console.print("\n[bold green]✅ Example: Shell Configuration[/bold green]")
+    console.print()
 
-        # Show the config with explanations
-        config_text = """[shell-config]
+    # Show the config with explanations
+    config_text = """[shell-config]
 paths = ["~/.bashrc", "~/.zshrc"]
 post_deploy = "shell_reload" """
 
-        console.print(Syntax(config_text, "toml", theme="monokai"))
-        console.print()
+    console.print(Syntax(config_text, "toml", theme="monokai"))
+    console.print()
 
-        # Explain each part
-        explanations = [
-            "[bold cyan]🔍 [section-name][/bold cyan]: A unique name for this group of files",
-            "[bold cyan]📂 paths[/bold cyan]: List of files/directories to track (supports ~ expansion)",
-            "[bold cyan]🚀 post_deploy[/bold cyan]: Command to run AFTER files are deployed",
-            "[bold cyan]🔄 shell_reload[/bold cyan]: Built-in alias that reloads bash/zsh (source ~/.bashrc || source ~/.zshrc)",
-        ]
+    # Explain each part
+    console.print(
+        "[bold cyan]🔍 [shell-config][/bold cyan] - A unique name for this group of files"
+    )
+    console.print(
+        "[bold cyan]📂 paths[/bold cyan] - List of files/directories to track (supports ~ expansion)"
+    )
+    console.print(
+        "[bold cyan]🚀 post_deploy[/bold cyan] - Command to run AFTER files are deployed"
+    )
+    console.print(
+        "[bold cyan]🔄 shell_reload[/bold cyan] - Built-in alias that reloads bash/zsh"
+    )
+    console.print("    [dim](runs: source ~/.bashrc || source ~/.zshrc)[/dim]")
 
-        for explanation in explanations:
-            console.print(f"  {explanation}")
+    console.print(
+        "\n[dim]💡 Smart defaults apply automatically - you only specify what's different![/dim]"
+    )
 
-        console.print(
-            "\n[dim]💡 Smart defaults apply automatically - you only specify what's different![/dim]"
-        )
+    console.print("\n[dim]Press Enter to continue...[/dim]")
+    input()
 
-    if Confirm.ask("Do you want to track your Git configuration (~/.gitconfig)?"):
-        console.print(
-            "\n[bold green]✅ Git config with automatic secret protection:[/bold green]"
-        )
-        console.print()
+    console.print(
+        "\n[bold green]✅ Git Config with Automatic Secret Protection:[/bold green]"
+    )
+    console.print()
 
-        config_text = """[gitconfig]
+    config_text = """[gitconfig]
 paths = ["~/.gitconfig"]"""
 
-        console.print(Syntax(config_text, "toml", theme="monokai"))
-        console.print()
+    console.print(Syntax(config_text, "toml", theme="monokai"))
+    console.print()
 
-        explanations = [
-            "[bold cyan]🔒 Automatic security[/bold cyan]: Git configs often contain tokens, so dot-man:",
-            "  • Automatically enables [yellow]secrets_filter = true[/yellow]",
-            "  • Redacts API keys, passwords, and tokens when saving",
-            '  • Uses [yellow]update_strategy = "replace"[/yellow] (overwrites existing files)',
-        ]
+    console.print(
+        "[bold cyan]🔒 Automatic security[/bold cyan] - Git configs get special protection:"
+    )
+    console.print(
+        "  • [yellow]secrets_filter = true[/yellow] - Detects and redacts sensitive data"
+    )
+    console.print(
+        "  • [yellow]API keys, passwords, tokens[/yellow] - Automatically removed when saving"
+    )
+    console.print(
+        '  • [yellow]update_strategy = "replace"[/yellow] - Safe for most config files'
+    )
 
-        for explanation in explanations:
-            console.print(f"  {explanation}")
+    console.print("\n[dim]Press Enter to continue...[/dim]")
+    input()
 
     # Step 2: Directories with patterns
     console.print(
@@ -2245,61 +2285,47 @@ paths = ["~/.gitconfig"]"""
     )
     console.print("When tracking directories, you can include/exclude specific files.")
 
-    editors = ["Neovim (~/.config/nvim)", "VS Code (~/.config/Code)", "Other"]
-    editor_choice = Prompt.ask(
-        "Which editor config do you want to track?",
-        choices=editors,
-        default="Neovim (~/.config/nvim)",
-    )
+    console.print("\n[bold green]✅ Neovim Config with Smart Exclusions:[/bold green]")
+    console.print()
 
-    if "Neovim" in editor_choice:
-        console.print(
-            "\n[bold green]✅ Neovim config with smart exclusions:[/bold green]"
-        )
-        console.print()
-
-        config_text = """[nvim]
+    config_text = """[nvim]
 paths = ["~/.config/nvim"]
 exclude = ["*.log", "plugin/packer_compiled.lua"]
 post_deploy = "nvim_sync" """
 
-        console.print(Syntax(config_text, "toml", theme="monokai"))
-        console.print()
+    console.print(Syntax(config_text, "toml", theme="monokai"))
+    console.print()
 
-        explanations = [
-            "[bold cyan]🎯 exclude[/bold cyan]: Patterns of files/directories to SKIP tracking",
-            "  • [yellow]*.log[/yellow]: Matches any .log files",
-            "  • [yellow]plugin/packer_compiled.lua[/yellow]: Skips compiled plugin cache",
-            "[bold cyan]📝 Pattern syntax[/bold cyan]: Supports wildcards (*, **, ?) and gitignore-style patterns",
-            "[bold cyan]🔄 nvim_sync[/bold cyan]: Alias that runs: nvim --headless +PackerSync +qa",
-        ]
+    console.print(
+        "[bold cyan]🎯 exclude[/bold cyan] - Patterns of files/directories to SKIP tracking"
+    )
+    console.print("  • [yellow]*.log[/yellow] - Any .log files")
+    console.print(
+        "  • [yellow]plugin/packer_compiled.lua[/yellow] - Compiled plugin cache"
+    )
+    console.print(
+        "[bold cyan]📝 Pattern syntax[/bold cyan] - Wildcards (*, **, ?) and gitignore-style"
+    )
+    console.print(
+        "[bold cyan]🔄 nvim_sync[/bold cyan] - Alias: nvim --headless +PackerSync +qa"
+    )
 
-        for explanation in explanations:
-            console.print(f"  {explanation}")
+    console.print(
+        '\n[dim]💡 Use ** for recursive: "**/*.tmp" matches all .tmp files in subdirs[/dim]'
+    )
 
-        console.print(
-            '\n[dim]💡 Use ** for recursive matching, like "**/*.tmp" for all .tmp files in subdirs[/dim]'
+    user_configs.append(
+        (
+            "nvim",
+            """[nvim]
+paths = ["~/.config/nvim"]
+exclude = ["*.log", "plugin/packer_compiled.lua"]
+post_deploy = "nvim_sync" """,
         )
+    )
 
-    elif "VS Code" in editor_choice:
-        console.print("\n[bold green]✅ VS Code settings:[/bold green]")
-        console.print()
-
-        config_text = """[vscode]
-paths = ["~/.config/Code/User"]
-post_deploy = "notify-send 'VS Code config updated'" """
-
-        console.print(Syntax(config_text, "toml", theme="monokai"))
-        console.print()
-
-        explanations = [
-            "[bold cyan]🔔 Custom commands[/bold cyan]: You can write any shell command",
-            "[bold cyan]🔔 notify-send[/bold cyan]: Shows desktop notification when config is deployed",
-            "[bold cyan]⚡ post_deploy timing[/bold cyan]: Runs after ALL files in this section are copied",
-        ]
-
-        for explanation in explanations:
-            console.print(f"  {explanation}")
+    console.print("\n[dim]Press Enter to continue...[/dim]")
+    input()
 
     # Step 3: Update strategies
     console.print(
@@ -2307,12 +2333,7 @@ post_deploy = "notify-send 'VS Code config updated'" """
     )
     console.print("Choose how dot-man handles existing files when deploying.")
 
-    strategies = ["Safe (rename_old)", "Direct (replace)", "Conservative (ignore)"]
-    strategy_choice = Prompt.ask(
-        "How should dot-man handle existing files?",
-        choices=strategies,
-        default="Safe (rename_old)",
-    )
+    # Show update strategy information
 
     console.print("\n[bold green]📋 Update Strategy Options:[/bold green]")
 
@@ -2336,38 +2357,43 @@ post_deploy = "notify-send 'VS Code config updated'" """
         console.print(Syntax(details["config"], "toml", theme="monokai"))
         console.print(details["explanation"])
 
+    console.print("\n[dim]Press Enter to continue...[/dim]")
+    input()
+
     # Step 4: Pre-deploy hooks
     console.print(
         "\n[bold cyan]⚡ Step 4: Pre-Deploy Hooks - Actions Before Deployment[/bold cyan]"
     )
     console.print("Sometimes you need to prepare before deploying files.")
 
-    if Confirm.ask("Want to see examples of pre-deploy hooks?"):
-        console.print("\n[bold green]🔧 Pre-deploy hook examples:[/bold green]")
-        console.print()
+    console.print("\n[bold green]🔧 Pre-deploy Hook Examples:[/bold green]")
+    console.print()
 
-        examples = [
-            {
-                "title": "Backup important files",
-                "config": """[important-config]
+    examples = [
+        {
+            "title": "Backup important files",
+            "config": """[important-config]
 paths = ["~/.important/app.conf"]
 pre_deploy = "cp ~/.important/app.conf ~/.important/app.conf.backup" """,
-                "explanation": "Creates a backup before dot-man touches the file",
-            },
-            {
-                "title": "Stop services before config change",
-                "config": """[service-config]
+            "explanation": "Creates a backup before dot-man touches the file",
+        },
+        {
+            "title": "Stop services before config change",
+            "config": """[service-config]
 paths = ["~/.config/my-service"]
 pre_deploy = "systemctl --user stop my-service" """,
-                "explanation": "Stops the service before updating its config files",
-            },
-        ]
+            "explanation": "Stops the service before updating its config files",
+        },
+    ]
 
-        for example in examples:
-            console.print(f"[cyan]{example['title']}:[/cyan]")
-            console.print(Syntax(example["config"], "toml", theme="monokai"))
-            console.print(f"  {example['explanation']}")
-            console.print()
+    for example in examples:
+        console.print(f"[cyan]{example['title']}:[/cyan]")
+        console.print(Syntax(example["config"], "toml", theme="monokai"))
+        console.print(f"  {example['explanation']}")
+        console.print()
+
+    console.print("\n[dim]Press Enter to continue...[/dim]")
+    input()
 
     # Step 5: Templates
     console.print(
@@ -2375,11 +2401,10 @@ pre_deploy = "systemctl --user stop my-service" """,
     )
     console.print("Define shared settings that multiple sections can inherit.")
 
-    if Confirm.ask("Want to learn about templates for shared settings?"):
-        console.print("\n[bold green]🎨 Template example:[/bold green]")
-        console.print()
+    console.print("\n[bold green]🎨 Template Example:[/bold green]")
+    console.print()
 
-        config_text = """# Define a template
+    config_text = """# Define a template
 [templates.desktop-apps]
 post_deploy = "notify-send 'Config updated'"
 update_strategy = "rename_old"
@@ -2395,52 +2420,58 @@ inherits = ["desktop-apps"]
 # Override settings if needed
 update_strategy = "replace" """
 
-        console.print(Syntax(config_text, "toml", theme="monokai"))
-        console.print()
+    console.print(Syntax(config_text, "toml", theme="monokai"))
+    console.print()
 
-        explanations = [
-            "[bold cyan]📋 Template definition[/bold cyan]: Settings under [templates.name] can be reused",
-            "[bold cyan]🔗 inherits[/bold cyan]: List of templates to inherit settings from",
-            "[bold cyan]⚡ Override behavior[/bold cyan]: Section settings override template settings",
-            "[bold cyan]🎯 Use case[/bold cyan]: Share desktop notifications, update strategies, etc.",
-        ]
+    console.print(
+        "[bold cyan]📋 Template definition[/bold cyan] - [templates.name] sections are reusable"
+    )
+    console.print(
+        "[bold cyan]🔗 inherits[/bold cyan] - List of templates to inherit settings from"
+    )
+    console.print(
+        "[bold cyan]⚡ Override behavior[/bold cyan] - Section settings override templates"
+    )
+    console.print(
+        "[bold cyan]🎯 Use case[/bold cyan] - Share notifications, strategies, etc."
+    )
 
-        for explanation in explanations:
-            console.print(f"  {explanation}")
+    console.print("\n[dim]Press Enter to continue...[/dim]")
+    input()
 
     # Step 6: Terminal
     console.print("\n[bold cyan]💻 Step 6: Terminal Configuration[/bold cyan]")
 
-    terminals = ["Kitty", "Alacritty", "WezTerm", "None"]
-    term_choice = Prompt.ask(
-        "Which terminal config do you want to track?", choices=terminals, default="None"
+    console.print("\n[bold green]✅ Kitty Terminal Configuration:[/bold green]")
+    console.print()
+
+    config_text = """[kitty]
+paths = ["~/.config/kitty"]
+post_deploy = "kitty_reload" """
+
+    console.print(Syntax(config_text, "toml", theme="monokai"))
+    console.print()
+
+    console.print(
+        "[bold cyan]🖥️ Kitty[/bold cyan] - Fast, GPU-accelerated terminal emulator"
+    )
+    console.print("[bold cyan]📂 paths[/bold cyan] - Kitty configuration directory")
+    console.print("[bold cyan]🚀 post_deploy[/bold cyan] - Reload command for Kitty")
+    console.print(
+        "[bold cyan]🔄 kitty_reload[/bold cyan] - Sends SIGUSR1 to reload running instances"
     )
 
-    term_configs = {
-        "Kitty": {
-            "config": """[kitty]
+    user_configs.append(
+        (
+            "kitty",
+            """[kitty]
 paths = ["~/.config/kitty"]
 post_deploy = "kitty_reload" """,
-            "explanation": "kitty_reload sends SIGUSR1 to running kitty processes to reload config",
-        },
-        "Alacritty": {
-            "config": """[alacritty]
-paths = ["~/.config/alacritty"]""",
-            "explanation": "Alacritty automatically reloads config when files change",
-        },
-        "WezTerm": {
-            "config": """[wezterm]
-paths = ["~/.config/wezterm"]""",
-            "explanation": "WezTerm typically reloads config automatically",
-        },
-    }
-
-    if term_choice in term_configs:
-        console.print(f"\n[bold green]✅ {term_choice} configuration:[/bold green]")
-        console.print(
-            Syntax(term_configs[term_choice]["config"], "toml", theme="monokai")
         )
-        console.print(f"\n  {term_configs[term_choice]['explanation']}")
+    )
+
+    console.print("\n[dim]Press Enter to continue...[/dim]")
+    input()
 
     # Final summary
     console.print("\n[bold green]🎉 Tutorial Complete![/bold green]")
