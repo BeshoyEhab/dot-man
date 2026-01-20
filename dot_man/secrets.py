@@ -306,13 +306,13 @@ class SecretScanner:
         except Exception:
             return True
 
-    def scan_content(
-        self, content: str, file_path: Path | None = None
+    def scan_lines(
+        self, lines: Iterator[str], file_path: Path | None = None
     ) -> Iterator[SecretMatch]:
-        """Scan content for secrets."""
+        """Scan lines for secrets."""
         file_path = file_path or Path("<string>")
 
-        for line_number, line in enumerate(content.splitlines(), start=1):
+        for line_number, line in enumerate(lines, start=1):
             # Skip likely false positives
             if self.is_false_positive(line):
                 continue
@@ -329,14 +329,20 @@ class SecretScanner:
                         matched_text=match.group(0),
                     )
 
+    def scan_content(
+        self, content: str, file_path: Path | None = None
+    ) -> Iterator[SecretMatch]:
+        """Scan content for secrets."""
+        return self.scan_lines(content.splitlines(), file_path)
+
     def scan_file(self, path: Path) -> Iterator[SecretMatch]:
         """Scan a file for secrets."""
         if self.is_binary_file(path):
             return
 
         try:
-            content = path.read_text(encoding="utf-8", errors="ignore")
-            yield from self.scan_content(content, path)
+            with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                yield from self.scan_lines(f, path)
         except Exception:
             # Skip files we can't read
             pass
@@ -392,17 +398,11 @@ class SecretScanner:
             line_modified = False
 
             for pattern in self.patterns:
-                # We need to find all matches in the line
-                # But simple substitution might mess up indices if we have multiple secrets
-                # For now, let's assume one secret per line or just handle the first one effectively
-                # or strictly use regex sub with a callback if possible, but we need SecretMatch context
-
-                # Simpler approach: Check if line matches, if so, ask user.
-                # If they say Redact, we redact the WHOLE pattern match.
-
                 match = pattern.pattern.search(current_line)
                 if match:
                     should_redact = True
+                    matched_text = match.group(0)
+
                     if callback:
                         secret_match = SecretMatch(
                             file=file_path,
@@ -410,7 +410,7 @@ class SecretScanner:
                             line_content=line.strip(),
                             pattern_name=pattern.name,
                             severity=pattern.severity,
-                            matched_text=match.group(0),
+                            matched_text=matched_text,
                         )
                         action = callback(secret_match)
                         should_redact = action == "REDACT"

@@ -8,12 +8,11 @@ from pathlib import Path
 from typing import Callable
 
 import click
-from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from rich.syntax import Syntax
 
-from . import __version__
+from . import __version__, ui
 from .constants import (
     DOT_MAN_DIR,
     REPO_DIR,
@@ -24,7 +23,7 @@ from .config import GlobalConfig, DotManConfig
 from .core import GitManager
 from .files import copy_file, backup_file, compare_files
 from .secrets import SecretScanner
-from .utils import get_editor, open_in_editor, is_git_installed, confirm
+from .utils import get_editor, open_in_editor, is_git_installed
 from .exceptions import (
     DotManError,
 )
@@ -33,9 +32,6 @@ from .secrets import (
     SecretMatch,
     PermanentRedactGuard,
 )
-
-console = Console()
-
 
 def get_secret_handler() -> Callable[[SecretMatch], str]:
     """Get a secret handler that prompts the user for action."""
@@ -54,50 +50,45 @@ def get_secret_handler() -> Callable[[SecretMatch], str]:
             return "IGNORE"
 
         # Show the secret to user
-        console.print()
-        console.print("[red]⚠️  Potential secret detected![/red]")
-        console.print(f"File: [cyan]{match.file}[/cyan]")
-        console.print(f"Line {match.line_number}: {match.line_content[:80]}...")
-        console.print(
+        ui.console.print()
+        ui.warn("Potential secret detected!")
+        ui.console.print(f"File: [cyan]{match.file}[/cyan]")
+        ui.console.print(f"Line {match.line_number}: {match.line_content[:80]}...")
+        ui.console.print(
             f"Pattern: {match.pattern_name} (severity: {match.severity.value})"
         )
-        console.print()
+        ui.console.print()
 
         # Options
-        console.print("Choose how to handle this secret:")
-        console.print("  1. [dim]Ignore (skip it this time)[/dim]")
-        console.print(
+        ui.console.print("Choose how to handle this secret:")
+        ui.console.print("  1. [dim]Ignore (skip it this time)[/dim]")
+        ui.console.print(
             "  2. [yellow]Protect (replace with ***REDACTED*** this time)[/yellow]"
         )
-        console.print("  3. [blue]Add to skip list (skip this line every time)[/blue]")
-        console.print("  4. [red]Protect forever (always replace in repo)[/red]")
-        console.print()
+        ui.console.print("  3. [blue]Add to skip list (skip this line every time)[/blue]")
+        ui.console.print("  4. [red]Protect forever (always replace in repo)[/red]")
+        ui.console.print()
 
-        while True:
-            try:
-                choice = click.prompt("Enter choice (1-4)", type=int, default=2)
-                if choice not in (1, 2, 3, 4):
-                    console.print("[red]Invalid choice. Please enter 1-4.[/red]")
-                    continue
+        choices = ["1", "2", "3", "4"]
+        choice = ui.ask("Enter choice", choices=choices, default="2")
 
-                if choice == 1:
-                    return "IGNORE"
-                elif choice == 2:
-                    return "REDACT"
-                elif choice == 3:
-                    guard.add_allowed(
-                        match.file, match.line_content, match.pattern_name
-                    )
-                    console.print("[blue]Added to skip list.[/blue]")
-                    return "IGNORE"
-                elif choice == 4:
-                    permanent_guard.add_permanent_redact(
-                        match.file, match.line_content, match.pattern_name
-                    )
-                    console.print("[red]Will always redact this secret.[/red]")
-                    return "REDACT"
-            except (ValueError, click.Abort):
-                console.print("[red]Invalid input. Please enter a number 1-4.[/red]")
+        if choice == "1":
+            return "IGNORE"
+        elif choice == "2":
+            return "REDACT"
+        elif choice == "3":
+            guard.add_allowed(
+                match.file, match.line_content, match.pattern_name
+            )
+            ui.info("Added to skip list.")
+            return "IGNORE"
+        elif choice == "4":
+            permanent_guard.add_permanent_redact(
+                match.file, match.line_content, match.pattern_name
+            )
+            ui.warn("Will always redact this secret.")
+            return "REDACT"
+        return "REDACT" # Should not reach here
 
     return handle_secret
 
@@ -114,18 +105,35 @@ def complete_branches(ctx, param, incomplete):
 
 def error(message: str, exit_code: int = 1) -> None:
     """Print error message and exit."""
-    console.print(f"[red]✗ Error:[/red] {message}")
-    sys.exit(exit_code)
+    ui.error(message, exit_code)
 
 
 def success(message: str) -> None:
     """Print success message."""
-    console.print(f"[green]✓[/green] {message}")
+    ui.success(message)
 
 
 def warn(message: str) -> None:
     """Print warning message."""
-    console.print(f"[yellow]⚠[/yellow] {message}")
+    ui.warn(message)
+
+
+class DotManGroup(click.Group):
+    """Custom Click Group to provide suggestions for typos."""
+
+    def get_command(self, ctx, cmd_name):
+        rv = click.Group.get_command(self, ctx, cmd_name)
+        if rv is not None:
+            return rv
+
+        matches = [cmd for cmd in self.list_commands(ctx)]
+        suggestion = ui.suggest_command(cmd_name, matches)
+
+        ui.error(f"Unknown command '{cmd_name}'", exit_code=0)
+        if suggestion:
+            ui.warn(f"Did you mean '{suggestion}'?")
+
+        ctx.exit(2)
 
 
 def require_init(func):
@@ -145,7 +153,7 @@ def require_init(func):
 # ============================================================================
 
 
-@click.group()
+@click.group(cls=DotManGroup)
 @click.version_option(version=__version__, prog_name="dot-man")
 def main():
     """dot-man: Dotfile manager with git-powered branching.
@@ -175,10 +183,10 @@ def init(force: bool, no_wizard: bool):
         error("Git not found. Please install git first.", exit_code=2)
 
     if DOT_MAN_DIR.exists() and not force:
-        if not confirm(
+        if not ui.confirm(
             "Repository already initialized. Reinitialize? (This will DELETE all data)"
         ):
-            console.print("Aborted.")
+            ui.info("Aborted.")
             sys.exit(1)
 
         import shutil
@@ -208,17 +216,9 @@ def init(force: bool, no_wizard: bool):
         git.commit("dot-man: Initial commit")
 
         # Success message
-        console.print()
-        console.print(
-            "╭─────────────────────────────────────────────────╮", style="green"
-        )
-        console.print(
-            "│  🎉 dot-man initialized successfully!           │", style="green bold"
-        )
-        console.print(
-            "╰─────────────────────────────────────────────────╯", style="green"
-        )
-        console.print()
+        ui.console.print()
+        ui.print_banner("🎉 dot-man initialized successfully!")
+        ui.console.print()
 
         # Run wizard by default (unless --no-wizard)
         if not no_wizard:
@@ -234,16 +234,16 @@ def run_setup_wizard(
     global_config: GlobalConfig, dotman_config: DotManConfig, git: GitManager
 ):
     """Interactive setup wizard for new users."""
-    console.print("[bold cyan]🧙 Setup Wizard[/bold cyan]")
-    console.print()
-    console.print(
+    ui.print_banner("🧙 Setup Wizard")
+    ui.console.print()
+    ui.console.print(
         "Let's get your dotfiles set up! I'll detect common files automatically."
     )
-    console.print()
+    ui.console.print()
 
     # Detect common dotfiles
-    console.print("[bold]Detecting dotfiles...[/bold]")
-    console.print()
+    ui.console.print("[bold]Detecting dotfiles...[/bold]")
+    ui.console.print()
 
     common_files = [
         ("~/.bashrc", "Bash shell", "bashrc"),
@@ -267,21 +267,21 @@ def run_setup_wizard(
         path = Path(path_str).expanduser()
         if path.exists():
             found_count += 1
-            console.print(f"  [green]✓[/green] Found: [cyan]{path_str}[/cyan] ({desc})")
-            if confirm("    Track this?", default=True):
+            ui.console.print(f"  [green]✓[/green] Found: [cyan]{path_str}[/cyan] ({desc})")
+            if ui.confirm("    Track this?", default=True):
                 files_to_add.append((path_str, section_name))
 
     if found_count == 0:
-        console.print("  [dim]No common dotfiles detected in default locations[/dim]")
-        console.print()
+        ui.console.print("  [dim]No common dotfiles detected in default locations[/dim]")
+        ui.console.print()
     else:
-        console.print()
+        ui.console.print()
 
     # Offer to add custom files
-    if confirm("Add custom files not in the list?", default=False):
-        console.print()
+    if ui.confirm("Add custom files not in the list?", default=False):
+        ui.console.print()
         while True:
-            custom_path = click.prompt(
+            custom_path = ui.ask(
                 "Path to track (or press Enter to finish)",
                 default="",
                 show_default=False,
@@ -301,14 +301,14 @@ def run_setup_wizard(
             else:
                 default_section = path.stem or path.name
 
-            section_name = click.prompt("Section name", default=default_section)
+            section_name = ui.ask("Section name", default=default_section)
             files_to_add.append((custom_path, section_name))
 
     # Add files to config
     if files_to_add:
-        console.print()
-        console.print(f"[bold]Adding {len(files_to_add)} files...[/bold]")
-        console.print()
+        ui.console.print()
+        ui.console.print(f"[bold]Adding {len(files_to_add)} files...[/bold]")
+        ui.console.print()
 
         for path_str, section_name in files_to_add:
             try:
@@ -319,7 +319,7 @@ def run_setup_wizard(
                     # repo_base auto-generated
                     # secrets_filter uses default (true)
                 )
-                console.print(f"  [green]✓[/green] [{section_name}]: {path_str}")
+                ui.console.print(f"  [green]✓[/green] [{section_name}]: {path_str}")
             except Exception as e:
                 warn(f"Could not add {path_str}: {e}")
 
@@ -329,78 +329,74 @@ def run_setup_wizard(
         git.add_all()
         git.commit("Add initial dotfiles configuration")
 
-        console.print()
+        ui.console.print()
         success(f"Added {len(files_to_add)} files to configuration")
-        console.print()
+        ui.console.print()
 
         # Show what was configured
-        console.print("[bold]Your dotfiles are now tracked:[/bold]")
+        ui.console.print("[bold]Your dotfiles are now tracked:[/bold]")
         for path_str, section_name in files_to_add[:5]:
-            console.print(f"  • [{section_name}] {path_str}")
+            ui.console.print(f"  • [{section_name}] {path_str}")
         if len(files_to_add) > 5:
-            console.print(f"  ... and {len(files_to_add) - 5} more")
+            ui.console.print(f"  ... and {len(files_to_add) - 5} more")
 
-    console.print()
+    ui.console.print()
 
     # Offer remote setup
-    if confirm("Set up remote repository for syncing? (optional)", default=False):
-        console.print()
+    if ui.confirm("Set up remote repository for syncing? (optional)", default=False):
+        ui.console.print()
         ctx = click.Context(setup)
         ctx.invoke(setup)
 
     # Final instructions
-    console.print()
-    console.print("╭─────────────────────────────────────────────────╮", style="cyan")
-    console.print(
-        "│            🎉 Setup Complete!                   │", style="cyan bold"
-    )
-    console.print("╰─────────────────────────────────────────────────╯", style="cyan")
-    console.print()
+    ui.console.print()
+    ui.print_banner("🎉 Setup Complete!")
+    ui.console.print()
 
     if files_to_add:
-        console.print("[bold]Next steps:[/bold]")
-        console.print(
+        ui.console.print("[bold]Next steps:[/bold]")
+        ui.console.print(
             "  1. [cyan]dot-man status[/cyan]       - View your tracked files"
         )
-        console.print(
+        ui.console.print(
             "  2. [cyan]dot-man switch work[/cyan]  - Create a work configuration branch"
         )
-        console.print("  3. [cyan]dot-man add <path>[/cyan]   - Track more files")
+        ui.console.print("  3. [cyan]dot-man add <path>[/cyan]   - Track more files")
     else:
-        console.print("[bold]Get started:[/bold]")
-        console.print("  [cyan]dot-man add ~/.bashrc[/cyan]   - Add files to track")
-        console.print("  [cyan]dot-man edit[/cyan]            - Edit config file")
-        console.print("  [cyan]dot-man status[/cyan]          - View status")
+        ui.console.print("[bold]Get started:[/bold]")
+        ui.console.print("  [cyan]dot-man add ~/.bashrc[/cyan]   - Add files to track")
+        ui.console.print("  [cyan]dot-man edit[/cyan]            - Edit config file")
+        ui.console.print("  [cyan]dot-man status[/cyan]          - View status")
 
-    console.print()
-    console.print("[dim]💡 Run 'dot-man --help' to see all commands[/dim]")
-    console.print()
+    ui.console.print()
+    ui.console.print("[dim]💡 Run 'dot-man --help' to see all commands[/dim]")
+    ui.console.print()
 
 
 def show_quick_start():
     """Display quick start guide (for --no-wizard users)."""
-    console.print("[bold]📚 Quick Start Guide:[/bold]")
-    console.print()
-    console.print("[bold cyan]Adding files to track:[/bold cyan]")
-    console.print("  dot-man add ~/.bashrc              [dim]# Single file[/dim]")
-    console.print("  dot-man add ~/.config/nvim         [dim]# Directory[/dim]")
-    console.print(
+    ui.console.print("[bold]📚 Quick Start Guide:[/bold]")
+    ui.console.print()
+    ui.console.print("[bold cyan]Adding files to track:[/bold cyan]")
+    ui.console.print("  dot-man add ~/.bashrc              [dim]# Single file[/dim]")
+    ui.console.print("  dot-man add ~/.config/nvim         [dim]# Directory[/dim]")
+    ui.console.print(
         "  dot-man edit                       [dim]# Edit config manually[/dim]"
     )
-    console.print()
-    console.print("[bold cyan]Managing configurations:[/bold cyan]")
-    console.print(
+    ui.console.print()
+    ui.console.print("[bold cyan]Managing configurations:[/bold cyan]")
+    ui.console.print(
         "  dot-man status                     [dim]# View tracked files[/dim]"
     )
-    console.print(
+    ui.console.print(
         "  dot-man switch main                [dim]# Save current state[/dim]"
     )
-    console.print(
+    ui.console.print(
         "  dot-man switch work                [dim]# Create work branch[/dim]"
     )
-    console.print()
-    console.print("[dim]💡 Tip: Config is at ~/.config/dot-man/repo/dot-man.toml[/dim]")
-    console.print()
+    ui.console.print()
+    ui.console.print("[dim]💡 Tip: Config is at ~/.config/dot-man/repo/dot-man.toml[/dim]")
+    ui.console.print()
 
 
 # ============================================================================
@@ -527,8 +523,8 @@ def add(
                 )
                 if success_copy:
                     success(f"Added file: {local_path}")
-                    console.print(f"  Section: [cyan][{section}][/cyan]")
-                    console.print(f"  Repo path: [dim]{repo_dest}[/dim]")
+                    ui.console.print(f"  Section: [cyan][{section}][/cyan]")
+                    ui.console.print(f"  Repo path: [dim]{repo_dest}[/dim]")
                     if secrets:
                         warn(f"{len(secrets)} secrets were redacted")
                 else:
@@ -548,18 +544,18 @@ def add(
                 secret_handler=secret_handler,
             )
             success(f"Added directory: {local_path}")
-            console.print(f"  Section: [cyan][{section}][/cyan]")
-            console.print(f"  Repo path: [dim]{repo_dest}[/dim]")
-            console.print(f"  Files: {copied} copied, {failed} failed")
+            ui.console.print(f"  Section: [cyan][{section}][/cyan]")
+            ui.console.print(f"  Repo path: [dim]{repo_dest}[/dim]")
+            ui.console.print(f"  Files: {copied} copied, {failed} failed")
             if secrets:
                 warn(f"{len(secrets)} secrets were redacted")
 
         # Show info about templates
         if inherits:
-            console.print(f"  Inherits: {', '.join(inherits)}")
+            ui.console.print(f"  Inherits: {', '.join(inherits)}")
 
-        console.print()
-        console.print("[dim]Run 'dot-man switch <branch>' to commit changes.[/dim]")
+        ui.console.print()
+        ui.console.print("[dim]Run 'dot-man switch <branch>' to commit changes.[/dim]")
 
     except DotManError as e:
         error(str(e), e.exit_code)
@@ -598,19 +594,19 @@ def status(verbose: bool, secrets: bool):
         info_table.add_row("Remote:", remote)
         info_table.add_row("Repository:", str(REPO_DIR))
 
-        console.print(
+        ui.console.print(
             Panel(
                 info_table, title="[bold]Repository Status[/bold]", border_style="blue"
             )
         )
-        console.print()
+        ui.console.print()
 
         # Get status summary
         summary = ops.get_status_summary()
 
         section_names = ops.get_sections()
         if not section_names:
-            console.print(
+            ui.console.print(
                 "[dim]No sections tracked. Run 'dot-man add <path>' to add files.[/dim]"
             )
             return
@@ -681,25 +677,25 @@ def status(verbose: bool, secrets: bool):
                 f"[dim]... +{len(section_names) - 10} more sections[/dim]", "", ""
             )
 
-        console.print(file_table)
+        ui.console.print(file_table)
 
         # Summary
-        console.print()
-        console.print(
+        ui.console.print()
+        ui.console.print(
             f"[dim]Summary: {summary['modified']} modified, {summary['new']} new, {summary['deleted']} deleted, {summary['identical']} identical[/dim]"
         )
 
         # Secrets warning
         if secrets_found:
-            console.print()
+            ui.console.print()
             warn(
                 f"{len(secrets_found)} potential secrets detected. Run 'dot-man audit' for details."
             )
 
         # Git status
         if ops.git.is_dirty():
-            console.print()
-            console.print("[yellow]Repository has uncommitted changes.[/yellow]")
+            ui.console.print()
+            ui.console.print("[yellow]Repository has uncommitted changes.[/yellow]")
 
     except DotManError as e:
         error(str(e), e.exit_code)
@@ -1090,7 +1086,7 @@ def deploy(branch: str, force: bool, dry_run: bool):
             error(f"Branch '{branch}' not found. Available: {available}")
 
         if not force and not dry_run:
-            console.print(
+            ui.console.print(
                 Panel(
                     "[yellow]WARNING: Deploy will OVERWRITE local files![/yellow]\n\n"
                     "This will:\n"
@@ -1103,8 +1099,8 @@ def deploy(branch: str, force: bool, dry_run: bool):
                 )
             )
 
-            if not confirm("Continue?"):
-                console.print("Aborted.")
+            if not ui.confirm("Continue?"):
+                ui.info("Aborted.")
                 return
 
         # Checkout branch
@@ -1119,8 +1115,8 @@ def deploy(branch: str, force: bool, dry_run: bool):
             return
 
         # Deploy files
-        console.print(f"Deploying [bold]{branch}[/bold] configuration...")
-        console.print()
+        ui.console.print(f"Deploying [bold]{branch}[/bold] configuration...")
+        ui.console.print()
 
         deployed = 0
         skipped = 0
@@ -1136,7 +1132,7 @@ def deploy(branch: str, force: bool, dry_run: bool):
                 repo_path = section.get_repo_path(local_path, REPO_DIR)
 
                 if not repo_path.exists():
-                    console.print(f"  [dim]Skip:[/dim] {repo_path} (missing)")
+                    ui.console.print(f"  [dim]Skip:[/dim] {repo_path} (missing)")
                     skipped += 1
                     continue
 
@@ -1156,34 +1152,34 @@ def deploy(branch: str, force: bool, dry_run: bool):
         # Run pre-deploy hooks
         pre_hooks = list(dict.fromkeys(pre_hooks))
         if not dry_run and pre_hooks:
-            console.print()
-            console.print("[bold]Running pre-deploy hooks...[/bold]")
+            ui.console.print()
+            ui.console.print("[bold]Running pre-deploy hooks...[/bold]")
             for cmd in pre_hooks:
-                console.print(f"  Exec: [cyan]{cmd}[/cyan]")
+                ui.console.print(f"  Exec: [cyan]{cmd}[/cyan]")
                 try:
                     subprocess.run(cmd, shell=True, check=False)
                 except Exception as e:
                     warn(f"Failed to run command '{cmd}': {e}")
-            console.print()
+            ui.console.print()
 
         # Pass 2: Deploy files
         for section, local_path, repo_path, will_change in sections_to_deploy:
             if dry_run:
                 action = "OVERWRITE" if local_path.exists() else "CREATE"
-                console.print(f"  Would {action}: {local_path}")
+                ui.console.print(f"  Would {action}: {local_path}")
                 if will_change:
                     if section.pre_deploy:
-                        console.print(f"    [dim]Pre-hook:[/dim]  {section.pre_deploy}")
+                        ui.console.print(f"    [dim]Pre-hook:[/dim]  {section.pre_deploy}")
                     if section.post_deploy:
-                        console.print(
+                        ui.console.print(
                             f"    [dim]Post-hook:[/dim] {section.post_deploy}"
                         )
                 else:
-                    console.print("    [dim](No changes needed)[/dim]")
+                    ui.console.print("    [dim](No changes needed)[/dim]")
             else:
                 if not will_change:
                     # Optimization: Skip copy if identical
-                    console.print(f"  [dim]-[/dim] {local_path} (unchanged)")
+                    ui.console.print(f"  [dim]-[/dim] {local_path} (unchanged)")
                     deployed += 1
                     continue
 
@@ -1195,18 +1191,18 @@ def deploy(branch: str, force: bool, dry_run: bool):
                         repo_path, local_path, filter_secrets_enabled=False
                     )
                     if success_copy:
-                        console.print(f"  [green]✓[/green] {local_path}")
+                        ui.console.print(f"  [green]✓[/green] {local_path}")
                         deployed += 1
                     else:
-                        console.print(f"  [red]✗[/red] {local_path}")
+                        ui.console.print(f"  [red]✗[/red] {local_path}")
 
         # Run post-deploy hooks (only if not dry_run)
         post_hooks = list(dict.fromkeys(post_hooks))
         if not dry_run and post_hooks:
-            console.print()
-            console.print("[bold]Running post-deploy hooks...[/bold]")
+            ui.console.print()
+            ui.console.print("[bold]Running post-deploy hooks...[/bold]")
             for cmd in post_hooks:
-                console.print(f"  Exec: [cyan]{cmd}[/cyan]")
+                ui.console.print(f"  Exec: [cyan]{cmd}[/cyan]")
                 try:
                     subprocess.run(cmd, shell=True, check=False)
                 except Exception as e:
@@ -1217,9 +1213,9 @@ def deploy(branch: str, force: bool, dry_run: bool):
             ops.global_config.current_branch = branch
             ops.global_config.save()
 
-        console.print()
+        ui.console.print()
         if dry_run:
-            console.print(
+            ui.console.print(
                 f"[dim]Dry run: {len(sections_to_deploy)} files would be deployed[/dim]"
             )
         else:
@@ -1255,10 +1251,10 @@ def audit(strict: bool, fix: bool):
         guard = SecretGuard()
         permanent_guard = PermanentRedactGuard()
 
-        console.print("🔒 [bold]Security Audit[/bold]")
-        console.print()
-        console.print(f"Scanning [cyan]{REPO_DIR}[/cyan]...")
-        console.print()
+        ui.console.print("🔒 [bold]Security Audit[/bold]")
+        ui.console.print()
+        ui.console.print(f"Scanning [cyan]{REPO_DIR}[/cyan]...")
+        ui.console.print()
 
         all_matches = list(scanner.scan_directory(REPO_DIR))
 
@@ -1300,37 +1296,37 @@ def audit(strict: bool, fix: bool):
             color = severity_colors[severity]
             items = by_severity[severity]
 
-            console.print(f"[{color}]{severity}[/{color}] ({len(items)} findings)")
-            console.print("─" * 50)
+            ui.console.print(f"[{color}]{severity}[/{color}] ({len(items)} findings)")
+            ui.console.print("─" * 50)
 
             for match in items:
                 rel_path = match.file.relative_to(REPO_DIR)
-                console.print(f"  File: [cyan]{rel_path}[/cyan]")
-                console.print(
+                ui.console.print(f"  File: [cyan]{rel_path}[/cyan]")
+                ui.console.print(
                     f"  Line {match.line_number}: {match.line_content[:60]}..."
                 )
-                console.print(f"  Pattern: {match.pattern_name}")
-                console.print()
+                ui.console.print(f"  Pattern: {match.pattern_name}")
+                ui.console.print()
 
         # Summary
-        console.print("─" * 50)
-        console.print(
+        ui.console.print("─" * 50)
+        ui.console.print(
             f"[bold]Total:[/bold] {len(matches)} secrets in {len(set(m.file for m in matches))} files"
         )
-        console.print()
+        ui.console.print()
 
         # Recommendations
-        console.print("[bold]Recommendations:[/bold]")
-        console.print(
+        ui.console.print("[bold]Recommendations:[/bold]")
+        ui.console.print(
             "  1. Enable [cyan]secrets_filter = true[/cyan] for affected files"
         )
-        console.print("  2. Move credentials to environment variables")
-        console.print("  3. Run [cyan]dot-man audit --fix[/cyan] to auto-redact")
+        ui.console.print("  2. Move credentials to environment variables")
+        ui.console.print("  3. Run [cyan]dot-man audit --fix[/cyan] to auto-redact")
 
         if fix:
-            console.print()
-            if not confirm("Auto-redact all detected secrets?"):
-                console.print("Aborted.")
+            ui.console.print()
+            if not ui.confirm("Auto-redact all detected secrets?"):
+                ui.info("Aborted.")
                 return
 
             # Perform redaction
@@ -1344,7 +1340,7 @@ def audit(strict: bool, fix: bool):
                 if count > 0:
                     match.file.write_text(redacted)
                     fixed_files.add(match.file)
-                    console.print(
+                    ui.console.print(
                         f"  [green]✓[/green] Redacted {count} secrets in {match.file.name}"
                     )
 
@@ -1386,7 +1382,7 @@ def branch_list():
         branches = git.list_branches()
 
         if not branches:
-            console.print("[dim]No branches found[/dim]")
+            ui.console.print("[dim]No branches found[/dim]")
             return
 
         table = Table(title="Branches")
@@ -1398,7 +1394,7 @@ def branch_list():
             style = "bold" if b == current else ""
             table.add_row(f"[{style}]{b}[/{style}]" if style else b, active)
 
-        console.print(table)
+        ui.console.print(table)
 
     except Exception as e:
         error(f"Failed to list branches: {e}")
@@ -1422,8 +1418,8 @@ def branch_delete(name: str, force: bool):
             error(f"Branch '{name}' not found")
 
         if not force:
-            if not confirm(f"Delete branch '{name}'? This cannot be undone"):
-                console.print("Aborted.")
+            if not ui.confirm(f"Delete branch '{name}'? This cannot be undone"):
+                ui.info("Aborted.")
                 return
 
         git.delete_branch(name, force=force)
@@ -1434,7 +1430,7 @@ def branch_delete(name: str, force: bool):
         from .exceptions import BranchNotMergedError
 
         if isinstance(e, BranchNotMergedError):
-            if confirm(f"Branch '{name}' is not fully merged. Force delete?"):
+            if ui.confirm(f"Branch '{name}' is not fully merged. Force delete?"):
                 try:
                     git.delete_branch(name, force=True)  # type: ignore
                     success(f"Deleted branch '{name}'")
@@ -1442,7 +1438,7 @@ def branch_delete(name: str, force: bool):
                 except Exception as e2:
                     error(f"Failed to force delete: {e2}")
             else:
-                console.print("Aborted.")
+                ui.info("Aborted.")
                 return
 
         error(str(e), e.exit_code)
@@ -1494,10 +1490,10 @@ def remote_get():
         git = GitManager()
         url = git.get_remote_url()
         if url:
-            console.print(f"Remote URL: [cyan]{url}[/cyan]")
+            ui.console.print(f"Remote URL: [cyan]{url}[/cyan]")
         else:
-            console.print("[dim]No remote configured[/dim]")
-            console.print("Use: [cyan]dot-man remote set <url>[/cyan]")
+            ui.console.print("[dim]No remote configured[/dim]")
+            ui.console.print("Use: [cyan]dot-man remote set <url>[/cyan]")
     except DotManError as e:
         error(str(e), e.exit_code)
     except Exception as e:
@@ -1528,27 +1524,32 @@ def sync(push_only: bool, pull_only: bool):
             error("No remote configured. Use 'dot-man remote set <url>' first.")
 
         current = git.current_branch()
-        console.print(f"Syncing branch [bold]{current}[/bold] with remote...")
-        console.print()
+        ui.console.print(f"Syncing branch [bold]{current}[/bold] with remote...")
+        ui.console.print()
 
         # Pull first (unless push-only)
         if not push_only:
-            console.print("[bold]Fetching...[/bold]")
+            ui.console.print("[bold]Fetching...[/bold]")
             git.fetch()
 
-            console.print("[bold]Pulling...[/bold]")
+            ui.console.print("[bold]Pulling...[/bold]")
             pull_result = git.pull(rebase=True)
-            console.print(f"  {pull_result}")
-            console.print()
+            ui.console.print(f"  {pull_result}")
+            ui.console.print()
 
         # Push (unless pull-only)
         if not pull_only:
-            console.print("[bold]Pushing...[/bold]")
-            push_result = git.push()
-            console.print(f"  {push_result}")
-            console.print()
-
-        success("Sync complete!")
+            # Pre-push audit
+            from .operations import get_operations
+            ops = get_operations()
+            if ops.pre_push_audit():
+                ui.console.print("[bold]Pushing...[/bold]")
+                push_result = git.push()
+                ui.console.print(f"  {push_result}")
+                ui.console.print()
+                success("Sync complete!")
+            else:
+                warn("Push aborted.")
 
     except DotManError as e:
         error(str(e), e.exit_code)
@@ -1584,12 +1585,12 @@ def tui():
     try:
         from .tui import run_tui
     except ImportError:
-        console.print("[yellow]TUI requires the 'textual' package.[/yellow]")
-        console.print()
-        console.print("Install with:")
-        console.print("  [cyan]pipx inject dot-man textual[/cyan]")
-        console.print("  or")
-        console.print("  [cyan]pip install dot-man[tui][/cyan]")
+        ui.console.print("[yellow]TUI requires the 'textual' package.[/yellow]")
+        ui.console.print()
+        ui.console.print("Install with:")
+        ui.console.print("  [cyan]pipx inject dot-man textual[/cyan]")
+        ui.console.print("  or")
+        ui.console.print("  [cyan]pip install dot-man[tui][/cyan]")
         return
 
     try:
@@ -1642,23 +1643,23 @@ def setup():
     # Check if remote already configured
     if git.has_remote():
         url = git.get_remote_url()
-        console.print(f"Remote already configured: [cyan]{url}[/cyan]")
-        if not confirm("Replace with a new remote?"):
+        ui.console.print(f"Remote already configured: [cyan]{url}[/cyan]")
+        if not ui.confirm("Replace with a new remote?"):
             return
 
-    console.print()
-    console.print("[bold]🔧 Remote Setup[/bold]")
-    console.print()
+    ui.console.print()
+    ui.console.print("[bold]🔧 Remote Setup[/bold]")
+    ui.console.print()
 
     # Check for GitHub CLI
     gh_available = shutil.which("gh") is not None
 
     if gh_available:
-        console.print("[green]✓[/green] GitHub CLI (gh) detected")
-        console.print()
+        ui.console.print("[green]✓[/green] GitHub CLI (gh) detected")
+        ui.console.print()
 
-        if confirm("Create a new private GitHub repository?"):
-            repo_name = click.prompt("Repository name", default="dotfiles")
+        if ui.confirm("Create a new private GitHub repository?"):
+            repo_name = ui.ask("Repository name", default="dotfiles")
 
             try:
                 # Create repo with gh
@@ -1689,40 +1690,40 @@ def setup():
                         global_config.save()
 
                     success(f"Created and connected to GitHub repository: {repo_name}")
-                    console.print()
-                    console.print(
+                    ui.console.print()
+                    ui.console.print(
                         "You can now use [cyan]dot-man sync[/cyan] to sync your dotfiles!"
                     )
                     return
                 else:
                     warn(f"gh command failed: {result.stderr}")
-                    console.print("Falling back to manual setup...")
-                    console.print()
+                    ui.console.print("Falling back to manual setup...")
+                    ui.console.print()
             except Exception as e:
                 warn(f"Error running gh: {e}")
-                console.print("Falling back to manual setup...")
-                console.print()
+                ui.console.print("Falling back to manual setup...")
+                ui.console.print()
     else:
-        console.print(
+        ui.console.print(
             "[dim]GitHub CLI not found. Install with: https://cli.github.com[/dim]"
         )
-        console.print()
+        ui.console.print()
 
     # Manual setup instructions
-    console.print("[bold]Manual Setup Steps:[/bold]")
-    console.print()
-    console.print("1. Create a new repository on GitHub:")
-    console.print("   [cyan]https://github.com/new[/cyan]")
-    console.print()
-    console.print("2. Copy the repository URL (SSH or HTTPS)")
-    console.print()
+    ui.console.print("[bold]Manual Setup Steps:[/bold]")
+    ui.console.print()
+    ui.console.print("1. Create a new repository on GitHub:")
+    ui.console.print("   [cyan]https://github.com/new[/cyan]")
+    ui.console.print()
+    ui.console.print("2. Copy the repository URL (SSH or HTTPS)")
+    ui.console.print()
 
-    url = click.prompt("Enter the repository URL (or 'skip' to exit)", default="skip")
+    url = ui.ask("Enter the repository URL (or 'skip' to exit)", default="skip")
 
     if url.lower() == "skip":
-        console.print()
-        console.print("You can set the remote later with:")
-        console.print("  [cyan]dot-man remote set <url>[/cyan]")
+        ui.console.print()
+        ui.console.print("You can set the remote later with:")
+        ui.console.print("  [cyan]dot-man remote set <url>[/cyan]")
         return
 
     try:
@@ -1736,12 +1737,12 @@ def setup():
 
         success(f"Remote set to: {url}")
 
-        if confirm("Push current dotfiles to remote?"):
-            console.print("Pushing...")
+        if ui.confirm("Push current dotfiles to remote?"):
+            ui.console.print("Pushing...")
             git.push()
             success("Pushed to remote!")
-            console.print()
-            console.print(
+            ui.console.print()
+            ui.console.print(
                 "You can now use [cyan]dot-man sync[/cyan] to sync your dotfiles!"
             )
     except Exception as e:
@@ -1764,7 +1765,7 @@ def repo():
         cd $(dot-man repo)
         git remote add origin <url>
     """
-    console.print(str(REPO_DIR))
+    ui.console.print(str(REPO_DIR))
 
 
 @main.command()
@@ -1776,9 +1777,9 @@ def shell():
     """
     import os
 
-    console.print(f"Opening shell in [cyan]{REPO_DIR}[/cyan]")
-    console.print("[dim]Type 'exit' to return[/dim]")
-    console.print()
+    ui.console.print(f"Opening shell in [cyan]{REPO_DIR}[/cyan]")
+    ui.console.print("[dim]Type 'exit' to return[/dim]")
+    ui.console.print()
 
     # Get user's shell
     user_shell = os.environ.get("SHELL", "/bin/bash")
@@ -1828,7 +1829,7 @@ def config_list():
         for k, v in sorted(flat_data.items()):
             table.add_row(k, str(v))
 
-        console.print(table)
+        ui.console.print(table)
 
     except Exception as e:
         error(f"Failed to list config: {e}")
@@ -1857,12 +1858,12 @@ def config_get(key: str):
 
         # If result is a dict, print it nicely? Or just error that it's a section?
         if isinstance(current, dict):
-            console.print(f"[dim]Section '{key}' contains:[/dim]")
+            ui.console.print(f"[dim]Section '{key}' contains:[/dim]")
             import json
 
-            console.print(json.dumps(current, indent=2))
+            ui.console.print(json.dumps(current, indent=2))
         else:
-            console.print(str(current))
+            ui.console.print(str(current))
 
     except Exception as e:
         error(f"Failed to get config: {e}")
@@ -2078,16 +2079,16 @@ def config_tutorial(section: str | None, interactive: bool):
     elif choice == "I":
         _run_interactive_tutorial()
     elif choice == "C":
-        console.print(
+        ui.console.print(
             "\n[dim]Tip: Run 'dot-man config create' to generate a config file with examples[/dim]"
         )
     elif choice == "Q":
-        console.print(
+        ui.console.print(
             "\n[dim]Goodbye! Run 'dot-man config tutorial' anytime to return.[/dim]"
         )
 
     return
-    console.print("[dim]Tip: Use --interactive for step-by-step guidance[/dim]")
+    ui.console.print("[dim]Tip: Use --interactive for step-by-step guidance[/dim]")
 
 
 def _show_section_examples(section: str):
@@ -2273,14 +2274,14 @@ secrets_filter = false""",
     }
 
     if section not in examples:
-        console.print(f"[red]Unknown section: {section}[/red]")
-        console.print(f"Available sections: {', '.join(examples.keys())}")
+        ui.error(f"Unknown section: {section}", exit_code=0)
+        ui.console.print(f"Available sections: {', '.join(examples.keys())}")
         return
 
     data = examples[section]
 
-    console.print()
-    console.print(
+    ui.console.print()
+    ui.console.print(
         Panel.fit(
             f"[bold blue]{data['title']}[/bold blue]\n\n{data['description']}",
             title=f"📖 {data['title']}",
@@ -2288,18 +2289,18 @@ secrets_filter = false""",
     )
 
     for i, example in enumerate(data["examples"], 1):
-        console.print(f"\n[bold cyan]Example {i}: {example['title']}[/bold cyan]")
+        ui.console.print(f"\n[bold cyan]Example {i}: {example['title']}[/bold cyan]")
 
         if "config" in example:
-            console.print(
+            ui.console.print(
                 Syntax(example["config"], "toml", theme="monokai", line_numbers=False)
             )
         elif "command" in example:
-            console.print(f"[green]$ {example['command']}[/green]")
+            ui.console.print(f"[green]$ {example['command']}[/green]")
 
-        console.print(f"\n[dim]{example['explanation']}[/dim]")
+        ui.console.print(f"\n[dim]{example['explanation']}[/dim]")
 
-    console.print(
+    ui.console.print(
         f"\n[dim]💡 Run 'dot-man config create' to add these examples to your config file[/dim]"
     )
 
@@ -2325,103 +2326,103 @@ def _run_interactive_tutorial():
     user_configs = []
 
     # Step 1: Basic files
-    console.print("\n[bold cyan]📁 Step 1: Basic File Tracking[/bold cyan]")
-    console.print(
+    ui.console.print("\n[bold cyan]📁 Step 1: Basic File Tracking[/bold cyan]")
+    ui.console.print(
         "Every configuration section starts with [section-name] and defines what files to track."
     )
 
-    console.print("\n[bold green]✅ Example: Shell Configuration[/bold green]")
-    console.print()
+    ui.console.print("\n[bold green]✅ Example: Shell Configuration[/bold green]")
+    ui.console.print()
 
     # Show the config with explanations
     config_text = """[shell-config]
 paths = ["~/.bashrc", "~/.zshrc"]
 post_deploy = "shell_reload" """
 
-    console.print(Syntax(config_text, "toml", theme="monokai"))
-    console.print()
+    ui.console.print(Syntax(config_text, "toml", theme="monokai"))
+    ui.console.print()
 
     # Explain each part
-    console.print(
+    ui.console.print(
         "[bold cyan]🔍 [shell-config][/bold cyan] - A unique name for this group of files"
     )
-    console.print(
+    ui.console.print(
         "[bold cyan]📂 paths[/bold cyan] - List of files/directories to track (supports ~ expansion)"
     )
-    console.print(
+    ui.console.print(
         "[bold cyan]🚀 post_deploy[/bold cyan] - Command to run AFTER files are deployed"
     )
-    console.print(
+    ui.console.print(
         "[bold cyan]🔄 shell_reload[/bold cyan] - Built-in alias that reloads bash/zsh"
     )
-    console.print("    [dim](runs: source ~/.bashrc || source ~/.zshrc)[/dim]")
+    ui.console.print("    [dim](runs: source ~/.bashrc || source ~/.zshrc)[/dim]")
 
-    console.print(
+    ui.console.print(
         "\n[dim]💡 Smart defaults apply automatically - you only specify what's different![/dim]"
     )
 
-    console.print("\n[dim]Press Enter to continue...[/dim]")
+    ui.console.print("\n[dim]Press Enter to continue...[/dim]")
     input()
 
-    console.print(
+    ui.console.print(
         "\n[bold green]✅ Git Config with Automatic Secret Protection:[/bold green]"
     )
-    console.print()
+    ui.console.print()
 
     config_text = """[gitconfig]
 paths = ["~/.gitconfig"]"""
 
-    console.print(Syntax(config_text, "toml", theme="monokai"))
-    console.print()
+    ui.console.print(Syntax(config_text, "toml", theme="monokai"))
+    ui.console.print()
 
-    console.print(
+    ui.console.print(
         "[bold cyan]🔒 Automatic security[/bold cyan] - Git configs get special protection:"
     )
-    console.print(
+    ui.console.print(
         "  • [yellow]secrets_filter = true[/yellow] - Detects and redacts sensitive data"
     )
-    console.print(
+    ui.console.print(
         "  • [yellow]API keys, passwords, tokens[/yellow] - Automatically removed when saving"
     )
-    console.print(
+    ui.console.print(
         '  • [yellow]update_strategy = "replace"[/yellow] - Safe for most config files'
     )
 
-    console.print("\n[dim]Press Enter to continue...[/dim]")
+    ui.console.print("\n[dim]Press Enter to continue...[/dim]")
     input()
 
     # Step 2: Directories with patterns
-    console.print(
+    ui.console.print(
         "\n[bold cyan]📂 Step 2: Directory Tracking with Patterns[/bold cyan]"
     )
-    console.print("When tracking directories, you can include/exclude specific files.")
+    ui.console.print("When tracking directories, you can include/exclude specific files.")
 
-    console.print("\n[bold green]✅ Neovim Config with Smart Exclusions:[/bold green]")
-    console.print()
+    ui.console.print("\n[bold green]✅ Neovim Config with Smart Exclusions:[/bold green]")
+    ui.console.print()
 
     config_text = """[nvim]
 paths = ["~/.config/nvim"]
 exclude = ["*.log", "plugin/packer_compiled.lua"]
 post_deploy = "nvim_sync" """
 
-    console.print(Syntax(config_text, "toml", theme="monokai"))
-    console.print()
+    ui.console.print(Syntax(config_text, "toml", theme="monokai"))
+    ui.console.print()
 
-    console.print(
+    ui.console.print(
         "[bold cyan]🎯 exclude[/bold cyan] - Patterns of files/directories to SKIP tracking"
     )
-    console.print("  • [yellow]*.log[/yellow] - Any .log files")
-    console.print(
+    ui.console.print("  • [yellow]*.log[/yellow] - Any .log files")
+    ui.console.print(
         "  • [yellow]plugin/packer_compiled.lua[/yellow] - Compiled plugin cache"
     )
-    console.print(
+    ui.console.print(
         "[bold cyan]📝 Pattern syntax[/bold cyan] - Wildcards (*, **, ?) and gitignore-style"
     )
-    console.print(
+    ui.console.print(
         "[bold cyan]🔄 nvim_sync[/bold cyan] - Alias: nvim --headless +PackerSync +qa"
     )
 
-    console.print(
+    ui.console.print(
         '\n[dim]💡 Use ** for recursive: "**/*.tmp" matches all .tmp files in subdirs[/dim]'
     )
 
@@ -2435,18 +2436,18 @@ post_deploy = "nvim_sync" """,
         )
     )
 
-    console.print("\n[dim]Press Enter to continue...[/dim]")
+    ui.console.print("\n[dim]Press Enter to continue...[/dim]")
     input()
 
     # Step 3: Update strategies
-    console.print(
+    ui.console.print(
         "\n[bold cyan]🔄 Step 3: Update Strategies - How Files Are Deployed[/bold cyan]"
     )
-    console.print("Choose how dot-man handles existing files when deploying.")
+    ui.console.print("Choose how dot-man handles existing files when deploying.")
 
     # Show update strategy information
 
-    console.print("\n[bold green]📋 Update Strategy Options:[/bold green]")
+    ui.console.print("\n[bold green]📋 Update Strategy Options:[/bold green]")
 
     strategy_examples = {
         "Safe (rename_old)": {
@@ -2464,21 +2465,21 @@ post_deploy = "nvim_sync" """,
     }
 
     for name, details in strategy_examples.items():
-        console.print(f"\n[yellow]{name}:[/yellow]")
-        console.print(Syntax(details["config"], "toml", theme="monokai"))
-        console.print(details["explanation"])
+        ui.console.print(f"\n[yellow]{name}:[/yellow]")
+        ui.console.print(Syntax(details["config"], "toml", theme="monokai"))
+        ui.console.print(details["explanation"])
 
-    console.print("\n[dim]Press Enter to continue...[/dim]")
+    ui.console.print("\n[dim]Press Enter to continue...[/dim]")
     input()
 
     # Step 4: Pre-deploy hooks
-    console.print(
+    ui.console.print(
         "\n[bold cyan]⚡ Step 4: Pre-Deploy Hooks - Actions Before Deployment[/bold cyan]"
     )
-    console.print("Sometimes you need to prepare before deploying files.")
+    ui.console.print("Sometimes you need to prepare before deploying files.")
 
-    console.print("\n[bold green]🔧 Pre-deploy Hook Examples:[/bold green]")
-    console.print()
+    ui.console.print("\n[bold green]🔧 Pre-deploy Hook Examples:[/bold green]")
+    ui.console.print()
 
     examples = [
         {
@@ -2498,22 +2499,22 @@ pre_deploy = "systemctl --user stop my-service" """,
     ]
 
     for example in examples:
-        console.print(f"[cyan]{example['title']}:[/cyan]")
-        console.print(Syntax(example["config"], "toml", theme="monokai"))
-        console.print(f"  {example['explanation']}")
-        console.print()
+        ui.console.print(f"[cyan]{example['title']}:[/cyan]")
+        ui.console.print(Syntax(example["config"], "toml", theme="monokai"))
+        ui.console.print(f"  {example['explanation']}")
+        ui.console.print()
 
-    console.print("\n[dim]Press Enter to continue...[/dim]")
+    ui.console.print("\n[dim]Press Enter to continue...[/dim]")
     input()
 
     # Step 5: Templates
-    console.print(
+    ui.console.print(
         "\n[bold cyan]📋 Step 5: Templates - Reusable Configuration[/bold cyan]"
     )
-    console.print("Define shared settings that multiple sections can inherit.")
+    ui.console.print("Define shared settings that multiple sections can inherit.")
 
-    console.print("\n[bold green]🎨 Template Example:[/bold green]")
-    console.print()
+    ui.console.print("\n[bold green]🎨 Template Example:[/bold green]")
+    ui.console.print()
 
     config_text = """# Define a template
 [templates.desktop-apps]
@@ -2531,44 +2532,44 @@ inherits = ["desktop-apps"]
 # Override settings if needed
 update_strategy = "replace" """
 
-    console.print(Syntax(config_text, "toml", theme="monokai"))
-    console.print()
+    ui.console.print(Syntax(config_text, "toml", theme="monokai"))
+    ui.console.print()
 
-    console.print(
+    ui.console.print(
         "[bold cyan]📋 Template definition[/bold cyan] - [templates.name] sections are reusable"
     )
-    console.print(
+    ui.console.print(
         "[bold cyan]🔗 inherits[/bold cyan] - List of templates to inherit settings from"
     )
-    console.print(
+    ui.console.print(
         "[bold cyan]⚡ Override behavior[/bold cyan] - Section settings override templates"
     )
-    console.print(
+    ui.console.print(
         "[bold cyan]🎯 Use case[/bold cyan] - Share notifications, strategies, etc."
     )
 
-    console.print("\n[dim]Press Enter to continue...[/dim]")
+    ui.console.print("\n[dim]Press Enter to continue...[/dim]")
     input()
 
     # Step 6: Terminal
-    console.print("\n[bold cyan]💻 Step 6: Terminal Configuration[/bold cyan]")
+    ui.console.print("\n[bold cyan]💻 Step 6: Terminal Configuration[/bold cyan]")
 
-    console.print("\n[bold green]✅ Kitty Terminal Configuration:[/bold green]")
-    console.print()
+    ui.console.print("\n[bold green]✅ Kitty Terminal Configuration:[/bold green]")
+    ui.console.print()
 
     config_text = """[kitty]
 paths = ["~/.config/kitty"]
 post_deploy = "kitty_reload" """
 
-    console.print(Syntax(config_text, "toml", theme="monokai"))
-    console.print()
+    ui.console.print(Syntax(config_text, "toml", theme="monokai"))
+    ui.console.print()
 
-    console.print(
+    ui.console.print(
         "[bold cyan]🖥️ Kitty[/bold cyan] - Fast, GPU-accelerated terminal emulator"
     )
-    console.print("[bold cyan]📂 paths[/bold cyan] - Kitty configuration directory")
-    console.print("[bold cyan]🚀 post_deploy[/bold cyan] - Reload command for Kitty")
-    console.print(
+    ui.console.print("[bold cyan]📂 paths[/bold cyan] - Kitty configuration directory")
+    ui.console.print("[bold cyan]🚀 post_deploy[/bold cyan] - Reload command for Kitty")
+    ui.console.print(
         "[bold cyan]🔄 kitty_reload[/bold cyan] - Sends SIGUSR1 to reload running instances"
     )
 
@@ -2581,27 +2582,27 @@ post_deploy = "kitty_reload" """,
         )
     )
 
-    console.print("\n[dim]Press Enter to continue...[/dim]")
+    ui.console.print("\n[dim]Press Enter to continue...[/dim]")
     input()
 
     # Final summary
-    console.print("\n[bold green]🎉 Tutorial Complete![/bold green]")
-    console.print("\n[dim]You've learned about:[/dim]")
-    console.print("  • 📁 Basic file and directory tracking")
-    console.print("  • 🎯 Include/exclude patterns for selective tracking")
-    console.print("  • 🔄 Update strategies (replace, rename_old, ignore)")
-    console.print("  • ⚡ Pre/post deploy hooks for automation")
-    console.print("  • 📋 Templates for reusable configuration")
-    console.print("  • 🔒 Automatic secret detection and filtering")
+    ui.console.print("\n[bold green]🎉 Tutorial Complete![/bold green]")
+    ui.console.print("\n[dim]You've learned about:[/dim]")
+    ui.console.print("  • 📁 Basic file and directory tracking")
+    ui.console.print("  • 🎯 Include/exclude patterns for selective tracking")
+    ui.console.print("  • 🔄 Update strategies (replace, rename_old, ignore)")
+    ui.console.print("  • ⚡ Pre/post deploy hooks for automation")
+    ui.console.print("  • 📋 Templates for reusable configuration")
+    ui.console.print("  • 🔒 Automatic secret detection and filtering")
 
-    console.print("\n[dim]Next steps:[/dim]")
-    console.print(
+    ui.console.print("\n[dim]Next steps:[/dim]")
+    ui.console.print(
         "[green]$ dot-man config create[/green] [dim]- Generate config file with examples[/dim]"
     )
-    console.print(
+    ui.console.print(
         "[green]$ dot-man edit[/green] [dim]- Customize your configuration[/dim]"
     )
-    console.print(
+    ui.console.print(
         "[green]$ dot-man config tutorial --section advanced[/green] [dim]- Learn advanced features[/dim]"
     )
 

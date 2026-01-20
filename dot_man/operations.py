@@ -10,6 +10,7 @@ from .files import copy_file, copy_directory, compare_files, get_file_status, ba
 from .secrets import SecretScanner, SecretMatch
 from .constants import REPO_DIR
 from .exceptions import DotManError, ConfigurationError
+from .vault import SecretVault
 
 
 class DotManOperations:
@@ -24,7 +25,15 @@ class DotManOperations:
         self._global_config: Optional[GlobalConfig] = None
         self._dotman_config: Optional[DotManConfig] = None
         self._git: Optional[GitManager] = None
+        self._vault: Optional[SecretVault] = None
     
+    @property
+    def vault(self) -> SecretVault:
+        """Get or load secret vault."""
+        if self._vault is None:
+            self._vault = SecretVault()
+        return self._vault
+
     @property
     def global_config(self) -> GlobalConfig:
         """Get or load global configuration."""
@@ -133,6 +142,27 @@ class DotManOperations:
         saved = 0
         all_secrets: list[SecretMatch] = []
         
+        # Enhanced secret handler that also stashes to vault
+        def wrapped_handler(match: SecretMatch) -> str:
+            action = "REDACT"
+            if secret_handler:
+                action = secret_handler(match)
+
+            if action == "REDACT":
+                # Stash to vault
+                try:
+                    self.vault.stash_secret(
+                        file_path=str(match.file),
+                        line_number=match.line_number,
+                        pattern_name=match.pattern_name,
+                        secret_value=match.matched_text,
+                        branch=self.current_branch
+                    )
+                except Exception as e:
+                    print(f"Warning: Failed to stash secret: {e}")
+
+            return action
+
         for local_path in section.paths:
             if not local_path.exists():
                 continue
@@ -143,7 +173,7 @@ class DotManOperations:
                 success, secrets = copy_file(
                     local_path, repo_path, 
                     filter_secrets_enabled=section.secrets_filter,
-                    secret_handler=secret_handler
+                    secret_handler=wrapped_handler
                 )
                 if success:
                     saved += 1
@@ -154,7 +184,7 @@ class DotManOperations:
                     filter_secrets_enabled=section.secrets_filter,
                     include_patterns=section.include,
                     exclude_patterns=section.exclude,
-                    secret_handler=secret_handler,
+                    secret_handler=wrapped_handler,
                 )
                 saved += files_copied
                 all_secrets.extend(secrets)
@@ -185,9 +215,23 @@ class DotManOperations:
             if section.update_strategy == "rename_old" and local_path.exists():
                 backup_file(local_path)
             
+            # Helper to restore secrets after copy
+            def restore_file_secrets(dest_path: Path):
+                try:
+                    content = dest_path.read_text(encoding="utf-8")
+                    restored = self.vault.restore_secrets_in_content(
+                        content, str(local_path), self.current_branch
+                    )
+                    if restored != content:
+                        dest_path.write_text(restored, encoding="utf-8")
+                except Exception:
+                    pass
+
             if repo_path.is_file():
                 success, _ = copy_file(repo_path, local_path, filter_secrets_enabled=False)
                 if success:
+                    if section.secrets_filter:
+                        restore_file_secrets(local_path)
                     deployed += 1
             else:
                 files_copied, _, _ = copy_directory(
@@ -196,6 +240,18 @@ class DotManOperations:
                     include_patterns=section.include,
                     exclude_patterns=section.exclude,
                 )
+                # Need to iterate deployed files to restore secrets?
+                # copy_directory doesn't return list of files.
+                # We can iterate destination if successful.
+                if section.secrets_filter:
+                    for deployed_file in local_path.rglob("*"):
+                        if deployed_file.is_file():
+                            # Map back to source path key used in vault?
+                            # Vault uses absolute local path as key usually or whatever scan used.
+                            # In save_section, it uses match.file which is the LOCAL path.
+                            # So we just pass the deployed_file path.
+                            restore_file_secrets(deployed_file)
+
                 deployed += files_copied
         
         return deployed, had_changes
@@ -370,6 +426,31 @@ class DotManOperations:
                 results.append((section_name, section_matches))
         
         return results
+
+    def pre_push_audit(self) -> bool:
+        """
+        Check for secrets before pushing.
+        Returns True if safe to push, False if secrets found.
+        """
+        audit_results = self.audit()
+
+        # Check if strict mode is enabled
+        strict_mode = self.global_config.strict_mode
+
+        if not audit_results:
+            return True
+
+        print("\n🔒 Pre-push Audit: Secrets detected!")
+        for section, matches in audit_results:
+            print(f"  [{section}]: {len(matches)} secrets")
+
+        if strict_mode:
+            print("Strict mode enabled. Push aborted.")
+            return False
+
+        # Interactive
+        from .ui import confirm
+        return confirm("Secrets detected. Push anyway?", default=False)
     
     def get_status_summary(self) -> dict:
         """
