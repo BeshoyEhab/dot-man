@@ -2,7 +2,7 @@
 
 from pathlib import Path
 import questionary
-from questionary import Validator, ValidationError
+from questionary import Validator, ValidationError, Style
 from rich.table import Table
 from rich.panel import Panel
 from rich.text import Text
@@ -11,15 +11,35 @@ from .config import DotManConfig, GlobalConfig, Section
 from .ui import console, print_banner, success, error, warn
 
 
-# ANSI Colors for Questionary choices
-COLOR_EDIT = "\033[36m"   # Cyan
-COLOR_TOGGLE = "\033[33m" # Yellow
-COLOR_SAVE = "\033[32m"   # Green
-COLOR_ADD = "\033[32m"    # Green
-COLOR_CANCEL = "\033[31m" # Red
-COLOR_DELETE = "\033[31m" # Red
-COLOR_RESET = "\033[0m"
+# Questionary Custom Style
+custom_style = Style([
+    ('qmark', 'fg:#673ab7 bold'),       # Token.Question.Mark
+    ('question', 'bold'),               # Token.Question
+    ('answer', 'fg:#f44336 bold'),      # Token.Answer
+    ('pointer', 'fg:#673ab7 bold'),     # Token.Pointer
+    ('highlighted', 'fg:#673ab7 bold'), # Token.Selected
+    ('selected', 'fg:#cc5454'),         # Token.Selected
+    ('separator', 'fg:#cc5454'),        # Token.Separator
+    ('instruction', ''),                # Token.Instruction
+    ('text', ''),                       # Token.Text
+    ('disabled', 'fg:#858585 italic')   # Token.Disabled
+])
 
+# Menu choices formatting
+# We use questionary's formatting, not raw ANSI
+def fmt_choice(text: str, action: str = "edit") -> questionary.Choice:
+    """Format a choice with color based on action type."""
+    return questionary.Choice(title=text, value=text) # text is displayed
+
+# Actually, questionary.Choice takes (title, value).
+# To style the title, we can rely on the style sheet or use simple logic.
+# But for different actions having different colors in the same list?
+# Questionary supports FormattedText from prompt_toolkit, but simple strings are safer.
+# Let's simple use prefixes or rely on 'pointer' color.
+# OR we can keep using ANSI but use rich to generate it? No that's complex.
+# Questionary's 'style' applies to the UI elements, difficult to style individual choices differently without prompt_toolkit.
+# However, user asked to remove "hardcoded ANSI".
+# Let's use simple textual prefixes for now, or just clean text.
 
 class PathValidator(Validator):
     def validate(self, document):
@@ -73,20 +93,21 @@ def run_section_wizard(config: DotManConfig, section_name: str):
         print_section_dashboard(section)
         console.print()
         
+        # Using clean text, relying on style for selection highlight
         choices = [
-            questionary.Choice(f"{COLOR_EDIT}Edit Paths{COLOR_RESET}", value="paths"),
-            questionary.Choice(f"{COLOR_EDIT}Edit Repo Base{COLOR_RESET}", value="repo_base"),
-            questionary.Choice(f"{COLOR_EDIT}Edit Update Strategy{COLOR_RESET}", value="update_strategy"),
-            questionary.Choice(f"{COLOR_TOGGLE}Toggle Secrets Filter{COLOR_RESET}", value="secrets_filter"),
-            questionary.Choice(f"{COLOR_EDIT}Edit Inherits{COLOR_RESET}", value="inherits"),
-            questionary.Choice(f"{COLOR_EDIT}Edit Pre-deploy Hook{COLOR_RESET}", value="pre_deploy"),
-            questionary.Choice(f"{COLOR_EDIT}Edit Post-deploy Hook{COLOR_RESET}", value="post_deploy"),
+            questionary.Choice("Edit Paths", value="paths"),
+            questionary.Choice("Edit Repo Base", value="repo_base"),
+            questionary.Choice("Edit Update Strategy", value="update_strategy"),
+            questionary.Choice("Toggle Secrets Filter", value="secrets_filter"),
+            questionary.Choice("Edit Inherits", value="inherits"),
+            questionary.Choice("Edit Pre-deploy Hook", value="pre_deploy"),
+            questionary.Choice("Edit Post-deploy Hook", value="post_deploy"),
             questionary.Separator(),
-            questionary.Choice(f"{COLOR_SAVE}Save & Return{COLOR_RESET}", value="save", shortcut_key="s"),
-            questionary.Choice(f"{COLOR_CANCEL}Cancel{COLOR_RESET}", value="cancel", shortcut_key="q"),
+            questionary.Choice("Save & Return", value="save", shortcut_key="s"),
+            questionary.Choice("Cancel", value="cancel", shortcut_key="q"),
         ]
         
-        field = questionary.select("Select action:", choices=choices).ask()
+        field = questionary.select("Select action:", choices=choices, style=custom_style).ask()
         
         if not field or field == "cancel":
             return
@@ -132,12 +153,12 @@ def run_section_wizard(config: DotManConfig, section_name: str):
         # Field Editing
         if field == "paths":
             current = ", ".join(str(p) for p in section.paths)
-            val = questionary.text("Paths (comma separated):", default=current, validate=PathValidator).ask()
+            val = questionary.text("Paths (comma separated):", default=current, validate=PathValidator, style=custom_style).ask()
             if val:
                 section.paths = [Path(p.strip()) for p in val.split(",") if p.strip()]
         
         elif field == "repo_base":
-            val = questionary.text("Repo Base Directory:", default=section.repo_base).ask()
+            val = questionary.text("Repo Base Directory:", default=section.repo_base, style=custom_style).ask()
             if val:
                 section.repo_base = val
                 
@@ -145,7 +166,8 @@ def run_section_wizard(config: DotManConfig, section_name: str):
             val = questionary.select(
                 "Update Strategy:",
                 choices=["replace", "rename_old", "ignore"],
-                default=section.update_strategy
+                default=section.update_strategy,
+                style=custom_style
             ).ask()
             if val:
                 section.update_strategy = val
@@ -156,16 +178,16 @@ def run_section_wizard(config: DotManConfig, section_name: str):
             
         elif field == "inherits":
             current = ", ".join(section.inherits)
-            val = questionary.text("Inherits templates (comma separated):", default=current).ask()
+            val = questionary.text("Inherits templates (comma separated):", default=current, style=custom_style).ask()
             if val is not None:
                 section.inherits = [t.strip() for t in val.split(",") if t.strip()]
                 
         elif field == "pre_deploy":
-            val = questionary.text("Pre-deploy Hook:", default=section.pre_deploy or "").ask()
+            val = questionary.text("Pre-deploy Hook:", default=section.pre_deploy or "", style=custom_style).ask()
             section.pre_deploy = val if val else None
             
         elif field == "post_deploy":
-            val = questionary.text("Post-deploy Hook:", default=section.post_deploy or "").ask()
+            val = questionary.text("Post-deploy Hook:", default=section.post_deploy or "", style=custom_style).ask()
             section.post_deploy = val if val else None
 
 def print_global_dashboard(config: GlobalConfig):
@@ -193,15 +215,15 @@ def run_global_wizard(config: GlobalConfig):
         console.print()
         
         choices = [
-            questionary.Choice(f"{COLOR_EDIT}Edit Default Editor{COLOR_RESET}", value="editor"),
-            questionary.Choice(f"{COLOR_EDIT}Edit Remote URL{COLOR_RESET}", value="remote_url"),
-            questionary.Choice(f"{COLOR_TOGGLE}Toggle Default Secrets Filter{COLOR_RESET}", value="secrets_filter"),
+            questionary.Choice("Edit Default Editor", value="editor"),
+            questionary.Choice("Edit Remote URL", value="remote_url"),
+            questionary.Choice("Toggle Default Secrets Filter", value="secrets_filter"),
             questionary.Separator(),
-            questionary.Choice(f"{COLOR_SAVE}Save & Return{COLOR_RESET}", value="save", shortcut_key="s"),
-            questionary.Choice(f"{COLOR_CANCEL}Cancel{COLOR_RESET}", value="cancel", shortcut_key="q"),
+            questionary.Choice("Save & Return", value="save", shortcut_key="s"),
+            questionary.Choice("Cancel", value="cancel", shortcut_key="q"),
         ]
         
-        field = questionary.select("Select action:", choices=choices).ask()
+        field = questionary.select("Select action:", choices=choices, style=custom_style).ask()
         
         if not field or field == "cancel":
             return
@@ -212,11 +234,11 @@ def run_global_wizard(config: GlobalConfig):
             return
 
         if field == "editor":
-            val = questionary.text("Editor Command:", default=config.editor or "").ask()
+            val = questionary.text("Editor Command:", default=config.editor or "", style=custom_style).ask()
             config.editor = val if val else None
             
         elif field == "remote_url":
-            val = questionary.text("Remote URL:", default=config.remote_url, validate=UrlValidator).ask()
+            val = questionary.text("Remote URL:", default=config.remote_url, validate=UrlValidator, style=custom_style).ask()
             config.remote_url = val if val else ""
             
         elif field == "secrets_filter":
@@ -257,19 +279,19 @@ def run_templates_wizard(config: DotManConfig):
         choices = []
         if templates:
             for name in templates:
-                choices.append(questionary.Choice(f"{COLOR_EDIT}Edit {name}{COLOR_RESET}", value=name))
+                choices.append(questionary.Choice(f"Edit {name}", value=name))
         
         choices.append(questionary.Separator())
-        choices.append(questionary.Choice(f"{COLOR_ADD}Add New Template{COLOR_RESET}", value="add_new"))
-        choices.append(questionary.Choice(f"{COLOR_CANCEL}Back{COLOR_RESET}", value="back", shortcut_key="q"))
+        choices.append(questionary.Choice("Add New Template", value="add_new"))
+        choices.append(questionary.Choice("Back", value="back", shortcut_key="q"))
         
-        selection = questionary.select("Manage Templates:", choices=choices, use_shortcuts=True).ask()
+        selection = questionary.select("Manage Templates:", choices=choices, use_shortcuts=True, style=custom_style).ask()
         
         if not selection or selection == "back":
             return
             
         if selection == "add_new":
-            name = questionary.text("Template Name:").ask()
+            name = questionary.text("Template Name:", style=custom_style).ask()
             if name:
                 if name in templates:
                     warn("Template already exists!")
@@ -305,35 +327,35 @@ def edit_template(config: DotManConfig, name: str):
         console.print()
         
         choices = [
-            questionary.Choice(f"{COLOR_EDIT}Edit Pre-deploy Hook{COLOR_RESET}", value="pre_deploy"),
-            questionary.Choice(f"{COLOR_EDIT}Edit Post-deploy Hook{COLOR_RESET}", value="post_deploy"),
-            questionary.Choice(f"{COLOR_EDIT}Edit Update Strategy{COLOR_RESET}", value="update_strategy"),
+            questionary.Choice("Edit Pre-deploy Hook", value="pre_deploy"),
+            questionary.Choice("Edit Post-deploy Hook", value="post_deploy"),
+            questionary.Choice("Edit Update Strategy", value="update_strategy"),
             questionary.Separator(),
-            questionary.Choice(f"{COLOR_SAVE}Save & Return{COLOR_RESET}", value="save", shortcut_key="s"),
-            questionary.Choice(f"{COLOR_DELETE}Delete Template{COLOR_RESET}", value="delete"),
+            questionary.Choice("Save & Return", value="save", shortcut_key="s"),
+            questionary.Choice("Delete Template", value="delete"),
         ]
         
-        field = questionary.select("Edit Template Field:", choices=choices, use_shortcuts=True).ask()
+        field = questionary.select("Edit Template Field:", choices=choices, use_shortcuts=True, style=custom_style).ask()
         
         if not field or field == "save":
             config.save()
             return
             
         if field == "delete":
-            if questionary.confirm(f"Delete template '{name}'?").ask():
+            if questionary.confirm(f"Delete template '{name}'?", style=custom_style).ask():
                 del config._data["templates"][name]
                 config.save()
                 return
 
         if field == "pre_deploy":
-            val = questionary.text("Pre-deploy Hook:", default=template.get("pre_deploy", "")).ask()
+            val = questionary.text("Pre-deploy Hook:", default=template.get("pre_deploy", ""), style=custom_style).ask()
             if val:
                 template["pre_deploy"] = val
             elif "pre_deploy" in template:
                 del template["pre_deploy"]
 
         elif field == "post_deploy":
-            val = questionary.text("Post-deploy Hook:", default=template.get("post_deploy", "")).ask()
+            val = questionary.text("Post-deploy Hook:", default=template.get("post_deploy", ""), style=custom_style).ask()
             if val:
                 template["post_deploy"] = val
             elif "post_deploy" in template:
@@ -343,7 +365,8 @@ def edit_template(config: DotManConfig, name: str):
             val = questionary.select(
                 "Update Strategy:",
                 choices=["replace", "rename_old", "ignore"],
-                default=template.get("update_strategy", "replace")
+                default=template.get("update_strategy", "replace"),
+                style=custom_style
             ).ask()
             if val:
                 template["update_strategy"] = val

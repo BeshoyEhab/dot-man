@@ -99,8 +99,11 @@ class SecretVault:
                      line_number: int,
                      pattern_name: str,
                      secret_value: str,
-                     branch: str) -> None:
-        """Encrypt and store a secret."""
+                     branch: str) -> str:
+        """
+        Encrypt and store a secret.
+        Returns the SHA256 hash of the secret value for ID purposes.
+        """
         self.load()
         f = self._get_fernet()
 
@@ -124,14 +127,22 @@ class SecretVault:
         # Check if already exists (update if so)
         for i, s in enumerate(self._data["secrets"]):
             if (s["file_path"] == str(file_path) and
-                s["line_number"] == line_number and
+                # We can now match by hash primarily if we wanted, but sticking to loc for updates
+                # is tricky if line numbers shifted.
+                # Actually, if we are stashing, we want to update the entry for this content
+                # regardless of where it is found?
+                # For now let's keep the existing logic but ALSO allow matching by hash to avoid dups
+                s["secret_hash"] == secret_hash and
                 s["branch"] == branch):
+                
+                # Update location info
                 self._data["secrets"][i] = entry
                 self.save()
-                return
+                return secret_hash
 
         self._data["secrets"].append(entry)
         self.save()
+        return secret_hash
 
     def get_secret(self, file_path: str, line_number: int, branch: str) -> Optional[str]:
         """Retrieve and decrypt a secret."""
@@ -148,75 +159,39 @@ class SecretVault:
                 except Exception:
                     return None
         return None
+        
+    def get_secret_by_hash(self, secret_hash: str) -> Optional[str]:
+        """Retrieve and decrypt a secret by its hash."""
+        self.load()
+        f = self._get_fernet()
+
+        # Search in reverse to find newest matching hash? 
+        # Or just first match. Hash collisions matching secret value are fine - same secret.
+        for s in self._data["secrets"]:
+            if s["secret_hash"] == secret_hash:
+                try:
+                    decrypted = f.decrypt(s["encrypted_value"].encode()).decode('utf-8')
+                    return decrypted
+                except Exception:
+                    continue
+        return None
 
     def restore_secrets_in_content(self, content: str, file_path: str, branch: str) -> str:
         """
         Restore secrets in content by replacing placeholders with actual values from vault.
-        Note: This assumes the content has redacted markers or we match by line number.
-        Matching by line number is fragile if file changed.
-
-        Better approach:
-        If we saved the *redacted* line structure or hash of context, we could match better.
-        For now, let's try line number matching but be careful.
-
-        Actually, a robust way is to look for the REDACTED marker and check if we have a secret
-        recorded for this file/line in the vault.
         """
         self.load()
-        from .constants import SECRET_REDACTION_TEXT
-
-        lines = content.splitlines()
-        modified = False
-
-        # Get secrets for this file/branch
-        file_secrets = [
-            s for s in self._data["secrets"]
-            if s["file_path"] == str(file_path) and s["branch"] == branch
-        ]
-
-        if not file_secrets:
-            return content
-
-        f = self._get_fernet()
-
-        # We need to map line numbers. If file didn't change length, line numbers match.
-        # But if we are restoring to a deployed file that came from repo, line numbers should match
-        # the version we scanned when saving?
-        # When we SAVE, we record line numbers.
-        # When we DEPLOY, we get the file from repo (which has redactions).
-        # So line numbers in repo file should match what we recorded.
-
-        new_lines = []
-        for i, line in enumerate(lines, start=1):
-            current_line = line
-            # Check if this line has a recorded secret
-            matching_secret = next((s for s in file_secrets if s["line_number"] == i), None)
-
-            if matching_secret and SECRET_REDACTION_TEXT in line:
-                try:
-                    decrypted = f.decrypt(matching_secret["encrypted_value"].encode()).decode('utf-8')
-                    # Replace the redaction marker with the secret
-                    # Note: This is simple replacement. If multiple secrets on one line, it gets complex.
-                    # Currently we assume one secret or simple replacement.
-                    # But the marker is fixed "***REDACTED***".
-                    # And `decrypted` is the *raw secret value*.
-                    # So we need to reconstruct the line.
-
-                    # But wait, `redact_content` in secrets.py replaced the MATCHED pattern text with marker.
-                    # So `pattern_name` tells us what matched.
-                    # We don't easily know exactly WHERE in the line it was if there are multiple similar parts.
-
-                    # However, stashing the *entire line* might be safer but risks stashing non-secrets.
-                    # Let's assume the vault stores the *secret value*.
-                    # And we blindly replace the FIRST instance of the redaction marker with the secret value?
-                    # That might be wrong if there are multiple.
-
-                    # Optimization: If we only support one secret per line or simple cases.
-                    current_line = current_line.replace(SECRET_REDACTION_TEXT, decrypted, 1)
-                    modified = True
-                except Exception:
-                    pass
-
-            new_lines.append(current_line)
-
-        return "\n".join(new_lines) if modified else content
+        import re
+        
+        # Regex to find ***REDACTED:<HASH>***
+        # We need to be careful about the exact format defined in constants/operations
+        pattern = re.compile(r"\*\*\*REDACTED:([a-fA-F0-9]{64})\*\*\*")
+        
+        def replace_match(match):
+            secret_hash = match.group(1)
+            restored = self.get_secret_by_hash(secret_hash)
+            if restored:
+                return restored
+            return match.group(0) # Keep redaction if not found
+            
+        return pattern.sub(replace_match, content)

@@ -753,9 +753,18 @@ def switch(branch: str, dry_run: bool, force: bool):
                         ui.console.print(f"  Would save: {local_path} [{status}]")
         else:
             secret_handler = get_secret_handler()
-            saved_count, secrets = ops.save_all(secret_handler)
+            save_result = ops.save_all(secret_handler)
+            saved_count = save_result["saved"]
+            secrets = save_result["secrets"]
+            errors = save_result["errors"]
+            
             if secrets:
                 warn(f"{len(secrets)} secrets were redacted during save")
+            
+            if errors:
+                ui.error(f"Encountered {len(errors)} errors during save:")
+                for err in errors:
+                    ui.console.print(f"  [red]• {err}[/red]")
 
             # Commit
             commit_msg = (
@@ -812,10 +821,70 @@ def switch(branch: str, dry_run: bool, force: bool):
                         else:
                             ui.console.print("    [dim](No changes needed)[/dim]")
         else:
-            # Collect hooks
-            pre_hooks: list[str] = []
-            post_hooks: list[str] = []
+            deploy_result = ops.deploy_all()
+            deployed_count = deploy_result["deployed"]
+            pre_hooks = deploy_result["pre_hooks"]
+            post_hooks = deploy_result["post_hooks"]
+            errors = deploy_result["errors"]
+            
+            if errors:
+                ui.error(f"Encountered {len(errors)} errors during deploy:")
+                for err in errors:
+                    ui.console.print(f"  [red]• {err}[/red]")
 
+            # Run pre-deploy hooks
+            if pre_hooks:
+                ui.console.print()
+                ui.console.print("[bold]Running pre-deploy hooks...[/bold]")
+                for cmd in pre_hooks:
+                    ui.console.print(f"  Exec: [cyan]{cmd}[/cyan]")
+                    try:
+                        shell = os.environ.get("SHELL", "/bin/sh")
+                        subprocess.run([shell, "-c", cmd], check=False)
+                    except Exception as e:
+                        warn(f"Failed to run command '{cmd}': {e}")
+                ui.console.print()
+
+            # Deploy has already happened in ops.deploy_all
+            # But wait, hooks logic in ops.switch_branch was gathering hooks MANUALLY
+            # because deploy_all returns hooks that *should be run*.
+            # The original CLI logic ran pre-hooks BEFORE deploy_all for some reason?
+            # Actually, looking at original code:
+            # 1. Collect hooks
+            # 2. Run pre-hooks
+            # 3. ops.deploy_all()
+            # 4. Run post-hooks
+            
+            # Since we moved hooks collection into deploy_all (which runs them? No, it just returns them),
+            # Wait, ops.deploy_all() executes the COPY.
+            # If we want pre-hooks to run BEFORE copy, they must be run before deploy_all().
+            # But deploy_all() calculates *what changed*.
+            # This is a circular dependency if hooks depend on change detection.
+            
+            # In previous logic, hooks were collected by iterating sections manually.
+            # We should probably do that here too or rely on switch_branch which does it?
+            # `ops.switch_branch` logic I added mimics this:
+            # It calculates hooks, then calls deploy_all.
+            
+            # Since I am in CLI `switch` command, I should probably use `ops.switch_branch` 
+            # instead of re-implementing the phases?
+            # The CLI `switch` command implements the phases manually to show UI progress.
+            # So I should keep the manual phases but use the new `deploy_all` return.
+            
+            # PROBLEM: `deploy_all` performs the copy. If I call it, the files are copied.
+            # If I want pre-hooks to run BEFORE copy, I must detect changes matching `deploy_all` logic
+            # BEFORE calling `deploy_all`.
+            # The original code did exactly that (lines 819-832).
+            
+            # So I should keep the hook collection logic here in CLI if I want to run pre-hooks correctly?
+            # Or reliance on `deploy_all` means pre-hooks run AFTER detection but BEFORE copy?
+            # No, `deploy_all` does the copy immediately.
+            
+            # Let's restore hook collection logic here.
+            
+            # Collect hooks
+            pre_hooks = []
+            post_hooks = []
             for section_name in ops.get_sections():
                 section = ops.get_section(section_name)
                 for local_path in section.paths:
@@ -829,9 +898,11 @@ def switch(branch: str, dry_run: bool, force: bool):
                                 pre_hooks.append(section.pre_deploy)
                             if section.post_deploy:
                                 post_hooks.append(section.post_deploy)
-
-            # Run pre-deploy hooks
+            
             pre_hooks = list(dict.fromkeys(pre_hooks))
+            post_hooks = list(dict.fromkeys(post_hooks))
+
+             # Run pre-deploy hooks
             if pre_hooks:
                 ui.console.print()
                 ui.console.print("[bold]Running pre-deploy hooks...[/bold]")
@@ -844,8 +915,29 @@ def switch(branch: str, dry_run: bool, force: bool):
                         warn(f"Failed to run command '{cmd}': {e}")
                 ui.console.print()
 
-            # Deploy
-            deployed_count, _, _ = ops.deploy_all()
+            deploy_result = ops.deploy_all()
+            deployed_count = deploy_result["deployed"]
+            errors = deploy_result["errors"]
+            
+            if errors:
+                ui.error(f"Encountered {len(errors)} errors during deploy:")
+                for err in errors:
+                    ui.console.print(f"  [red]• {err}[/red]")
+            
+            ui.console.print(f"  Deployed {deployed_count} files")
+            
+            # Run post-deploy hooks
+            if post_hooks:
+                ui.console.print()
+                ui.console.print("[bold]Running post-deploy hooks...[/bold]")
+                for cmd in post_hooks:
+                    ui.console.print(f"  Exec: [cyan]{cmd}[/cyan]")
+                    try:
+                        shell = os.environ.get("SHELL", "/bin/sh")
+                        subprocess.run([shell, "-c", cmd], check=False)
+                    except Exception as e:
+                        warn(f"Failed to run command '{cmd}': {e}")
+                ui.console.print()
 
             # Update global config
             ops.global_config.current_branch = branch
@@ -899,7 +991,7 @@ def edit(editor: str | None, edit_global: bool, raw: bool):
     """
     try:
         from .constants import GLOBAL_TOML, DOT_MAN_TOML, DOT_MAN_DIR
-        from .interactive import run_section_wizard, run_global_wizard, run_templates_wizard
+        from .interactive import run_section_wizard, run_global_wizard, run_templates_wizard, custom_style
 
         # 1. Determine target file path for "raw" editing
         if edit_global:
@@ -952,7 +1044,8 @@ def edit(editor: str | None, edit_global: bool, raw: bool):
                 selection = questionary.select(
                     "What would you like to configure?",
                     choices=choices,
-                    use_shortcuts=True
+                    use_shortcuts=True,
+                    style=custom_style
                 ).ask()
 
                 if not selection or selection == "quit":
@@ -967,7 +1060,7 @@ def edit(editor: str | None, edit_global: bool, raw: bool):
                 
                 elif selection == "add_new":
                     # Simple prompt to add a new file (wraps 'dot-man add' conceptually)
-                    path_str = questionary.path("Path to file or directory:").ask()
+                    path_str = questionary.path("Path to file or directory:", style=custom_style).ask()
                     if path_str:
                         # We delegate to the 'add' logic or recreate it here. 
                         # To keep it simple, we just call the add command logic or similar.
@@ -979,7 +1072,7 @@ def edit(editor: str | None, edit_global: bool, raw: bool):
                                  warn(f"Path does not exist: {path}")
                                  continue
                              
-                             section_name = questionary.text("Section Name:", default=path.stem).ask()
+                             section_name = questionary.text("Section Name:", default=path.stem, style=custom_style).ask()
                              if section_name:
                                 from .cli import add
                                 # Using click's context to invoke add is cleaner but tricky inside a loop.

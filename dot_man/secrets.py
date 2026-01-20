@@ -379,8 +379,10 @@ class SecretScanner:
 
         Args:
             content: Text content to redact
-            callback: Optional function that takes a SecretMatch and returns "REDACT" or "KEEP".
-                      If None, all secrets are redacted.
+            callback: Optional function that takes a SecretMatch and returns a string action ("REDACT") 
+                      OR the replacement string itself.
+                      If it returns "REDACT", default redaction text is used.
+                      If it returns anything else (and not "KEEP"), that string is used as replacement.
             file_path: Path to the file being scanned (for context in callback)
         """
         redacted_lines = []
@@ -400,6 +402,7 @@ class SecretScanner:
             for pattern in self.patterns:
                 match = pattern.pattern.search(current_line)
                 if match:
+                    replacement_text = SECRET_REDACTION_TEXT
                     should_redact = True
                     matched_text = match.group(0)
 
@@ -412,13 +415,21 @@ class SecretScanner:
                             severity=pattern.severity,
                             matched_text=matched_text,
                         )
-                        action = callback(secret_match)
-                        should_redact = action == "REDACT"
+                        result = callback(secret_match)
+                        
+                        if result == "KEEP":
+                            should_redact = False
+                        elif result == "REDACT":
+                            should_redact = True
+                        else:
+                            # Use custom replacement
+                            should_redact = True
+                            replacement_text = result
 
                     if should_redact:
                         # Replace the matched text with redaction
                         current_line = pattern.pattern.sub(
-                            SECRET_REDACTION_TEXT, current_line
+                            replacement_text, current_line
                         )
                         count += 1
                         line_modified = True

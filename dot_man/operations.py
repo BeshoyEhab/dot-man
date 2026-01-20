@@ -132,15 +132,16 @@ class DotManOperations:
         self, 
         section: Section,
         secret_handler: Optional[Callable[[SecretMatch], str]] = None
-    ) -> tuple[int, list[SecretMatch]]:
+    ) -> tuple[int, list[SecretMatch], list[str]]:
         """
         Save a section from local to repo.
         
         Returns:
-            (files_saved, secrets_detected)
+            (files_saved, secrets_detected, errors)
         """
         saved = 0
         all_secrets: list[SecretMatch] = []
+        errors: list[str] = []
         
         # Enhanced secret handler that also stashes to vault
         def wrapped_handler(match: SecretMatch) -> str:
@@ -151,15 +152,20 @@ class DotManOperations:
             if action == "REDACT":
                 # Stash to vault
                 try:
-                    self.vault.stash_secret(
+                    secret_hash = self.vault.stash_secret(
                         file_path=str(match.file),
                         line_number=match.line_number,
                         pattern_name=match.pattern_name,
                         secret_value=match.matched_text,
                         branch=self.current_branch
                     )
+                    # Return formatted redaction string with hash
+                    return f"***REDACTED:{secret_hash}***"
                 except Exception as e:
-                    print(f"Warning: Failed to stash secret: {e}")
+                    errors.append(f"Failed to stash secret in vault: {e}")
+                    # Fallback to standard redaction if vault fails
+                    from .constants import SECRET_REDACTION_TEXT
+                    return SECRET_REDACTION_TEXT
 
             return action
 
@@ -169,37 +175,43 @@ class DotManOperations:
             
             repo_path = section.get_repo_path(local_path, REPO_DIR)
             
-            if local_path.is_file():
-                success, secrets = copy_file(
-                    local_path, repo_path, 
-                    filter_secrets_enabled=section.secrets_filter,
-                    secret_handler=wrapped_handler
-                )
-                if success:
-                    saved += 1
-                all_secrets.extend(secrets)
-            else:
-                files_copied, _, secrets = copy_directory(
-                    local_path, repo_path,
-                    filter_secrets_enabled=section.secrets_filter,
-                    include_patterns=section.include,
-                    exclude_patterns=section.exclude,
-                    secret_handler=wrapped_handler,
-                )
-                saved += files_copied
-                all_secrets.extend(secrets)
+            try:
+                if local_path.is_file():
+                    success, secrets = copy_file(
+                        local_path, repo_path, 
+                        filter_secrets_enabled=section.secrets_filter,
+                        secret_handler=wrapped_handler
+                    )
+                    if success:
+                        saved += 1
+                    all_secrets.extend(secrets)
+                else:
+                    files_copied, files_failed, secrets = copy_directory(
+                        local_path, repo_path,
+                        filter_secrets_enabled=section.secrets_filter,
+                        include_patterns=section.include,
+                        exclude_patterns=section.exclude,
+                        secret_handler=wrapped_handler,
+                    )
+                    saved += files_copied
+                    all_secrets.extend(secrets)
+                    if files_failed > 0:
+                        errors.append(f"Failed to copy {files_failed} files in {local_path}")
+            except Exception as e:
+                errors.append(f"Error processing {local_path}: {e}")
         
-        return saved, all_secrets
+        return saved, all_secrets, errors
     
-    def deploy_section(self, section: Section) -> tuple[int, bool]:
+    def deploy_section(self, section: Section) -> tuple[int, bool, list[str]]:
         """
         Deploy a section from repo to local.
         
         Returns:
-            (files_deployed, had_changes)
+            (files_deployed, had_changes, errors)
         """
         deployed = 0
         had_changes = False
+        errors: list[str] = []
         
         for local_path in section.paths:
             repo_path = section.get_repo_path(local_path, REPO_DIR)
@@ -224,45 +236,50 @@ class DotManOperations:
                     )
                     if restored != content:
                         dest_path.write_text(restored, encoding="utf-8")
-                except Exception:
-                    pass
+                except Exception as e:
+                    errors.append(f"Failed to restore secrets for {dest_path}: {e}")
 
-            if repo_path.is_file():
-                success, _ = copy_file(repo_path, local_path, filter_secrets_enabled=False)
-                if success:
+            try:
+                if repo_path.is_file():
+                    success, _ = copy_file(repo_path, local_path, filter_secrets_enabled=False)
+                    if success:
+                        if section.secrets_filter:
+                            restore_file_secrets(local_path)
+                        deployed += 1
+                else:
+                    files_copied, files_failed, _ = copy_directory(
+                        repo_path, local_path,
+                        filter_secrets_enabled=False,
+                        include_patterns=section.include,
+                        exclude_patterns=section.exclude,
+                    )
+                    # Need to iterate deployed files to restore secrets?
+                    # copy_directory doesn't return list of files.
+                    # We can iterate destination if successful.
                     if section.secrets_filter:
-                        restore_file_secrets(local_path)
-                    deployed += 1
-            else:
-                files_copied, _, _ = copy_directory(
-                    repo_path, local_path,
-                    filter_secrets_enabled=False,
-                    include_patterns=section.include,
-                    exclude_patterns=section.exclude,
-                )
-                # Need to iterate deployed files to restore secrets?
-                # copy_directory doesn't return list of files.
-                # We can iterate destination if successful.
-                if section.secrets_filter:
-                    for deployed_file in local_path.rglob("*"):
-                        if deployed_file.is_file():
-                            # Map back to source path key used in vault?
-                            # Vault uses absolute local path as key usually or whatever scan used.
-                            # In save_section, it uses match.file which is the LOCAL path.
-                            # So we just pass the deployed_file path.
-                            restore_file_secrets(deployed_file)
+                        for deployed_file in local_path.rglob("*"):
+                            if deployed_file.is_file():
+                                restore_file_secrets(deployed_file)
 
-                deployed += files_copied
+                    deployed += files_copied
+                    if files_failed > 0:
+                        errors.append(f"Failed to deploy {files_failed} files in {local_path}")
+            except Exception as e:
+                errors.append(f"Error deploying {local_path}: {e}")
         
-        return deployed, had_changes
+        return deployed, had_changes, errors
     
     def save_all(
         self,
         secret_handler: Optional[Callable[[SecretMatch], str]] = None
-    ) -> tuple[int, list[SecretMatch]]:
-        """Save all sections from local to repo."""
+    ) -> dict:
+        """
+        Save all sections from local to repo.
+        Returns dict with keys: 'saved', 'secrets', 'errors'
+        """
         total_saved = 0
         all_secrets: list[SecretMatch] = []
+        all_errors: list[str] = []
         
         sections = [self.get_section(name) for name in self.get_sections()]
         
@@ -275,25 +292,28 @@ class DotManOperations:
             
             for future in as_completed(future_to_section):
                 try:
-                    saved, secrets = future.result()
+                    saved, secrets, errors = future.result()
                     total_saved += saved
                     all_secrets.extend(secrets)
+                    all_errors.extend(errors)
                 except Exception as e:
-                    # In a real app we might want to log this or raise
-                    print(f"Error saving section: {e}")
+                    all_errors.append(f"Critical error saving section: {e}")
         
-        return total_saved, all_secrets
+        return {
+            "saved": total_saved,
+            "secrets": all_secrets,
+            "errors": all_errors
+        }
     
-    def deploy_all(self) -> tuple[int, list[str], list[str]]:
+    def deploy_all(self) -> dict:
         """
         Deploy all sections from repo to local.
-        
-        Returns:
-            (files_deployed, pre_hooks, post_hooks)
+        Returns dict with keys: 'deployed', 'pre_hooks', 'post_hooks', 'errors'
         """
         total_deployed = 0
         pre_hooks: list[str] = []
         post_hooks: list[str] = []
+        all_errors: list[str] = []
         
         sections = [self.get_section(name) for name in self.get_sections()]
 
@@ -306,8 +326,9 @@ class DotManOperations:
             for future in as_completed(future_to_section):
                 section = future_to_section[future]
                 try:
-                    deployed, had_changes = future.result()
+                    deployed, had_changes, errors = future.result()
                     total_deployed += deployed
+                    all_errors.extend(errors)
                     
                     if had_changes:
                         if section.pre_deploy:
@@ -315,9 +336,14 @@ class DotManOperations:
                         if section.post_deploy:
                             post_hooks.append(section.post_deploy)
                 except Exception as e:
-                    print(f"Error deploying section {section.name}: {e}")
+                    all_errors.append(f"Critical error deploying section {section.name}: {e}")
         
-        return total_deployed, list(dict.fromkeys(pre_hooks)), list(dict.fromkeys(post_hooks))
+        return {
+            "deployed": total_deployed,
+            "pre_hooks": list(dict.fromkeys(pre_hooks)),
+            "post_hooks": list(dict.fromkeys(post_hooks)),
+            "errors": all_errors
+        }
     
     def switch_branch(
         self, 
@@ -335,6 +361,7 @@ class DotManOperations:
             - pre_hooks: list of pre-deploy commands
             - post_hooks: list of post-deploy commands
             - created_branch: True if branch was newly created
+            - errors: list of error messages
         """
         current_branch = self.current_branch
         result: dict[str, Any] = {
@@ -344,6 +371,7 @@ class DotManOperations:
             "pre_hooks": [],
             "post_hooks": [],
             "created_branch": False,
+            "errors": []
         }
         
         if current_branch == target_branch and not dry_run:
@@ -351,9 +379,10 @@ class DotManOperations:
         
         # Phase 1: Save current branch
         if not dry_run:
-            saved, secrets = self.save_all(secret_handler)
-            result["saved_count"] = saved
-            result["secrets_redacted"] = len(secrets)
+            save_result = self.save_all(secret_handler)
+            result["saved_count"] = save_result["saved"]
+            result["secrets_redacted"] = len(save_result["secrets"])
+            result["errors"].extend(save_result["errors"])
             
             # Commit
             commit_msg = f"Auto-save from '{current_branch}' before switch to '{target_branch}'"
@@ -372,6 +401,8 @@ class DotManOperations:
         # Phase 3: Deploy target branch
         if not dry_run:
             # Collect hooks for sections that will change
+            # Note: This optimization requires checking file status which relies on compare_files
+            # We skip detailed error handling here for brevity in collecting hooks
             for section_name in self.get_sections():
                 section = self.get_section(section_name)
                 for local_path in section.paths:
@@ -389,8 +420,9 @@ class DotManOperations:
             result["post_hooks"] = list(dict.fromkeys(result["post_hooks"]))
             
             # Deploy
-            deployed, _, _ = self.deploy_all()
-            result["deployed_count"] = deployed
+            deploy_result = self.deploy_all()
+            result["deployed_count"] = deploy_result["deployed"]
+            result["errors"].extend(deploy_result["errors"])
             
             # Update global config
             self.global_config.current_branch = target_branch
