@@ -892,8 +892,9 @@ def switch(branch: str, dry_run: bool, force: bool):
 @main.command()
 @click.option("--editor", help="Editor to use (default: config or $VISUAL or $EDITOR)")
 @click.option("--global", "edit_global", is_flag=True, help="Edit global configuration")
+@click.option("--raw", is_flag=True, help="Use raw text editor instead of interactive TUI")
 @require_init
-def edit(editor: str | None, edit_global: bool):
+def edit(editor: str | None, edit_global: bool, raw: bool):
     """Open the configuration file in your text editor.
 
     By default, opens the dot-man.toml file for the current branch.
@@ -911,6 +912,51 @@ def edit(editor: str | None, edit_global: bool):
 
         if not target.exists():
             error(f"Configuration file not found: {target}")
+
+        if not edit_global and not raw:
+            try:
+                from .operations import get_operations
+                
+                # Load config
+                ops = get_operations()
+                sections = ops.get_sections()
+                
+                if not sections:
+                    console.print("[dim]No sections to edit. Opening raw file...[/dim]")
+                else:
+                    # Interactive CLI Menu
+                    console.print("[bold cyan]Configuration Editor[/bold cyan]")
+                    console.print()
+                    console.print(f"Select a section to configure:")
+                    
+                    for i, name in enumerate(sections, 1):
+                        console.print(f"  {i}. {name}")
+                    console.print("  r. Raw File (Advanced)")
+                    console.print("  q. Quit")
+                    console.print()
+                    
+                    choice = click.prompt("Selection", default="q")
+                    
+                    if choice.lower() == "q":
+                        return
+                        
+                    if choice.lower() == "r":
+                        # Proceed to raw editor
+                        pass
+                    elif choice.isdigit():
+                        idx = int(choice) - 1
+                        if 0 <= idx < len(sections):
+                            selected_section = sections[idx]
+                            _run_section_wizard(ops.dotman_config, selected_section)
+                            return
+                        else:
+                             console.print("[red]Invalid selection[/red]")
+                    else:
+                         console.print("[red]Invalid selection[/red]")
+
+            except Exception as e:
+                warn(f"Interactive menu error: {e}")
+                console.print("Falling back to raw editor...")
 
         # Priority: CLI flag > global config > environment > fallback
         global_config = GlobalConfig()
@@ -946,6 +992,71 @@ def edit(editor: str | None, edit_global: bool):
 
     except DotManError as e:
         error(str(e), e.exit_code)
+
+
+def _run_section_wizard(config: DotManConfig, section_name: str):
+    """Run interactive wizard to edit a section."""
+    section = config.get_section(section_name)
+    
+    console.print()
+    console.print(f"[bold]Editing section: {section_name}[/bold]")
+    console.print("Press Enter to keep current value.")
+    console.print()
+    
+    # 1. Paths
+    current_paths = ", ".join(str(p) for p in section.paths)
+    new_paths = click.prompt(f"Paths", default=current_paths, show_default=True)
+    if new_paths != current_paths:
+        paths_list = [p.strip() for p in new_paths.split(",") if p.strip()]
+    else:
+        paths_list = [str(p) for p in section.paths]
+        
+    # 2. Repo Base
+    new_base = click.prompt("Repo Base", default=section.repo_base)
+    
+    # 3. Update Strategy
+    current_strategy = section.update_strategy
+    new_strategy = click.prompt(
+        "Update Strategy (replace/rename_old/ignore)", 
+        default=current_strategy
+    )
+    
+    # 4. Secrets Filter
+    current_secrets = section.secrets_filter
+    new_secrets = confirm("Filter Secrets?", default=current_secrets)
+    
+    # 5. Hooks
+    new_pre = click.prompt("Pre-deploy hook", default=section.pre_deploy or "")
+    new_post = click.prompt("Post-deploy hook", default=section.post_deploy or "")
+    
+    # Save
+    console.print()
+    if confirm("Save changes?"):
+        # Since we don't have a direct 'update_section' method that accepts partials easily in public API yet
+        # We re-add it (add_section handles overwrite if exists)
+        # Or better, modify internal dict like we did in TUI
+        
+        try:
+             # We can use add_section to overwrite
+             config.add_section(
+                 name=section_name,
+                 paths=paths_list,
+                 repo_base=new_base,
+                 update_strategy=new_strategy,
+                 secrets_filter=new_secrets,
+                 pre_deploy=new_pre if new_pre else None,
+                 post_deploy=new_post if new_post else None,
+                 # Preserve others
+                 include=section.include,
+                 exclude=section.exclude,
+                 inherits=section.inherits
+             )
+             config.save()
+             success(f"Section '{section_name}' updated.")
+        except Exception as e:
+            error(f"Failed to save: {e}")
+    else:
+        console.print("Changes discarded.")
 
 
 # ============================================================================

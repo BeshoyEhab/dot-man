@@ -4,48 +4,30 @@
 paths = [
     "~/.bashrc",
 ]
-repo_base = "bashrc"
-update_strategy = "replace"
-secrets_filter = true
 
 [config-hypr]
 paths = [
     "~/.config/hypr",
 ]
-repo_base = "hypr"
 post_deploy = "notify-send \"Reloading Hyprland\" && hyprctl reload"
-update_strategy = "replace"
-secrets_filter = true
 
 [config-quickshell]
 paths = [
     "~/.config/quickshell",
 ]
-repo_base = "quickshell"
 post_deploy = "notify-send \"Reloading Quickshell\""
-update_strategy = "replace"
-secrets_filter = true
 
 [config-illogical-impulse]
 paths = [
     "~/.config/illogical-impulse",
 ]
-repo_base = "illogical-impulse"
-update_strategy = "replace"
-secrets_filter = true
 
 [config-fish]
 paths = [
     "~/.config/fish",
 ]
-repo_base = "fish"
-update_strategy = "replace"
-secrets_filter = true
 
 [config-kitty]
 paths = [
     "~/.config/kitty",
 ]
-repo_base = "kitty"
-update_strategy = "replace"
-secrets_filter = true

@@ -3,6 +3,7 @@
 import subprocess
 import sys
 from pathlib import Path
+from typing import Optional
 
 if sys.version_info >= (3, 11):
     import tomllib
@@ -23,6 +24,7 @@ from rich.table import Table
 from .core import GitManager
 from .config import GlobalConfig, DotManConfig
 from .files import compare_files, get_file_status
+from .tui_editor import ConfigEditorScreen, AddSectionModal
 
 
 # All available commands with (name, description, command_args, needs_input)
@@ -30,10 +32,12 @@ COMMANDS = [
     ("status", "Show current repository status", ["status"], False),
     ("status -v", "Show verbose status with file details", ["status", "-v"], False),
     ("status --secrets", "Show status and scan for secrets", ["status", "--secrets"], False),
-    ("edit", "Open config in your editor", ["edit"], True),
+    ("edit", "Interactive configuration editor", ["edit"], False),
+    ("edit --raw", "Open config in external editor", ["edit", "--raw"], True),
     ("edit --global", "Open global config in editor", ["edit", "--global"], True),
     ("audit", "Scan all files for secrets", ["audit"], False),
     ("audit --strict", "Scan for secrets (fail on any)", ["audit", "--strict"], False),
+    ("add", "Add a new section to track", ["add"], False),
     ("branch list", "List all configuration branches", ["branch", "list"], False),
     ("branch delete", "Delete a branch (prompts for name)", ["branch", "delete"], "branch"),
     ("remote get", "Show current remote URL", ["remote", "get"], False),
@@ -50,9 +54,9 @@ class OutputModal(ModalScreen):
     """Modal screen to display command output."""
     
     BINDINGS = [
-        Binding("escape", "dismiss", "Close"),
-        Binding("enter", "dismiss", "Close"),
-        Binding("q", "dismiss", "Close"),
+        Binding("escape", "dismiss_modal", "Close"),
+        Binding("enter", "dismiss_modal", "Close"),
+        Binding("q", "dismiss_modal", "Close"),
     ]
     
     CSS = """
@@ -109,7 +113,7 @@ class OutputModal(ModalScreen):
                 yield Static(self.output_text, id="output-text")
             yield Label("[Escape/Enter/q to close]", id="close-hint")
     
-    def action_dismiss(self) -> None:
+    def action_dismiss_modal(self) -> None:
         self.app.pop_screen()
 
 
@@ -560,8 +564,10 @@ class DotManApp(App):
         Binding("question_mark", "help", "Help"),
     ]
     
-    def __init__(self):
+    
+    def __init__(self, initial_command: Optional[str] = None):
         super().__init__()
+        self.initial_command = initial_command
         self.git = GitManager()
         self.global_config = GlobalConfig()
         self.global_config.load()
@@ -587,6 +593,9 @@ class DotManApp(App):
         self._load_branches()
         self._update_files()
         self._update_sync_status()
+        
+        if self.initial_command == "edit":
+            self.call_after_refresh(self.action_edit)
     
     def _load_branches(self) -> None:
         table = self.query_one("#branch-table", DataTable)
@@ -613,7 +622,7 @@ class DotManApp(App):
             table.move_cursor(row=idx)
             self._update_preview(self.current_branch)
     
-    def _update_files(self, branch_name: str | None = None) -> None:
+    def _update_files(self, branch_name: Optional[str] = None) -> None:
         """Update files panel, optionally for a specific branch."""
         files_widget = self.query_one("#files-panel", FilesPanel)
         
@@ -759,8 +768,14 @@ class DotManApp(App):
                 self._run_command(full_args, name)
             self.push_screen(InputModal(name, f"Enter {needs_input}:", on_input))
         else:
-            # Run directly
-            self._run_command(args, name)
+            # Special command handling
+            if name == "edit":
+                self.action_edit()
+            elif name == "add":
+                self.action_add()
+            else:
+                # Run direct command
+                self._run_command(args, name)
     
     def action_command_palette(self) -> None:
         self.push_screen(CommandPalette(self._handle_command))
@@ -793,8 +808,20 @@ class DotManApp(App):
                 self.exit(result=("deploy", branch))
     
     def action_edit(self) -> None:
-        self.notify("Opening config in editor...")
+        self.push_screen(ConfigEditorScreen())
+
+    def action_toggle_raw(self) -> None:
+        """Switch to raw editor."""
+        self.notify("Switching to system editor...")
         self.exit(result=("run", ["edit"]))
+
+    def action_add(self) -> None:
+        """Show add section modal."""
+        def on_add(result):
+            if result:
+                self._update_files()
+        
+        self.push_screen(AddSectionModal(), on_add)
     
     def action_audit(self) -> None:
         self._run_command(["audit"], "Security Audit")
@@ -806,8 +833,8 @@ class DotManApp(App):
         self.notify("Refreshed")
 
 
-def run_tui():
+def run_tui(initial_command: Optional[str] = None):
     """Run the TUI and handle the result."""
-    app = DotManApp()
+    app = DotManApp(initial_command=initial_command)
     result = app.run()
     return result

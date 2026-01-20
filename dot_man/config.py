@@ -1,6 +1,7 @@
 """Configuration parsing for dot-man using TOML format."""
 
 import sys
+from typing import Optional, Any, Union
 from pathlib import Path
 from datetime import datetime
 
@@ -222,7 +223,7 @@ class GlobalConfig:
         self._data["remote"]["url"] = value
 
     @property
-    def editor(self) -> str | None:
+    def editor(self) -> Optional[str]:
         """Get the configured editor."""
         return self._data.get("dot-man", {}).get("editor")
 
@@ -247,7 +248,7 @@ class GlobalConfig:
         """Get default settings that apply to all sections."""
         return self._data.get("defaults", {})
 
-    def get_template(self, name: str) -> dict | None:
+    def get_template(self, name: str) -> Optional[dict[str, Any]]:
         """Get a template by name."""
         return self._data.get("templates", {}).get(name)
 
@@ -263,15 +264,15 @@ class Section:
         self,
         name: str,
         paths: list[Path],
-        repo_base: str | None = None,  # NOW OPTIONAL!
-        repo_path: str | None = None,
-        secrets_filter: bool | None = None,  # None = use default
-        update_strategy: str | None = None,  # None = use default
-        include: list[str] | None = None,
-        exclude: list[str] | None = None,
-        pre_deploy: str | None = None,
-        post_deploy: str | None = None,
-        inherits: list[str] | None = None,
+        repo_base: Optional[str] = None,  # NOW OPTIONAL!
+        repo_path: Optional[str] = None,
+        secrets_filter: Optional[bool] = None,  # None = use default
+        update_strategy: Optional[str] = None,  # None = use default
+        include: Optional[list[str]] = None,
+        exclude: Optional[list[str]] = None,
+        pre_deploy: Optional[str] = None,
+        post_deploy: Optional[str] = None,
+        inherits: Optional[list[str]] = None,
     ):
         self.name = name
         self.paths = paths
@@ -357,9 +358,9 @@ class Section:
         # Use repo_base + filename
         return repo_dir / self.repo_base / local_path.name
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert section to dictionary (only non-default values)."""
-        result = {
+        result: dict[str, Any] = {
             "paths": [str(p) for p in self.paths],
         }
 

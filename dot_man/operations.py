@@ -1,8 +1,8 @@
 """Core operations for dot-man - modular business logic."""
 
 from pathlib import Path
-from pathlib import Path
-from typing import Iterator, Callable
+from typing import Iterator, Callable, Any, Optional, Union
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .config import GlobalConfig, DotManConfig, Section
 from .core import GitManager
@@ -21,9 +21,9 @@ class DotManOperations:
     """
     
     def __init__(self):
-        self._global_config: GlobalConfig | None = None
-        self._dotman_config: DotManConfig | None = None
-        self._git: GitManager | None = None
+        self._global_config: Optional[GlobalConfig] = None
+        self._dotman_config: Optional[DotManConfig] = None
+        self._git: Optional[GitManager] = None
     
     @property
     def global_config(self) -> GlobalConfig:
@@ -122,7 +122,7 @@ class DotManOperations:
     def save_section(
         self, 
         section: Section,
-        secret_handler: Callable[[SecretMatch], str] | None = None
+        secret_handler: Optional[Callable[[SecretMatch], str]] = None
     ) -> tuple[int, list[SecretMatch]]:
         """
         Save a section from local to repo.
@@ -202,17 +202,29 @@ class DotManOperations:
     
     def save_all(
         self,
-        secret_handler: Callable[[SecretMatch], str] | None = None
+        secret_handler: Optional[Callable[[SecretMatch], str]] = None
     ) -> tuple[int, list[SecretMatch]]:
         """Save all sections from local to repo."""
         total_saved = 0
         all_secrets: list[SecretMatch] = []
         
-        for section_name in self.get_sections():
-            section = self.get_section(section_name)
-            saved, secrets = self.save_section(section, secret_handler)
-            total_saved += saved
-            all_secrets.extend(secrets)
+        sections = [self.get_section(name) for name in self.get_sections()]
+        
+        # Parallel execution
+        with ThreadPoolExecutor() as executor:
+            future_to_section = {
+                executor.submit(self.save_section, section, secret_handler): section 
+                for section in sections
+            }
+            
+            for future in as_completed(future_to_section):
+                try:
+                    saved, secrets = future.result()
+                    total_saved += saved
+                    all_secrets.extend(secrets)
+                except Exception as e:
+                    # In a real app we might want to log this or raise
+                    print(f"Error saving section: {e}")
         
         return total_saved, all_secrets
     
@@ -227,16 +239,27 @@ class DotManOperations:
         pre_hooks: list[str] = []
         post_hooks: list[str] = []
         
-        for section_name in self.get_sections():
-            section = self.get_section(section_name)
-            deployed, had_changes = self.deploy_section(section)
-            total_deployed += deployed
+        sections = [self.get_section(name) for name in self.get_sections()]
+
+        with ThreadPoolExecutor() as executor:
+            future_to_section = {
+                executor.submit(self.deploy_section, section): section
+                for section in sections
+            }
             
-            if had_changes:
-                if section.pre_deploy:
-                    pre_hooks.append(section.pre_deploy)
-                if section.post_deploy:
-                    post_hooks.append(section.post_deploy)
+            for future in as_completed(future_to_section):
+                section = future_to_section[future]
+                try:
+                    deployed, had_changes = future.result()
+                    total_deployed += deployed
+                    
+                    if had_changes:
+                        if section.pre_deploy:
+                            pre_hooks.append(section.pre_deploy)
+                        if section.post_deploy:
+                            post_hooks.append(section.post_deploy)
+                except Exception as e:
+                    print(f"Error deploying section {section.name}: {e}")
         
         return total_deployed, list(dict.fromkeys(pre_hooks)), list(dict.fromkeys(post_hooks))
     
@@ -244,7 +267,7 @@ class DotManOperations:
         self, 
         target_branch: str, 
         dry_run: bool = False,
-        secret_handler: Callable[[SecretMatch], str] | None = None
+        secret_handler: Optional[Callable[[SecretMatch], str]] = None
     ) -> dict:
         """
         Switch to a different branch.
@@ -258,7 +281,7 @@ class DotManOperations:
             - created_branch: True if branch was newly created
         """
         current_branch = self.current_branch
-        result = {
+        result: dict[str, Any] = {
             "saved_count": 0,
             "deployed_count": 0,
             "secrets_redacted": 0,
@@ -360,7 +383,7 @@ class DotManOperations:
             - new: number of new files
             - deleted: number of deleted files
         """
-        summary = {
+        summary: dict[str, Any] = {
             "branch": self.current_branch,
             "sections": 0,
             "total_paths": 0,
@@ -391,7 +414,7 @@ class DotManOperations:
 
 
 # Singleton instance for convenience
-_operations: DotManOperations | None = None
+_operations: Optional[DotManOperations] = None
 
 
 def get_operations() -> DotManOperations:
