@@ -64,16 +64,16 @@ def run_section_wizard(config: DotManConfig, section_name: str):
         console.print()
         
         choices = [
-            questionary.Choice("📂 Edit Paths", value="paths"),
-            questionary.Choice("📁 Edit Repo Base", value="repo_base"),
-            questionary.Choice("🔄 Edit Update Strategy", value="update_strategy"),
-            questionary.Choice("🔒 Toggle Secrets Filter", value="secrets_filter"),
-            questionary.Choice("🧬 Edit Inherits", value="inherits"),
-            questionary.Choice("⚡ Edit Pre-deploy Hook", value="pre_deploy"),
-            questionary.Choice("🏁 Edit Post-deploy Hook", value="post_deploy"),
+            questionary.Choice("Edit Paths", value="paths"),
+            questionary.Choice("Edit Repo Base", value="repo_base"),
+            questionary.Choice("Edit Update Strategy", value="update_strategy"),
+            questionary.Choice("Toggle Secrets Filter", value="secrets_filter"),
+            questionary.Choice("Edit Inherits", value="inherits"),
+            questionary.Choice("Edit Pre-deploy Hook", value="pre_deploy"),
+            questionary.Choice("Edit Post-deploy Hook", value="post_deploy"),
             questionary.Separator(),
-            questionary.Choice("💾 Save & Return", value="save", shortcut_key="s"),
-            questionary.Choice("🔙 Cancel", value="cancel", shortcut_key="q"),
+            questionary.Choice("Save & Return", value="save", shortcut_key="s"),
+            questionary.Choice("Cancel", value="cancel", shortcut_key="q"),
         ]
         
         field = questionary.select("Select action:", choices=choices).ask()
@@ -83,10 +83,24 @@ def run_section_wizard(config: DotManConfig, section_name: str):
             
         if field == "save":
             try:
+                # Fix paths to be relative if possible
+                fixed_paths = []
+                home = Path.home()
+                for p in section.paths:
+                    path_obj = Path(p)
+                    if path_obj.is_absolute() and path_obj.is_relative_to(home):
+                         # Convert absolute /home/user/.foo to .foo
+                         # The config expects relative paths to imply relative to home (or repo checkout)
+                         # Usually standard dotfiles are relative to home.
+                         rel = path_obj.relative_to(home)
+                         fixed_paths.append(str(rel))
+                    else:
+                         fixed_paths.append(str(p))
+
                 # Re-add section to save changes (updates existing)
                 config.add_section(
                     name=section_name,
-                    paths=[str(p) for p in section.paths],
+                    paths=fixed_paths,
                     repo_base=section.repo_base,
                     update_strategy=section.update_strategy,
                     secrets_filter=section.secrets_filter,
@@ -169,12 +183,12 @@ def run_global_wizard(config: GlobalConfig):
         console.print()
         
         choices = [
-            questionary.Choice("📝 Edit Default Editor", value="editor"),
-            questionary.Choice("🌐 Edit Remote URL", value="remote_url"),
-            questionary.Choice("🔒 Toggle Default Secrets Filter", value="secrets_filter"),
+            questionary.Choice("Edit Default Editor", value="editor"),
+            questionary.Choice("Edit Remote URL", value="remote_url"),
+            questionary.Choice("Toggle Default Secrets Filter", value="secrets_filter"),
             questionary.Separator(),
-            questionary.Choice("💾 Save & Return", value="save", shortcut_key="s"),
-            questionary.Choice("🔙 Cancel", value="cancel", shortcut_key="q"),
+            questionary.Choice("Save & Return", value="save", shortcut_key="s"),
+            questionary.Choice("Cancel", value="cancel", shortcut_key="q"),
         ]
         
         field = questionary.select("Select action:", choices=choices).ask()
@@ -236,8 +250,8 @@ def run_templates_wizard(config: DotManConfig):
                 choices.append(questionary.Choice(f"Edit {name}", value=name))
         
         choices.append(questionary.Separator())
-        choices.append(questionary.Choice("➕ Add New Template", value="add_new"))
-        choices.append(questionary.Choice("🔙 Back", value="back", shortcut_key="q"))
+        choices.append(questionary.Choice("Add New Template", value="add_new"))
+        choices.append(questionary.Choice("Back", value="back", shortcut_key="q"))
         
         selection = questionary.select("Manage Templates:", choices=choices, use_shortcuts=True).ask()
         
@@ -281,12 +295,12 @@ def edit_template(config: DotManConfig, name: str):
         console.print()
         
         choices = [
-            questionary.Choice("⚡ Edit Pre-deploy Hook", value="pre_deploy"),
-            questionary.Choice("🏁 Edit Post-deploy Hook", value="post_deploy"),
-            questionary.Choice("🔄 Edit Update Strategy", value="update_strategy"),
+            questionary.Choice("Edit Pre-deploy Hook", value="pre_deploy"),
+            questionary.Choice("Edit Post-deploy Hook", value="post_deploy"),
+            questionary.Choice("Edit Update Strategy", value="update_strategy"),
             questionary.Separator(),
-            questionary.Choice("💾 Save & Return", value="save", shortcut_key="s"),
-            questionary.Choice("🗑️  Delete Template", value="delete"),
+            questionary.Choice("Save & Return", value="save", shortcut_key="s"),
+            questionary.Choice("Delete Template", value="delete"),
         ]
         
         field = questionary.select("Edit Template Field:", choices=choices, use_shortcuts=True).ask()
