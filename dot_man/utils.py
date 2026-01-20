@@ -37,7 +37,7 @@ def open_in_editor(path: Path, editor: str | None = None) -> bool:
     try:
         result = subprocess.run([editor, str(path)])
         return result.returncode == 0
-    except Exception:
+    except (subprocess.SubprocessError, OSError):
         return False
 
 
@@ -45,16 +45,17 @@ def human_size(size_bytes: int) -> str:
     """Convert bytes to human-readable size.
 
     Args:
-        size_bytes: Size in bytes
+        size_bytes: Size in bytes (int or float)
 
     Returns:
         Human-readable size string (e.g., "2.3 MB")
     """
+    size_num = float(size_bytes)
     for unit in ("B", "KB", "MB", "GB", "TB"):
-        if abs(size_bytes) < 1024:
-            return f"{size_bytes:.1f} {unit}"
-        size_bytes /= 1024
-    return f"{size_bytes:.1f} PB"
+        if abs(size_num) < 1024:
+            return f"{size_num:.1f} {unit}"
+        size_num /= 1024
+    return f"{size_num:.1f} PB"
 
 
 def get_directory_size(path: Path) -> int:

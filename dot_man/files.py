@@ -60,7 +60,7 @@ def copy_file(
 
         return True, detected_secrets
 
-    except Exception:
+    except OSError:
         return False, detected_secrets
 
 
@@ -172,7 +172,7 @@ def compare_files(file1: Path, file2: Path) -> bool:
         # Efficient chunked comparison
         import filecmp
         return filecmp.cmp(file1, file2, shallow=False)
-    except Exception:
+    except OSError:
         return False
 
 
@@ -252,5 +252,5 @@ def backup_file(path: Path) -> Path | None:
         else:
             shutil.copytree(path, backup_path)
         return backup_path
-    except Exception:
+    except OSError:
         return None

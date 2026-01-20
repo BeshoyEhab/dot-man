@@ -25,6 +25,7 @@ from .core import GitManager
 from .config import GlobalConfig, DotManConfig
 from .files import compare_files, get_file_status
 from .tui_editor import ConfigEditorScreen, AddSectionModal
+from .exceptions import DotManError
 
 
 # All available commands with (name, description, command_args, needs_input)
@@ -441,7 +442,7 @@ class FilesPanel(Static):
                 
                 shown_sections += 1
                 
-            except Exception:
+            except (DotManError, OSError):
                 pass
         
         remaining = len(section_names) - shown_sections
@@ -625,7 +626,7 @@ class DotManApp(App):
                 stats = self.git.get_branch_stats(branch)
                 file_count = str(stats["file_count"])
                 commit_count = str(stats["commit_count"])
-            except Exception:
+            except (DotManError, ValueError):
                 file_count = "?"
                 commit_count = "?"
 
@@ -719,7 +720,7 @@ class DotManApp(App):
                         title=f"Files ({branch_name})",
                         border_style="dim"
                     ))
-            except Exception as e:
+            except (DotManError, OSError, tomllib.TOMLDecodeError) as e:
                 files_widget.update(Panel(
                     Text(f"Could not load branch config: {e}", style="red"),
                     title="Files",
@@ -737,10 +738,10 @@ class DotManApp(App):
                 ops = get_operations()
                 audit_results = ops.audit()
                 audit_count = sum(len(matches) for _, matches in audit_results)
-            except Exception:
+            except DotManError:
                 pass
             sync_widget.update_status(status, audit_count)
-        except Exception:
+        except (DotManError, OSError):
             sync_widget.update_status({"remote_configured": False})
     
     def _update_preview(self, selected_branch: str) -> None:
@@ -773,7 +774,7 @@ class DotManApp(App):
             self.push_screen(OutputModal(title, output.strip(), is_error))
         except subprocess.TimeoutExpired:
             self.push_screen(OutputModal(title, "Command timed out", True))
-        except Exception as e:
+        except (subprocess.SubprocessError, OSError) as e:
             self.push_screen(OutputModal(title, f"Error: {e}", True))
     
     def _handle_command(self, cmd: tuple) -> None:

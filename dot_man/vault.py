@@ -59,7 +59,7 @@ class SecretVault:
             key = self.key_file.read_bytes()
             self._fernet = Fernet(key)
             return self._fernet
-        except Exception as e:
+        except (ValueError, OSError) as e:
             raise VaultError(f"Failed to load encryption key: {e}")
 
     def _generate_key(self) -> None:
@@ -82,7 +82,7 @@ class SecretVault:
         try:
             content = self.vault_file.read_text(encoding="utf-8")
             self._data = json.loads(content)
-        except Exception:
+        except (OSError, json.JSONDecodeError):
             self._data = {"secrets": []}
 
     def save(self) -> None:
@@ -91,7 +91,7 @@ class SecretVault:
             content = json.dumps(self._data, indent=2)
             self.vault_file.write_text(content, encoding="utf-8")
             self.vault_file.chmod(0o600)  # Restricted permissions
-        except Exception as e:
+        except OSError as e:
             raise VaultError(f"Failed to save vault: {e}")
 
     def stash_secret(self,
@@ -156,7 +156,7 @@ class SecretVault:
                 try:
                     decrypted = f.decrypt(s["encrypted_value"].encode()).decode('utf-8')
                     return decrypted
-                except Exception:
+                except (ValueError, TypeError): # + cryptography exceptions if imported
                     return None
         return None
         
@@ -172,7 +172,7 @@ class SecretVault:
                 try:
                     decrypted = f.decrypt(s["encrypted_value"].encode()).decode('utf-8')
                     return decrypted
-                except Exception:
+                except (ValueError, TypeError):
                     continue
         return None
 

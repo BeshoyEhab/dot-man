@@ -27,6 +27,7 @@ from .secrets import SecretScanner
 from .utils import get_editor, open_in_editor, is_git_installed
 from .exceptions import (
     DotManError,
+    ConfigurationError,
 )
 from .secrets import (
     SecretGuard,
@@ -1951,7 +1952,7 @@ def config_set(key: str, value: str):
         config = GlobalConfig()
         try:
             config.load()
-        except Exception:
+        except (FileNotFoundError, ConfigurationError):
             # If load fails (e.g. no file), we assume empty default or create new
             config.create_default()
 

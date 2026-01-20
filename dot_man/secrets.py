@@ -5,9 +5,9 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 from pathlib import Path
-from typing import Iterator, Callable
+from typing import Iterable, Iterator, Callable
 
-from .constants import SECRET_REDACTION_TEXT, DOTMAN_REDACTION_TEXT
+from .constants import SECRET_REDACTION_TEXT, DOT_MAN_DIR
 
 import json
 import hashlib
@@ -41,7 +41,9 @@ class SecretGuard:
         try:
             content = self.allow_list_path.read_text(encoding="utf-8")
             return json.loads(content)
-        except Exception:
+        except (FileNotFoundError, json.JSONDecodeError):
+            return []
+        except OSError:
             return []
 
     def save(self) -> None:
@@ -52,8 +54,8 @@ class SecretGuard:
 
             content = json.dumps(self._allowed_secrets, indent=2)
             self.allow_list_path.write_text(content, encoding="utf-8")
-        except Exception:
-            pass
+        except OSError:
+            pass  # Fail silently if we can't write, likely permissions
 
     def _compute_hash(self, content: str) -> str:
         """Compute SHA256 hash of the content."""
@@ -96,7 +98,7 @@ class PermanentRedactGuard:
     """Manages the list of secrets that should always be redacted."""
 
     def __init__(self, config_dir: Path | None = None, path: Path | None = None):
-        self.config_dir = config_dir or Path.home() / ".config" / "dot-man"
+        self.config_dir = config_dir or DOT_MAN_DIR
         self.redact_list_path = path or (
             self.config_dir / ".dotman-permanent-redact.json"
         )
@@ -109,7 +111,9 @@ class PermanentRedactGuard:
         try:
             content = self.redact_list_path.read_text(encoding="utf-8")
             return json.loads(content)
-        except Exception:
+        except (FileNotFoundError, json.JSONDecodeError):
+            return []
+        except OSError:
             return []
 
     def save(self) -> None:
@@ -120,7 +124,7 @@ class PermanentRedactGuard:
 
             content = json.dumps(self._redact_secrets, indent=2)
             self.redact_list_path.write_text(content, encoding="utf-8")
-        except Exception:
+        except OSError:
             pass
 
     def _compute_hash(self, content: str) -> str:
@@ -303,11 +307,11 @@ class SecretScanner:
             with open(path, "rb") as f:
                 chunk = f.read(8192)
                 return b"\x00" in chunk
-        except Exception:
-            return True
+        except OSError:
+            return True  # Assume binary if we can't read it
 
     def scan_lines(
-        self, lines: Iterator[str], file_path: Path | None = None
+        self, lines: Iterable[str], file_path: Path | None = None
     ) -> Iterator[SecretMatch]:
         """Scan lines for secrets."""
         file_path = file_path or Path("<string>")
@@ -343,7 +347,7 @@ class SecretScanner:
         try:
             with open(path, "r", encoding="utf-8", errors="ignore") as f:
                 yield from self.scan_lines(f, path)
-        except Exception:
+        except (OSError, UnicodeDecodeError):
             # Skip files we can't read
             pass
 

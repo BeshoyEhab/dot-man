@@ -8,7 +8,6 @@ from git.exc import InvalidGitRepositoryError
 
 from .constants import REPO_DIR, DEFAULT_BRANCH, GIT_IGNORE_PATTERNS
 from .exceptions import (
-    GitNotFoundError,
     GitOperationError,
     BranchNotFoundError,
     NotInitializedError,
@@ -38,7 +37,7 @@ class GitManager:
         """Check if the repository is initialized."""
         try:
             return self._repo_path.exists() and (self._repo_path / ".git").exists()
-        except Exception:
+        except OSError:
             return False
 
     def init(self) -> None:
@@ -58,7 +57,7 @@ class GitManager:
                 if not config.has_option("user", "email"):
                     config.set_value("user", "email", "dot-man@localhost")
 
-        except Exception as e:
+        except (GitCommandError, OSError) as e:
             raise GitOperationError(f"Failed to initialize repository: {e}")
 
     def current_branch(self) -> str:
@@ -81,7 +80,7 @@ class GitManager:
         """Create a new branch."""
         try:
             self.repo.create_head(name)
-        except Exception as e:
+        except (GitCommandError, OSError, ValueError) as e:
             raise GitOperationError(f"Failed to create branch '{name}': {e}")
 
     def checkout(self, branch: str, create: bool = False) -> None:
@@ -93,7 +92,7 @@ class GitManager:
             self.repo.heads[branch].checkout()
         except IndexError:
             raise BranchNotFoundError(f"Branch not found: {branch}")
-        except Exception as e:
+        except (GitCommandError, OSError) as e:
             raise GitOperationError(f"Failed to checkout '{branch}': {e}")
 
     def is_dirty(self) -> bool:
@@ -131,7 +130,7 @@ class GitManager:
         """Stage all changes."""
         try:
             self.repo.git.add(A=True)
-        except Exception as e:
+        except (GitCommandError, OSError) as e:
             raise GitOperationError(f"Failed to stage changes: {e}")
 
     def commit(self, message: str) -> str | None:
@@ -147,7 +146,7 @@ class GitManager:
             self.add_all()
             commit = self.repo.index.commit(message)
             return commit.hexsha
-        except Exception as e:
+        except (GitCommandError, OSError, ValueError) as e:
             raise GitOperationError(f"Failed to commit: {e}")
 
     def get_commits(self, count: int = 10) -> Iterator[dict]:
@@ -160,11 +159,11 @@ class GitManager:
             for commit in self.repo.iter_commits(max_count=count):
                 yield {
                     "sha": commit.hexsha[:7],
-                    "message": commit.message.strip().split("\n")[0],
+                    "message": str(commit.message).strip().split("\n")[0],
                     "author": str(commit.author),
                     "date": commit.committed_datetime.isoformat(),
                 }
-        except Exception:
+        except (GitCommandError, ValueError, OSError):
             return
 
     def delete_branch(self, name: str, force: bool = False) -> None:
@@ -185,7 +184,7 @@ class GitManager:
                 from .exceptions import BranchNotMergedError
                 raise BranchNotMergedError(f"Branch '{name}' is not fully merged")
             raise GitOperationError(f"Failed to delete branch '{name}': {e}")
-        except Exception as e:
+        except (GitCommandError, OSError) as e:
             raise GitOperationError(f"Failed to delete branch '{name}': {e}")
 
     def has_remote(self) -> bool:
@@ -205,7 +204,7 @@ class GitManager:
                 self.repo.remotes.origin.set_url(url)
             else:
                 self.repo.create_remote("origin", url)
-        except Exception as e:
+        except (GitCommandError, ValueError) as e:
             raise GitOperationError(f"Failed to set remote: {e}")
 
     def fetch(self) -> None:
@@ -214,7 +213,7 @@ class GitManager:
             raise GitOperationError("No remote configured. Use 'dot-man remote set <url>' first.")
         try:
             self.repo.remotes.origin.fetch()
-        except Exception as e:
+        except (GitCommandError, ValueError) as e:
             raise GitOperationError(f"Failed to fetch: {e}")
 
     def pull(self, rebase: bool = True) -> str:
@@ -279,7 +278,7 @@ class GitManager:
                     "Then run 'git rebase --continue' or 'git rebase --abort'"
                 )
             raise GitOperationError(f"Failed to pull: {e.stderr}")
-        except Exception as e:
+        except OSError as e:
             # Restore stash even on error
             if stashed:
                 try:
@@ -309,7 +308,7 @@ class GitManager:
                     "Push rejected. Remote has changes. Run 'dot-man sync' to pull first."
                 )
             raise GitOperationError(f"Failed to push: {e.stderr}")
-        except Exception as e:
+        except (GitCommandError, OSError) as e:
             raise GitOperationError(f"Failed to push: {e}")
 
     def get_branch_stats(self, branch_name: str) -> dict:
@@ -326,15 +325,15 @@ class GitManager:
             
             # Count files in branch
             tree = branch.commit.tree
-            file_count = sum(1 for _ in tree.traverse() if _.type == 'blob')
+            file_count = sum(1 for _ in tree.traverse() if _.type == 'blob')  # type: ignore 
             
             return {
                 "commit_count": len(commits),
                 "last_commit_date": last_commit.committed_datetime.strftime("%Y-%m-%d %H:%M") if last_commit else "N/A",
-                "last_commit_msg": last_commit.message.strip().split("\n")[0][:50] if last_commit else "N/A",
+                "last_commit_msg": str(last_commit.message).strip().split("\n")[0][:50] if last_commit else "N/A",
                 "file_count": file_count,
             }
-        except Exception:
+        except (GitCommandError, ValueError, IndexError, OSError):
             return {
                 "commit_count": 0,
                 "last_commit_date": "N/A",
@@ -371,7 +370,7 @@ class GitManager:
                 "remote_configured": True,
                 "remote_branch_exists": True,
             }
-        except Exception:
+        except (GitCommandError, ValueError, OSError):
             return {"ahead": 0, "behind": 0, "remote_configured": True, "error": True}
 
     def get_file_from_branch(self, branch: str, file_path: str) -> str | None:
@@ -390,6 +389,6 @@ class GitManager:
         except GitCommandError:
             # File doesn't exist in that branch
             return None
-        except Exception:
+        except (GitCommandError, ValueError, OSError):
             return None
 
