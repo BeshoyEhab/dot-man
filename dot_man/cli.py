@@ -946,7 +946,7 @@ def edit(editor: str | None, edit_global: bool, raw: bool):
                 choices.append(questionary.Choice("➕ Add New Section", value="add_new"))
                 choices.append(questionary.Choice("📝 Edit Templates", value="templates"))
                 choices.append(questionary.Choice("📝 Open Raw File (Advanced)", value="raw"))
-                choices.append(questionary.Choice("🚪 Quit", value="quit"))
+                choices.append(questionary.Choice("🚪 Quit", value="quit", shortcut_key="q"))
 
                 selection = questionary.select(
                     "What would you like to configure?",
@@ -1051,8 +1051,8 @@ def _run_section_wizard(config: DotManConfig, section_name: str):
             questionary.Choice(f"Pre-deploy Hook ({section.pre_deploy or 'None'})", value="pre_deploy"),
             questionary.Choice(f"Post-deploy Hook ({section.post_deploy or 'None'})", value="post_deploy"),
             questionary.Separator(),
-            questionary.Choice("💾 Save & Return", value="save"),
-            questionary.Choice("🔙 Cancel", value="cancel"),
+            questionary.Choice("💾 Save & Return", value="save", shortcut_key="s"),
+            questionary.Choice("🔙 Cancel", value="cancel", shortcut_key="q"),
         ]
         
         field = questionary.select("Select field to edit:", choices=choices).ask()
@@ -1136,8 +1136,8 @@ def _run_global_wizard(config: GlobalConfig):
             questionary.Choice(f"Remote URL ({config.remote_url or 'Not Set'})", value="remote_url"),
             questionary.Choice(f"Default Secrets Filter ({'Enabled' if config.secrets_filter_enabled else 'Disabled'})", value="secrets_filter"),
             questionary.Separator(),
-            questionary.Choice("💾 Save & Return", value="save"),
-            questionary.Choice("🔙 Cancel", value="cancel"),
+            questionary.Choice("💾 Save & Return", value="save", shortcut_key="s"),
+            questionary.Choice("🔙 Cancel", value="cancel", shortcut_key="q"),
         ]
         
         field = questionary.select("Select setting to edit:", choices=choices).ask()
@@ -1183,9 +1183,9 @@ def _run_templates_wizard(config: DotManConfig):
         
         choices.append(questionary.Separator())
         choices.append(questionary.Choice("➕ Add New Template", value="add_new"))
-        choices.append(questionary.Choice("🔙 Back", value="back"))
+        choices.append(questionary.Choice("🔙 Back", value="back", shortcut_key="q"))
         
-        selection = questionary.select("Manage Templates:", choices=choices).ask()
+        selection = questionary.select("Manage Templates:", choices=choices, use_shortcuts=True).ask()
         
         if not selection or selection == "back":
             return
@@ -1220,11 +1220,11 @@ def _edit_template(config: DotManConfig, name: str):
             questionary.Choice(f"Post-deploy Hook ({current_post})", value="post_deploy"),
             questionary.Choice(f"Update Strategy ({current_strategy})", value="update_strategy"),
             questionary.Separator(),
-            questionary.Choice("💾 Save & Return", value="save"),
+            questionary.Choice("💾 Save & Return", value="save", shortcut_key="s"),
             questionary.Choice("🗑️  Delete Template", value="delete"),
         ]
         
-        field = questionary.select("Edit Template Field:", choices=choices).ask()
+        field = questionary.select("Edit Template Field:", choices=choices, use_shortcuts=True).ask()
         
         if not field or field == "save":
             config.save()
