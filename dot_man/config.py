@@ -784,6 +784,16 @@ class DotManConfig:
                     ):
                         warnings.append(f"[{name}]: Template not found: {template}")
 
+                # Check for invalid keys
+                valid_keys = {
+                    "paths", "repo_base", "repo_path", "secrets_filter",
+                    "update_strategy", "include", "exclude", "pre_deploy",
+                    "post_deploy", "inherits"
+                }
+                for key in self._data[name]:
+                    if key not in valid_keys:
+                        warnings.append(f"[{name}]: Unknown key '{key}'")
+
             except Exception as e:
                 warnings.append(f"[{name}]: {e}")
 

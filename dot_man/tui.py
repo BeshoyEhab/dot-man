@@ -590,29 +590,52 @@ class DotManApp(App):
     def on_mount(self) -> None:
         self.title = "dot-man"
         self.sub_title = f"Branch: {self.current_branch} | Press ? for help"
-        self._load_branches()
+
+        # Initialize UI
+        self._init_branch_table()
         self._update_files()
-        self._update_sync_status()
+
+        # Load heavy data asynchronously
+        self.call_after_refresh(self._load_branches)
+        self.call_after_refresh(self._update_sync_status)
         
         if self.initial_command == "edit":
             self.call_after_refresh(self.action_edit)
-    
-    def _load_branches(self) -> None:
+
+    def _init_branch_table(self) -> None:
         table = self.query_one("#branch-table", DataTable)
         table.clear(columns=True)
         table.add_columns("", "Branch", "Files", "Commits")
         table.cursor_type = "row"
         
+        # Show loading or current branch initially
+        table.add_row("✓", Text(self.current_branch, style="bold"), "...", "...", key=self.current_branch)
+
+    def _load_branches(self) -> None:
+        table = self.query_one("#branch-table", DataTable)
+        table.clear()
+
         branches = self.git.list_branches()
+
+        # Process in batches if there are many branches
         for branch in branches:
-            stats = self.git.get_branch_stats(branch)
+            # We skip heavy stats for now or we could load them lazily
+            # But get_branch_stats usually runs `git ls-tree` which is fast enough
+            try:
+                stats = self.git.get_branch_stats(branch)
+                file_count = str(stats["file_count"])
+                commit_count = str(stats["commit_count"])
+            except Exception:
+                file_count = "?"
+                commit_count = "?"
+
             marker = "✓" if branch == self.current_branch else ""
             style = "bold" if branch == self.current_branch else ""
             table.add_row(
                 marker,
                 Text(branch, style=style),
-                str(stats["file_count"]),
-                str(stats["commit_count"]),
+                file_count,
+                commit_count,
                 key=branch
             )
         

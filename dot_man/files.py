@@ -165,7 +165,13 @@ def compare_files(file1: Path, file2: Path) -> bool:
                     return False
             return True
 
-        return file1.read_bytes() == file2.read_bytes()
+        # Quick size check first
+        if file1.stat().st_size != file2.stat().st_size:
+            return False
+
+        # Efficient chunked comparison
+        import filecmp
+        return filecmp.cmp(file1, file2, shallow=False)
     except Exception:
         return False
 

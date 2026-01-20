@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Encrypted Secret Vault**: Redacted secrets are now securely encrypted (Fernet) and stashed locally. They are automatically restored when you switch back to a branch.
+- **Pre-Push Audit**: `dot-man sync` now automatically scans for secrets before pushing to remote, preventing accidental leaks.
+- **"Did you mean?"**: CLI now suggests commands for typos (e.g., `swtich` -> `switch`).
+- **Interactive Tutorial**: Revamped `dot-man config tutorial` with colorful interactive examples.
+- **Config Validation**: Strict validation for `dot-man.toml` to catch misspelled keys or invalid options.
+
+### Changed
+
+- **UI Overhaul**: Consistent, colorful CLI output using Rich.
+- **Performance**: Optimized file comparison and secret scanning (streaming processing) for large files and directories.
+- **TUI Responsiveness**: TUI now loads heavy data asynchronously to prevent freezing.
+
 ### Fixed
 
 - **Remote URL Persistence**: `dot-man setup` and `dot-man remote set` now correctly save the remote URL to `global.conf`
