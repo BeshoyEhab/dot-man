@@ -66,6 +66,7 @@ class TestWizards:
     def mock_config(self):
         config = MagicMock(spec=DotManConfig)
         section = MagicMock(spec=Section)
+        section.name = "test_section"
         section.paths = [Path("/tmp/foo")]
         section.repo_base = "foo_base"
         section.update_strategy = "replace"
@@ -146,4 +147,21 @@ class TestWizards:
         run_global_wizard(mock_global_config)
         
         assert mock_global_config.editor == "nano"
+        mock_global_config.save.assert_called_once()
+
+    @patch("dot_man.interactive.questionary")
+    @patch("dot_man.interactive.console")
+    def test_run_global_wizard_toggle_secrets(self, mock_console, mock_questionary, mock_global_config):
+        """Test toggling global secrets filter."""
+        # 1. Select "secrets_filter" to toggle
+        # 2. Select "save"
+        mock_questionary.select.return_value.ask.side_effect = ["secrets_filter", "save"]
+        
+        # Initial state is True (from fixture)
+        # So after toggle it should be False
+        
+        run_global_wizard(mock_global_config)
+        
+        # Check internal data update
+        assert mock_global_config._data["defaults"]["secrets_filter"] is False
         mock_global_config.save.assert_called_once()

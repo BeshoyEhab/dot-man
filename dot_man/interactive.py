@@ -3,9 +3,12 @@
 from pathlib import Path
 import questionary
 from questionary import Validator, ValidationError
+from rich.table import Table
+from rich.panel import Panel
+from rich.text import Text
 
-from .config import DotManConfig, GlobalConfig
-from .ui import console, print_banner, confirm, warn, success, error
+from .config import DotManConfig, GlobalConfig, Section
+from .ui import console, print_banner, success, error, warn
 
 
 class PathValidator(Validator):
@@ -27,30 +30,53 @@ class UrlValidator(Validator):
                 cursor_position=len(document.text),
             )
 
+def print_section_dashboard(section: Section):
+    """Print a dashboard summary for the section."""
+    table = Table(title=None, box=None, show_header=False, padding=(0, 2))
+    table.add_column("Key", style="cyan bold")
+    table.add_column("Value")
+
+    paths = ", ".join(str(p) for p in section.paths)
+    inherits = ", ".join(section.inherits) if section.inherits else "[dim]None[/dim]"
+    
+    table.add_row("Paths", paths)
+    table.add_row("Repo Base", section.repo_base)
+    table.add_row("Update Strategy", section.update_strategy)
+    table.add_row("Secrets Filter", "[green]Enabled[/green]" if section.secrets_filter else "[dim]Disabled[/dim]")
+    table.add_row("InheritsFrom", inherits)
+    table.add_row("Pre-deploy", section.pre_deploy or "[dim]None[/dim]")
+    table.add_row("Post-deploy", section.post_deploy or "[dim]None[/dim]")
+
+    console.print(Panel(
+        table,
+        title=f"[magenta bold]Editing Section: {section.name}[/magenta bold]",
+        subtitle="[dim]Select a field below to edit[/dim]",
+        border_style="cyan"
+    ))
+
 def run_section_wizard(config: DotManConfig, section_name: str):
     """Run interactive wizard to edit a section."""
     section = config.get_section(section_name)
     
     while True:
         console.clear()
-        print_banner(f"Editing Section: {section_name}")
-        console.print(f"Path: {', '.join(str(p) for p in section.paths)}")
+        print_section_dashboard(section)
         console.print()
         
         choices = [
-            questionary.Choice(f"Paths ({', '.join(str(p) for p in section.paths)})", value="paths"),
-            questionary.Choice(f"Repo Base ({section.repo_base})", value="repo_base"),
-            questionary.Choice(f"Update Strategy ({section.update_strategy})", value="update_strategy"),
-            questionary.Choice(f"Secrets Filter ({'Enabled' if section.secrets_filter else 'Disabled'})", value="secrets_filter"),
-            questionary.Choice(f"Inherits ({', '.join(section.inherits) if section.inherits else 'None'})", value="inherits"),
-            questionary.Choice(f"Pre-deploy Hook ({section.pre_deploy or 'None'})", value="pre_deploy"),
-            questionary.Choice(f"Post-deploy Hook ({section.post_deploy or 'None'})", value="post_deploy"),
+            questionary.Choice("📂 Edit Paths", value="paths"),
+            questionary.Choice("📁 Edit Repo Base", value="repo_base"),
+            questionary.Choice("🔄 Edit Update Strategy", value="update_strategy"),
+            questionary.Choice("🔒 Toggle Secrets Filter", value="secrets_filter"),
+            questionary.Choice("🧬 Edit Inherits", value="inherits"),
+            questionary.Choice("⚡ Edit Pre-deploy Hook", value="pre_deploy"),
+            questionary.Choice("🏁 Edit Post-deploy Hook", value="post_deploy"),
             questionary.Separator(),
             questionary.Choice("💾 Save & Return", value="save", shortcut_key="s"),
             questionary.Choice("🔙 Cancel", value="cancel", shortcut_key="q"),
         ]
         
-        field = questionary.select("Select field to edit:", choices=choices).ask()
+        field = questionary.select("Select action:", choices=choices).ask()
         
         if not field or field == "cancel":
             return
@@ -101,8 +127,8 @@ def run_section_wizard(config: DotManConfig, section_name: str):
                 section.update_strategy = val
                 
         elif field == "secrets_filter":
-            val = questionary.confirm("Enable Secrets Filter?", default=section.secrets_filter).ask()
-            section.secrets_filter = val
+            # Toggle logic since it's a checkbox essentially
+            section.secrets_filter = not section.secrets_filter
             
         elif field == "inherits":
             current = ", ".join(section.inherits)
@@ -118,23 +144,40 @@ def run_section_wizard(config: DotManConfig, section_name: str):
             val = questionary.text("Post-deploy Hook:", default=section.post_deploy or "").ask()
             section.post_deploy = val if val else None
 
+def print_global_dashboard(config: GlobalConfig):
+    """Print global config dashboard."""
+    table = Table(title=None, box=None, show_header=False, padding=(0, 2))
+    table.add_column("Key", style="cyan bold")
+    table.add_column("Value")
+
+    table.add_row("Default Editor", config.editor or "[dim]System Default[/dim]")
+    table.add_row("Remote URL", config.remote_url or "[dim]Not Set[/dim]")
+    table.add_row("Default Secrets Filter", "[green]Enabled[/green]" if config.secrets_filter_enabled else "[dim]Disabled[/dim]")
+
+    console.print(Panel(
+        table,
+        title="[magenta bold]Global Configuration[/magenta bold]",
+        subtitle="[dim]Settings apply to all new sections/machines[/dim]",
+        border_style="cyan"
+    ))
+
 def run_global_wizard(config: GlobalConfig):
     """Edit global configuration."""
     while True:
         console.clear()
-        print_banner("Global Configuration")
+        print_global_dashboard(config)
         console.print()
         
         choices = [
-            questionary.Choice(f"Default Editor ({config.editor or 'System Default'})", value="editor"),
-            questionary.Choice(f"Remote URL ({config.remote_url or 'Not Set'})", value="remote_url"),
-            questionary.Choice(f"Default Secrets Filter ({'Enabled' if config.secrets_filter_enabled else 'Disabled'})", value="secrets_filter"),
+            questionary.Choice("📝 Edit Default Editor", value="editor"),
+            questionary.Choice("🌐 Edit Remote URL", value="remote_url"),
+            questionary.Choice("🔒 Toggle Default Secrets Filter", value="secrets_filter"),
             questionary.Separator(),
             questionary.Choice("💾 Save & Return", value="save", shortcut_key="s"),
             questionary.Choice("🔙 Cancel", value="cancel", shortcut_key="q"),
         ]
         
-        field = questionary.select("Select setting to edit:", choices=choices).ask()
+        field = questionary.select("Select action:", choices=choices).ask()
         
         if not field or field == "cancel":
             return
@@ -153,9 +196,9 @@ def run_global_wizard(config: GlobalConfig):
             config.remote_url = val if val else ""
             
         elif field == "secrets_filter":
-             # We need to update the deeply nested 'defaults' dict
              current = config.secrets_filter_enabled
-             val = questionary.confirm("Enable Secrets Filter by default?", default=current).ask()
+             # Toggle
+             val = not current
              if "defaults" not in config._data:
                  config._data["defaults"] = {}
              config._data["defaults"]["secrets_filter"] = val
@@ -163,12 +206,34 @@ def run_global_wizard(config: GlobalConfig):
 def run_templates_wizard(config: DotManConfig):
     """Add or edit templates."""
     while True:
-        templates = config.get_local_templates()
+        console.clear()
+        print_banner("Templates Manager")
         
+        templates = config.get_local_templates()
+        if templates:
+            table = Table(title="Available Templates", show_header=True)
+            table.add_column("Name", style="green")
+            table.add_column("Update Strategy")
+            table.add_column("Hooks")
+            
+            for name in templates:
+                tmpl = config._data["templates"][name]
+                hooks = []
+                if tmpl.get("pre_deploy"): hooks.append("Pre")
+                if tmpl.get("post_deploy"): hooks.append("Post")
+                
+                table.add_row(
+                    name,
+                    tmpl.get("update_strategy", "default"),
+                    ", ".join(hooks) if hooks else "-"
+                )
+            console.print(table)
+            console.print()
+
         choices = []
         if templates:
             for name in templates:
-                choices.append(questionary.Choice(f"📝 {name}", value=name))
+                choices.append(questionary.Choice(f"Edit {name}", value=name))
         
         choices.append(questionary.Separator())
         choices.append(questionary.Choice("➕ Add New Template", value="add_new"))
@@ -198,16 +263,27 @@ def edit_template(config: DotManConfig, name: str):
     
     while True:
         console.clear()
-        print_banner(f"Template: {name}")
         
-        current_pre = template.get("pre_deploy", "None")
-        current_post = template.get("post_deploy", "None")
-        current_strategy = template.get("update_strategy", "Default")
+        # Mini dashboard for template
+        table = Table(title=None, box=None, show_header=False, padding=(0, 2))
+        table.add_column("Key", style="cyan bold")
+        table.add_column("Value")
+        
+        table.add_row("Pre-deploy Hook", template.get("pre_deploy", "[dim]None[/dim]"))
+        table.add_row("Post-deploy Hook", template.get("post_deploy", "[dim]None[/dim]"))
+        table.add_row("Update Strategy", template.get("update_strategy", "Default"))
+        
+        console.print(Panel(
+            table,
+            title=f"[magenta bold]Template: {name}[/magenta bold]",
+            border_style="cyan"
+        ))
+        console.print()
         
         choices = [
-            questionary.Choice(f"Pre-deploy Hook ({current_pre})", value="pre_deploy"),
-            questionary.Choice(f"Post-deploy Hook ({current_post})", value="post_deploy"),
-            questionary.Choice(f"Update Strategy ({current_strategy})", value="update_strategy"),
+            questionary.Choice("⚡ Edit Pre-deploy Hook", value="pre_deploy"),
+            questionary.Choice("🏁 Edit Post-deploy Hook", value="post_deploy"),
+            questionary.Choice("🔄 Edit Update Strategy", value="update_strategy"),
             questionary.Separator(),
             questionary.Choice("💾 Save & Return", value="save", shortcut_key="s"),
             questionary.Choice("🗑️  Delete Template", value="delete"),
