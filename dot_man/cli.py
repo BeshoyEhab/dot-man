@@ -3,7 +3,6 @@
 import sys
 import os
 import subprocess
-from datetime import datetime
 from functools import wraps
 from pathlib import Path
 from typing import Callable
@@ -12,32 +11,24 @@ import click
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
-from rich import print as rprint
+from rich.syntax import Syntax
 
 from . import __version__
 from .constants import (
     DOT_MAN_DIR,
     REPO_DIR,
     BACKUPS_DIR,
-    DEFAULT_BRANCH,
     FILE_PERMISSIONS,
 )
 from .config import GlobalConfig, DotManConfig
 from .core import GitManager
-from .files import copy_file, get_file_status, backup_file, compare_files
-from .secrets import SecretScanner, Severity
+from .files import copy_file, backup_file, compare_files
+from .secrets import SecretScanner
 from .utils import get_editor, open_in_editor, is_git_installed, confirm
 from .exceptions import (
     DotManError,
-    NotInitializedError,
-    AlreadyInitializedError,
-    GitNotFoundError,
-    GitNotFoundError,
-    SecretsDetectedError,
 )
 from .secrets import (
-    SecretScanner,
-    Severity,
     SecretGuard,
     SecretMatch,
     PermanentRedactGuard,
@@ -64,7 +55,7 @@ def get_secret_handler() -> Callable[[SecretMatch], str]:
 
         # Show the secret to user
         console.print()
-        console.print(f"[red]⚠️  Potential secret detected![/red]")
+        console.print("[red]⚠️  Potential secret detected![/red]")
         console.print(f"File: [cyan]{match.file}[/cyan]")
         console.print(f"Line {match.line_number}: {match.line_content[:80]}...")
         console.print(
@@ -277,7 +268,7 @@ def run_setup_wizard(
         if path.exists():
             found_count += 1
             console.print(f"  [green]✓[/green] Found: [cyan]{path_str}[/cyan] ({desc})")
-            if confirm(f"    Track this?", default=True):
+            if confirm("    Track this?", default=True):
                 files_to_add.append((path_str, section_name))
 
     if found_count == 0:
@@ -748,7 +739,7 @@ def switch(branch: str, dry_run: bool, force: bool):
             return
 
         if dry_run:
-            console.print(f"[dim]Dry run - no changes will be made[/dim]")
+            console.print("[dim]Dry run - no changes will be made[/dim]")
             console.print()
 
         # Phase 1: Save current branch state
@@ -1813,6 +1804,664 @@ def config_set(key: str, value: str):
 
     except Exception as e:
         error(f"Failed to set config: {e}")
+
+
+@config.command("create")
+@click.option(
+    "--examples",
+    "with_examples",
+    is_flag=True,
+    default=True,
+    help="Include commented examples in the config file (default: True)",
+)
+@click.option(
+    "--minimal",
+    is_flag=True,
+    help="Create a minimal config file without examples or comments",
+)
+@click.option(
+    "--force", is_flag=True, help="Overwrite existing config file without prompting"
+)
+@require_init
+def config_create(with_examples: bool, minimal: bool, force: bool):
+    """Create or regenerate the dot-man.toml configuration file.
+
+    This command creates a new dot-man.toml file for the current branch.
+    By default, it includes commented examples to help you get started.
+
+    Examples:
+        # Create config with examples (default)
+        dot-man config create
+
+        # Create minimal config without examples
+        dot-man config create --minimal
+
+        # Create config with examples, overwrite existing
+        dot-man config create --examples --force
+
+        # Create minimal config, overwrite existing
+        dot-man config create --minimal --force
+    """
+    try:
+        from .constants import DOT_MAN_TOML
+
+        config_path = REPO_DIR / DOT_MAN_TOML
+
+        # Check if file exists
+        if config_path.exists() and not force:
+            if not confirm(f"Config file already exists at {config_path}. Overwrite?"):
+                console.print("Cancelled.")
+                return
+
+        # Create the config
+        dotman_config = DotManConfig()
+
+        if minimal:
+            # Create minimal config without examples
+            dotman_config._data = {}
+            dotman_config.save()
+            console.print(f"Created minimal config at {config_path}")
+        else:
+            # Create config with examples (default behavior)
+            dotman_config.create_default()
+            console.print(f"Created config with examples at {config_path}")
+
+        console.print("Tip: Use 'dot-man edit' to open the config in your editor")
+
+    except Exception as e:
+        error(f"Failed to create config: {e}")
+
+
+@config.command("tutorial")
+@click.option("--section", help="Show examples for a specific section type")
+@click.option("--interactive", "-i", is_flag=True, help="Interactive tutorial mode")
+def config_tutorial(section: str | None, interactive: bool):
+    """Interactive configuration tutorial with examples.
+
+    Learn how to configure dot-man with practical examples and explanations.
+    Similar to vimtutor, this guides you through configuration options.
+
+    Examples:
+        # Show all examples
+        dot-man config tutorial
+
+        # Show examples for a specific type
+        dot-man config tutorial --section basic
+        dot-man config tutorial --section advanced
+        dot-man config tutorial --section hooks
+
+        # Interactive mode (step by step)
+        dot-man config tutorial --interactive
+    """
+    from rich.panel import Panel
+    from rich.text import Text
+    from rich.table import Table
+    from rich.prompt import Prompt, Confirm
+
+    if interactive:
+        _run_interactive_tutorial()
+        return
+
+    if section:
+        _show_section_examples(section)
+        return
+
+    # Show overview with all sections
+    console.print()
+    console.print(
+        Panel.fit(
+            "[bold blue]dot-man Configuration Tutorial[/bold blue]\n\n"
+            "This tutorial shows you how to configure dot-man to track your dotfiles.\n"
+            "Use the options below to explore different configuration aspects.",
+            title="🎯 Tutorial Overview",
+        )
+    )
+
+    console.print("\n[bold]Available sections:[/bold]")
+    table = Table()
+    table.add_column("Section", style="cyan")
+    table.add_column("Description")
+    table.add_column("Command")
+
+    sections = [
+        ("basic", "Basic file tracking", "dot-man config tutorial --section basic"),
+        (
+            "directories",
+            "Directory tracking",
+            "dot-man config tutorial --section directories",
+        ),
+        ("hooks", "Pre/post deploy hooks", "dot-man config tutorial --section hooks"),
+        (
+            "templates",
+            "Reusable templates",
+            "dot-man config tutorial --section templates",
+        ),
+        ("advanced", "Advanced options", "dot-man config tutorial --section advanced"),
+        ("secrets", "Secret filtering", "dot-man config tutorial --section secrets"),
+    ]
+
+    for name, desc, cmd in sections:
+        table.add_row(name, desc, f"[dim]{cmd}[/dim]")
+
+    console.print(table)
+
+    console.print(
+        "\n[dim]Tip: Run 'dot-man config create' to generate a config file with examples[/dim]"
+    )
+    console.print("[dim]Tip: Use --interactive for step-by-step guidance[/dim]")
+
+
+def _show_section_examples(section: str):
+    """Show examples for a specific section."""
+    from rich.panel import Panel
+    from rich.text import Text
+    from rich.syntax import Syntax
+
+    examples = {
+        "basic": {
+            "title": "Basic File Tracking",
+            "description": "Track individual files with smart defaults",
+            "examples": [
+                {
+                    "title": "Simple file tracking",
+                    "config": """[bashrc]
+paths = ["~/.bashrc"]""",
+                    "explanation": "Tracks your bash configuration. dot-man automatically:\n"
+                    "• Generates repo_base as 'bashrc'\n"
+                    "• Uses 'replace' update_strategy\n"
+                    "• Enables secrets_filter",
+                },
+                {
+                    "title": "Multiple files in one section",
+                    "config": """[shell-files]
+paths = ["~/.bashrc", "~/.zshrc", "~/.profile"]""",
+                    "explanation": "Group related files together. All files share the same settings.",
+                },
+                {
+                    "title": "Custom repository name",
+                    "config": """[my-config]
+paths = ["~/.myapp/config"]
+repo_base = "my-app-config" """,
+                    "explanation": "Override the auto-generated repo_base with a custom name.",
+                },
+            ],
+        },
+        "directories": {
+            "title": "Directory Tracking",
+            "description": "Track entire directories with include/exclude patterns",
+            "examples": [
+                {
+                    "title": "Basic directory tracking",
+                    "config": """[nvim]
+paths = ["~/.config/nvim"]""",
+                    "explanation": "Tracks your entire Neovim config directory.",
+                },
+                {
+                    "title": "Directory with exclusions",
+                    "config": """[nvim]
+paths = ["~/.config/nvim"]
+exclude = ["*.log", "plugin/packer_compiled.lua"]""",
+                    "explanation": "Exclude temporary files and compiled plugins from tracking.",
+                },
+                {
+                    "title": "Include only specific files",
+                    "config": """[dotfiles]
+paths = ["~/dotfiles"]
+include = ["*.conf", "*.sh", "README.md"]""",
+                    "explanation": "Only track configuration files, scripts, and documentation.",
+                },
+            ],
+        },
+        "hooks": {
+            "title": "Pre/Post Deploy Hooks",
+            "description": "Run commands before or after file deployment",
+            "examples": [
+                {
+                    "title": "Shell reload after config change",
+                    "config": """[bashrc]
+paths = ["~/.bashrc"]
+post_deploy = "shell_reload" """,
+                    "explanation": "Reloads your shell after deploying bash config.\n"
+                    "'shell_reload' is an alias for: source ~/.bashrc || source ~/.zshrc",
+                },
+                {
+                    "title": "Neovim plugin sync",
+                    "config": """[nvim]
+paths = ["~/.config/nvim"]
+post_deploy = "nvim_sync" """,
+                    "explanation": "Runs PackerSync after deploying Neovim config.\n"
+                    "'nvim_sync' is an alias for: nvim --headless +PackerSync +qa",
+                },
+                {
+                    "title": "Custom command",
+                    "config": """[custom-app]
+paths = ["~/.config/myapp"]
+post_deploy = "systemctl --user restart myapp" """,
+                    "explanation": "Restart a user service after config deployment.",
+                },
+                {
+                    "title": "Pre-deploy backup",
+                    "config": """[important-config]
+paths = ["~/.important"]
+pre_deploy = "cp ~/.important ~/.important.backup" """,
+                    "explanation": "Create a backup before overwriting important files.",
+                },
+            ],
+        },
+        "templates": {
+            "title": "Reusable Templates",
+            "description": "Define shared settings that can be inherited",
+            "examples": [
+                {
+                    "title": "Template definition",
+                    "config": """[templates.linux-desktop]
+post_deploy = "notify-send 'Config updated'"
+update_strategy = "rename_old"
+
+[templates.dev-tools]
+secrets_filter = false
+pre_deploy = "echo 'Deploying dev config'" """,
+                    "explanation": "Define reusable templates with common settings.",
+                },
+                {
+                    "title": "Template inheritance",
+                    "config": """[hyprland]
+paths = ["~/.config/hypr"]
+inherits = ["linux-desktop"]
+
+[git]
+paths = ["~/.gitconfig"]
+inherits = ["dev-tools"]""",
+                    "explanation": "Inherit settings from templates. Child settings override parent settings.",
+                },
+            ],
+        },
+        "advanced": {
+            "title": "Advanced Options",
+            "description": "Fine-tune behavior with advanced configuration options",
+            "examples": [
+                {
+                    "title": "Update strategies",
+                    "config": """[careful-config]
+paths = ["~/.important"]
+update_strategy = "rename_old"
+
+[aggressive-config]
+paths = ["~/.cache/myapp"]
+update_strategy = "replace"
+
+[readonly-config]
+paths = ["~/.readonly"]
+update_strategy = "ignore" """,
+                    "explanation": "• 'replace': Overwrite existing files (default)\n"
+                    "• 'rename_old': Backup existing files\n"
+                    "• 'ignore': Skip if file exists",
+                },
+                {
+                    "title": "Explicit repository paths",
+                    "config": """[special-file]
+paths = ["~/.config/app/special.conf"]
+repo_path = "configs/special-config.toml" """,
+                    "explanation": "Override automatic repo path generation with explicit repo_path.",
+                },
+            ],
+        },
+        "secrets": {
+            "title": "Secret Detection & Filtering",
+            "description": "Automatically detect and handle sensitive information",
+            "examples": [
+                {
+                    "title": "Automatic secret filtering",
+                    "config": """[gitconfig]
+paths = ["~/.gitconfig"]
+# secrets_filter = true  (enabled by default)""",
+                    "explanation": "Automatically redacts API keys, passwords, and tokens when saving.",
+                },
+                {
+                    "title": "Disable filtering for trusted files",
+                    "config": """[trusted-config]
+paths = ["~/.config/trusted"]
+secrets_filter = false""",
+                    "explanation": "Disable secret filtering for files you know are safe.",
+                },
+                {
+                    "title": "Check for secrets",
+                    "command": "dot-man audit",
+                    "explanation": "Scan your repository for secrets. Use --strict for CI/CD.",
+                },
+            ],
+        },
+    }
+
+    if section not in examples:
+        console.print(f"[red]Unknown section: {section}[/red]")
+        console.print(f"Available sections: {', '.join(examples.keys())}")
+        return
+
+    data = examples[section]
+
+    console.print()
+    console.print(
+        Panel.fit(
+            f"[bold blue]{data['title']}[/bold blue]\n\n{data['description']}",
+            title=f"📖 {data['title']}",
+        )
+    )
+
+    for i, example in enumerate(data["examples"], 1):
+        console.print(f"\n[bold cyan]Example {i}: {example['title']}[/bold cyan]")
+
+        if "config" in example:
+            console.print(
+                Syntax(example["config"], "toml", theme="monokai", line_numbers=False)
+            )
+        elif "command" in example:
+            console.print(f"[green]$ {example['command']}[/green]")
+
+        console.print(f"\n[dim]{example['explanation']}[/dim]")
+
+    console.print(
+        f"\n[dim]💡 Run 'dot-man config create' to add these examples to your config file[/dim]"
+    )
+
+
+def _run_interactive_tutorial():
+    """Run interactive step-by-step tutorial with detailed explanations."""
+    from rich.prompt import Prompt, Confirm
+    from rich.panel import Panel
+    from rich.text import Text
+    from rich.columns import Columns
+
+    console.print()
+    console.print(
+        Panel.fit(
+            "[bold green]🎓 Interactive dot-man Configuration Tutorial[/bold green]\n\n"
+            "This interactive tutorial will guide you through configuring dot-man.\n"
+            "You'll learn what each configuration option does as we build examples.",
+            title="Welcome!",
+        )
+    )
+
+    # Step 1: Basic files
+    console.print("\n[bold cyan]📁 Step 1: Basic File Tracking[/bold cyan]")
+    console.print(
+        "Every configuration section starts with [section-name] and defines what files to track."
+    )
+
+    if Confirm.ask(
+        "Do you want to track your shell configuration (~/.bashrc, ~/.zshrc)?"
+    ):
+        console.print("\n[bold green]✅ Here's what this config does:[/bold green]")
+        console.print()
+
+        # Show the config with explanations
+        config_text = """[shell-config]
+paths = ["~/.bashrc", "~/.zshrc"]
+post_deploy = "shell_reload" """
+
+        console.print(Syntax(config_text, "toml", theme="monokai"))
+        console.print()
+
+        # Explain each part
+        explanations = [
+            "[bold cyan]🔍 [section-name][/bold cyan]: A unique name for this group of files",
+            "[bold cyan]📂 paths[/bold cyan]: List of files/directories to track (supports ~ expansion)",
+            "[bold cyan]🚀 post_deploy[/bold cyan]: Command to run AFTER files are deployed",
+            "[bold cyan]🔄 shell_reload[/bold cyan]: Built-in alias that reloads bash/zsh (source ~/.bashrc || source ~/.zshrc)",
+        ]
+
+        for explanation in explanations:
+            console.print(f"  {explanation}")
+
+        console.print(
+            "\n[dim]💡 Smart defaults apply automatically - you only specify what's different![/dim]"
+        )
+
+    if Confirm.ask("Do you want to track your Git configuration (~/.gitconfig)?"):
+        console.print(
+            "\n[bold green]✅ Git config with automatic secret protection:[/bold green]"
+        )
+        console.print()
+
+        config_text = """[gitconfig]
+paths = ["~/.gitconfig"]"""
+
+        console.print(Syntax(config_text, "toml", theme="monokai"))
+        console.print()
+
+        explanations = [
+            "[bold cyan]🔒 Automatic security[/bold cyan]: Git configs often contain tokens, so dot-man:",
+            "  • Automatically enables [yellow]secrets_filter = true[/yellow]",
+            "  • Redacts API keys, passwords, and tokens when saving",
+            '  • Uses [yellow]update_strategy = "replace"[/yellow] (overwrites existing files)',
+        ]
+
+        for explanation in explanations:
+            console.print(f"  {explanation}")
+
+    # Step 2: Directories with patterns
+    console.print(
+        "\n[bold cyan]📂 Step 2: Directory Tracking with Patterns[/bold cyan]"
+    )
+    console.print("When tracking directories, you can include/exclude specific files.")
+
+    editors = ["Neovim (~/.config/nvim)", "VS Code (~/.config/Code)", "Other"]
+    editor_choice = Prompt.ask(
+        "Which editor config do you want to track?",
+        choices=editors,
+        default="Neovim (~/.config/nvim)",
+    )
+
+    if "Neovim" in editor_choice:
+        console.print(
+            "\n[bold green]✅ Neovim config with smart exclusions:[/bold green]"
+        )
+        console.print()
+
+        config_text = """[nvim]
+paths = ["~/.config/nvim"]
+exclude = ["*.log", "plugin/packer_compiled.lua"]
+post_deploy = "nvim_sync" """
+
+        console.print(Syntax(config_text, "toml", theme="monokai"))
+        console.print()
+
+        explanations = [
+            "[bold cyan]🎯 exclude[/bold cyan]: Patterns of files/directories to SKIP tracking",
+            "  • [yellow]*.log[/yellow]: Matches any .log files",
+            "  • [yellow]plugin/packer_compiled.lua[/yellow]: Skips compiled plugin cache",
+            "[bold cyan]📝 Pattern syntax[/bold cyan]: Supports wildcards (*, **, ?) and gitignore-style patterns",
+            "[bold cyan]🔄 nvim_sync[/bold cyan]: Alias that runs: nvim --headless +PackerSync +qa",
+        ]
+
+        for explanation in explanations:
+            console.print(f"  {explanation}")
+
+        console.print(
+            '\n[dim]💡 Use ** for recursive matching, like "**/*.tmp" for all .tmp files in subdirs[/dim]'
+        )
+
+    elif "VS Code" in editor_choice:
+        console.print("\n[bold green]✅ VS Code settings:[/bold green]")
+        console.print()
+
+        config_text = """[vscode]
+paths = ["~/.config/Code/User"]
+post_deploy = "notify-send 'VS Code config updated'" """
+
+        console.print(Syntax(config_text, "toml", theme="monokai"))
+        console.print()
+
+        explanations = [
+            "[bold cyan]🔔 Custom commands[/bold cyan]: You can write any shell command",
+            "[bold cyan]🔔 notify-send[/bold cyan]: Shows desktop notification when config is deployed",
+            "[bold cyan]⚡ post_deploy timing[/bold cyan]: Runs after ALL files in this section are copied",
+        ]
+
+        for explanation in explanations:
+            console.print(f"  {explanation}")
+
+    # Step 3: Update strategies
+    console.print(
+        "\n[bold cyan]🔄 Step 3: Update Strategies - How Files Are Deployed[/bold cyan]"
+    )
+    console.print("Choose how dot-man handles existing files when deploying.")
+
+    strategies = ["Safe (rename_old)", "Direct (replace)", "Conservative (ignore)"]
+    strategy_choice = Prompt.ask(
+        "How should dot-man handle existing files?",
+        choices=strategies,
+        default="Safe (rename_old)",
+    )
+
+    console.print("\n[bold green]📋 Update Strategy Options:[/bold green]")
+
+    strategy_examples = {
+        "Safe (rename_old)": {
+            "config": 'update_strategy = "rename_old"',
+            "explanation": "• Backs up existing file as filename.bak\n• Then overwrites with new version\n• Your original file is safe if something goes wrong",
+        },
+        "Direct (replace)": {
+            "config": 'update_strategy = "replace"  # Default',
+            "explanation": "• Directly overwrites existing files\n• No backup created\n• Fastest option",
+        },
+        "Conservative (ignore)": {
+            "config": 'update_strategy = "ignore"',
+            "explanation": "• Skips files that already exist\n• Never overwrites your changes\n• Good for one-time setup files",
+        },
+    }
+
+    for name, details in strategy_examples.items():
+        console.print(f"\n[yellow]{name}:[/yellow]")
+        console.print(Syntax(details["config"], "toml", theme="monokai"))
+        console.print(details["explanation"])
+
+    # Step 4: Pre-deploy hooks
+    console.print(
+        "\n[bold cyan]⚡ Step 4: Pre-Deploy Hooks - Actions Before Deployment[/bold cyan]"
+    )
+    console.print("Sometimes you need to prepare before deploying files.")
+
+    if Confirm.ask("Want to see examples of pre-deploy hooks?"):
+        console.print("\n[bold green]🔧 Pre-deploy hook examples:[/bold green]")
+        console.print()
+
+        examples = [
+            {
+                "title": "Backup important files",
+                "config": """[important-config]
+paths = ["~/.important/app.conf"]
+pre_deploy = "cp ~/.important/app.conf ~/.important/app.conf.backup" """,
+                "explanation": "Creates a backup before dot-man touches the file",
+            },
+            {
+                "title": "Stop services before config change",
+                "config": """[service-config]
+paths = ["~/.config/my-service"]
+pre_deploy = "systemctl --user stop my-service" """,
+                "explanation": "Stops the service before updating its config files",
+            },
+        ]
+
+        for example in examples:
+            console.print(f"[cyan]{example['title']}:[/cyan]")
+            console.print(Syntax(example["config"], "toml", theme="monokai"))
+            console.print(f"  {example['explanation']}")
+            console.print()
+
+    # Step 5: Templates
+    console.print(
+        "\n[bold cyan]📋 Step 5: Templates - Reusable Configuration[/bold cyan]"
+    )
+    console.print("Define shared settings that multiple sections can inherit.")
+
+    if Confirm.ask("Want to learn about templates for shared settings?"):
+        console.print("\n[bold green]🎨 Template example:[/bold green]")
+        console.print()
+
+        config_text = """# Define a template
+[templates.desktop-apps]
+post_deploy = "notify-send 'Config updated'"
+update_strategy = "rename_old"
+
+# Use the template
+[hyprland]
+paths = ["~/.config/hypr"]
+inherits = ["desktop-apps"]
+
+[waybar]
+paths = ["~/.config/waybar"]
+inherits = ["desktop-apps"]
+# Override settings if needed
+update_strategy = "replace" """
+
+        console.print(Syntax(config_text, "toml", theme="monokai"))
+        console.print()
+
+        explanations = [
+            "[bold cyan]📋 Template definition[/bold cyan]: Settings under [templates.name] can be reused",
+            "[bold cyan]🔗 inherits[/bold cyan]: List of templates to inherit settings from",
+            "[bold cyan]⚡ Override behavior[/bold cyan]: Section settings override template settings",
+            "[bold cyan]🎯 Use case[/bold cyan]: Share desktop notifications, update strategies, etc.",
+        ]
+
+        for explanation in explanations:
+            console.print(f"  {explanation}")
+
+    # Step 6: Terminal
+    console.print("\n[bold cyan]💻 Step 6: Terminal Configuration[/bold cyan]")
+
+    terminals = ["Kitty", "Alacritty", "WezTerm", "None"]
+    term_choice = Prompt.ask(
+        "Which terminal config do you want to track?", choices=terminals, default="None"
+    )
+
+    term_configs = {
+        "Kitty": {
+            "config": """[kitty]
+paths = ["~/.config/kitty"]
+post_deploy = "kitty_reload" """,
+            "explanation": "kitty_reload sends SIGUSR1 to running kitty processes to reload config",
+        },
+        "Alacritty": {
+            "config": """[alacritty]
+paths = ["~/.config/alacritty"]""",
+            "explanation": "Alacritty automatically reloads config when files change",
+        },
+        "WezTerm": {
+            "config": """[wezterm]
+paths = ["~/.config/wezterm"]""",
+            "explanation": "WezTerm typically reloads config automatically",
+        },
+    }
+
+    if term_choice in term_configs:
+        console.print(f"\n[bold green]✅ {term_choice} configuration:[/bold green]")
+        console.print(
+            Syntax(term_configs[term_choice]["config"], "toml", theme="monokai")
+        )
+        console.print(f"\n  {term_configs[term_choice]['explanation']}")
+
+    # Final summary
+    console.print("\n[bold green]🎉 Tutorial Complete![/bold green]")
+    console.print("\n[dim]You've learned about:[/dim]")
+    console.print("  • 📁 Basic file and directory tracking")
+    console.print("  • 🎯 Include/exclude patterns for selective tracking")
+    console.print("  • 🔄 Update strategies (replace, rename_old, ignore)")
+    console.print("  • ⚡ Pre/post deploy hooks for automation")
+    console.print("  • 📋 Templates for reusable configuration")
+    console.print("  • 🔒 Automatic secret detection and filtering")
+
+    console.print("\n[dim]Next steps:[/dim]")
+    console.print(
+        "[green]$ dot-man config create[/green] [dim]- Generate config file with examples[/dim]"
+    )
+    console.print(
+        "[green]$ dot-man edit[/green] [dim]- Customize your configuration[/dim]"
+    )
+    console.print(
+        "[green]$ dot-man config tutorial --section advanced[/green] [dim]- Learn advanced features[/dim]"
+    )
 
 
 # ============================================================================

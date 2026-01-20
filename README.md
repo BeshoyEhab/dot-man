@@ -94,23 +94,27 @@ dot-man init
 
 Creates `~/.config/dot-man/` with a git repository.
 
-### 2. Add files to track
+### 2. Create configuration file
+
+```bash
+dot-man config create
+```
+
+This creates `dot-man.toml` with commented examples. Uncomment and customize sections for your dotfiles:
+
+```toml
+[bashrc]
+paths = ["~/.bashrc"]
+post_deploy = "shell_reload"
+
+[gitconfig]
+paths = ["~/.gitconfig"]
+```
+
+Or edit manually:
 
 ```bash
 dot-man edit
-```
-
-Add sections to `dot-man.ini`:
-
-```ini
-[~/.bashrc]
-local_path = ~/.bashrc
-repo_path = bashrc
-
-[~/.gitconfig]
-local_path = ~/.gitconfig
-repo_path = gitconfig
-secrets_filter = true
 ```
 
 ### 3. Save your configuration
@@ -144,7 +148,7 @@ dot-man switch main  # Saves work, deploys main
 | `dot-man init`            | Initialize repository at `~/.config/dot-man/` |
 | `dot-man status`          | Show tracked files and their status           |
 | `dot-man switch <branch>` | Save current config, switch to branch, deploy |
-| `dot-man edit`            | Open `dot-man.ini` in your editor             |
+| `dot-man edit`            | Open `dot-man.toml` in your editor            |
 | `dot-man deploy <branch>` | One-way deploy (for new machines)             |
 | `dot-man audit`           | Scan repository for secrets                   |
 
@@ -163,6 +167,20 @@ dot-man switch main  # Saves work, deploys main
 | ------------------------------ | ------------------------------------- |
 | `dot-man branch list`          | List all configuration branches       |
 | `dot-man branch delete <name>` | Delete a branch (prompts if unmerged) |
+
+### Configuration
+
+| Command                                    | Description                                       |
+| ------------------------------------------ | ------------------------------------------------- |
+| `dot-man config tutorial`                  | Interactive configuration tutorial                |
+| `dot-man config tutorial --interactive`    | Step-by-step guided tutorial with explanations    |
+| `dot-man config tutorial --section <name>` | Show examples for specific config aspects         |
+| `dot-man config create`                    | Create dot-man.toml with examples                 |
+| `dot-man config create --minimal`          | Create minimal dot-man.toml without examples      |
+| `dot-man config list`                      | List all global configuration values              |
+| `dot-man config get <key>`                 | Get a configuration value                         |
+| `dot-man config set <key> <val>`           | Set a configuration value                         |
+| `dot-man edit`                             | Open `dot-man.toml` in your editor               |
 
 ### Utilities
 
@@ -220,27 +238,26 @@ dot-man status --secrets        # Highlight files with secrets
 
 ## Configuration
 
-### dot-man.ini
+### dot-man.toml
 
-Located at `~/.config/dot-man/repo/dot-man.ini`:
+Located at `~/.config/dot-man/repo/dot-man.toml`:
 
-```ini
-[DEFAULT]
+```toml
+# Global defaults (applied to all sections)
+[defaults]
 secrets_filter = true
-update_strategy = replace
+update_strategy = "replace"
 
-[~/.bashrc]
-local_path = ~/.bashrc
-repo_path = bashrc
+# Individual file sections
+[bashrc]
+paths = ["~/.bashrc"]
 
-[~/.config/nvim]
-local_path = ~/.config/nvim
-repo_path = nvim
-update_strategy = rename_old
+[nvim]
+paths = ["~/.config/nvim"]
+update_strategy = "rename_old"
 
-[~/.ssh/config]
-local_path = ~/.ssh/config
-repo_path = ssh_config
+[ssh-config]
+paths = ["~/.ssh/config"]
 secrets_filter = true
 ```
 
