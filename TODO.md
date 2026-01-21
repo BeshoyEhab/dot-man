@@ -138,6 +138,10 @@
 - [ ] Dotfile sharing/marketplace
 - [ ] CI/CD integration for dotfile testing
 - [ ] Cloud sync backends (S3, Dropbox, etc.)
+- [ ] **Per-branch config inheritance** - Allow branches to inherit from other branches
+  - `inherits_branch = "main"` in dot-man.toml to start with main's sections
+  - Merge strategy: local sections override inherited ones
+  - Useful for work/personal variants that share common configs
 - [ ] Universal Setup Wizard (`dot-man setup` overhaul)
   - [ ] Interactive menu: remote, dotfiles, secrets, hooks, completions
   - [ ] Auto-scan and track common dotfile locations

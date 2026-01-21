@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from pathlib import Path
+
 from typing import Iterable, Iterator, Callable
 
 from .constants import SECRET_REDACTION_TEXT, DOT_MAN_DIR
@@ -24,92 +24,25 @@ class AllowedSecret(TypedDict):
     added_at: str
 
 
-class SecretGuard:
-    """Manages the list of allowed (skipped) secrets."""
+class BaseSecretGuard:
+    """Base class for managing secret lists (allow list, redact list)."""
 
-    def __init__(self, config_dir: Path | None = None, path: Path | None = None):
-        self.config_dir = config_dir or Path.home() / ".config" / "dot-man"
-        self.allow_list_path = path or (
-            self.config_dir / ".dotman-allowed-secrets.json"
-        )
-        self._allowed_secrets: list[AllowedSecret] = self._load()
-
-    def _load(self) -> list[AllowedSecret]:
-        """Load allowed secrets from disk."""
-        if not self.allow_list_path.exists():
-            return []
-        try:
-            content = self.allow_list_path.read_text(encoding="utf-8")
-            return json.loads(content)
-        except (FileNotFoundError, json.JSONDecodeError):
-            return []
-        except OSError:
-            return []
-
-    def save(self) -> None:
-        """Save allowed secrets to disk."""
-        try:
-            # Ensure directory exists
-            self.allow_list_path.parent.mkdir(parents=True, exist_ok=True)
-
-            content = json.dumps(self._allowed_secrets, indent=2)
-            self.allow_list_path.write_text(content, encoding="utf-8")
-        except OSError:
-            pass  # Fail silently if we can't write, likely permissions
-
-    def _compute_hash(self, content: str) -> str:
-        """Compute SHA256 hash of the content."""
-        return hashlib.sha256(content.encode("utf-8")).hexdigest()
-
-    def is_allowed(
-        self, file_path: Path | str, line_content: str, pattern_name: str
-    ) -> bool:
-        """Check if a secret is in the allow list."""
-        path_str = str(file_path)
-        content_hash = self._compute_hash(line_content)
-
-        for secret in self._allowed_secrets:
-            if (
-                secret["file_path"] == path_str
-                and secret["secret_hash"] == content_hash
-                and secret["pattern_name"] == pattern_name
-            ):
-                return True
-        return False
-
-    def add_allowed(
-        self, file_path: Path | str, line_content: str, pattern_name: str
-    ) -> None:
-        """Add a secret to the allow list."""
-        if self.is_allowed(file_path, line_content, pattern_name):
-            return
-
-        entry: AllowedSecret = {
-            "file_path": str(file_path),
-            "secret_hash": self._compute_hash(line_content),
-            "pattern_name": pattern_name,
-            "added_at": datetime.now().isoformat(),
-        }
-        self._allowed_secrets.append(entry)
-        self.save()
-
-
-class PermanentRedactGuard:
-    """Manages the list of secrets that should always be redacted."""
-
-    def __init__(self, config_dir: Path | None = None, path: Path | None = None):
+    def __init__(
+        self,
+        config_dir: Path | None = None,
+        path: Path | None = None,
+        default_filename: str = "secrets.json",
+    ):
         self.config_dir = config_dir or DOT_MAN_DIR
-        self.redact_list_path = path or (
-            self.config_dir / ".dotman-permanent-redact.json"
-        )
-        self._redact_secrets: list[AllowedSecret] = self._load()
+        self.list_path = path or (self.config_dir / default_filename)
+        self._secrets: list[AllowedSecret] = self._load()
 
     def _load(self) -> list[AllowedSecret]:
-        """Load permanent redact secrets from disk."""
-        if not self.redact_list_path.exists():
+        """Load secrets from disk."""
+        if not self.list_path.exists():
             return []
         try:
-            content = self.redact_list_path.read_text(encoding="utf-8")
+            content = self.list_path.read_text(encoding="utf-8")
             return json.loads(content)
         except (FileNotFoundError, json.JSONDecodeError):
             return []
@@ -117,13 +50,13 @@ class PermanentRedactGuard:
             return []
 
     def save(self) -> None:
-        """Save permanent redact secrets to disk."""
+        """Save secrets to disk."""
         try:
             # Ensure directory exists
-            self.redact_list_path.parent.mkdir(parents=True, exist_ok=True)
+            self.list_path.parent.mkdir(parents=True, exist_ok=True)
 
-            content = json.dumps(self._redact_secrets, indent=2)
-            self.redact_list_path.write_text(content, encoding="utf-8")
+            content = json.dumps(self._secrets, indent=2)
+            self.list_path.write_text(content, encoding="utf-8")
         except OSError:
             pass
 
@@ -131,14 +64,14 @@ class PermanentRedactGuard:
         """Compute SHA256 hash of the content."""
         return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
-    def should_redact(
+    def _is_in_list(
         self, file_path: Path | str, line_content: str, pattern_name: str
     ) -> bool:
-        """Check if a secret should be permanently redacted."""
+        """Check if a secret is in the list."""
         path_str = str(file_path)
         content_hash = self._compute_hash(line_content)
 
-        for secret in self._redact_secrets:
+        for secret in self._secrets:
             if (
                 secret["file_path"] == path_str
                 and secret["secret_hash"] == content_hash
@@ -147,11 +80,11 @@ class PermanentRedactGuard:
                 return True
         return False
 
-    def add_permanent_redact(
+    def _add_to_list(
         self, file_path: Path | str, line_content: str, pattern_name: str
     ) -> None:
-        """Add a secret to the permanent redact list."""
-        if self.should_redact(file_path, line_content, pattern_name):
+        """Add a secret to the list."""
+        if self._is_in_list(file_path, line_content, pattern_name):
             return
 
         entry: AllowedSecret = {
@@ -160,8 +93,51 @@ class PermanentRedactGuard:
             "pattern_name": pattern_name,
             "added_at": datetime.now().isoformat(),
         }
-        self._redact_secrets.append(entry)
+        self._secrets.append(entry)
         self.save()
+
+
+class SecretGuard(BaseSecretGuard):
+    """Manages the list of allowed (skipped) secrets."""
+
+    def __init__(self, config_dir: Path | None = None, path: Path | None = None):
+        super().__init__(
+            config_dir, path, default_filename=".dotman-allowed-secrets.json"
+        )
+
+    def is_allowed(
+        self, file_path: Path | str, line_content: str, pattern_name: str
+    ) -> bool:
+        """Check if a secret is in the allow list."""
+        return self._is_in_list(file_path, line_content, pattern_name)
+
+    def add_allowed(
+        self, file_path: Path | str, line_content: str, pattern_name: str
+    ) -> None:
+        """Add a secret to the allow list."""
+        self._add_to_list(file_path, line_content, pattern_name)
+
+
+class PermanentRedactGuard(BaseSecretGuard):
+    """Manages the list of secrets that should always be redacted."""
+
+    def __init__(self, config_dir: Path | None = None, path: Path | None = None):
+        super().__init__(
+            config_dir, path, default_filename=".dotman-permanent-redact.json"
+        )
+
+    def should_redact(
+        self, file_path: Path | str, line_content: str, pattern_name: str
+    ) -> bool:
+        """Check if a secret should be permanently redacted."""
+        return self._is_in_list(file_path, line_content, pattern_name)
+
+    def add_permanent_redact(
+        self, file_path: Path | str, line_content: str, pattern_name: str
+    ) -> None:
+        """Add a secret to the permanent redact list."""
+        self._add_to_list(file_path, line_content, pattern_name)
+
 
 
 class Severity(Enum):

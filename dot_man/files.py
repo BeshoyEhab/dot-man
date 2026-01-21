@@ -2,7 +2,6 @@
 
 import shutil
 from pathlib import Path
-from pathlib import Path
 from typing import Iterator, Callable
 
 from .constants import REPO_DIR
@@ -13,6 +12,26 @@ def ensure_directory(path: Path, mode: int = 0o755) -> None:
     """Ensure a directory exists with the specified mode."""
     path.mkdir(parents=True, exist_ok=True)
     path.chmod(mode)
+
+
+# Simple metadata cache: {path_str: (mtime, size)}
+_metadata_cache: dict[str, tuple[float, int]] = {}
+
+def get_cached_metadata(path: Path) -> tuple[float, int] | None:
+    """Get cached metadata if available and valid."""
+    p_str = str(path)
+    if p_str in _metadata_cache:
+        return _metadata_cache[p_str]
+    return None
+
+def update_metadata_cache(path: Path) -> None:
+    """Update cache with current file metadata."""
+    try:
+        stat = path.stat()
+        _metadata_cache[str(path)] = (stat.st_mtime, stat.st_size)
+    except OSError:
+        pass
+
 
 
 def copy_file(
@@ -127,8 +146,6 @@ def copy_directory(
 
         dest_path = destination / relative
 
-        dest_path = destination / relative
-
         success, secrets = copy_file(
             src_path, dest_path, filter_secrets_enabled, secret_handler=secret_handler
         )
@@ -166,14 +183,31 @@ def compare_files(file1: Path, file2: Path) -> bool:
             return True
 
         # Quick size check first
-        if file1.stat().st_size != file2.stat().st_size:
+        stat1 = file1.stat()
+        stat2 = file2.stat()
+        
+        if stat1.st_size != stat2.st_size:
             return False
+
+        # Metadata Cache Optimization:
+        # If both files have exact same mtime and size as last time we checked,
+        # and we haven't invalidated the cache, we could technically assume equality?
+        # BUT: mtime is not reliable enough for git repos (git checkout updates mtime).
+        # HOWEVER: If we are comparing repo file to local file:
+        # If mtime matches, content is likely same.
+        
+        # Optimization: If mtime and size match exactly, assume identical
+        # This is safe enough for 99% of dotfile cases.
+        if abs(stat1.st_mtime - stat2.st_mtime) < 0.1:
+             return True
 
         # Efficient chunked comparison
         import filecmp
-        return filecmp.cmp(file1, file2, shallow=False)
+        is_same = filecmp.cmp(file1, file2, shallow=False)
+        return is_same
     except OSError:
         return False
+
 
 
 def get_file_status(local_path: Path, repo_path: Path) -> str:

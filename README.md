@@ -1,4 +1,4 @@
-# dot-man
+<p align="center"><h1>dot-man</h1></p>
 
 <p align="center">
   <strong>Dotfile manager with git-powered branching</strong>
@@ -170,17 +170,17 @@ dot-man switch main  # Saves work, deploys main
 
 ### Configuration
 
-| Command                                    | Description                                       |
-| ------------------------------------------ | ------------------------------------------------- |
-| `dot-man config tutorial`                  | Interactive configuration tutorial                |
-| `dot-man config tutorial --interactive`    | Step-by-step guided tutorial with explanations    |
-| `dot-man config tutorial --section <name>` | Show examples for specific config aspects         |
-| `dot-man config create`                    | Create dot-man.toml with examples                 |
-| `dot-man config create --minimal`          | Create minimal dot-man.toml without examples      |
-| `dot-man config list`                      | List all global configuration values              |
-| `dot-man config get <key>`                 | Get a configuration value                         |
-| `dot-man config set <key> <val>`           | Set a configuration value                         |
-| `dot-man edit`                             | Open `dot-man.toml` in your editor               |
+| Command                                    | Description                                    |
+| ------------------------------------------ | ---------------------------------------------- |
+| `dot-man config tutorial`                  | Interactive configuration tutorial             |
+| `dot-man config tutorial --interactive`    | Step-by-step guided tutorial with explanations |
+| `dot-man config tutorial --section <name>` | Show examples for specific config aspects      |
+| `dot-man config create`                    | Create dot-man.toml with examples              |
+| `dot-man config create --minimal`          | Create minimal dot-man.toml without examples   |
+| `dot-man config list`                      | List all global configuration values           |
+| `dot-man config get <key>`                 | Get a configuration value                      |
+| `dot-man config set <key> <val>`           | Set a configuration value                      |
+| `dot-man edit`                             | Open `dot-man.toml` in your editor             |
 
 ### Utilities
 
@@ -195,12 +195,12 @@ dot-man switch main  # Saves work, deploys main
 Launch with `dot-man tui` for a visual dashboard:
 
 ```
-┌─ dot-man ───────────────────────────────────────────────────┐
-│  Branches     │  Switch Preview      │  Files (3)           │
-│  ✓ main       │  Switch: main → work │  ~/.bashrc    ✓      │
-│    work       │  Actions:            │  ~/.gitconfig ✓      │
-│    server     │  1. Save to 'main'   │  ~/.vimrc     modified│
-│               │  2. Deploy 'work'    │                      │
+┌─ dot-man ─────────────────────────────────────────────────────┐
+│  Branches     │  Switch Preview      │  Files (3)             │
+│  ✓ main       │  Switch: main → work │  ~/.bashrc    ✓       │
+│    work       │  Actions:            │  ~/.gitconfig ✓        │
+│    server     │  1. Save to 'main'   │  ~/.vimrc     modified │
+│               │  2. Deploy 'work'    │                        │
 └───────────────────────────────────────────────────────────────┘
 ```
 

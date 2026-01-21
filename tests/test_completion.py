@@ -3,7 +3,7 @@ import pytest
 from unittest.mock import patch, MagicMock
 from dot_man.cli import complete_branches
 
-@patch("dot_man.cli.GitManager")
+@patch("dot_man.cli.common.GitManager")
 def test_complete_branches_filtering(mock_git):
     """Test that completion filters branches based on input."""
     # Setup mock
@@ -23,7 +23,7 @@ def test_complete_branches_filtering(mock_git):
     # Test no match
     assert complete_branches(None, None, "z") == []
 
-@patch("dot_man.cli.GitManager")
+@patch("dot_man.cli.common.GitManager")
 def test_complete_branches_error_handling(mock_git):
     """Test that completion returns empty list on error."""
     mock_instance = mock_git.return_value

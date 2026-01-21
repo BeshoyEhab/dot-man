@@ -3,7 +3,8 @@ import pytest
 from unittest.mock import patch, MagicMock
 from pathlib import Path
 from click.testing import CliRunner
-from dot_man.cli import switch, deploy
+from dot_man.cli.switch_cmd import switch
+from dot_man.cli.deploy_cmd import deploy
 from dot_man.config import DotManConfig
 
 @pytest.fixture
@@ -23,8 +24,10 @@ def mock_config(tmp_path):
     repo_file.write_text("content")
 
     # Mock constants
-    with patch("dot_man.cli.DOT_MAN_DIR", dot_man_dir), \
-         patch("dot_man.cli.REPO_DIR", repo_dir), \
+    with patch("dot_man.cli.common.DOT_MAN_DIR", dot_man_dir), \
+         patch("dot_man.cli.common.REPO_DIR", repo_dir), \
+         patch("dot_man.cli.switch_cmd.REPO_DIR", repo_dir), \
+         patch("dot_man.operations.REPO_DIR", repo_dir), \
          patch("dot_man.config.REPO_DIR", repo_dir), \
          patch("dot_man.constants.REPO_DIR", repo_dir):
         yield {
@@ -57,12 +60,14 @@ def test_config_parses_hooks(mock_config):
     assert section.pre_deploy == "echo pre"
     assert section.post_deploy == "echo post"
 
-@pytest.mark.skip(reason="Test needs update for new operations module architecture")
-@patch("dot_man.cli.subprocess.run")
-@patch("dot_man.cli.GitManager")
-@patch("dot_man.cli.GlobalConfig")
-def test_switch_runs_hooks(mock_global_config, mock_git, mock_subprocess, mock_config):
+@patch("dot_man.cli.switch_cmd.subprocess.run")
+@patch("dot_man.operations.GitManager")
+@patch("dot_man.operations.GlobalConfig")
+@patch("dot_man.operations.compare_files", return_value=False)
+@patch("dot_man.cli.switch_cmd.compare_files", return_value=False)
+def test_switch_runs_hooks(mock_compare_cmd, mock_compare_ops, mock_global_config, mock_git, mock_subprocess, mock_config, monkeypatch, tmp_path):
     """Test that switch command runs hooks."""
+    monkeypatch.setenv("HOME", str(tmp_path))
     runner = CliRunner()
     
     # Setup config with hooks
@@ -70,10 +75,11 @@ def test_switch_runs_hooks(mock_global_config, mock_git, mock_subprocess, mock_c
     config.create_default()
     config.add_section(
         "test_section", 
-        [str(mock_config["local_file"])], 
+        ["~/test_file.txt"], 
         "test_file.txt",
         pre_deploy="echo pre",
-        post_deploy="echo post"
+        post_deploy="echo post",
+        repo_path="test_file.txt"
     )
     config.save()
     
@@ -83,6 +89,8 @@ def test_switch_runs_hooks(mock_global_config, mock_git, mock_subprocess, mock_c
     # Global config mock
     mock_global_instance = mock_global_config.return_value
     mock_global_instance.current_branch = "main"
+    mock_global_instance.get_defaults.return_value = {}
+    mock_global_instance.get_template.return_value = None
 
     # Git mock
     mock_git_instance = mock_git.return_value
@@ -98,9 +106,8 @@ def test_switch_runs_hooks(mock_global_config, mock_git, mock_subprocess, mock_c
     # Note: verify_init decorator might check paths, which we mocked in fixture but
     # imports in cli.py might resolved earlier. We might need to mock is_git_installed too.
     
-    with patch("dot_man.cli.is_git_installed", return_value=True), \
-         patch("dot_man.cli.DOT_MAN_DIR", mock_config["repo_dir"].parent), \
-         patch("dot_man.cli.REPO_DIR", mock_config["repo_dir"]):
+    with patch("dot_man.cli.common.DOT_MAN_DIR", mock_config["repo_dir"].parent), \
+         patch("dot_man.cli.switch_cmd.REPO_DIR", mock_config["repo_dir"]):
         
         result = runner.invoke(switch, ["other_branch"])
     
@@ -115,30 +122,29 @@ def test_switch_runs_hooks(mock_global_config, mock_git, mock_subprocess, mock_c
     # assert "echo pre" in calls
 
 
-@pytest.mark.skip(reason="Test needs update for new operations module architecture")
-@patch("dot_man.cli.subprocess.run")
-@patch("dot_man.cli.GitManager") 
-def test_deploy_runs_hooks(mock_git, mock_subprocess, mock_config):
+@patch("dot_man.cli.deploy_cmd.subprocess.run")
+@patch("dot_man.operations.GitManager") 
+def test_deploy_runs_hooks(mock_git, mock_subprocess, mock_config, monkeypatch, tmp_path):
     """Test that deploy command runs hooks."""
+    monkeypatch.setenv("HOME", str(tmp_path))
     runner = CliRunner()
     
     config = DotManConfig(repo_path=mock_config["repo_dir"])
     config.create_default()
     config.add_section(
         "test_section", 
-        [str(mock_config["local_file"])], 
+        ["~/test_file.txt"], 
         "test_file.txt",
         pre_deploy="echo pre_deploy",
-        post_deploy="echo post_deploy"
+        post_deploy="echo post_deploy",
+        repo_path="test_file.txt"
     )
     config.save()
 
     mock_git_instance = mock_git.return_value
     mock_git_instance.branch_exists.return_value = True
     
-    with patch("dot_man.cli.is_git_installed", return_value=True), \
-         patch("dot_man.cli.DOT_MAN_DIR", mock_config["repo_dir"].parent), \
-         patch("dot_man.cli.REPO_DIR", mock_config["repo_dir"]):
+    with patch("dot_man.cli.common.DOT_MAN_DIR", mock_config["repo_dir"].parent):
          
         result = runner.invoke(deploy, ["main", "--force"])
         

@@ -125,3 +125,9 @@ class DeploymentError(DotManError):
     """Deployment failed."""
 
     exit_code = 40
+
+
+class BackupError(DotManError):
+    """Backup operation failed."""
+
+    exit_code = 41

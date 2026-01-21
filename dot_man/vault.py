@@ -2,6 +2,7 @@
 
 import json
 import base64
+import hashlib
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 from datetime import datetime
@@ -108,7 +109,6 @@ class SecretVault:
         f = self._get_fernet()
 
         # Compute hash for identification (to avoid duplicates or find later)
-        import hashlib
         secret_hash = hashlib.sha256(secret_value.encode()).hexdigest()
 
         # Encrypt
