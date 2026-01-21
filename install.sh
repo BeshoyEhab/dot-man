@@ -14,9 +14,12 @@ source "$SCRIPT_DIR/scripts/utils.sh"
 source "$SCRIPT_DIR/scripts/completions/install.sh"
 source "$SCRIPT_DIR/scripts/path-setup.sh"
 
+# Get version from pyproject.toml
+VERSION=$(grep -m1 '^version = ' "$SCRIPT_DIR/pyproject.toml" | cut -d '"' -f 2)
+
 echo ""
 echo "╔══════════════════════════════════════╗"
-echo "║       dot-man Installer v0.4.0       ║"
+echo "║       dot-man Installer v${VERSION}       ║"
 echo "╚══════════════════════════════════════╝"
 echo ""
 
