@@ -1,5 +1,106 @@
 """Custom exceptions for dot-man."""
 
+from dataclasses import dataclass
+from enum import Enum
+from typing import Optional
+
+
+class ErrorCategory(Enum):
+    """Categorizes errors for user-friendly diagnostics."""
+    SECRETS = "secrets"           # Secrets detected / redaction issues
+    PERMISSION = "permission"     # File permission denied
+    GIT_CONFLICT = "git_conflict" # Git merge/rebase conflict
+    INTERRUPTED = "interrupted"   # KeyboardInterrupt / SIGTERM
+    COMMAND = "command"           # Hook command failed / not found
+    CONFIG = "config"             # Configuration errors
+    DISK = "disk"                 # Disk space / I/O errors
+    NETWORK = "network"           # Remote sync failures
+    UNKNOWN = "unknown"           # Fallback
+
+
+@dataclass
+class ErrorDiagnostic:
+    """Rich error diagnostic for user display."""
+    category: ErrorCategory
+    title: str
+    details: str
+    suggestion: str
+
+    @classmethod
+    def from_exception(cls, exc: Exception) -> "ErrorDiagnostic":
+        """Factory to create diagnostics from common exceptions."""
+        import builtins
+        from .exceptions import (
+            SecretsDetectedError, GitOperationError,
+            ConfigurationError, DiskSpaceError
+        )
+        
+        if isinstance(exc, KeyboardInterrupt):
+            return cls(
+                ErrorCategory.INTERRUPTED,
+                "Operation interrupted",
+                "User cancelled the operation",
+                "Run the command again to retry"
+            )
+        # Check for built-in PermissionError first
+        if isinstance(exc, builtins.PermissionError) or "permission denied" in str(exc).lower():
+            return cls(
+                ErrorCategory.PERMISSION,
+                "Permission denied",
+                str(exc),
+                "Try running with sudo or check file permissions"
+            )
+        if isinstance(exc, SecretsDetectedError):
+            return cls(
+                ErrorCategory.SECRETS,
+                "Secrets detected",
+                str(exc),
+                "Use 'dot-man audit' to review secrets, or add them to the ignore list"
+            )
+        if isinstance(exc, GitOperationError):
+            msg = str(exc).lower()
+            if "conflict" in msg:
+                return cls(
+                    ErrorCategory.GIT_CONFLICT,
+                    "Git conflict detected",
+                    str(exc),
+                    "Resolve conflicts in ~/.config/dot-man/repo, then retry"
+                )
+            return cls(
+                ErrorCategory.UNKNOWN,
+                "Git operation failed",
+                str(exc),
+                "Check git status in ~/.config/dot-man/repo"
+            )
+        if isinstance(exc, ConfigurationError):
+            return cls(
+                ErrorCategory.CONFIG,
+                "Configuration error",
+                str(exc),
+                "Run 'dot-man edit' to fix configuration issues"
+            )
+        if isinstance(exc, DiskSpaceError):
+            return cls(
+                ErrorCategory.DISK,
+                "Disk space issue",
+                str(exc),
+                "Free up disk space and retry"
+            )
+        if "command not found" in str(exc).lower() or isinstance(exc, FileNotFoundError):
+            return cls(
+                ErrorCategory.COMMAND,
+                "Command not found",
+                str(exc),
+                "Check that the required program is installed and in PATH"
+            )
+        
+        # Fallback
+        return cls(
+            ErrorCategory.UNKNOWN,
+            "Unexpected error",
+            str(exc),
+            "Check logs or run with --verbose for details"
+        )
 
 class DotManError(Exception):
     """Base exception for all dot-man errors."""

@@ -311,6 +311,10 @@ class DotManOperations:
                     continue
                 
                 try:
+                    # Skip if source doesn't exist in repo
+                    if not repo_path.exists():
+                        continue
+                    
                     # Check if will change (using optimized compare_files)
                     will_change = not local_path.exists() or not compare_files(repo_path, local_path)
                     
@@ -362,6 +366,18 @@ class DotManOperations:
                     
                     # Helper to restore secrets
                     def restore_file_secrets(dest_path: Path):
+                        # Skip binary files that can't contain text secrets
+                        binary_extensions = {
+                            '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.ico', '.webp', '.svg',
+                            '.mp4', '.mp3', '.wav', '.ogg', '.flac', '.avi', '.mkv', '.webm',
+                            '.pyc', '.pyo', '.so', '.dll', '.exe', '.bin', '.dat',
+                            '.zip', '.tar', '.gz', '.bz2', '.xz', '.7z', '.rar',
+                            '.pdf', '.doc', '.docx', '.xls', '.xlsx',
+                            '.ttf', '.otf', '.woff', '.woff2', '.eot',
+                        }
+                        if dest_path.suffix.lower() in binary_extensions:
+                            return  # Skip binary files silently
+                        
                         try:
                             content = dest_path.read_text(encoding="utf-8")
                             restored = self.vault.restore_secrets_in_content(
@@ -369,7 +385,9 @@ class DotManOperations:
                             )
                             if restored != content:
                                 dest_path.write_text(restored, encoding="utf-8")
-                        except (OSError, UnicodeDecodeError) as e:
+                        except UnicodeDecodeError:
+                            pass  # Skip binary files silently
+                        except OSError as e:
                             item_errors.append(f"Failed to restore secrets for {dest_path}: {e}")
 
                     try:
@@ -379,7 +397,9 @@ class DotManOperations:
                                 if section.secrets_filter:
                                     restore_file_secrets(local_path)
                                 deployed_count += 1
-                        else:
+                            else:
+                                item_errors.append(f"Failed to copy {repo_path} to {local_path}")
+                        elif repo_path.is_dir():
                             files_copied, files_failed, _ = copy_directory(
                                 repo_path, local_path,
                                 filter_secrets_enabled=False,
@@ -395,11 +415,13 @@ class DotManOperations:
                             deployed_count += files_copied
                             if files_failed > 0:
                                 item_errors.append(f"Failed to deploy {files_failed} files in {local_path}")
+                        else:
+                            item_errors.append(f"Source not found in repo: {repo_path}")
                                 
                     except PermissionError as e:
                         item_errors.append(f"Permission denied deploying {local_path}. Try running with sudo?")
                     except FileNotFoundError as e:
-                        item_errors.append(f"File not found during deployment: {local_path}")
+                        item_errors.append(f"File not found during deployment: {repo_path}")
                     except OSError as e:
                         item_errors.append(f"Error deploying {local_path}: {e}")
                         

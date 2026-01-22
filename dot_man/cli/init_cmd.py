@@ -12,7 +12,7 @@ from ..config import GlobalConfig, DotManConfig
 from ..core import GitManager
 from ..utils import is_git_installed
 from .interface import cli as main
-from .common import error, success, warn
+from .common import error, success, warn, handle_exception
 
 
 @main.command()
@@ -70,8 +70,10 @@ def init(force: bool, no_wizard: bool):
         else:
             show_quick_start()
 
+    except KeyboardInterrupt:
+        handle_exception(KeyboardInterrupt())
     except Exception as e:
-        error(f"Initialization failed: {e}")
+        handle_exception(e, "Initialization")
 
 
 def run_setup_wizard(
@@ -100,6 +102,8 @@ def run_setup_wizard(
         ("~/.config/alacritty", "Alacritty terminal", "alacritty"),
         ("~/.config/hypr", "Hyprland WM", "hypr"),
         ("~/.config/i3", "i3 WM", "i3"),
+        ("~/.config/quickshell", "Quickshell bar", "quickshell"),
+        ("~/.config/illogical-impulse", "Illogical Impulse", "illogical-impulse"),
         ("~/.tmux.conf", "tmux", "tmux"),
         ("~/.ssh/config", "SSH config", "ssh-config"),
     ]

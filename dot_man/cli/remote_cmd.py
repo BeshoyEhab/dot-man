@@ -58,6 +58,87 @@ def remote_get():
         error(f"Failed to get remote: {e}")
 
 
+@remote.command("sync-branch")
+@require_init
+def sync_branch():
+    """Synchronize local branch name with remote default branch.
+    
+    Detects the remote's default branch (e.g., 'master') and renames
+    the local branch to match if they differ. Fixes push/pull failures
+    caused by main vs master naming mismatch.
+    
+    Example: dot-man remote sync-branch
+    """
+    try:
+        git = GitManager()
+        
+        if not git.has_remote():
+            error("No remote configured. Use 'dot-man remote set <url>' first.")
+            return
+        
+        # Fetch to ensure we have remote info
+        ui.console.print("Fetching remote info...")
+        git.fetch()
+        
+        # Get remote default branch via git remote show
+        try:
+            result = git.repo.git.remote("show", "origin")
+            remote_default = None
+            for line in result.split("\n"):
+                if "HEAD branch:" in line:
+                    remote_default = line.split(":")[1].strip()
+                    break
+        except Exception as e:
+            error(f"Could not determine remote default branch: {e}")
+            return
+        
+        if not remote_default:
+            error("Could not detect remote default branch")
+            return
+        
+        local_current = git.current_branch()
+        
+        ui.console.print(f"Remote default branch: [cyan]{remote_default}[/cyan]")
+        ui.console.print(f"Local current branch:  [cyan]{local_current}[/cyan]")
+        ui.console.print()
+        
+        if local_current == remote_default:
+            success("Branch names already match!")
+            return
+        
+        # Offer to rename
+        ui.console.print(f"[yellow]Branch name mismatch detected![/yellow]")
+        ui.console.print()
+        
+        if ui.confirm(f"Rename local '{local_current}' to '{remote_default}'?"):
+            try:
+                # Rename the branch
+                git.repo.git.branch("-m", local_current, remote_default)
+                
+                # Update global config
+                global_config = GlobalConfig()
+                global_config.load()
+                global_config.current_branch = remote_default
+                global_config.save()
+                
+                success(f"Renamed local branch to '{remote_default}'")
+                ui.console.print()
+                ui.console.print("You can now sync with: [cyan]dot-man sync[/cyan]")
+                
+            except Exception as rename_err:
+                error(f"Failed to rename branch: {rename_err}")
+        else:
+            ui.info("Keeping current branch name")
+            ui.console.print()
+            ui.console.print("Tip: You can also set upstream manually with:")
+            ui.console.print(f"  [cyan]git push -u origin {local_current}:{remote_default}[/cyan]")
+            
+    except DotManError as e:
+        error(str(e), e.exit_code)
+    except Exception as e:
+        error(f"Sync branch failed: {e}")
+
+
 @main.command()
 @click.option("--push-only", is_flag=True, help="Only push, don't pull")
 @click.option("--pull-only", is_flag=True, help="Only pull, don't push")

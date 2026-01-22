@@ -154,12 +154,13 @@ dot-man switch main  # Saves work, deploys main
 
 ### Remote & Sync
 
-| Command                    | Description                                    |
-| -------------------------- | ---------------------------------------------- |
-| `dot-man sync`             | Push/pull dotfiles with remote repository      |
-| `dot-man remote set <url>` | Set remote repository URL                      |
-| `dot-man remote get`       | Show current remote URL                        |
-| `dot-man setup`            | Guided setup for GitHub remote (supports `gh`) |
+| Command                      | Description                                     |
+| ---------------------------- | ----------------------------------------------- |
+| `dot-man sync`               | Push/pull dotfiles with remote repository       |
+| `dot-man remote set <url>`   | Set remote repository URL                       |
+| `dot-man remote get`         | Show current remote URL                         |
+| `dot-man remote sync-branch` | Sync local/remote branch names (main vs master) |
+| `dot-man setup`              | Guided setup for GitHub remote (supports `gh`)  |
 
 ### Branch Management
 

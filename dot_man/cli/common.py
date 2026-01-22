@@ -27,6 +27,32 @@ def warn(message: str) -> None:
     ui.warn(message)
 
 
+def handle_exception(exc: BaseException, context: str = "Operation") -> None:
+    """Handle exceptions with user-friendly diagnostics.
+    
+    Uses ErrorDiagnostic to categorize errors and provide helpful suggestions.
+    This is the centralized exception handler for all CLI commands.
+    """
+    from ..exceptions import ErrorDiagnostic, DotManError
+    
+    if isinstance(exc, DotManError):
+        error(str(exc), exc.exit_code)
+        return
+    
+    if isinstance(exc, KeyboardInterrupt):
+        ui.console.print()
+        warn("Operation cancelled by user")
+        raise SystemExit(130)
+    
+    # At this point exc is known to be an Exception (not KeyboardInterrupt)
+    diagnostic = ErrorDiagnostic.from_exception(exc)  # type: ignore[arg-type]
+    ui.console.print()
+    ui.console.print(f"[red bold]{diagnostic.title}[/red bold]")
+    ui.console.print(f"[red]{diagnostic.details}[/red]")
+    ui.console.print()
+    ui.console.print(f"[dim]💡 {diagnostic.suggestion}[/dim]")
+    raise SystemExit(1)
+
 class DotManGroup(click.Group):
     """Custom Click Group to provide suggestions for typos."""
 

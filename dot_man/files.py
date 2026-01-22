@@ -189,17 +189,9 @@ def compare_files(file1: Path, file2: Path) -> bool:
         if stat1.st_size != stat2.st_size:
             return False
 
-        # Metadata Cache Optimization:
-        # If both files have exact same mtime and size as last time we checked,
-        # and we haven't invalidated the cache, we could technically assume equality?
-        # BUT: mtime is not reliable enough for git repos (git checkout updates mtime).
-        # HOWEVER: If we are comparing repo file to local file:
-        # If mtime matches, content is likely same.
-        
-        # Optimization: If mtime and size match exactly, assume identical
-        # This is safe enough for 99% of dotfile cases.
-        if abs(stat1.st_mtime - stat2.st_mtime) < 0.1:
-             return True
+        # NOTE: mtime optimization removed - git checkout updates mtimes,
+        # making this unreliable for dotfile sync scenarios.
+        # Always use content-based comparison for accuracy.
 
         # Efficient chunked comparison
         import filecmp

@@ -15,6 +15,21 @@ from datetime import datetime
 from typing import TypedDict
 
 
+def _canonicalize_path(file_path: Path | str) -> str:
+    """Resolve path to canonical absolute form for consistent matching.
+    
+    This ensures that ~/file, /home/user/file, and ./file all resolve
+    to the same canonical path for reliable secret ignore list matching.
+    """
+    path = Path(file_path).expanduser()
+    try:
+        # resolve() handles symlinks and .. components
+        return str(path.resolve())
+    except OSError:
+        # File might not exist yet, just expand and convert to absolute
+        return str(path.absolute())
+
+
 class AllowedSecret(TypedDict):
     """Structure for an allowed secret entry."""
 
@@ -68,7 +83,7 @@ class BaseSecretGuard:
         self, file_path: Path | str, line_content: str, pattern_name: str
     ) -> bool:
         """Check if a secret is in the list."""
-        path_str = str(file_path)
+        path_str = _canonicalize_path(file_path)
         content_hash = self._compute_hash(line_content)
 
         for secret in self._secrets:
@@ -88,7 +103,7 @@ class BaseSecretGuard:
             return
 
         entry: AllowedSecret = {
-            "file_path": str(file_path),
+            "file_path": _canonicalize_path(file_path),
             "secret_hash": self._compute_hash(line_content),
             "pattern_name": pattern_name,
             "added_at": datetime.now().isoformat(),
@@ -397,12 +412,12 @@ class SecretScanner:
                         )
                         result = callback(secret_match)
                         
-                        if result == "KEEP":
+                        if result == "KEEP" or result == "IGNORE":
                             should_redact = False
                         elif result == "REDACT":
                             should_redact = True
                         else:
-                            # Use custom replacement
+                            # Use custom replacement (e.g., hashed redaction)
                             should_redact = True
                             replacement_text = result
 
@@ -427,12 +442,25 @@ def filter_secrets(
     """Filter secrets from content before saving.
 
     Returns:
-        Tuple of (filtered_content, list_of_matches)
+        Tuple of (filtered_content, list_of_redacted_secrets)
+        Note: Only secrets that were actually redacted are returned, not ignored ones.
     """
     scanner = SecretScanner()
-    # Note: We aren't returning the matches list here perfectly if we use the callback
-    # because the callback might Skip/Ignore them.
-    # But usually we return the list of *detected* secrets for logging.
-    matches = list(scanner.scan_content(content, file_path))
-    filtered_content, _ = scanner.redact_content(content, callback, file_path)
-    return filtered_content, matches
+    
+    # Track which secrets were actually redacted
+    redacted_secrets: list[SecretMatch] = []
+    
+    def tracking_callback(match: SecretMatch) -> str:
+        if callback:
+            result = callback(match)
+            # Only add to redacted list if not ignored/kept
+            if result not in ("KEEP", "IGNORE"):
+                redacted_secrets.append(match)
+            return result
+        else:
+            # No callback = always redact
+            redacted_secrets.append(match)
+            return "REDACT"
+    
+    filtered_content, _ = scanner.redact_content(content, tracking_callback, file_path)
+    return filtered_content, redacted_secrets

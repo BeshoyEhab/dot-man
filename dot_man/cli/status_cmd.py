@@ -11,7 +11,7 @@ from ..constants import REPO_DIR
 from ..exceptions import DotManError
 from ..secrets import SecretScanner
 from .interface import cli as main
-from .common import error, require_init
+from .common import error, require_init, handle_exception
 
 
 @main.command()
@@ -146,5 +146,7 @@ def status(verbose: bool, secrets: bool):
 
     except DotManError as e:
         error(str(e), e.exit_code)
+    except KeyboardInterrupt:
+        handle_exception(KeyboardInterrupt())
     except Exception as e:
-        error(f"Status check failed: {e}")
+        handle_exception(e, "Status check")

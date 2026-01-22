@@ -55,6 +55,8 @@ DEFAULT_UPDATE_STRATEGY = "replace"  # replace, rename_old, ignore
 VALID_UPDATE_STRATEGIES = ["replace", "rename_old", "ignore"]
 
 # Hook aliases - short names for common commands
+# Placeholders:
+#   {qs_config} - Quickshell config directory name (e.g., "ii", "caelestea")
 HOOK_ALIASES = {
     "shell_reload": "source ~/.bashrc 2>/dev/null || source ~/.zshrc 2>/dev/null || true",
     "nvim_sync": "nvim --headless +PackerSync +qa 2>/dev/null || true",
@@ -62,6 +64,10 @@ HOOK_ALIASES = {
     "fish_reload": "source ~/.config/fish/config.fish 2>/dev/null || true",
     "tmux_reload": "tmux source-file ~/.tmux.conf 2>/dev/null || true",
     "kitty_reload": "killall -SIGUSR1 kitty 2>/dev/null || true",
+    # Quickshell hooks - use {qs_config} for auto-detected config directory
+    "quickshell_reload": "killall qs 2>/dev/null; sleep 0.3; qs -c {qs_config} &",
+    "quickshell_restart": "killall qs 2>/dev/null; sleep 0.5; qs -c {qs_config} &",
+    "quickshell_validate": "qs -c {qs_config} --check 2>/dev/null || true",
 }
 
 # ============================================================================

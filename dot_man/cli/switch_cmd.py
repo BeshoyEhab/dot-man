@@ -150,7 +150,8 @@ def switch(branch: str, dry_run: bool, force: bool):
 
             deploy_result = ops.deploy_all()
             deployed_count = deploy_result["deployed"]
-            errors = deploy_result["errors"]
+            # Filter empty/whitespace-only errors
+            errors = [e for e in deploy_result["errors"] if e and str(e).strip()]
             
             if errors:
                 ui.error(f"Encountered {len(errors)} errors during deploy:")
@@ -188,5 +189,15 @@ def switch(branch: str, dry_run: bool, force: bool):
 
     except DotManError as e:
         error(str(e), e.exit_code)
+    except KeyboardInterrupt:
+        ui.console.print()
+        warn("Operation cancelled by user")
     except Exception as e:
-        error(f"Switch failed: {e}")
+        from ..exceptions import ErrorDiagnostic
+        diagnostic = ErrorDiagnostic.from_exception(e)
+        ui.console.print()
+        ui.console.print(f"[red bold]{diagnostic.title}[/red bold]")
+        ui.console.print(f"[red]{diagnostic.details}[/red]")
+        ui.console.print()
+        ui.console.print(f"[dim]💡 {diagnostic.suggestion}[/dim]")
+        raise SystemExit(1)

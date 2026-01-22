@@ -8,7 +8,7 @@ from ..core import GitManager
 from ..config import GlobalConfig
 from ..exceptions import DotManError
 from .interface import cli as main
-from .common import error, success, require_init, complete_branches
+from .common import error, success, require_init, complete_branches, handle_exception
 
 
 @main.group()
@@ -44,8 +44,10 @@ def branch_list():
 
         ui.console.print(table)
 
+    except KeyboardInterrupt:
+        handle_exception(KeyboardInterrupt())
     except Exception as e:
-        error(f"Failed to list branches: {e}")
+        handle_exception(e, "Branch list")
 
 
 @branch.command("delete")
@@ -89,5 +91,7 @@ def branch_delete(name: str, force: bool):
                 return
 
         error(str(e), e.exit_code)
+    except KeyboardInterrupt:
+        handle_exception(KeyboardInterrupt())
     except Exception as e:
-        error(f"Failed to delete branch: {e}")
+        handle_exception(e, "Branch delete")

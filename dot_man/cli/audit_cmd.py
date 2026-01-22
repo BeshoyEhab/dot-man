@@ -8,7 +8,7 @@ from ..core import GitManager
 from ..secrets import SecretScanner, SecretGuard, PermanentRedactGuard
 from ..exceptions import DotManError
 from .interface import cli as main
-from .common import error, success, require_init
+from .common import error, success, require_init, handle_exception
 
 
 @main.command()
@@ -133,5 +133,7 @@ def audit(strict: bool, fix: bool):
 
     except DotManError as e:
         error(str(e), e.exit_code)
+    except KeyboardInterrupt:
+        handle_exception(KeyboardInterrupt())
     except Exception as e:
-        error(f"Audit failed: {e}")
+        handle_exception(e, "Audit")

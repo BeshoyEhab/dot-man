@@ -71,9 +71,10 @@ def test_filter_secrets_callback():
 
     filtered, matches = filter_secrets(content, callback=keep_cb)
 
-    # Should find the match
-    assert len(matches) == 1
-    # But content should NOT be redacted
+    # Matches should be empty since we KEPT the secret (didn't redact)
+    # filter_secrets now only returns secrets that were actually redacted
+    assert len(matches) == 0
+    # Content should NOT be redacted
     assert "REDACTED" not in filtered
     assert "abcdef" in filtered
 

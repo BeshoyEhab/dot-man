@@ -325,16 +325,61 @@ class Section:
         Examples:
             "shell_reload" → "source ~/.bashrc || ..."
             "nvim_sync" → "nvim --headless +PackerSync +qa"
+            "quickshell_reload" → "killall qs; qs -c ii &" (with detected config)
             "echo hello" → "echo hello" (unchanged)
         """
         if not hook:
             return None
 
         # Check if it's an alias
-        if hook in HOOK_ALIASES:
-            return HOOK_ALIASES[hook]
-
-        return hook
+        resolved = HOOK_ALIASES.get(hook, hook)
+        
+        # Replace {qs_config} placeholder with detected quickshell config dir
+        if "{qs_config}" in resolved:
+            qs_config = self._detect_quickshell_config()
+            resolved = resolved.replace("{qs_config}", qs_config)
+        
+        return resolved
+    
+    def _detect_quickshell_config(self) -> str:
+        """Detect the quickshell config directory name from section paths.
+        
+        Looks for paths like ~/.config/quickshell/<config_name> or
+        subdirectories of quickshell config.
+        
+        Returns:
+            Config directory name (e.g., "ii", "caelestea") or empty string if not found.
+        """
+        quickshell_base = Path("~/.config/quickshell").expanduser()
+        
+        for path in self.paths:
+            path_resolved = path.resolve() if path.exists() else path.expanduser()
+            
+            # Check if path is under ~/.config/quickshell
+            try:
+                rel = path_resolved.relative_to(quickshell_base)
+                # Get the first part of the relative path (the config dir)
+                parts = rel.parts
+                if parts:
+                    return parts[0]
+            except ValueError:
+                # Not under quickshell_base, try checking if the path contains 'quickshell'
+                str_path = str(path_resolved)
+                if "quickshell" in str_path.lower():
+                    # Try to extract config dir from path like /some/path/quickshell/ii/...
+                    parts = path_resolved.parts
+                    for i, part in enumerate(parts):
+                        if part.lower() == "quickshell" and i + 1 < len(parts):
+                            return parts[i + 1]
+        
+        # Fallback: check if any subdirectory exists in quickshell base
+        if quickshell_base.exists():
+            for subdir in quickshell_base.iterdir():
+                if subdir.is_dir() and not subdir.name.startswith("."):
+                    return subdir.name
+        
+        # Ultimate fallback
+        return ""
 
     def get_repo_path(self, local_path: Path, repo_dir: Path) -> Path:
         """Get the repository path for a local path."""

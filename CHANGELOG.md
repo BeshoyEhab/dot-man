@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-01-22
+
+### Added
+
+- **Branch Name Sync**: New `dot-man remote sync-branch` command to synchronize local/remote branch names (fixes main vs master mismatch)
+- **Quickshell Hooks**: Added `quickshell_reload`, `quickshell_restart`, `quickshell_validate` hook aliases with `{qs_config}` auto-detection for config directory
+- **Error Categorization**: New `ErrorCategory` enum and `ErrorDiagnostic` class for user-friendly error messages with suggestions
+- **Comprehensive CLI Tests**: New `test_cli_commands.py` with 42 tests covering all commands, hyprland/quickshell file structures, path canonicalization, and error handling
+
+### Fixed
+
+- **File Comparison**: Removed unreliable mtime-based optimization in `compare_files()` that caused false "files changed" after git checkout
+- **Secret Ignore List**: Added path canonicalization so `~/file` and `/home/user/file` are treated as the same path
+- **Switch Command Errors**: Now shows categorized errors with helpful suggestions (e.g., "Permission denied → Try sudo")
+- **KeyboardInterrupt Handling**: Graceful handling of Ctrl+C during switch operations
+- **PermissionError Detection**: Fixed error categorization to properly detect built-in PermissionError
+- **Deploy Error Reporting**: Fixed missing error messages when file copy fails during deploy; added check to skip non-existent repo paths
+- **Secret IGNORE Action**: Fixed "IGNORE" action being treated as a replacement string instead of skipping redaction; now only reports actually redacted secrets in log message
+- **Binary File Handling**: Skip binary files (.jpg, .pyc, etc.) when restoring secrets during deploy to prevent UTF-8 decode errors
+
 ## [0.5.0] - 2026-01-21
 
 ### Added

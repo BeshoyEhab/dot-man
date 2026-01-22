@@ -38,7 +38,7 @@
 - [x] Branch-specific file preview in TUI
 - [x] Refactored all commands to use new Section API
 
-## v0.5.0 - Backup & Stash System
+## v0.5.0 ✅ - Backup & Stash System
 
 - [ ] `dot-man backup create` - Manual backups
 - [ ] `dot-man backup list` - Show available backups
@@ -49,6 +49,15 @@
 - [ ] `dot-man stash pop` - Restore stashed changes
 - [ ] `dot-man switch --stash` - Stash changes instead of committing
 - [ ] `dot-man switch --save-to <branch>` - Save to new branch before switching
+
+## v0.5.1 ✅ - Bug Fixes & Stability
+
+- [x] Fix file comparison false positives after git checkout (removed mtime optimization)
+- [x] Fix secret ignore list path matching (canonicalize `~` and relative paths)
+- [x] Add error categorization with user-friendly suggestions
+- [x] Add `dot-man remote sync-branch` to fix main/master naming mismatch
+- [x] Add quickshell hook aliases (`quickshell_reload`, `quickshell_restart`, `quickshell_validate`)
+- [x] Graceful KeyboardInterrupt handling in switch command
 
 ## v0.6.0 - TUI Core Actions
 

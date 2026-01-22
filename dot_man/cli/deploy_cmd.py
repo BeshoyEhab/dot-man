@@ -8,7 +8,7 @@ from rich.panel import Panel
 from .. import ui
 from ..exceptions import DotManError
 from .interface import cli as main
-from .common import error, success, warn, require_init, complete_branches
+from .common import error, success, warn, require_init, complete_branches, handle_exception
 
 
 @main.command()
@@ -153,5 +153,7 @@ def deploy(branch: str, force: bool, dry_run: bool):
 
     except DotManError as e:
         error(str(e), e.exit_code)
+    except KeyboardInterrupt:
+        handle_exception(KeyboardInterrupt())
     except Exception as e:
-        error(f"Deployment failed: {e}")
+        handle_exception(e, "Deployment")
