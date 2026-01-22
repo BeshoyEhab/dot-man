@@ -5,7 +5,38 @@ from pathlib import Path
 from typing import Iterator, Callable
 
 from .constants import REPO_DIR
-from .secrets import filter_secrets, SecretMatch
+from .secrets import filter_secrets, SecretMatch, SecretScanner, SecretGuard, PermanentRedactGuard
+
+
+def has_unhandled_secrets(file_path: Path) -> bool:
+    """Check if a file contains secrets not in allow list or permanent redact list.
+    
+    Returns True if there are secrets that need user decision, False otherwise.
+    """
+    if not file_path.exists() or not file_path.is_file():
+        return False
+    
+    try:
+        content = file_path.read_text(encoding="utf-8")
+    except (UnicodeDecodeError, OSError):
+        return False  # Binary file or read error, no text secrets
+    
+    scanner = SecretScanner()
+    allow_guard = SecretGuard()
+    redact_guard = PermanentRedactGuard()
+    
+    for match in scanner.scan_content(content, file_path):
+        # Check if this secret is already handled
+        if allow_guard.is_allowed(file_path, match.line_content, match.pattern_name):
+            continue  # Allowed, will be skipped
+        if redact_guard.should_redact(file_path, match.line_content, match.pattern_name):
+            continue  # Will be auto-redacted
+        
+        # Found an unhandled secret
+        return True
+    
+    return False
+
 
 
 def ensure_directory(path: Path, mode: int = 0o755) -> None:
@@ -128,6 +159,7 @@ def copy_directory(
         exclude_patterns if exclude_patterns is not None else (ignore_patterns or [])
     )
     files_copied = 0
+    files_skipped = 0
     files_failed = 0
     all_secrets: list[SecretMatch] = []
 
@@ -146,6 +178,20 @@ def copy_directory(
             continue
 
         dest_path = destination / relative
+
+        # Skip unchanged files (content + permissions) UNLESS they have unhandled secrets
+        if dest_path.exists():
+            try:
+                if (compare_files(src_path, dest_path) and 
+                    src_path.stat().st_mode == dest_path.stat().st_mode):
+                    # Still process if file has unhandled secrets that need user decision
+                    if filter_secrets_enabled and has_unhandled_secrets(src_path):
+                        pass  # Don't skip - needs secret handling
+                    else:
+                        files_skipped += 1
+                        continue  # File unchanged, skip
+            except OSError:
+                pass  # If stat fails, proceed with copy
 
         success, secrets = copy_file(
             src_path, dest_path, filter_secrets_enabled, secret_handler=secret_handler
