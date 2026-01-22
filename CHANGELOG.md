@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-01-23
+
+### Added
+
+- **Atomic File Operations**: New `atomic_write_text` ensures files are written to a temp file (`.tmp`) first and then renamed, preventing data corruption during save/deploy.
+- **Ignored Secret Persistence**: Secrets in the ignore list are now correctly preserved in the local file (unredacted) without trigger warnings.
+- **Smart Save Strategy**: Unified file saving logic (`smart_save_file`) that performs content comparison, secret checking, and atomic writing in a single efficient pass.
+
+### Changed
+
+- **Performance**: Optimized file saving by reducing redundant file reads and writes; destination files are now only written to if content actually differs.
+- **Code Quality**: Consolidated duplicated secret checking logic from `check_file_save_status` and `copy_file` into a single source of truth.
+- **Robustness**: Enforced `newline=""` in all file I/O to guarantee consistent line ending preservation across operations.
+
 ## [0.5.1] - 2026-01-22
 
 ### Added
