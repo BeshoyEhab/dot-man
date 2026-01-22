@@ -13,6 +13,9 @@ from .constants import REPO_DIR
 from .exceptions import DotManError, ConfigurationError, PermissionError, DeploymentError
 from .vault import SecretVault
 from .backups import BackupManager
+from .lock import FileLock
+
+LOCK_FILE = REPO_DIR.parent / ".lock"
 
 
 class DeploymentPlan(TypedDict):
@@ -450,48 +453,50 @@ class DotManOperations:
         Save all sections from local to repo.
         Returns dict with keys: 'saved', 'secrets', 'errors'
         """
-        total_saved = 0
-        all_secrets: list[SecretMatch] = []
-        all_errors: list[str] = []
-        
-        sections = [self.get_section(name) for name in self.get_sections()]
-        
-        # Parallel execution
-        with ThreadPoolExecutor() as executor:
-            future_to_section = {
-                executor.submit(self.save_section, section, secret_handler): section 
-                for section in sections
-            }
+        with FileLock(LOCK_FILE):
+            total_saved = 0
+            all_secrets: list[SecretMatch] = []
+            all_errors: list[str] = []
             
-            for future in as_completed(future_to_section):
-                try:
-                    saved, secrets, errors = future.result()
-                    total_saved += saved
-                    all_secrets.extend(secrets)
-                    all_errors.extend(errors)
-                except Exception as e:
-                    all_errors.append(f"Critical error saving section: {e}")
-        
-        return {
-            "saved": total_saved,
-            "secrets": all_secrets,
-            "errors": all_errors
-        }
+            sections = [self.get_section(name) for name in self.get_sections()]
+            
+            # Parallel execution
+            with ThreadPoolExecutor() as executor:
+                future_to_section = {
+                    executor.submit(self.save_section, section, secret_handler): section 
+                    for section in sections
+                }
+                
+                for future in as_completed(future_to_section):
+                    try:
+                        saved, secrets, errors = future.result()
+                        total_saved += saved
+                        all_secrets.extend(secrets)
+                        all_errors.extend(errors)
+                    except Exception as e:
+                        all_errors.append(f"Critical error saving section: {e}")
+            
+            return {
+                "saved": total_saved,
+                "secrets": all_secrets,
+                "errors": all_errors
+            }
     
     def deploy_all(self) -> dict:
         """
         Deploy all sections from repo to local (Refactored Two-Phase).
         Returns dict with keys: 'deployed', 'pre_hooks', 'post_hooks', 'errors'
         """
-        sections = [self.get_section(name) for name in self.get_sections()]
-        
-        # Phase 1: Scan
-        plan = self.scan_deployable_changes(sections)
-        
-        # Phase 2: Execute
-        result = self.execute_deployment_plan(plan)
-        
-        return result
+        with FileLock(LOCK_FILE):
+            sections = [self.get_section(name) for name in self.get_sections()]
+            
+            # Phase 1: Scan
+            plan = self.scan_deployable_changes(sections)
+            
+            # Phase 2: Execute
+            result = self.execute_deployment_plan(plan)
+            
+            return result
     
     def switch_branch(
         self, 
@@ -525,77 +530,78 @@ class DotManOperations:
         if current_branch == target_branch and not dry_run:
             return result
         
-        # Phase 1: Save current branch
-        if not dry_run:
-            save_result = self.save_all(secret_handler)
-            result["saved_count"] = save_result["saved"]
-            result["secrets_redacted"] = len(save_result["secrets"])
-            result["errors"].extend(save_result["errors"])
+        # Acquire lock for the entire switch operation
+        # Note: If dry_run is True, we don't strictly need a lock, but good to be consistent
+        import contextlib
+        lock_context = FileLock(LOCK_FILE) if not dry_run else contextlib.nullcontext()
+        
+        with lock_context:
+            # Phase 1: Save current branch
+            if not dry_run:
+                save_result = self.save_all(secret_handler)
+                result["saved_count"] = save_result["saved"]
+                result["secrets_redacted"] = len(save_result["secrets"])
+                result["errors"].extend(save_result["errors"])
+                
+                # Commit
+                commit_msg = f"Auto-save from '{current_branch}' before switch to '{target_branch}'"
+                self.git.commit(commit_msg)
             
-            # Commit
-            commit_msg = f"Auto-save from '{current_branch}' before switch to '{target_branch}'"
-            self.git.commit(commit_msg)
-        
-        # Phase 2: Switch git branch
-        branch_exists = self.git.branch_exists(target_branch)
-        result["created_branch"] = not branch_exists
-        
-        if not dry_run:
-            self.git.checkout(target_branch, create=not branch_exists)
+            # Phase 2: Switch git branch
+            branch_exists = self.git.branch_exists(target_branch)
+            result["created_branch"] = not branch_exists
             
-            # Reload config for new branch
-            self.reload_config()
-        
-        # Phase 3: Deploy target branch
-        if not dry_run:
-            # Auto-backup before potentially destructive deployment
-            try:
-                # Identify files that will be changed to backup them
-                # For now, simplistic approach: Backup all tracked files in current config?
-                # Or better: Backup files that are about to be overwritten.
-                # Simplest safe bet: Backup all files tracked by the OLD branch (current state)
-                # before we switch and overwrite them.
-                paths_to_backup = []
-                for section_name in self.get_sections():
-                     section = self.get_section(section_name)
-                     paths_to_backup.extend([p for p in section.paths if p.exists()])
+            if not dry_run:
+                self.git.checkout(target_branch, create=not branch_exists)
                 
-                if paths_to_backup:
-                    self.backups.create_backup(paths_to_backup, note=f"pre-switch-{target_branch}")
-            except Exception as e:
-                result["errors"].append(f"Warning: Auto-backup failed: {e}")
-
-
-            # Two-Phase Deployment for Target Branch
-            # Because we are inside switch_branch, we handle this manually to populate 'result' correctly
-            try:
-                sections = [self.get_section(name) for name in self.get_sections()]
-                
-                # Phase 1: Scan
-                plan = self.scan_deployable_changes(sections)
-                
-                # Deduplicate hooks from scan
-                result["pre_hooks"].extend(plan["pre_hooks"])
-                result["post_hooks"].extend(plan["post_hooks"])
-                result["errors"].extend(plan["errors"])
-                
-                # Deduplicate
-                result["pre_hooks"] = list(dict.fromkeys(result["pre_hooks"]))
-                result["post_hooks"] = list(dict.fromkeys(result["post_hooks"]))
-                
-                # Phase 2: Execute
-                deploy_result = self.execute_deployment_plan(plan)
-                
-                result["deployed_count"] = deploy_result["deployed"]
-                result["errors"].extend(deploy_result["errors"])
-                
-            except Exception as e:
-                result["errors"].append(f"Critical error during switch deployment: {e}")
+                # Reload config for new branch
+                self.reload_config()
             
-            # Update global config
-            self.global_config.current_branch = target_branch
-            self.global_config.save()
-        
+            # Phase 3: Deploy target branch
+            if not dry_run:
+                # Auto-backup before potentially destructive deployment
+                try:
+                    # Identify files that will be changed to backup them
+                    paths_to_backup = []
+                    for section_name in self.get_sections():
+                         section = self.get_section(section_name)
+                         paths_to_backup.extend([p for p in section.paths if p.exists()])
+                    
+                    if paths_to_backup:
+                        self.backups.create_backup(paths_to_backup, note=f"pre-switch-{target_branch}")
+                except Exception as e:
+                    result["errors"].append(f"Warning: Auto-backup failed: {e}")
+    
+    
+                # Two-Phase Deployment for Target Branch
+                try:
+                    sections = [self.get_section(name) for name in self.get_sections()]
+                    
+                    # Phase 1: Scan
+                    plan = self.scan_deployable_changes(sections)
+                    
+                    # Deduplicate hooks from scan
+                    result["pre_hooks"].extend(plan["pre_hooks"])
+                    result["post_hooks"].extend(plan["post_hooks"])
+                    result["errors"].extend(plan["errors"])
+                    
+                    # Deduplicate
+                    result["pre_hooks"] = list(dict.fromkeys(result["pre_hooks"]))
+                    result["post_hooks"] = list(dict.fromkeys(result["post_hooks"]))
+                    
+                    # Phase 2: Execute
+                    deploy_result = self.execute_deployment_plan(plan)
+                    
+                    result["deployed_count"] = deploy_result["deployed"]
+                    result["errors"].extend(deploy_result["errors"])
+                    
+                except Exception as e:
+                    result["errors"].append(f"Critical error during switch deployment: {e}")
+                
+                # Update global config
+                self.global_config.current_branch = target_branch
+                self.global_config.save()
+            
         return result
     
     def audit(self) -> list[tuple[str, list[SecretMatch]]]:

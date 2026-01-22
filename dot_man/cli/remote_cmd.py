@@ -151,38 +151,42 @@ def sync(push_only: bool, pull_only: bool):
 
     Example: dot-man sync
     """
+    from ..lock import FileLock
+    from ..operations import LOCK_FILE
+    
     try:
-        git = GitManager()
+        with FileLock(LOCK_FILE):
+            git = GitManager()
 
-        if not git.has_remote():
-            error("No remote configured. Use 'dot-man remote set <url>' first.")
+            if not git.has_remote():
+                error("No remote configured. Use 'dot-man remote set <url>' first.")
 
-        current = git.current_branch()
-        ui.console.print(f"Syncing branch [bold]{current}[/bold] with remote...")
-        ui.console.print()
-
-        # Pull first (unless push-only)
-        if not push_only:
-            ui.console.print("[bold]Fetching...[/bold]")
-            git.fetch()
-
-            ui.console.print("[bold]Pulling...[/bold]")
-            pull_result = git.pull(rebase=True)
-            ui.console.print(f"  {pull_result}")
+            current = git.current_branch()
+            ui.console.print(f"Syncing branch [bold]{current}[/bold] with remote...")
             ui.console.print()
 
-        # Push (unless pull-only)
-        if not pull_only:
-            from ..operations import get_operations
-            ops = get_operations()
-            if ops.pre_push_audit():
-                ui.console.print("[bold]Pushing...[/bold]")
-                push_result = git.push()
-                ui.console.print(f"  {push_result}")
+            # Pull first (unless push-only)
+            if not push_only:
+                ui.console.print("[bold]Fetching...[/bold]")
+                git.fetch()
+
+                ui.console.print("[bold]Pulling...[/bold]")
+                pull_result = git.pull(rebase=True)
+                ui.console.print(f"  {pull_result}")
                 ui.console.print()
-                success("Sync complete!")
-            else:
-                warn("Push aborted.")
+
+            # Push (unless pull-only)
+            if not pull_only:
+                from ..operations import get_operations
+                ops = get_operations()
+                if ops.pre_push_audit():
+                    ui.console.print("[bold]Pushing...[/bold]")
+                    push_result = git.push()
+                    ui.console.print(f"  {push_result}")
+                    ui.console.print()
+                    success("Sync complete!")
+                else:
+                    warn("Push aborted.")
 
     except DotManError as e:
         error(str(e), e.exit_code)
