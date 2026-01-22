@@ -113,6 +113,58 @@ def run_setup_wizard(
 
     for path_str, desc, section_name in common_files:
         path = Path(path_str).expanduser()
+
+        # Special handling for Quickshell ambiguity
+        if section_name == "quickshell" and path.exists():
+            subdirs = [
+                d for d in path.iterdir() if d.is_dir() and not d.name.startswith(".")
+            ]
+            if len(subdirs) > 1:
+                found_count += 1
+                ui.console.print(
+                    f"  [green]✓[/green] Found: [cyan]{path_str}[/cyan] ({desc})"
+                )
+                ui.console.print(
+                    "    [yellow]⚠️  Multiple configurations detected:[/yellow]"
+                )
+
+                # List options
+                options = subdirs + [path]  # subdirs + root
+                for i, opt in enumerate(options, 1):
+                    if opt == path:
+                        label = f"Track root directory ({path_str})"
+                    else:
+                        label = f"Track '{opt.name}'"
+                    ui.console.print(f"      [bold]{i}.[/bold] {label}")
+
+                # Ask user
+                while True:
+                    choice = ui.ask(
+                        f"    Which one to track? (1-{len(options)})", 
+                        default=str(len(options))
+                    )
+                    try:
+                        idx = int(choice) - 1
+                        if 0 <= idx < len(options):
+                            selected_path = options[idx]
+                            
+                            # Determine section name
+                            if selected_path == path:
+                                final_section = section_name
+                                final_path_str = path_str
+                            else:
+                                final_section = selected_path.name
+                                final_path_str = str(selected_path)
+
+                            if ui.confirm(f"    Track '{final_section}'?", default=True):
+                                files_to_add.append((final_path_str, final_section))
+                            break
+                        else:
+                            warn("Invalid selection")
+                    except ValueError:
+                        warn("Please enter a number")
+                continue
+
         if path.exists():
             found_count += 1
             ui.console.print(f"  [green]✓[/green] Found: [cyan]{path_str}[/cyan] ({desc})")

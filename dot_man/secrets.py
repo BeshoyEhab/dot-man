@@ -384,7 +384,7 @@ class SecretScanner:
         count = 0
         file_path = file_path or Path("<string>")
 
-        for line_number, line in enumerate(content.splitlines(), start=1):
+        for line_number, line in enumerate(content.splitlines(keepends=True), start=1):
             # precise matching logic needed to handle multiple secrets in one line appropriately
             # checking for false positives first
             if self.is_false_positive(line):
@@ -431,11 +431,7 @@ class SecretScanner:
 
             redacted_lines.append(current_line)
 
-        result = "\n".join(redacted_lines)
-        # Preserve trailing newline if original content had one
-        if content.endswith("\n") and not result.endswith("\n"):
-            result += "\n"
-        return result, count
+        return "".join(redacted_lines), count
 
 
 def filter_secrets(

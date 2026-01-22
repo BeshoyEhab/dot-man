@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .config import GlobalConfig, DotManConfig, Section
 from .core import GitManager
-from .files import copy_file, copy_directory, compare_files, get_file_status, backup_file, has_unhandled_secrets
+from .files import copy_file, copy_directory, compare_files, get_file_status, backup_file, check_file_save_status
 from .secrets import SecretScanner, SecretMatch
 from .constants import REPO_DIR
 from .exceptions import DotManError, ConfigurationError, PermissionError, DeploymentError
@@ -187,18 +187,13 @@ class DotManOperations:
             
             try:
                 if local_path.is_file():
-                    # Skip unchanged files (content + permissions) UNLESS they have unhandled secrets
-                    if repo_path.exists():
-                        try:
-                            if (compare_files(local_path, repo_path) and 
-                                local_path.stat().st_mode == repo_path.stat().st_mode):
-                                # Still process if file has unhandled secrets that need user decision
-                                if section.secrets_filter and has_unhandled_secrets(local_path):
-                                    pass  # Don't skip - needs secret handling
-                                else:
-                                    continue  # File unchanged, skip
-                        except OSError:
-                            pass  # If stat fails, proceed with copy
+                    # Optimized: check unchanged status and secrets in a single file read
+                    is_unchanged, has_secrets = check_file_save_status(
+                        local_path, repo_path, check_secrets=section.secrets_filter
+                    )
+                    
+                    if is_unchanged and not has_secrets:
+                        continue  # File unchanged and no unhandled secrets, skip
                     
                     success, secrets = copy_file(
                         local_path, repo_path, 

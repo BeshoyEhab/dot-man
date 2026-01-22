@@ -8,6 +8,106 @@ from .constants import REPO_DIR
 from .secrets import filter_secrets, SecretMatch, SecretScanner, SecretGuard, PermanentRedactGuard
 
 
+def check_file_save_status(
+    src_path: Path, 
+    dest_path: Path, 
+    check_secrets: bool = True
+) -> tuple[bool, bool]:
+    """Check if a file needs saving by examining content and secrets in a single read.
+    
+    This function reads the source file ONCE and checks:
+    1. Whether the content matches the destination (unchanged)
+    2. Whether there are unhandled secrets (if check_secrets is True)
+    
+    Args:
+        src_path: Source file path (local file)
+        dest_path: Destination file path (repo file)
+        check_secrets: Whether to scan for unhandled secrets
+        
+    Returns:
+        Tuple of (is_unchanged, has_unhandled_secrets)
+        - is_unchanged: True if files are identical (content + permissions)
+        - has_unhandled_secrets: True if there are secrets needing user decision
+    """
+    # Quick checks first (no file read needed)
+    if not src_path.exists() or not src_path.is_file():
+        return False, False
+    
+    if not dest_path.exists():
+        # New file - definitely needs saving
+        if check_secrets:
+            # Still need to check for secrets
+            try:
+                with src_path.open("r", encoding="utf-8", newline="") as f:
+                    content = f.read()
+            except (UnicodeDecodeError, OSError):
+                return False, False  # Binary or unreadable
+            
+            scanner = SecretScanner()
+            allow_guard = SecretGuard()
+            redact_guard = PermanentRedactGuard()
+            
+            for match in scanner.scan_content(content, src_path):
+                if not allow_guard.is_allowed(src_path, match.line_content, match.pattern_name):
+                    if not redact_guard.should_redact(src_path, match.line_content, match.pattern_name):
+                        return False, True  # Not unchanged, has unhandled secrets
+            
+        return False, False  # Not unchanged (new file), no unhandled secrets
+    
+    # Both files exist - compare
+    try:
+        src_stat = src_path.stat()
+        dest_stat = dest_path.stat()
+        
+        # Quick size check
+        if src_stat.st_size != dest_stat.st_size:
+            return False, False  # Different size = changed, don't bother with secret check
+        
+        # Permission check
+        if src_stat.st_mode != dest_stat.st_mode:
+            return False, False  # Different permissions = needs update
+        
+    except OSError:
+        return False, False  # Stat failed, assume changed
+    
+    # Read source file ONCE for content comparison and secret scanning
+    try:
+        with src_path.open("r", encoding="utf-8", newline="") as f:
+            src_content = f.read()
+    except UnicodeDecodeError:
+        # Binary file - use filecmp for comparison, no secrets
+        import filecmp
+        is_same = filecmp.cmp(src_path, dest_path, shallow=False)
+        return is_same, False
+    except OSError:
+        return False, False
+    
+    # Read destination for comparison
+    try:
+        with dest_path.open("r", encoding="utf-8", newline="") as f:
+            dest_content = f.read()
+    except (UnicodeDecodeError, OSError):
+        return False, False  # Can't compare, assume changed
+    
+    # Content comparison
+    is_unchanged = (src_content == dest_content)
+    
+    # Only check for secrets if file is unchanged (optimization: if changed, we process anyway)
+    if is_unchanged and check_secrets:
+        scanner = SecretScanner()
+        allow_guard = SecretGuard()
+        redact_guard = PermanentRedactGuard()
+        
+        for match in scanner.scan_content(src_content, src_path):
+            if not allow_guard.is_allowed(src_path, match.line_content, match.pattern_name):
+                if not redact_guard.should_redact(src_path, match.line_content, match.pattern_name):
+                    return True, True  # Unchanged but has unhandled secrets
+        
+        return True, False  # Unchanged, no unhandled secrets
+    
+    return is_unchanged, False
+
+
 def has_unhandled_secrets(file_path: Path) -> bool:
     """Check if a file contains secrets not in allow list or permanent redact list.
     
@@ -90,12 +190,18 @@ def copy_file(
         if filter_secrets_enabled and source.is_file():
             # Read and filter content
             try:
-                content = source.read_text(encoding="utf-8")
+                with source.open("r", encoding="utf-8", newline="") as f:
+                    content = f.read()
+                
                 filtered_content, secrets = filter_secrets(
                     content, callback=secret_handler, file_path=source
                 )
                 detected_secrets = secrets
-                destination.write_text(filtered_content, encoding="utf-8")
+                
+                with destination.open("w", encoding="utf-8", newline="") as f:
+                    f.write(filtered_content)
+                
+                # Preserve original file permissions (e.g., executable bit)
                 destination.chmod(source.stat().st_mode)
             except UnicodeDecodeError:
                 # Binary file - copy without filtering
@@ -179,19 +285,14 @@ def copy_directory(
 
         dest_path = destination / relative
 
-        # Skip unchanged files (content + permissions) UNLESS they have unhandled secrets
-        if dest_path.exists():
-            try:
-                if (compare_files(src_path, dest_path) and 
-                    src_path.stat().st_mode == dest_path.stat().st_mode):
-                    # Still process if file has unhandled secrets that need user decision
-                    if filter_secrets_enabled and has_unhandled_secrets(src_path):
-                        pass  # Don't skip - needs secret handling
-                    else:
-                        files_skipped += 1
-                        continue  # File unchanged, skip
-            except OSError:
-                pass  # If stat fails, proceed with copy
+        # Optimized: check unchanged status and secrets in a single file read
+        is_unchanged, has_secrets = check_file_save_status(
+            src_path, dest_path, check_secrets=filter_secrets_enabled
+        )
+        
+        if is_unchanged and not has_secrets:
+            files_skipped += 1
+            continue  # File unchanged and no unhandled secrets, skip
 
         success, secrets = copy_file(
             src_path, dest_path, filter_secrets_enabled, secret_handler=secret_handler

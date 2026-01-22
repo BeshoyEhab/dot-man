@@ -40,15 +40,15 @@
 
 ## v0.5.0 ✅ - Backup & Stash System
 
-- [ ] `dot-man backup create` - Manual backups
-- [ ] `dot-man backup list` - Show available backups
-- [ ] `dot-man backup restore` - Restore from backup
-- [ ] Auto-backup before destructive operations
-- [ ] Backup rotation (max 5)
-- [ ] `dot-man stash` - Temporarily stash current changes
-- [ ] `dot-man stash pop` - Restore stashed changes
-- [ ] `dot-man switch --stash` - Stash changes instead of committing
-- [ ] `dot-man switch --save-to <branch>` - Save to new branch before switching
+- [x] `dot-man backup create` - Manual backups
+- [x] `dot-man backup list` - Show available backups
+- [x] `dot-man backup restore` - Restore from backup
+- [x] Auto-backup before destructive operations
+- [x] Backup rotation (max 5)
+- [x] `dot-man stash` - Temporarily stash current changes
+- [x] `dot-man stash pop` - Restore stashed changes
+- [x] `dot-man switch --stash` - Stash changes instead of committing
+- [x] `dot-man switch --save-to <branch>` - Save to new branch before switching
 
 ## v0.5.1 ✅ - Bug Fixes & Stability
 
@@ -142,6 +142,11 @@
 
 ## Future Ideas (v2.0+)
 
+- [ ] **Content-addressable storage** - Store identical files as SHA-keyed objects
+  - Files with same content across branches are stored once with SHA hash as key
+  - Branch-specific entries point to the SHA rather than duplicating content
+  - Significant space savings for large shared configs
+  - Enables instant comparison (just compare SHAs)
 - [ ] Encrypted files support (GPG/age)
 - [ ] Web dashboard for configuration management
 - [ ] Dotfile sharing/marketplace

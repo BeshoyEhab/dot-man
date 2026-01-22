@@ -184,7 +184,7 @@ class GitManager:
                 from .exceptions import BranchNotMergedError
                 raise BranchNotMergedError(f"Branch '{name}' is not fully merged")
             raise GitOperationError(f"Failed to delete branch '{name}': {e}")
-        except (GitCommandError, OSError) as e:
+        except OSError as e:
             raise GitOperationError(f"Failed to delete branch '{name}': {e}")
 
     def has_remote(self) -> bool:
