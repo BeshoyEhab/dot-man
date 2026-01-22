@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .config import GlobalConfig, DotManConfig, Section
 from .core import GitManager
-from .files import copy_file, copy_directory, compare_files, get_file_status, backup_file, check_file_save_status
+from .files import copy_file, copy_directory, compare_files, get_file_status, backup_file, atomic_write_text
 from .secrets import SecretScanner, SecretMatch
 from .constants import REPO_DIR
 from .exceptions import DotManError, ConfigurationError, PermissionError, DeploymentError
@@ -187,14 +187,7 @@ class DotManOperations:
             
             try:
                 if local_path.is_file():
-                    # Optimized: check unchanged status and secrets in a single file read
-                    is_unchanged, has_secrets = check_file_save_status(
-                        local_path, repo_path, check_secrets=section.secrets_filter
-                    )
-                    
-                    if is_unchanged and not has_secrets:
-                        continue  # File unchanged and no unhandled secrets, skip
-                    
+                    # Optimized: smart_save_file (via copy_file) handles check+save in one pass
                     success, secrets = copy_file(
                         local_path, repo_path, 
                         filter_secrets_enabled=section.secrets_filter,
@@ -253,7 +246,7 @@ class DotManOperations:
                         content, str(local_path), self.current_branch
                     )
                     if restored != content:
-                        dest_path.write_text(restored, encoding="utf-8")
+                        atomic_write_text(dest_path, restored)
                 except (OSError, UnicodeDecodeError) as e:
                     errors.append(f"Failed to restore secrets for {dest_path}: {e}")
 
@@ -392,7 +385,7 @@ class DotManOperations:
                                 content, str(local_path), self.current_branch
                             )
                             if restored != content:
-                                dest_path.write_text(restored, encoding="utf-8")
+                                atomic_write_text(dest_path, restored)
                         except UnicodeDecodeError:
                             pass  # Skip binary files silently
                         except OSError as e:

@@ -1,6 +1,7 @@
 """File operations for dot-man."""
 
 import shutil
+import os
 from pathlib import Path
 from typing import Iterator, Callable
 
@@ -8,135 +9,136 @@ from .constants import REPO_DIR
 from .secrets import filter_secrets, SecretMatch, SecretScanner, SecretGuard, PermanentRedactGuard
 
 
-def check_file_save_status(
-    src_path: Path, 
-    dest_path: Path, 
-    check_secrets: bool = True
-) -> tuple[bool, bool]:
-    """Check if a file needs saving by examining content and secrets in a single read.
-    
-    This function reads the source file ONCE and checks:
-    1. Whether the content matches the destination (unchanged)
-    2. Whether there are unhandled secrets (if check_secrets is True)
-    
-    Args:
-        src_path: Source file path (local file)
-        dest_path: Destination file path (repo file)
-        check_secrets: Whether to scan for unhandled secrets
-        
-    Returns:
-        Tuple of (is_unchanged, has_unhandled_secrets)
-        - is_unchanged: True if files are identical (content + permissions)
-        - has_unhandled_secrets: True if there are secrets needing user decision
+def atomic_write_text(path: Path, content: str, encoding: str = "utf-8") -> None:
+    """Write content to a file atomically using a temporary file.
+
+    Ensures line endings are preserved exactly as in content (using newline="").
     """
-    # Quick checks first (no file read needed)
-    if not src_path.exists() or not src_path.is_file():
-        return False, False
+    # Create temp file in same directory to ensure atomic rename
+    temp_path = path.with_suffix(f"{path.suffix}.tmp")
     
-    if not dest_path.exists():
-        # New file - definitely needs saving
-        if check_secrets:
-            # Still need to check for secrets
-            try:
-                with src_path.open("r", encoding="utf-8", newline="") as f:
-                    content = f.read()
-            except (UnicodeDecodeError, OSError):
-                return False, False  # Binary or unreadable
-            
-            scanner = SecretScanner()
-            allow_guard = SecretGuard()
-            redact_guard = PermanentRedactGuard()
-            
-            for match in scanner.scan_content(content, src_path):
-                if not allow_guard.is_allowed(src_path, match.line_content, match.pattern_name):
-                    if not redact_guard.should_redact(src_path, match.line_content, match.pattern_name):
-                        return False, True  # Not unchanged, has unhandled secrets
-            
-        return False, False  # Not unchanged (new file), no unhandled secrets
-    
-    # Both files exist - compare
     try:
-        src_stat = src_path.stat()
-        dest_stat = dest_path.stat()
+        with temp_path.open("w", encoding=encoding, newline="") as f:
+            f.write(content)
         
-        # Quick size check
-        if src_stat.st_size != dest_stat.st_size:
-            return False, False  # Different size = changed, don't bother with secret check
-        
-        # Permission check
-        if src_stat.st_mode != dest_stat.st_mode:
-            return False, False  # Different permissions = needs update
-        
+        # Atomic rename
+        os.replace(temp_path, path)
     except OSError:
-        return False, False  # Stat failed, assume changed
+        if temp_path.exists():
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
+        raise
+
+
+def smart_save_file(
+    src_path: Path,
+    dest_path: Path,
+    secret_handler: Callable[[SecretMatch], str] | None = None,
+    check_secrets: bool = True,
+) -> tuple[bool, list[SecretMatch]]:
+    """Smartly save a file from source to destination.
+
+    1. Reads source file once.
+    2. Filters secrets (if enabled).
+    3. Compares result with destination.
+    4. Atomically writes if different.
+
+    Returns:
+        tuple(saved: bool, secrets: list[SecretMatch])
+    """
+    detected_secrets: list[SecretMatch] = []
     
-    # Read source file ONCE for content comparison and secret scanning
+    if not src_path.exists() or not src_path.is_file():
+        return False, []
+
+    # 1. Read source
     try:
         with src_path.open("r", encoding="utf-8", newline="") as f:
             src_content = f.read()
-    except UnicodeDecodeError:
-        # Binary file - use filecmp for comparison, no secrets
-        import filecmp
-        is_same = filecmp.cmp(src_path, dest_path, shallow=False)
-        return is_same, False
-    except OSError:
-        return False, False
-    
-    # Read destination for comparison
-    try:
-        with dest_path.open("r", encoding="utf-8", newline="") as f:
-            dest_content = f.read()
     except (UnicodeDecodeError, OSError):
-        return False, False  # Can't compare, assume changed
-    
-    # Content comparison
-    is_unchanged = (src_content == dest_content)
-    
-    # Only check for secrets if file is unchanged (optimization: if changed, we process anyway)
-    if is_unchanged and check_secrets:
-        scanner = SecretScanner()
+        # Binary file or read error - fallback to direct copy if different
+        return _handle_binary_copy(src_path, dest_path, check_secrets)
+
+    # 2. Filter secrets
+    final_content = src_content
+    if check_secrets:
+        # Wrap handler to include implicit Guard checking
         allow_guard = SecretGuard()
         redact_guard = PermanentRedactGuard()
         
-        for match in scanner.scan_content(src_content, src_path):
-            if not allow_guard.is_allowed(src_path, match.line_content, match.pattern_name):
-                if not redact_guard.should_redact(src_path, match.line_content, match.pattern_name):
-                    return True, True  # Unchanged but has unhandled secrets
-        
-        return True, False  # Unchanged, no unhandled secrets
+        def wrapped_handler(match: SecretMatch) -> str:
+            # Check allow list first
+            if allow_guard.is_allowed(src_path, match.line_content, match.pattern_name):
+                return "IGNORE"
+            
+            # Check permanent redact list
+            if redact_guard.should_redact(src_path, match.line_content, match.pattern_name):
+                return "REDACT"
+                
+            # Delegate to user handler
+            if secret_handler:
+                return secret_handler(match)
+            return "REDACT"
+
+        final_content, detected_secrets = filter_secrets(
+            src_content, callback=wrapped_handler, file_path=src_path
+        )
     
-    return is_unchanged, False
+    # 3. Compare with destination
+    should_save = True
+    if dest_path.exists() and dest_path.is_file():
+        try:
+            # Check permissions first
+            src_stat = src_path.stat()
+            dest_stat = dest_path.stat()
+            if src_stat.st_mode != dest_stat.st_mode:
+                should_save = True
+            else:
+                # Compare content
+                with dest_path.open("r", encoding="utf-8", newline="") as f:
+                    dest_content = f.read()
+                
+                if final_content == dest_content:
+                    should_save = False
+                    
+        except (UnicodeDecodeError, OSError):
+            should_save = True # Assume changed if can't read dest
+
+    # 4. Atomic Write if needed
+    if should_save:
+        ensure_directory(dest_path.parent)
+        atomic_write_text(dest_path, final_content)
+        # Copy permissions
+        try:
+            dest_path.chmod(src_path.stat().st_mode)
+        except OSError:
+            pass
+            
+    return should_save, detected_secrets
 
 
-def has_unhandled_secrets(file_path: Path) -> bool:
-    """Check if a file contains secrets not in allow list or permanent redact list.
+def _handle_binary_copy(src_path: Path, dest_path: Path, check_secrets: bool) -> tuple[bool, list[SecretMatch]]:
+    """Handle binary file copying (no secret filtering)."""
+    # Simple binary comparison
+    import filecmp
+    if dest_path.exists() and filecmp.cmp(src_path, dest_path, shallow=False):
+        # Check permissions
+        if src_path.stat().st_mode == dest_path.stat().st_mode:
+            return False, []
     
-    Returns True if there are secrets that need user decision, False otherwise.
-    """
-    if not file_path.exists() or not file_path.is_file():
-        return False
-    
+    ensure_directory(dest_path.parent)
+    # shutil.copy2 copies data and metadata (permissions)
+    # For binary, we can copy to temp then move to ensure atomicity
+    temp_path = dest_path.with_suffix(f"{dest_path.suffix}.tmp")
     try:
-        content = file_path.read_text(encoding="utf-8")
-    except (UnicodeDecodeError, OSError):
-        return False  # Binary file or read error, no text secrets
-    
-    scanner = SecretScanner()
-    allow_guard = SecretGuard()
-    redact_guard = PermanentRedactGuard()
-    
-    for match in scanner.scan_content(content, file_path):
-        # Check if this secret is already handled
-        if allow_guard.is_allowed(file_path, match.line_content, match.pattern_name):
-            continue  # Allowed, will be skipped
-        if redact_guard.should_redact(file_path, match.line_content, match.pattern_name):
-            continue  # Will be auto-redacted
+        shutil.copy2(src_path, temp_path)
+        os.replace(temp_path, dest_path)
+    except OSError:
+        return False, []
         
-        # Found an unhandled secret
-        return True
-    
-    return False
-
+    return True, []
 
 
 def ensure_directory(path: Path, mode: int = 0o755) -> None:
@@ -164,7 +166,6 @@ def update_metadata_cache(path: Path) -> None:
         pass
 
 
-
 def copy_file(
     source: Path,
     destination: Path,
@@ -172,53 +173,16 @@ def copy_file(
     secret_handler: Callable[[SecretMatch], str] | None = None,
 ) -> tuple[bool, list[SecretMatch]]:
     """Copy a file from source to destination.
-
-    Args:
-        source: Source file path
-        destination: Destination file path
-        filter_secrets_enabled: Whether to filter secrets from content
-
-    Returns:
-        Tuple of (success, list_of_detected_secrets)
+    
+    Wrapper around smart_save_file.
     """
-    detected_secrets: list[SecretMatch] = []
-
-    try:
-        # Ensure destination directory exists
-        ensure_directory(destination.parent)
-
-        if filter_secrets_enabled and source.is_file():
-            # Read and filter content
-            try:
-                with source.open("r", encoding="utf-8", newline="") as f:
-                    content = f.read()
-                
-                filtered_content, secrets = filter_secrets(
-                    content, callback=secret_handler, file_path=source
-                )
-                detected_secrets = secrets
-                
-                with destination.open("w", encoding="utf-8", newline="") as f:
-                    f.write(filtered_content)
-                
-                # Preserve original file permissions (e.g., executable bit)
-                destination.chmod(source.stat().st_mode)
-            except UnicodeDecodeError:
-                # Binary file - copy without filtering
-                shutil.copy2(source, destination)
-        else:
-            # Direct copy
-            if source.is_file():
-                shutil.copy2(source, destination)
-            elif source.is_dir():
-                if destination.exists():
-                    shutil.rmtree(destination)
-                shutil.copytree(source, destination)
-
-        return True, detected_secrets
-
-    except OSError:
-        return False, detected_secrets
+    saved, secrets = smart_save_file(
+        source, 
+        destination, 
+        secret_handler=secret_handler, 
+        check_secrets=filter_secrets_enabled
+    )
+    return saved, secrets
 
 
 def matches_patterns(path: Path, patterns: list[str]) -> bool:
@@ -265,7 +229,6 @@ def copy_directory(
         exclude_patterns if exclude_patterns is not None else (ignore_patterns or [])
     )
     files_copied = 0
-    files_skipped = 0
     files_failed = 0
     all_secrets: list[SecretMatch] = []
 
@@ -285,23 +248,18 @@ def copy_directory(
 
         dest_path = destination / relative
 
-        # Optimized: check unchanged status and secrets in a single file read
-        is_unchanged, has_secrets = check_file_save_status(
-            src_path, dest_path, check_secrets=filter_secrets_enabled
-        )
-        
-        if is_unchanged and not has_secrets:
-            files_skipped += 1
-            continue  # File unchanged and no unhandled secrets, skip
-
-        success, secrets = copy_file(
-            src_path, dest_path, filter_secrets_enabled, secret_handler=secret_handler
-        )
-        all_secrets.extend(secrets)
-
-        if success:
-            files_copied += 1
-        else:
+        try:
+            # Use smart_save_file for single pass, robust saving
+            saved, secrets = smart_save_file(
+                src_path, 
+                dest_path, 
+                secret_handler=secret_handler, 
+                check_secrets=filter_secrets_enabled
+            )
+            all_secrets.extend(secrets)
+            if saved:
+                files_copied += 1
+        except Exception:
             files_failed += 1
 
     return files_copied, files_failed, all_secrets
@@ -337,17 +295,12 @@ def compare_files(file1: Path, file2: Path) -> bool:
         if stat1.st_size != stat2.st_size:
             return False
 
-        # NOTE: mtime optimization removed - git checkout updates mtimes,
-        # making this unreliable for dotfile sync scenarios.
-        # Always use content-based comparison for accuracy.
-
         # Efficient chunked comparison
         import filecmp
         is_same = filecmp.cmp(file1, file2, shallow=False)
         return is_same
     except OSError:
         return False
-
 
 
 def get_file_status(local_path: Path, repo_path: Path) -> str:
