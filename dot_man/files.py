@@ -65,6 +65,7 @@ def copy_file(
                 )
                 detected_secrets = secrets
                 destination.write_text(filtered_content, encoding="utf-8")
+                destination.chmod(source.stat().st_mode)
             except UnicodeDecodeError:
                 # Binary file - copy without filtering
                 shutil.copy2(source, destination)

@@ -431,7 +431,11 @@ class SecretScanner:
 
             redacted_lines.append(current_line)
 
-        return "\n".join(redacted_lines), count
+        result = "\n".join(redacted_lines)
+        # Preserve trailing newline if original content had one
+        if content.endswith("\n") and not result.endswith("\n"):
+            result += "\n"
+        return result, count
 
 
 def filter_secrets(
