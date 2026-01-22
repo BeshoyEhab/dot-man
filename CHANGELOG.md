@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Atomic File Operations**: New `atomic_write_text` ensures files are written to a temp file (`.tmp`) first and then renamed, preventing data corruption during save/deploy.
 - **Ignored Secret Persistence**: Secrets in the ignore list are now correctly preserved in the local file (unredacted) without trigger warnings.
 - **Smart Save Strategy**: Unified file saving logic (`smart_save_file`) that performs content comparison, secret checking, and atomic writing in a single efficient pass.
+- **File Locking**: New `FileLock` context manager prevents concurrent `dot-man` operations to avoid race conditions.
+- **Strict Typing**: Achieved 100% type safety with strict `mypy` checks.
 
 ### Changed
 

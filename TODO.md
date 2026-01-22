@@ -63,15 +63,17 @@
 
 ---
 
-## Next Up
-
-### v0.6.0 - Code Quality & Robustness
+### v0.6.0 ✅ - Code Quality & Robustness
 
 - [x] **Atomic file operations** - Write to temp file, then rename (prevents corruption)
 - [x] **Consistent file I/O** - Use `newline=""` everywhere for line ending preservation
 - [x] **Consolidate secret checking** - Reduce duplicate code in `has_unhandled_secrets()` and `check_file_save_status()`
-- [ ] **Complete type hints** - Add missing type annotations throughout codebase
-- [ ] **File locking** - Prevent concurrent `dot-man` operations from conflicting
+- [x] **Complete type hints** - Add missing type annotations throughout codebase
+- [x] **File locking** - Prevent concurrent `dot-man` operations from conflicting
+
+---
+
+## Next Up
 
 ### v0.7.0 - New Commands
 
