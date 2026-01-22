@@ -6,7 +6,6 @@ from enum import Enum
 from pathlib import Path
 
 from typing import Iterable, Iterator, Callable
-
 from .constants import SECRET_REDACTION_TEXT, DOT_MAN_DIR
 
 import json
@@ -58,7 +57,8 @@ class BaseSecretGuard:
             return []
         try:
             content = self.list_path.read_text(encoding="utf-8")
-            return json.loads(content)
+            from typing import cast
+            return cast(list[AllowedSecret], json.loads(content))
         except (FileNotFoundError, json.JSONDecodeError):
             return []
         except OSError:

@@ -105,7 +105,7 @@ class GitManager:
         Returns:
             Dictionary with keys: 'modified', 'new', 'deleted', 'untracked'
         """
-        status = {
+        status: dict[str, list[str]] = {
             "modified": [],
             "new": [],
             "deleted": [],
@@ -114,12 +114,13 @@ class GitManager:
 
         # Get diff from index
         for diff in self.repo.index.diff(None):
-            if diff.change_type == "M":
-                status["modified"].append(diff.a_path)
-            elif diff.change_type == "D":
-                status["deleted"].append(diff.a_path)
-            elif diff.change_type == "A":
-                status["new"].append(diff.a_path)
+            if diff.a_path:
+                if diff.change_type == "M":
+                    status["modified"].append(diff.a_path)
+                elif diff.change_type == "D":
+                    status["deleted"].append(diff.a_path)
+                elif diff.change_type == "A":
+                    status["new"].append(diff.a_path)
 
         # Get untracked files
         status["untracked"] = self.repo.untracked_files
@@ -385,7 +386,8 @@ class GitManager:
         """
         try:
             # Use git show to read file from branch
-            return self.repo.git.show(f"{branch}:{file_path}")
+            from typing import cast
+            return cast(str | None, self.repo.git.show(f"{branch}:{file_path}"))
         except GitCommandError:
             # File doesn't exist in that branch
             return None

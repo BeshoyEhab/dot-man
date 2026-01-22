@@ -95,7 +95,7 @@ def config_set(key: str, value: str):
         except (FileNotFoundError, ConfigurationError):
             cfg.create_default()
 
-        # Handle boolean values
+        val: bool | str
         if value.lower() == "true":
             val = True
         elif value.lower() == "false":
@@ -298,7 +298,8 @@ def _show_section_examples(section: str):
     from rich.panel import Panel
     from rich.syntax import Syntax
 
-    examples = {
+    from typing import Any
+    examples: dict[str, dict[str, Any]] = {
         "basic": {
             "title": "Basic File Tracking",
             "description": "Track individual files with smart defaults",

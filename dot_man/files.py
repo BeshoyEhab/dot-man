@@ -1,5 +1,7 @@
 """File operations for dot-man."""
 
+from __future__ import annotations
+
 import shutil
 import os
 from pathlib import Path

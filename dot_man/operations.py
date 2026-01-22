@@ -1,7 +1,8 @@
 """Core operations for dot-man - modular business logic."""
 
+from __future__ import annotations
 from pathlib import Path
-from typing import Iterator, Callable, Any, Optional, Union
+from typing import Iterator, Callable, Any, Optional, Union, TypedDict, cast
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .config import GlobalConfig, DotManConfig, Section
@@ -12,6 +13,13 @@ from .constants import REPO_DIR
 from .exceptions import DotManError, ConfigurationError, PermissionError, DeploymentError
 from .vault import SecretVault
 from .backups import BackupManager
+
+
+class DeploymentPlan(TypedDict):
+    sections_to_deploy: list[tuple[Section, Path, Path]]
+    pre_hooks: list[str]
+    post_hooks: list[str]
+    errors: list[str]
 
 
 class DotManOperations:
@@ -284,18 +292,14 @@ class DotManOperations:
         
         return deployed, had_changes, errors
     
-    def scan_deployable_changes(self, sections: list[Section]) -> dict:
+    def scan_deployable_changes(self, sections: list[Section]) -> DeploymentPlan:
         """
         Phase 1: Scan for changes and collect hooks (Fast Scan).
         
         Returns:
-            dict containing:
-            - 'sections_to_deploy': list of (section, local_path, repo_path) tuples
-            - 'pre_hooks': list of pre-deploy commands
-            - 'post_hooks': list of post-deploy commands
-            - 'errors': list of scan errors
+            DeploymentPlan dict
         """
-        plan = {
+        plan: DeploymentPlan = {
             "sections_to_deploy": [],
             "pre_hooks": [],
             "post_hooks": [],
@@ -332,7 +336,7 @@ class DotManOperations:
                     
         return plan
 
-    def execute_deployment_plan(self, plan: dict) -> dict:
+    def execute_deployment_plan(self, plan: DeploymentPlan) -> dict:
         """
         Phase 2: Execute the deployment plan.
         
@@ -342,16 +346,7 @@ class DotManOperations:
         all_errors: list[str] = list(plan["errors"])
         pre_hooks = list(dict.fromkeys(plan["pre_hooks"]))
         post_hooks = list(dict.fromkeys(plan["post_hooks"]))
-        
-        # 1. Run Pre-Hooks (BEFORE any file changes)
-        # Note: We return them for the caller (CLI/TUI) to run them, OR we run them here?
-        # Following existing pattern: CLI runs the hooks returned in the result dict.
-        # BUT for `switch_branch` logic inside operations, we might want to know about them.
-        # Limitation: operations.py currently usually returns hooks for CLI to run/display.
-        # However, to fix the "too late" bug, we must ensure CLI runs them before.
-        # For `deploy_all`, we just return them. The CLI code runs pre_hooks from the result.
-        
-        # 2. Deploy Files (Parallel)
+
         sections_to_deploy = plan["sections_to_deploy"]
         
         if sections_to_deploy:

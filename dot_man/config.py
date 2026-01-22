@@ -1,7 +1,7 @@
 """Configuration parsing for dot-man using TOML format."""
 
 import sys
-from typing import Optional, Any, Union
+from typing import Optional, Any, Union, cast
 from pathlib import Path
 from datetime import datetime
 
@@ -168,7 +168,7 @@ class GlobalConfig:
     @property
     def current_branch(self) -> str:
         """Get the current branch name."""
-        return self._data.get("dot-man", {}).get("current_branch", DEFAULT_BRANCH)
+        return cast(str, self._data.get("dot-man", {}).get("current_branch", DEFAULT_BRANCH))
 
     @current_branch.setter
     def current_branch(self, value: str) -> None:
@@ -181,7 +181,7 @@ class GlobalConfig:
     @property
     def remote_url(self) -> str:
         """Get the remote URL."""
-        return self._data.get("remote", {}).get("url", "")
+        return cast(str, self._data.get("remote", {}).get("url", ""))
 
     @remote_url.setter
     def remote_url(self, value: str) -> None:
@@ -194,7 +194,7 @@ class GlobalConfig:
     @property
     def editor(self) -> Optional[str]:
         """Get the configured editor."""
-        return self._data.get("dot-man", {}).get("editor")
+        return cast(Optional[str], self._data.get("dot-man", {}).get("editor"))
 
     @editor.setter
     def editor(self, value: Optional[str]) -> None:
@@ -207,7 +207,7 @@ class GlobalConfig:
     @property
     def secrets_filter_enabled(self) -> bool:
         """Check if secrets filter is enabled by default."""
-        return self._data.get("defaults", {}).get("secrets_filter", True)
+        return cast(bool, self._data.get("defaults", {}).get("secrets_filter", True))
 
     @secrets_filter_enabled.setter
     def secrets_filter_enabled(self, value: bool) -> None:
@@ -220,7 +220,7 @@ class GlobalConfig:
     @property
     def strict_mode(self) -> bool:
         """Check if strict mode is enabled."""
-        return self._data.get("security", {}).get("strict_mode", False)
+        return cast(bool, self._data.get("security", {}).get("strict_mode", False))
 
     @strict_mode.setter
     def strict_mode(self, value: bool) -> None:
@@ -230,17 +230,18 @@ class GlobalConfig:
         self._data["security"]["strict_mode"] = value
         self._dirty = True
 
-    def get_defaults(self) -> dict:
+    def get_defaults(self) -> dict[str, Any]:
         """Get default settings that apply to all sections."""
-        return self._data.get("defaults", {})
+        return cast(dict[str, Any], self._data.get("defaults", {}))
 
     def get_template(self, name: str) -> Optional[dict[str, Any]]:
         """Get a template by name."""
-        return self._data.get("templates", {}).get(name)
+        templates = self._data.get("templates", {})
+        return cast(Optional[dict[str, Any]], templates.get(name))
 
-    def get_all_templates(self) -> dict:
+    def get_all_templates(self) -> dict[str, Any]:
         """Get all templates."""
-        return self._data.get("templates", {})
+        return cast(dict[str, Any], self._data.get("templates", {}))
 
 
 class Section:
@@ -506,7 +507,7 @@ class DotManConfig:
             section_data = dict(config[section_name])
 
             # Convert old format to new format
-            new_section = {}
+            new_section: dict[str, Any] = {}
 
             # Handle local_path -> paths
             if "local_path" in section_data:
@@ -695,16 +696,16 @@ class DotManConfig:
             if name != "templates" and isinstance(self._data[name], dict)
         ]
 
-    def get_local_templates(self) -> dict:
+    def get_local_templates(self) -> dict[str, Any]:
         """Get templates defined in this file."""
-        return self._data.get("templates", {})
+        return cast(dict[str, Any], self._data.get("templates", {}))
 
-    def _resolve_template(self, name: str) -> dict:
+    def _resolve_template(self, name: str) -> dict[str, Any]:
         """Resolve a template by name, checking local first then global."""
         # Check local templates
         local = self.get_local_templates().get(name)
         if local:
-            return local
+            return cast(dict[str, Any], local)
 
         # Check global templates
         if self._global_config:
@@ -936,7 +937,7 @@ class LegacyConfigLoader:
         config = configparser.ConfigParser()
         config.read(old_path)
 
-        data = {}
+        data: dict[str, dict[str, Any]] = {}
         for section in config.sections():
             data[section] = dict(config[section])
             # Convert string booleans
