@@ -10,7 +10,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Revert Command**: New `dot-man revert <file>` command allows restoring individual files to their repository state, discarding local changes.
-- **Improved Testing**: Added robust text fixtures using `repo_path` configuration for explicit file mapping in tests.
 
 ## [0.6.0] - 2026-01-23
 
