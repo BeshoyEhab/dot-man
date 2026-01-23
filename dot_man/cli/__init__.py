@@ -29,6 +29,7 @@ from .branch_cmd import branch
 from .remote_cmd import remote, sync
 from .tui_cmd import tui
 from .config_cmd import config
+from .revert_cmd import revert
 
 __all__ = [
     'main',
@@ -54,4 +55,5 @@ __all__ = [
     'sync',
     'tui',
     'config',
+    'revert',
 ]

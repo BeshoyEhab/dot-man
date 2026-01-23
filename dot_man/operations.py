@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 from pathlib import Path
-from typing import Iterator, Callable, Any, Optional, Union, TypedDict, cast
+from typing import Iterator, Callable, Any, Optional, TypedDict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .config import GlobalConfig, DotManConfig, Section
@@ -10,10 +10,11 @@ from .core import GitManager
 from .files import copy_file, copy_directory, compare_files, get_file_status, backup_file, atomic_write_text
 from .secrets import SecretScanner, SecretMatch
 from .constants import REPO_DIR
-from .exceptions import DotManError, ConfigurationError, PermissionError, DeploymentError
+from .exceptions import DotManError, PermissionError
 from .vault import SecretVault
 from .backups import BackupManager
 from .lock import FileLock
+from .ui import warn
 
 LOCK_FILE = REPO_DIR.parent / ".lock"
 
@@ -603,6 +604,69 @@ class DotManOperations:
                 self.global_config.save()
             
         return result
+    
+    def revert_file(self, path: Path) -> bool:
+        """
+        Revert a specific file to its repository version.
+        
+        Args:
+            path: Absolute path to the file to revert.
+            
+        Returns:
+            True if successful, False if file not tracked or not found in repo.
+        """
+        path = path.resolve()
+        
+        # Find which section tracks this file
+        target_section = None
+        repo_source = None
+        
+        for section_name in self.get_sections():
+            section = self.get_section(section_name)
+            # Check explicit paths
+            if path in section.paths:
+                 target_section = section
+                 repo_source = section.get_repo_path(path, REPO_DIR)
+                 break
+            
+            # Check directory inclusions
+            for p in section.paths:
+                if p.is_dir() and p in path.parents:
+                    target_section = section
+                    repo_source = section.get_repo_path(path, REPO_DIR)
+                    break
+            
+            if target_section:
+                break
+        
+        if not target_section or not repo_source:
+             warn(f"File not tracked by any section: {path}")
+             return False
+
+        if not repo_source.exists():
+             warn(f"File not found in repository (branch: {self.current_branch}): {repo_source}")
+             return False
+        
+        try:
+             # Basic copy first
+             success, _ = copy_file(repo_source, path, filter_secrets_enabled=False)
+             
+             if success and target_section.secrets_filter:
+                 # Attempt to restore secrets
+                 try:
+                    content = path.read_text(encoding="utf-8")
+                    restored = self.vault.restore_secrets_in_content(
+                        content, str(path), self.current_branch
+                    )
+                    if restored != content:
+                        atomic_write_text(path, restored)
+                 except (OSError, UnicodeDecodeError):
+                     pass # Ignore binary/read errors for secrets
+
+             return success
+
+        except Exception as e:
+             raise DotManError(f"Failed to revert {path}: {e}")
     
     def audit(self) -> list[tuple[str, list[SecretMatch]]]:
         """
