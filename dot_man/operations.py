@@ -498,8 +498,8 @@ class DotManOperations:
             
             sections = [self.get_section(name) for name in self.get_sections()]
             
-            # Parallel execution
-            with ThreadPoolExecutor() as executor:
+            # Parallel execution with vault batching
+            with self.vault.batch(), ThreadPoolExecutor() as executor:
                 future_to_section = {
                     executor.submit(self.save_section, section, secret_handler): section 
                     for section in sections
