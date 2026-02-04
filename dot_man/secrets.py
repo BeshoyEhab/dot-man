@@ -16,7 +16,7 @@ from typing import TypedDict
 
 def _canonicalize_path(file_path: Path | str) -> str:
     """Resolve path to canonical absolute form for consistent matching.
-    
+
     This ensures that ~/file, /home/user/file, and ./file all resolve
     to the same canonical path for reliable secret ignore list matching.
     """
@@ -58,6 +58,7 @@ class BaseSecretGuard:
         try:
             content = self.list_path.read_text(encoding="utf-8")
             from typing import cast
+
             return cast(list[AllowedSecret], json.loads(content))
         except (FileNotFoundError, json.JSONDecodeError):
             return []
@@ -152,7 +153,6 @@ class PermanentRedactGuard(BaseSecretGuard):
     ) -> None:
         """Add a secret to the permanent redact list."""
         self._add_to_list(file_path, line_content, pattern_name)
-
 
 
 class Severity(Enum):
@@ -346,22 +346,33 @@ class SecretScanner:
         self, directory: Path, exclude_patterns: list[str] | None = None
     ) -> Iterator[SecretMatch]:
         """Scan all files in a directory for secrets."""
+        import os
+
         exclude_patterns = exclude_patterns or []
+        directory = Path(directory)
 
-        for path in directory.rglob("*"):
-            # Skip directories
-            if path.is_dir():
-                continue
+        for root, dirs, files in os.walk(directory):
+            # Prune .git directory
+            if ".git" in dirs:
+                dirs.remove(".git")
 
-            # Skip .git directory
-            if ".git" in path.parts:
-                continue
+            root_path = Path(root)
 
-            # Skip excluded patterns
-            if any(path.match(pattern) for pattern in exclude_patterns):
-                continue
+            # Prune excluded directories
+            # We iterate over a copy of dirs to safely remove from the original list
+            for d in list(dirs):
+                dir_path = root_path / d
+                if any(dir_path.match(pattern) for pattern in exclude_patterns):
+                    dirs.remove(d)
 
-            yield from self.scan_file(path)
+            for file in files:
+                file_path = root_path / file
+
+                # Skip excluded patterns
+                if any(file_path.match(pattern) for pattern in exclude_patterns):
+                    continue
+
+                yield from self.scan_file(file_path)
 
     def redact_content(
         self,
@@ -374,7 +385,7 @@ class SecretScanner:
 
         Args:
             content: Text content to redact
-            callback: Optional function that takes a SecretMatch and returns a string action ("REDACT") 
+            callback: Optional function that takes a SecretMatch and returns a string action ("REDACT")
                       OR the replacement string itself.
                       If it returns "REDACT", default redaction text is used.
                       If it returns anything else (and not "KEEP"), that string is used as replacement.
@@ -411,7 +422,7 @@ class SecretScanner:
                             matched_text=matched_text,
                         )
                         result = callback(secret_match)
-                        
+
                         if result == "KEEP" or result == "IGNORE":
                             should_redact = False
                         elif result == "REDACT":
@@ -446,10 +457,10 @@ def filter_secrets(
         Note: Only secrets that were actually redacted are returned, not ignored ones.
     """
     scanner = SecretScanner()
-    
+
     # Track which secrets were actually redacted
     redacted_secrets: list[SecretMatch] = []
-    
+
     def tracking_callback(match: SecretMatch) -> str:
         if callback:
             result = callback(match)
@@ -461,6 +472,6 @@ def filter_secrets(
             # No callback = always redact
             redacted_secrets.append(match)
             return "REDACT"
-    
+
     filtered_content, _ = scanner.redact_content(content, tracking_callback, file_path)
     return filtered_content, redacted_secrets
