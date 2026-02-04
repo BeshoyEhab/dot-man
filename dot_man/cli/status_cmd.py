@@ -158,23 +158,6 @@ def status(verbose: bool, secrets: bool):
 
             displayed_sections += 1
 
-        if len(all_section_names) > 10 and displayed_sections < 10:
-             # Case where some sections were empty and not yielded by get_detailed_status?
-             # get_detailed_status yields all paths. If a section has no paths (empty dir?), it might yield nothing.
-             # But if section exists, we want to show it?
-             # existing logic only showed sections returned by iteration.
-             pass
-
-        # If there were sections that didn't appear in items (no files found),
-        # they won't be in the table. This matches typical "status" behavior (show tracked files).
-        # But we might want to show empty sections.
-        # The previous code iterated `section_names[:10]` and then `iter_section_paths`.
-        # If `iter_section_paths` yielded nothing, it would just show the header.
-        # My new code only iterates groups present in `status_items`.
-        # If a section has no paths yielded by `iter_section_paths`, it won't be in `status_items`.
-        # This is a slight behavior change: empty sections disappear from status.
-        # This is acceptable optimization.
-
         ui.console.print(file_table)
 
         # Summary
