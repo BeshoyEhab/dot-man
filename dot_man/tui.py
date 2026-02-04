@@ -2,6 +2,7 @@
 
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 if sys.version_info >= (3, 11):
@@ -488,14 +489,22 @@ class SwitchPreview(Static):
 
 class SyncStatus(Static):
     """Widget to display sync status with optional audit badge."""
-    
-    def update_status(self, status: dict, audit_count: int = 0):
+
+    def on_mount(self) -> None:
+        self.update_status(None)
+
+    def update_status(self, status: dict | None, audit_count: int = 0):
+        if status is None:
+            text = Text("⌛ Syncing...", style="dim")
+            self.update(Panel(text, title="Sync", border_style="yellow"))
+            return
+
         text = Text()
-        
+
         # Audit badge first if issues found
         if audit_count > 0:
             text.append(f"🔒 {audit_count} ", style="red bold")
-        
+
         if not status.get("remote_configured"):
             text.append("⚠ No remote\n", style="yellow")
             text.append("Use: remote set <url>", style="dim")
@@ -509,7 +518,7 @@ class SyncStatus(Static):
                     text.append(f"↑ {ahead} ", style="green")
                 if behind > 0:
                     text.append(f"↓ {behind}", style="yellow")
-        
+
         title = "Sync" + (" • Audit" if audit_count > 0 else "")
         self.update(Panel(text, title=title, border_style="green" if audit_count == 0 else "red"))
 
@@ -696,20 +705,29 @@ class DotManApp(App):
     
     def _update_sync_status(self) -> None:
         sync_widget = self.query_one("#sync-status", SyncStatus)
-        try:
-            status = self.git.get_sync_status()
-            # Get audit count for badge
-            audit_count = 0
+        sync_widget.update_status(None)  # Show loading state
+
+        def worker():
             try:
-                from .operations import get_operations
-                ops = get_operations()
-                audit_results = ops.audit()
-                audit_count = sum(len(matches) for _, matches in audit_results)
+                status = self.git.get_sync_status()
+                # Get audit count for badge
+                audit_count = 0
+                try:
+                    from .operations import get_operations
+                    ops = get_operations()
+                    audit_results = ops.audit()
+                    audit_count = sum(len(matches) for _, matches in audit_results)
+                except Exception:
+                    pass
+
+                # Use call_from_thread to update UI safely
+                self.call_from_thread(sync_widget.update_status, status, audit_count)
             except Exception:
-                pass
-            sync_widget.update_status(status, audit_count)
-        except Exception:
-            sync_widget.update_status({"remote_configured": False})
+                self.call_from_thread(sync_widget.update_status, {"remote_configured": False})
+
+        # Run the worker in a separate thread
+        thread = threading.Thread(target=worker, daemon=True)
+        thread.start()
     
     def _update_preview(self, selected_branch: str) -> None:
         preview_widget = self.query_one("#switch-preview", SwitchPreview)
