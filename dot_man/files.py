@@ -160,25 +160,8 @@ def ensure_directory(path: Path, mode: int = 0o755) -> None:
     path.chmod(mode)
 
 
-# Simple metadata cache: {path_str: (mtime, size)}
-_metadata_cache: dict[str, tuple[float, int]] = {}
-
-
-def get_cached_metadata(path: Path) -> tuple[float, int] | None:
-    """Get cached metadata if available and valid."""
-    p_str = str(path)
-    if p_str in _metadata_cache:
-        return _metadata_cache[p_str]
-    return None
-
-
-def update_metadata_cache(path: Path) -> None:
-    """Update cache with current file metadata."""
-    try:
-        stat = path.stat()
-        _metadata_cache[str(path)] = (stat.st_mtime, stat.st_size)
-    except OSError:
-        pass
+# Cache for file comparisons: { "path1|path2": (mtime1, size1, mtime2, size2, result) }
+_comparison_cache: dict[str, tuple[float, int, float, int, bool]] = {}
 
 
 def copy_file(
@@ -345,10 +328,34 @@ def compare_files(file1: Path, file2: Path) -> bool:
         if stat1.st_size != stat2.st_size:
             return False
 
+        # Check comparison cache
+        # Key combining both paths ensures uniqueness for the pair
+        cache_key = f"{file1}|{file2}"
+        if cache_key in _comparison_cache:
+            m1, s1, m2, s2, res = _comparison_cache[cache_key]
+            # Verify cache validity: both files must match their cached metadata
+            if (
+                m1 == stat1.st_mtime
+                and s1 == stat1.st_size
+                and m2 == stat2.st_mtime
+                and s2 == stat2.st_size
+            ):
+                return res
+
         # Efficient chunked comparison
         import filecmp
 
         is_same = filecmp.cmp(file1, file2, shallow=False)
+
+        # Update cache
+        _comparison_cache[cache_key] = (
+            stat1.st_mtime,
+            stat1.st_size,
+            stat2.st_mtime,
+            stat2.st_size,
+            is_same,
+        )
+
         return is_same
     except OSError:
         return False

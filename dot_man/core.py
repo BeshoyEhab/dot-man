@@ -342,6 +342,42 @@ class GitManager:
                 "file_count": 0,
             }
 
+    def get_all_branch_stats(self) -> list[dict]:
+        """Get stats for all branches efficiently using git for-each-ref.
+
+        Returns:
+            List of dicts with: name, last_commit_date, last_commit_msg
+        """
+        try:
+            # format: refname:short|committerdate:iso|subject
+            output = self.repo.git.for_each_ref(
+                "--format=%(refname:short)|%(committerdate:iso)|%(subject)",
+                "refs/heads/",
+            )
+
+            branches = []
+            if not output:
+                return []
+
+            for line in output.split("\n"):
+                if not line.strip():
+                    continue
+                parts = line.split("|", 2)
+                if len(parts) == 3:
+                    name, date, msg = parts
+                    branches.append(
+                        {
+                            "name": name,
+                            "last_commit_date": date,
+                            "last_commit_msg": msg,
+                            # File count is expensive, so we don't include it here
+                            "file_count": None,
+                        }
+                    )
+            return branches
+        except (GitCommandError, ValueError, OSError):
+            return []
+
     def get_sync_status(self) -> dict:
         """Get sync status with remote.
         

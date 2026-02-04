@@ -758,7 +758,26 @@ class DotManOperations:
         # Interactive
         from .ui import confirm
         return confirm("Secrets detected. Push anyway?", default=False)
-    
+
+    def get_detailed_status(self) -> Iterator[dict]:
+        """
+        Get detailed status for all tracked files.
+
+        Yields:
+            Dict with: section, local_path, repo_path, status, inherits
+        """
+        for section_name in self.get_sections():
+            section = self.get_section(section_name)
+
+            for local_path, repo_path, status in self.iter_section_paths(section):
+                yield {
+                    "section": section_name,
+                    "local_path": local_path,
+                    "repo_path": repo_path,
+                    "status": status,
+                    "inherits": section.inherits,
+                }
+
     def get_status_summary(self) -> dict:
         """
         Get a summary of current status.
@@ -781,23 +800,23 @@ class DotManOperations:
             "identical": 0,
         }
         
-        section_names = self.get_sections()
-        summary["sections"] = len(section_names)
+        section_names = set()
         
-        for section_name in section_names:
-            section = self.get_section(section_name)
-            summary["total_paths"] += len(section.paths)
+        for item in self.get_detailed_status():
+            section_names.add(item["section"])
+            summary["total_paths"] += 1
             
-            for _, _, status in self.iter_section_paths(section):
-                if status == "MODIFIED":
-                    summary["modified"] += 1
-                elif status == "NEW":
-                    summary["new"] += 1
-                elif status == "DELETED":
-                    summary["deleted"] += 1
-                else:
-                    summary["identical"] += 1
+            status = item["status"]
+            if status == "MODIFIED":
+                summary["modified"] += 1
+            elif status == "NEW":
+                summary["new"] += 1
+            elif status == "DELETED":
+                summary["deleted"] += 1
+            else:
+                summary["identical"] += 1
         
+        summary["sections"] = len(section_names)
         return summary
 
 
