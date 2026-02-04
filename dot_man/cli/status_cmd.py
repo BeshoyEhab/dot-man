@@ -47,17 +47,38 @@ def status(verbose: bool, secrets: bool):
         )
         ui.console.print()
 
-        # Get status summary
-        summary = ops.get_status_summary()
+        # Get detailed status once (Optimized single pass)
+        status_items = list(ops.get_detailed_status())
 
-        section_names = ops.get_sections()
-        if not section_names:
+        # Calculate summary from items
+        summary = {
+            "modified": 0,
+            "new": 0,
+            "deleted": 0,
+            "identical": 0
+        }
+
+        section_names_set = set()
+        for item in status_items:
+            section_names_set.add(item["section"])
+            st = item["status"]
+            if st == "MODIFIED":
+                summary["modified"] += 1
+            elif st == "NEW":
+                summary["new"] += 1
+            elif st == "DELETED":
+                summary["deleted"] += 1
+            else:
+                summary["identical"] += 1
+
+        all_section_names = ops.get_sections()
+        if not all_section_names:
             ui.console.print(
                 "[dim]No sections tracked. Run 'dot-man add <path>' to add files.[/dim]"
             )
             return
 
-        file_table = Table(title=f"Tracked Sections ({len(section_names)})")
+        file_table = Table(title=f"Tracked Sections ({len(all_section_names)})")
         file_table.add_column("Section / Path", style="cyan")
         file_table.add_column("Status")
         file_table.add_column("Details", style="dim")
@@ -72,7 +93,21 @@ def status(verbose: bool, secrets: bool):
         scanner = SecretScanner() if secrets else None
         secrets_found = []
 
-        for section_name in section_names[:10]:  # Limit display
+        from itertools import groupby
+
+        # Items are already sorted by section iteration order from get_detailed_status
+        displayed_sections = 0
+
+        for section_name, group in groupby(status_items, key=lambda x: x["section"]):
+            if displayed_sections >= 10:
+                file_table.add_row(
+                    f"[dim]... +{len(all_section_names) - 10} more sections[/dim]", "", ""
+                )
+                break
+
+            items = list(group)
+            # Retrieve section object for metadata like 'inherits'
+            # Note: This is a fast lookup
             section = ops.get_section(section_name)
 
             # Section header
@@ -84,10 +119,13 @@ def status(verbose: bool, secrets: bool):
 
             # Files under section
             path_count = 0
-            for local_path, repo_path, file_status in ops.iter_section_paths(section):
+            for item in items:
                 if path_count >= 5:  # Limit per section
                     file_table.add_row("  [dim]... more files[/dim]", "", "")
                     break
+
+                local_path = item["local_path"]
+                file_status = item["status"]
 
                 color = status_colors.get(file_status, "white")
 
@@ -118,10 +156,7 @@ def status(verbose: bool, secrets: bool):
                 )
                 path_count += 1
 
-        if len(section_names) > 10:
-            file_table.add_row(
-                f"[dim]... +{len(section_names) - 10} more sections[/dim]", "", ""
-            )
+            displayed_sections += 1
 
         ui.console.print(file_table)
 

@@ -625,35 +625,64 @@ class DotManApp(App):
         table = self.query_one("#branch-table", DataTable)
         table.clear()
 
-        branches = self.git.list_branches()
+        # Fast load using for-each-ref
+        branches_info = self.git.get_all_branch_stats()
 
-        # Process in batches if there are many branches
-        for branch in branches:
-            # We skip heavy stats for now or we could load them lazily
-            # But get_branch_stats usually runs `git ls-tree` which is fast enough
-            try:
-                stats = self.git.get_branch_stats(branch)
-                file_count = str(stats["file_count"])
-                commit_count = str(stats["commit_count"])
-            except (DotManError, ValueError):
-                file_count = "?"
-                commit_count = "?"
+        # Sort: current branch first, then alphabetical
+        branches_info.sort(key=lambda x: (x["name"] != self.current_branch, x["name"]))
+
+        branch_names = []
+        for info in branches_info:
+            branch = info["name"]
+            branch_names.append(branch)
 
             marker = "✓" if branch == self.current_branch else ""
             style = "bold" if branch == self.current_branch else ""
+
+            # Use '?' for lazy loaded fields
             table.add_row(
                 marker,
                 Text(branch, style=style),
-                file_count,
-                commit_count,
+                "?",  # Files
+                "?",  # Commits
                 key=branch
             )
         
         # Select current branch
-        if self.current_branch in branches:
-            idx = branches.index(self.current_branch)
+        if self.current_branch in branch_names:
+            idx = branch_names.index(self.current_branch)
             table.move_cursor(row=idx)
             self._update_preview(self.current_branch)
+
+        # Trigger lazy stats loading
+        self._lazy_load_stats(branch_names)
+
+    def _lazy_load_stats(self, branch_names: list[str]) -> None:
+        def worker():
+            for branch in branch_names:
+                try:
+                    # Expensive operation
+                    stats = self.git.get_branch_stats(branch)
+                    file_count = str(stats["file_count"])
+                    commit_count = str(stats["commit_count"])
+
+                    self.call_from_thread(
+                        self._update_branch_row, branch, file_count, commit_count
+                    )
+                except Exception:
+                    pass
+
+        thread = threading.Thread(target=worker, daemon=True)
+        thread.start()
+
+    def _update_branch_row(self, branch: str, files: str, commits: str) -> None:
+        try:
+            table = self.query_one("#branch-table", DataTable)
+            # Update cells using column labels as keys
+            table.update_cell(branch, "Files", files)
+            table.update_cell(branch, "Commits", commits)
+        except Exception:
+            pass
     
     def _update_files(self, branch_name: Optional[str] = None) -> None:
         """Update files panel, optionally for a specific branch."""
