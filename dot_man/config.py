@@ -24,6 +24,7 @@ from .constants import (
     DEFAULT_BRANCH,
     VALID_UPDATE_STRATEGIES,
     HOOK_ALIASES,
+    DEFAULT_IGNORED_DIRECTORIES,
 )
 from .exceptions import ConfigurationError, ConfigValidationError
 
@@ -102,6 +103,8 @@ class GlobalConfig:
             self._data["defaults"] = {
                 "secrets_filter": True,
                 "update_strategy": "replace",
+                "ignored_directories": DEFAULT_IGNORED_DIRECTORIES,
+                "follow_symlinks": False,
             }
 
         # Add empty templates section
@@ -149,6 +152,8 @@ class GlobalConfig:
             "defaults": {
                 "secrets_filter": True,
                 "update_strategy": "replace",
+                "ignored_directories": DEFAULT_IGNORED_DIRECTORIES,
+                "follow_symlinks": False,
             },
             "security": {
                 "strict_mode": False,
@@ -232,7 +237,13 @@ class GlobalConfig:
 
     def get_defaults(self) -> dict[str, Any]:
         """Get default settings that apply to all sections."""
-        return cast(dict[str, Any], self._data.get("defaults", {}))
+        defaults = cast(dict[str, Any], self._data.get("defaults", {}))
+        # Ensure default ignored directories are present if not specified
+        if "ignored_directories" not in defaults:
+            defaults["ignored_directories"] = DEFAULT_IGNORED_DIRECTORIES
+        if "follow_symlinks" not in defaults:
+            defaults["follow_symlinks"] = False
+        return defaults
 
     def get_template(self, name: str) -> Optional[dict[str, Any]]:
         """Get a template by name."""
@@ -260,6 +271,8 @@ class Section:
         pre_deploy: Optional[str] = None,
         post_deploy: Optional[str] = None,
         inherits: Optional[list[str]] = None,
+        ignored_directories: Optional[list[str]] = None,
+        follow_symlinks: Optional[bool] = None,
     ):
         self.name = name
         self.paths = paths
@@ -283,6 +296,9 @@ class Section:
         self.post_deploy = self._resolve_hook(post_deploy)
 
         self.inherits = inherits or []
+
+        self.ignored_directories = ignored_directories if ignored_directories is not None else DEFAULT_IGNORED_DIRECTORIES
+        self.follow_symlinks = follow_symlinks if follow_symlinks is not None else False
 
     def _generate_repo_base(self) -> str:
         """Auto-generate repo_base from first path.
@@ -417,6 +433,12 @@ class Section:
             result["post_deploy"] = self.post_deploy
         if self.inherits:
             result["inherits"] = self.inherits
+
+        if self.ignored_directories != DEFAULT_IGNORED_DIRECTORIES:
+             result["ignored_directories"] = self.ignored_directories
+        if self.follow_symlinks is not False:
+             result["follow_symlinks"] = self.follow_symlinks
+
         return result
 
 
@@ -473,7 +495,7 @@ class DotManConfig:
         valid_section_keys = {
             "paths", "repo_base", "repo_path", "secrets_filter",
             "update_strategy", "include", "exclude", "pre_deploy",
-            "post_deploy", "inherits"
+            "post_deploy", "inherits", "ignored_directories", "follow_symlinks"
         }
         
         for name, section in self._data.items():
@@ -778,6 +800,8 @@ class DotManConfig:
             pre_deploy=settings.get("pre_deploy"),
             post_deploy=settings.get("post_deploy"),
             inherits=inherits,
+            ignored_directories=settings.get("ignored_directories"),
+            follow_symlinks=settings.get("follow_symlinks"),
         )
 
     def add_section(
@@ -827,6 +851,8 @@ class DotManConfig:
             "post_deploy",
             "inherits",
             "repo_path",
+            "ignored_directories",
+            "follow_symlinks",
         ]:
             if key in kwargs and kwargs[key]:
                 section_data[key] = kwargs[key]
@@ -850,7 +876,7 @@ class DotManConfig:
         valid_keys = {
             "paths", "repo_base", "repo_path", "secrets_filter",
             "update_strategy", "include", "exclude", "pre_deploy",
-            "post_deploy", "inherits"
+            "post_deploy", "inherits", "ignored_directories", "follow_symlinks"
         }
         
         for key, value in kwargs.items():
@@ -910,7 +936,7 @@ class DotManConfig:
                 valid_keys = {
                     "paths", "repo_base", "repo_path", "secrets_filter",
                     "update_strategy", "include", "exclude", "pre_deploy",
-                    "post_deploy", "inherits"
+                    "post_deploy", "inherits", "ignored_directories", "follow_symlinks"
                 }
                 for key in self._data[name]:
                     if key not in valid_keys:

@@ -212,16 +212,19 @@ def copy_directory(
     exclude_patterns: list[str] | None = None,
     ignore_patterns: list[str] | None = None,  # Deprecated, use exclude_patterns
     secret_handler: Callable[[SecretMatch], str] | None = None,
+    follow_symlinks: bool = False,
 ) -> tuple[int, int, list[SecretMatch]]:
-    """Copy a directory recursively with pattern filtering.
+    """Copy a directory recursively with pattern filtering and efficient pruning.
 
     Args:
         source: Source directory path
         destination: Destination directory path
         filter_secrets_enabled: Whether to filter secrets
         include_patterns: Only include files matching these patterns (if specified)
-        exclude_patterns: Exclude files matching these patterns
+        exclude_patterns: Exclude files/directories matching these patterns
         ignore_patterns: Deprecated alias for exclude_patterns
+        secret_handler: Callback for detected secrets
+        follow_symlinks: Whether to follow symbolic links during traversal
 
     Returns:
         Tuple of (files_copied, files_failed, detected_secrets)
@@ -234,35 +237,67 @@ def copy_directory(
     files_failed = 0
     all_secrets: list[SecretMatch] = []
 
-    for src_path in source.rglob("*"):
-        if src_path.is_dir():
-            continue
+    # Use os.walk for better performance and control over directory recursion
+    for root, dirs, files in os.walk(source, topdown=True, followlinks=follow_symlinks):
+        root_path = Path(root)
 
-        relative = src_path.relative_to(source)
+        # Prune ignored directories in-place to avoid traversing them
+        if exclude_patterns:
+            # We need to calculate relative path for each dir to check against patterns
+            # Note: dirs[:] = [d for d in dirs if not matches_patterns...]
+            # The check needs to be efficient.
 
-        # Check exclude patterns first
-        if exclude_patterns and matches_patterns(relative, exclude_patterns):
-            continue
+            # Since matches_patterns expects a Path relative to source, we construct it.
+            # root_rel is the relative path of current directory from source.
+            try:
+                root_rel = root_path.relative_to(source)
+            except ValueError:
+                # Should not happen as we walk source
+                continue
 
-        # Check include patterns (if specified, file must match at least one)
-        if include_patterns and not matches_patterns(relative, include_patterns):
-            continue
+            # Iterate backwards to safely remove items
+            for i in range(len(dirs) - 1, -1, -1):
+                d_name = dirs[i]
+                d_rel = root_rel / d_name
 
-        dest_path = destination / relative
+                # Check if this directory should be excluded
+                if matches_patterns(d_rel, exclude_patterns):
+                    del dirs[i]
+                    continue
 
-        try:
-            # Use smart_save_file for single pass, robust saving
-            saved, secrets = smart_save_file(
-                src_path, 
-                dest_path, 
-                secret_handler=secret_handler, 
-                check_secrets=filter_secrets_enabled
-            )
-            all_secrets.extend(secrets)
-            if saved:
-                files_copied += 1
-        except Exception:
-            files_failed += 1
+        # Process files
+        for filename in files:
+            src_file = root_path / filename
+
+            # Calculate relative path from source root
+            try:
+                relative = src_file.relative_to(source)
+            except ValueError:
+                continue
+
+            # Check exclude patterns
+            if exclude_patterns and matches_patterns(relative, exclude_patterns):
+                continue
+
+            # Check include patterns (if specified, file must match at least one)
+            if include_patterns and not matches_patterns(relative, include_patterns):
+                continue
+
+            dest_path = destination / relative
+
+            try:
+                # Use smart_save_file for single pass, robust saving
+                saved, secrets = smart_save_file(
+                    src_file,
+                    dest_path,
+                    secret_handler=secret_handler,
+                    check_secrets=filter_secrets_enabled
+                )
+                all_secrets.extend(secrets)
+                if saved:
+                    files_copied += 1
+            except Exception:
+                files_failed += 1
 
     return files_copied, files_failed, all_secrets
 
