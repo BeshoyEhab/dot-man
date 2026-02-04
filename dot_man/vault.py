@@ -160,9 +160,10 @@ class SecretVault:
                     return None
         return None
         
-    def get_secret_by_hash(self, secret_hash: str) -> Optional[str]:
+    def get_secret_by_hash(self, secret_hash: str, reload: bool = True) -> Optional[str]:
         """Retrieve and decrypt a secret by its hash."""
-        self.load()
+        if reload:
+            self.load()
         f = self._get_fernet()
 
         # Search in reverse to find newest matching hash? 
@@ -189,7 +190,7 @@ class SecretVault:
         
         def replace_match(match):
             secret_hash = match.group(1)
-            restored = self.get_secret_by_hash(secret_hash)
+            restored = self.get_secret_by_hash(secret_hash, reload=False)
             if restored:
                 return restored
             return match.group(0) # Keep redaction if not found
