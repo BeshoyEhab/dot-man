@@ -1,9 +1,5 @@
 """Add command for dot-man CLI."""
 
-# TODO: Move add command implementation here
-# For now, this is a placeholder for the module structure.
-# The actual command is still in the main cli.py
-
 from pathlib import Path
 
 import click
