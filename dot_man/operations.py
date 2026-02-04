@@ -109,11 +109,33 @@ class DotManOperations:
             if local_path.is_dir():
                 # For directories, iterate over files inside
                 if local_path.exists():
-                    for local_file in local_path.rglob("*"):
-                        if local_file.is_file():
-                            # Apply include/exclude patterns
+                    # Combine exclude patterns with ignored directories
+                    excludes = (section.exclude or []) + (section.ignored_directories or [])
+
+                    # Manual walk to support exclusion logic in iteration (similar to copy_directory)
+                    # We can use os.walk but need to yield paths
+                    import os
+                    for root, dirs, files in os.walk(local_path, followlinks=section.follow_symlinks):
+                        root_path = Path(root)
+
+                        # Prune directories
+                        if excludes:
+                            try:
+                                root_rel = root_path.relative_to(local_path)
+                            except ValueError:
+                                continue
+
+                            for i in range(len(dirs) - 1, -1, -1):
+                                d_name = dirs[i]
+                                d_rel = root_rel / d_name
+                                if self._matches_patterns(d_rel, excludes):
+                                    del dirs[i]
+
+                        for file in files:
+                            local_file = root_path / file
                             rel = local_file.relative_to(local_path)
-                            if section.exclude and self._matches_patterns(rel, section.exclude):
+
+                            if excludes and self._matches_patterns(rel, excludes):
                                 continue
                             if section.include and not self._matches_patterns(rel, section.include):
                                 continue
@@ -124,12 +146,15 @@ class DotManOperations:
                 
                 # Also check repo for files that might be deleted locally
                 if repo_path.exists():
+                    # Combine exclude patterns with ignored directories
+                    excludes = (section.exclude or []) + (section.ignored_directories or [])
+
                     for repo_file in repo_path.rglob("*"):
                         if repo_file.is_file():
                             rel = repo_file.relative_to(repo_path)
                             local_file = local_path / rel
                             
-                            if section.exclude and self._matches_patterns(rel, section.exclude):
+                            if excludes and self._matches_patterns(rel, excludes):
                                 continue
                             if section.include and not self._matches_patterns(rel, section.include):
                                 continue
@@ -191,6 +216,9 @@ class DotManOperations:
 
             return action
 
+        # Merge exclude patterns with ignored directories
+        final_excludes = (section.exclude or []) + (section.ignored_directories or [])
+
         for local_path in section.paths:
             if not local_path.exists():
                 continue
@@ -213,8 +241,9 @@ class DotManOperations:
                         local_path, repo_path,
                         filter_secrets_enabled=section.secrets_filter,
                         include_patterns=section.include,
-                        exclude_patterns=section.exclude,
+                        exclude_patterns=final_excludes,
                         secret_handler=wrapped_handler,
+                        follow_symlinks=section.follow_symlinks,
                     )
                     saved += files_copied
                     all_secrets.extend(secrets)
@@ -236,6 +265,9 @@ class DotManOperations:
         had_changes = False
         errors: list[str] = []
         
+        # Merge exclude patterns with ignored directories
+        final_excludes = (section.exclude or []) + (section.ignored_directories or [])
+
         for local_path in section.paths:
             repo_path = section.get_repo_path(local_path, REPO_DIR)
             # Handle update strategy
@@ -274,7 +306,8 @@ class DotManOperations:
                         repo_path, local_path,
                         filter_secrets_enabled=False,
                         include_patterns=section.include,
-                        exclude_patterns=section.exclude,
+                        exclude_patterns=final_excludes,
+                        follow_symlinks=section.follow_symlinks,
                     )
                     # Need to iterate deployed files to restore secrets?
                     # copy_directory doesn't return list of files.
@@ -390,6 +423,9 @@ class DotManOperations:
                         except OSError as e:
                             item_errors.append(f"Failed to restore secrets for {dest_path}: {e}")
 
+                    # Merge exclude patterns with ignored directories
+                    final_excludes = (section.exclude or []) + (section.ignored_directories or [])
+
                     try:
                         if repo_path.is_file():
                             success, _ = copy_file(repo_path, local_path, filter_secrets_enabled=False)
@@ -404,7 +440,8 @@ class DotManOperations:
                                 repo_path, local_path,
                                 filter_secrets_enabled=False,
                                 include_patterns=section.include,
-                                exclude_patterns=section.exclude,
+                                exclude_patterns=final_excludes,
+                                follow_symlinks=section.follow_symlinks,
                             )
                             # Restore secrets in directory
                             if section.secrets_filter:

@@ -65,6 +65,9 @@ def test_operations_lock_integration(monkeypatch, tmp_path):
     import dot_man.operations
     monkeypatch.setattr(dot_man.operations, "FileLock", MockLock)
     
+    # Mock get_sections to avoid config loading
+    monkeypatch.setattr(op, "get_sections", lambda: [])
+
     # Just running save_all with empty config shouldn't crash
     # This verifies the indentation/syntax issues are gone
     op.save_all()

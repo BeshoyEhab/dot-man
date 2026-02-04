@@ -54,6 +54,25 @@ GIT_IGNORE_PATTERNS = [
 DEFAULT_UPDATE_STRATEGY = "replace"  # replace, rename_old, ignore
 VALID_UPDATE_STRATEGIES = ["replace", "rename_old", "ignore"]
 
+# Default ignored directories for file operations
+DEFAULT_IGNORED_DIRECTORIES = [
+    ".git",
+    "node_modules",
+    "__pycache__",
+    ".venv",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    "dist",
+    "build",
+    "target",
+    "venv",
+    "env",
+    ".env",
+    ".idea",
+    ".vscode",
+]
+
 # Hook aliases - short names for common commands
 # Placeholders:
 #   {qs_config} - Quickshell config directory name (e.g., "ii", "caelestea")
