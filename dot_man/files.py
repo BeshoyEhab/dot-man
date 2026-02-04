@@ -1,18 +1,171 @@
 """File operations for dot-man."""
 
+from __future__ import annotations
+
 import shutil
-from pathlib import Path
+import os
 from pathlib import Path
 from typing import Iterator, Callable
 
 from .constants import REPO_DIR
-from .secrets import filter_secrets, SecretMatch
+from .secrets import filter_secrets, SecretMatch, SecretScanner, SecretGuard, PermanentRedactGuard
+
+
+def atomic_write_text(path: Path, content: str, encoding: str = "utf-8") -> None:
+    """Write content to a file atomically using a temporary file.
+
+    Ensures line endings are preserved exactly as in content (using newline="").
+    """
+    # Create temp file in same directory to ensure atomic rename
+    temp_path = path.with_suffix(f"{path.suffix}.tmp")
+    
+    try:
+        with temp_path.open("w", encoding=encoding, newline="") as f:
+            f.write(content)
+        
+        # Atomic rename
+        os.replace(temp_path, path)
+    except OSError:
+        if temp_path.exists():
+            try:
+                os.remove(temp_path)
+            except OSError:
+                pass
+        raise
+
+
+def smart_save_file(
+    src_path: Path,
+    dest_path: Path,
+    secret_handler: Callable[[SecretMatch], str] | None = None,
+    check_secrets: bool = True,
+) -> tuple[bool, list[SecretMatch]]:
+    """Smartly save a file from source to destination.
+
+    1. Reads source file once.
+    2. Filters secrets (if enabled).
+    3. Compares result with destination.
+    4. Atomically writes if different.
+
+    Returns:
+        tuple(saved: bool, secrets: list[SecretMatch])
+    """
+    detected_secrets: list[SecretMatch] = []
+    
+    if not src_path.exists() or not src_path.is_file():
+        return False, []
+
+    # 1. Read source
+    try:
+        with src_path.open("r", encoding="utf-8", newline="") as f:
+            src_content = f.read()
+    except (UnicodeDecodeError, OSError):
+        # Binary file or read error - fallback to direct copy if different
+        return _handle_binary_copy(src_path, dest_path, check_secrets)
+
+    # 2. Filter secrets
+    final_content = src_content
+    if check_secrets:
+        # Wrap handler to include implicit Guard checking
+        allow_guard = SecretGuard()
+        redact_guard = PermanentRedactGuard()
+        
+        def wrapped_handler(match: SecretMatch) -> str:
+            # Check allow list first
+            if allow_guard.is_allowed(src_path, match.line_content, match.pattern_name):
+                return "IGNORE"
+            
+            # Check permanent redact list
+            if redact_guard.should_redact(src_path, match.line_content, match.pattern_name):
+                return "REDACT"
+                
+            # Delegate to user handler
+            if secret_handler:
+                return secret_handler(match)
+            return "REDACT"
+
+        final_content, detected_secrets = filter_secrets(
+            src_content, callback=wrapped_handler, file_path=src_path
+        )
+    
+    # 3. Compare with destination
+    should_save = True
+    if dest_path.exists() and dest_path.is_file():
+        try:
+            # Check permissions first
+            src_stat = src_path.stat()
+            dest_stat = dest_path.stat()
+            if src_stat.st_mode != dest_stat.st_mode:
+                should_save = True
+            else:
+                # Compare content
+                with dest_path.open("r", encoding="utf-8", newline="") as f:
+                    dest_content = f.read()
+                
+                if final_content == dest_content:
+                    should_save = False
+                    
+        except (UnicodeDecodeError, OSError):
+            should_save = True # Assume changed if can't read dest
+
+    # 4. Atomic Write if needed
+    if should_save:
+        ensure_directory(dest_path.parent)
+        atomic_write_text(dest_path, final_content)
+        # Copy permissions
+        try:
+            dest_path.chmod(src_path.stat().st_mode)
+        except OSError:
+            pass
+            
+    return should_save, detected_secrets
+
+
+def _handle_binary_copy(src_path: Path, dest_path: Path, check_secrets: bool) -> tuple[bool, list[SecretMatch]]:
+    """Handle binary file copying (no secret filtering)."""
+    # Simple binary comparison
+    import filecmp
+    if dest_path.exists() and filecmp.cmp(src_path, dest_path, shallow=False):
+        # Check permissions
+        if src_path.stat().st_mode == dest_path.stat().st_mode:
+            return False, []
+    
+    ensure_directory(dest_path.parent)
+    # shutil.copy2 copies data and metadata (permissions)
+    # For binary, we can copy to temp then move to ensure atomicity
+    temp_path = dest_path.with_suffix(f"{dest_path.suffix}.tmp")
+    try:
+        shutil.copy2(src_path, temp_path)
+        os.replace(temp_path, dest_path)
+    except OSError:
+        return False, []
+        
+    return True, []
 
 
 def ensure_directory(path: Path, mode: int = 0o755) -> None:
     """Ensure a directory exists with the specified mode."""
     path.mkdir(parents=True, exist_ok=True)
     path.chmod(mode)
+
+
+# Simple metadata cache: {path_str: (mtime, size)}
+_metadata_cache: dict[str, tuple[float, int]] = {}
+
+def get_cached_metadata(path: Path) -> tuple[float, int] | None:
+    """Get cached metadata if available and valid."""
+    p_str = str(path)
+    if p_str in _metadata_cache:
+        return _metadata_cache[p_str]
+    return None
+
+def update_metadata_cache(path: Path) -> None:
+    """Update cache with current file metadata."""
+    try:
+        stat = path.stat()
+        _metadata_cache[str(path)] = (stat.st_mtime, stat.st_size)
+    except OSError:
+        pass
 
 
 def copy_file(
@@ -22,46 +175,16 @@ def copy_file(
     secret_handler: Callable[[SecretMatch], str] | None = None,
 ) -> tuple[bool, list[SecretMatch]]:
     """Copy a file from source to destination.
-
-    Args:
-        source: Source file path
-        destination: Destination file path
-        filter_secrets_enabled: Whether to filter secrets from content
-
-    Returns:
-        Tuple of (success, list_of_detected_secrets)
+    
+    Wrapper around smart_save_file.
     """
-    detected_secrets: list[SecretMatch] = []
-
-    try:
-        # Ensure destination directory exists
-        ensure_directory(destination.parent)
-
-        if filter_secrets_enabled and source.is_file():
-            # Read and filter content
-            try:
-                content = source.read_text(encoding="utf-8")
-                filtered_content, secrets = filter_secrets(
-                    content, callback=secret_handler, file_path=source
-                )
-                detected_secrets = secrets
-                destination.write_text(filtered_content, encoding="utf-8")
-            except UnicodeDecodeError:
-                # Binary file - copy without filtering
-                shutil.copy2(source, destination)
-        else:
-            # Direct copy
-            if source.is_file():
-                shutil.copy2(source, destination)
-            elif source.is_dir():
-                if destination.exists():
-                    shutil.rmtree(destination)
-                shutil.copytree(source, destination)
-
-        return True, detected_secrets
-
-    except Exception:
-        return False, detected_secrets
+    saved, secrets = smart_save_file(
+        source, 
+        destination, 
+        secret_handler=secret_handler, 
+        check_secrets=filter_secrets_enabled
+    )
+    return saved, secrets
 
 
 def matches_patterns(path: Path, patterns: list[str]) -> bool:
@@ -127,16 +250,18 @@ def copy_directory(
 
         dest_path = destination / relative
 
-        dest_path = destination / relative
-
-        success, secrets = copy_file(
-            src_path, dest_path, filter_secrets_enabled, secret_handler=secret_handler
-        )
-        all_secrets.extend(secrets)
-
-        if success:
-            files_copied += 1
-        else:
+        try:
+            # Use smart_save_file for single pass, robust saving
+            saved, secrets = smart_save_file(
+                src_path, 
+                dest_path, 
+                secret_handler=secret_handler, 
+                check_secrets=filter_secrets_enabled
+            )
+            all_secrets.extend(secrets)
+            if saved:
+                files_copied += 1
+        except Exception:
             files_failed += 1
 
     return files_copied, files_failed, all_secrets
@@ -165,8 +290,18 @@ def compare_files(file1: Path, file2: Path) -> bool:
                     return False
             return True
 
-        return file1.read_bytes() == file2.read_bytes()
-    except Exception:
+        # Quick size check first
+        stat1 = file1.stat()
+        stat2 = file2.stat()
+        
+        if stat1.st_size != stat2.st_size:
+            return False
+
+        # Efficient chunked comparison
+        import filecmp
+        is_same = filecmp.cmp(file1, file2, shallow=False)
+        return is_same
+    except OSError:
         return False
 
 
@@ -246,5 +381,5 @@ def backup_file(path: Path) -> Path | None:
         else:
             shutil.copytree(path, backup_path)
         return backup_path
-    except Exception:
+    except OSError:
         return None

@@ -16,8 +16,8 @@ def test_secret_guard_init(temp_config_dir):
     """Test SecretGuard initialization."""
     guard = SecretGuard(config_dir=temp_config_dir)
     assert guard.config_dir == temp_config_dir
-    assert guard.allow_list_path == temp_config_dir / ".dotman-allowed-secrets.json"
-    assert guard._allowed_secrets == []
+    assert guard.list_path == temp_config_dir / ".dotman-allowed-secrets.json"
+    assert guard._secrets == []
 
 
 def test_add_and_check_allowed(temp_config_dir):
@@ -51,29 +51,30 @@ def test_callback_redaction():
     assert "REDACTED" in redacted
     assert count == 1
 
-    # Case 2: Callback says IGNORE
-    def ignore_cb(match: SecretMatch) -> str:
-        return "IGNORE"
+    # Case 2: Callback says KEEP (preserved as-is)
+    def keep_cb(match: SecretMatch) -> str:
+        return "KEEP"
 
-    redacted_ignore, count_ignore = scanner.redact_content(content, callback=ignore_cb)
-    assert "secret_pass" in redacted_ignore
-    assert "REDACTED" not in redacted_ignore
-    assert count_ignore == 0
+    kept_content, count_kept = scanner.redact_content(content, callback=keep_cb)
+    assert "secret_pass" in kept_content
+    assert "REDACTED" not in kept_content
+    assert count_kept == 0
 
 
 def test_filter_secrets_callback():
     """Test filter_secrets wrapper with callback."""
     content = "api_key = 'abcdef1234567890abcdef1234567890'"
 
-    def skip_cb(match: SecretMatch) -> str:
-        # Simulate ignoring/skipping
-        return "IGNORE"
+    def keep_cb(match: SecretMatch) -> str:
+        # Simulate keeping/skipping redaction
+        return "KEEP"
 
-    filtered, matches = filter_secrets(content, callback=skip_cb)
+    filtered, matches = filter_secrets(content, callback=keep_cb)
 
-    # Should find the match
-    assert len(matches) == 1
-    # But content should NOT be redacted
+    # Matches should be empty since we KEPT the secret (didn't redact)
+    # filter_secrets now only returns secrets that were actually redacted
+    assert len(matches) == 0
+    # Content should NOT be redacted
     assert "REDACTED" not in filtered
     assert "abcdef" in filtered
 

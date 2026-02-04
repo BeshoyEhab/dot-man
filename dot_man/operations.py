@@ -1,15 +1,29 @@
 """Core operations for dot-man - modular business logic."""
 
+from __future__ import annotations
 from pathlib import Path
-from pathlib import Path
-from typing import Iterator, Callable
+from typing import Iterator, Callable, Any, Optional, TypedDict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .config import GlobalConfig, DotManConfig, Section
 from .core import GitManager
-from .files import copy_file, copy_directory, compare_files, get_file_status, backup_file
+from .files import copy_file, copy_directory, compare_files, get_file_status, backup_file, atomic_write_text
 from .secrets import SecretScanner, SecretMatch
 from .constants import REPO_DIR
-from .exceptions import DotManError, ConfigurationError
+from .exceptions import DotManError, PermissionError
+from .vault import SecretVault
+from .backups import BackupManager
+from .lock import FileLock
+from .ui import warn
+
+LOCK_FILE = REPO_DIR.parent / ".lock"
+
+
+class DeploymentPlan(TypedDict):
+    sections_to_deploy: list[tuple[Section, Path, Path]]
+    pre_hooks: list[str]
+    post_hooks: list[str]
+    errors: list[str]
 
 
 class DotManOperations:
@@ -21,10 +35,27 @@ class DotManOperations:
     """
     
     def __init__(self):
-        self._global_config: GlobalConfig | None = None
-        self._dotman_config: DotManConfig | None = None
-        self._git: GitManager | None = None
+        self._global_config: Optional[GlobalConfig] = None
+        self._dotman_config: Optional[DotManConfig] = None
+        self._git: Optional[GitManager] = None
+        self._vault: Optional[SecretVault] = None
+        self._backups: Optional[BackupManager] = None
+
+
+    @property
+    def backups(self) -> BackupManager:
+        """Get or load backup manager."""
+        if self._backups is None:
+            self._backups = BackupManager()
+        return self._backups
     
+    @property
+    def vault(self) -> SecretVault:
+        """Get or load secret vault."""
+        if self._vault is None:
+            self._vault = SecretVault()
+        return self._vault
+
     @property
     def global_config(self) -> GlobalConfig:
         """Get or load global configuration."""
@@ -122,54 +153,88 @@ class DotManOperations:
     def save_section(
         self, 
         section: Section,
-        secret_handler: Callable[[SecretMatch], str] | None = None
-    ) -> tuple[int, list[SecretMatch]]:
+        secret_handler: Optional[Callable[[SecretMatch], str]] = None
+    ) -> tuple[int, list[SecretMatch], list[str]]:
         """
         Save a section from local to repo.
         
         Returns:
-            (files_saved, secrets_detected)
+            (files_saved, secrets_detected, errors)
         """
         saved = 0
         all_secrets: list[SecretMatch] = []
+        errors: list[str] = []
         
+        # Enhanced secret handler that also stashes to vault
+        def wrapped_handler(match: SecretMatch) -> str:
+            action = "REDACT"
+            if secret_handler:
+                action = secret_handler(match)
+
+            if action == "REDACT":
+                # Stash to vault
+                try:
+                    secret_hash = self.vault.stash_secret(
+                        file_path=str(match.file),
+                        line_number=match.line_number,
+                        pattern_name=match.pattern_name,
+                        secret_value=match.matched_text,
+                        branch=self.current_branch
+                    )
+                    # Return formatted redaction string with hash
+                    return f"***REDACTED:{secret_hash}***"
+                except (OSError, IOError) as e:
+                    errors.append(f"Failed to stash secret in vault: {e}")
+                    # Fallback to standard redaction if vault fails
+                    from .constants import SECRET_REDACTION_TEXT
+                    return SECRET_REDACTION_TEXT
+
+            return action
+
         for local_path in section.paths:
             if not local_path.exists():
                 continue
             
             repo_path = section.get_repo_path(local_path, REPO_DIR)
             
-            if local_path.is_file():
-                success, secrets = copy_file(
-                    local_path, repo_path, 
-                    filter_secrets_enabled=section.secrets_filter,
-                    secret_handler=secret_handler
-                )
-                if success:
-                    saved += 1
-                all_secrets.extend(secrets)
-            else:
-                files_copied, _, secrets = copy_directory(
-                    local_path, repo_path,
-                    filter_secrets_enabled=section.secrets_filter,
-                    include_patterns=section.include,
-                    exclude_patterns=section.exclude,
-                    secret_handler=secret_handler,
-                )
-                saved += files_copied
-                all_secrets.extend(secrets)
+            try:
+                if local_path.is_file():
+                    # Optimized: smart_save_file (via copy_file) handles check+save in one pass
+                    success, secrets = copy_file(
+                        local_path, repo_path, 
+                        filter_secrets_enabled=section.secrets_filter,
+                        secret_handler=wrapped_handler
+                    )
+                    if success:
+                        saved += 1
+                    all_secrets.extend(secrets)
+                else:
+                    files_copied, files_failed, secrets = copy_directory(
+                        local_path, repo_path,
+                        filter_secrets_enabled=section.secrets_filter,
+                        include_patterns=section.include,
+                        exclude_patterns=section.exclude,
+                        secret_handler=wrapped_handler,
+                    )
+                    saved += files_copied
+                    all_secrets.extend(secrets)
+                    if files_failed > 0:
+                        errors.append(f"Failed to copy {files_failed} files in {local_path}")
+            except (OSError, IOError, PermissionError) as e:
+                errors.append(f"Error processing {local_path}: {e}")
         
-        return saved, all_secrets
+        return saved, all_secrets, errors
     
-    def deploy_section(self, section: Section) -> tuple[int, bool]:
+    def deploy_section(self, section: Section) -> tuple[int, bool, list[str]]:
         """
         Deploy a section from repo to local.
         
         Returns:
-            (files_deployed, had_changes)
+            (files_deployed, had_changes, errors)
         """
         deployed = 0
         had_changes = False
+        errors: list[str] = []
         
         for local_path in section.paths:
             repo_path = section.get_repo_path(local_path, REPO_DIR)
@@ -185,66 +250,260 @@ class DotManOperations:
             if section.update_strategy == "rename_old" and local_path.exists():
                 backup_file(local_path)
             
-            if repo_path.is_file():
-                success, _ = copy_file(repo_path, local_path, filter_secrets_enabled=False)
-                if success:
-                    deployed += 1
-            else:
-                files_copied, _, _ = copy_directory(
-                    repo_path, local_path,
-                    filter_secrets_enabled=False,
-                    include_patterns=section.include,
-                    exclude_patterns=section.exclude,
-                )
-                deployed += files_copied
+            # Helper to restore secrets after copy
+            def restore_file_secrets(dest_path: Path):
+                try:
+                    content = dest_path.read_text(encoding="utf-8")
+                    restored = self.vault.restore_secrets_in_content(
+                        content, str(local_path), self.current_branch
+                    )
+                    if restored != content:
+                        atomic_write_text(dest_path, restored)
+                except (OSError, UnicodeDecodeError) as e:
+                    errors.append(f"Failed to restore secrets for {dest_path}: {e}")
+
+            try:
+                if repo_path.is_file():
+                    success, _ = copy_file(repo_path, local_path, filter_secrets_enabled=False)
+                    if success:
+                        if section.secrets_filter:
+                            restore_file_secrets(local_path)
+                        deployed += 1
+                else:
+                    files_copied, files_failed, _ = copy_directory(
+                        repo_path, local_path,
+                        filter_secrets_enabled=False,
+                        include_patterns=section.include,
+                        exclude_patterns=section.exclude,
+                    )
+                    # Need to iterate deployed files to restore secrets?
+                    # copy_directory doesn't return list of files.
+                    # We can iterate destination if successful.
+                    if section.secrets_filter:
+                        for deployed_file in local_path.rglob("*"):
+                            if deployed_file.is_file():
+                                restore_file_secrets(deployed_file)
+
+                    deployed += files_copied
+                    if files_failed > 0:
+                        errors.append(f"Failed to deploy {files_failed} files in {local_path}")
+            except PermissionError as e:
+                errors.append(f"Permission denied deploying {local_path}. Try running with sudo?")
+            except FileNotFoundError as e:
+                errors.append(f"File not found during deployment: {local_path}")
+            except OSError as e:
+                errors.append(f"Error deploying {local_path}: {e}")
         
-        return deployed, had_changes
+        return deployed, had_changes, errors
+    
+    def scan_deployable_changes(self, sections: list[Section]) -> DeploymentPlan:
+        """
+        Phase 1: Scan for changes and collect hooks (Fast Scan).
+        
+        Returns:
+            DeploymentPlan dict
+        """
+        plan: DeploymentPlan = {
+            "sections_to_deploy": [],
+            "pre_hooks": [],
+            "post_hooks": [],
+            "errors": []
+        }
+        
+        # Parallel scan could be implemented here, but simple iteration with cached metadata is fast enough
+        for section in sections:
+            for local_path in section.paths:
+                repo_path = section.get_repo_path(local_path, REPO_DIR)
+                
+                # Handle update strategy
+                if section.update_strategy == "ignore" and local_path.exists():
+                    continue
+                
+                try:
+                    # Skip if source doesn't exist in repo
+                    if not repo_path.exists():
+                        continue
+                    
+                    # Check if will change (using optimized compare_files)
+                    will_change = not local_path.exists() or not compare_files(repo_path, local_path)
+                    
+                    if will_change:
+                        plan["sections_to_deploy"].append((section, local_path, repo_path))
+                        
+                        if section.pre_deploy:
+                            plan["pre_hooks"].append(section.pre_deploy)
+                        if section.post_deploy:
+                            plan["post_hooks"].append(section.post_deploy)
+                            
+                except OSError as e:
+                    plan["errors"].append(f"Error scanning {local_path}: {e}")
+                    
+        return plan
+
+    def execute_deployment_plan(self, plan: DeploymentPlan) -> dict:
+        """
+        Phase 2: Execute the deployment plan.
+        
+        Returns dict with keys: 'deployed', 'pre_hooks', 'post_hooks', 'errors'
+        """
+        total_deployed = 0
+        all_errors: list[str] = list(plan["errors"])
+        pre_hooks = list(dict.fromkeys(plan["pre_hooks"]))
+        post_hooks = list(dict.fromkeys(plan["post_hooks"]))
+
+        sections_to_deploy = plan["sections_to_deploy"]
+        
+        if sections_to_deploy:
+             with ThreadPoolExecutor() as executor:
+                # Helper to process single file/dir deployment
+                def deploy_item(item_tuple):
+                    section, local_path, repo_path = item_tuple
+                    deployed_count = 0
+                    item_errors = []
+                    
+                    if section.update_strategy == "rename_old" and local_path.exists():
+                        backup_file(local_path)
+                    
+                    # Helper to restore secrets
+                    def restore_file_secrets(dest_path: Path):
+                        # Skip binary files that can't contain text secrets
+                        binary_extensions = {
+                            '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.ico', '.webp', '.svg',
+                            '.mp4', '.mp3', '.wav', '.ogg', '.flac', '.avi', '.mkv', '.webm',
+                            '.pyc', '.pyo', '.so', '.dll', '.exe', '.bin', '.dat',
+                            '.zip', '.tar', '.gz', '.bz2', '.xz', '.7z', '.rar',
+                            '.pdf', '.doc', '.docx', '.xls', '.xlsx',
+                            '.ttf', '.otf', '.woff', '.woff2', '.eot',
+                        }
+                        if dest_path.suffix.lower() in binary_extensions:
+                            return  # Skip binary files silently
+                        
+                        try:
+                            content = dest_path.read_text(encoding="utf-8")
+                            restored = self.vault.restore_secrets_in_content(
+                                content, str(local_path), self.current_branch
+                            )
+                            if restored != content:
+                                atomic_write_text(dest_path, restored)
+                        except UnicodeDecodeError:
+                            pass  # Skip binary files silently
+                        except OSError as e:
+                            item_errors.append(f"Failed to restore secrets for {dest_path}: {e}")
+
+                    try:
+                        if repo_path.is_file():
+                            success, _ = copy_file(repo_path, local_path, filter_secrets_enabled=False)
+                            if success:
+                                if section.secrets_filter:
+                                    restore_file_secrets(local_path)
+                                deployed_count += 1
+                            else:
+                                item_errors.append(f"Failed to copy {repo_path} to {local_path}")
+                        elif repo_path.is_dir():
+                            files_copied, files_failed, _ = copy_directory(
+                                repo_path, local_path,
+                                filter_secrets_enabled=False,
+                                include_patterns=section.include,
+                                exclude_patterns=section.exclude,
+                            )
+                            # Restore secrets in directory
+                            if section.secrets_filter:
+                                for deployed_file in local_path.rglob("*"):
+                                    if deployed_file.is_file():
+                                        restore_file_secrets(deployed_file)
+                                        
+                            deployed_count += files_copied
+                            if files_failed > 0:
+                                item_errors.append(f"Failed to deploy {files_failed} files in {local_path}")
+                        else:
+                            item_errors.append(f"Source not found in repo: {repo_path}")
+                                
+                    except PermissionError as e:
+                        item_errors.append(f"Permission denied deploying {local_path}. Try running with sudo?")
+                    except FileNotFoundError as e:
+                        item_errors.append(f"File not found during deployment: {repo_path}")
+                    except OSError as e:
+                        item_errors.append(f"Error deploying {local_path}: {e}")
+                        
+                    return deployed_count, item_errors
+
+                # Submit all tasks
+                futures = [executor.submit(deploy_item, item) for item in sections_to_deploy]
+                
+                for future in as_completed(futures):
+                    try:
+                        count, errs = future.result()
+                        total_deployed += count
+                        all_errors.extend(errs)
+                    except Exception as e:
+                        all_errors.append(f"Critical error in deployment thread: {e}")
+
+        return {
+            "deployed": total_deployed,
+            "pre_hooks": pre_hooks,
+            "post_hooks": post_hooks,
+            "errors": all_errors
+        }
+
     
     def save_all(
         self,
-        secret_handler: Callable[[SecretMatch], str] | None = None
-    ) -> tuple[int, list[SecretMatch]]:
-        """Save all sections from local to repo."""
-        total_saved = 0
-        all_secrets: list[SecretMatch] = []
-        
-        for section_name in self.get_sections():
-            section = self.get_section(section_name)
-            saved, secrets = self.save_section(section, secret_handler)
-            total_saved += saved
-            all_secrets.extend(secrets)
-        
-        return total_saved, all_secrets
-    
-    def deploy_all(self) -> tuple[int, list[str], list[str]]:
+        secret_handler: Optional[Callable[[SecretMatch], str]] = None
+    ) -> dict:
         """
-        Deploy all sections from repo to local.
-        
-        Returns:
-            (files_deployed, pre_hooks, post_hooks)
+        Save all sections from local to repo.
+        Returns dict with keys: 'saved', 'secrets', 'errors'
         """
-        total_deployed = 0
-        pre_hooks: list[str] = []
-        post_hooks: list[str] = []
-        
-        for section_name in self.get_sections():
-            section = self.get_section(section_name)
-            deployed, had_changes = self.deploy_section(section)
-            total_deployed += deployed
+        with FileLock(LOCK_FILE):
+            total_saved = 0
+            all_secrets: list[SecretMatch] = []
+            all_errors: list[str] = []
             
-            if had_changes:
-                if section.pre_deploy:
-                    pre_hooks.append(section.pre_deploy)
-                if section.post_deploy:
-                    post_hooks.append(section.post_deploy)
-        
-        return total_deployed, list(dict.fromkeys(pre_hooks)), list(dict.fromkeys(post_hooks))
+            sections = [self.get_section(name) for name in self.get_sections()]
+            
+            # Parallel execution
+            with ThreadPoolExecutor() as executor:
+                future_to_section = {
+                    executor.submit(self.save_section, section, secret_handler): section 
+                    for section in sections
+                }
+                
+                for future in as_completed(future_to_section):
+                    try:
+                        saved, secrets, errors = future.result()
+                        total_saved += saved
+                        all_secrets.extend(secrets)
+                        all_errors.extend(errors)
+                    except Exception as e:
+                        all_errors.append(f"Critical error saving section: {e}")
+            
+            return {
+                "saved": total_saved,
+                "secrets": all_secrets,
+                "errors": all_errors
+            }
+    
+    def deploy_all(self) -> dict:
+        """
+        Deploy all sections from repo to local (Refactored Two-Phase).
+        Returns dict with keys: 'deployed', 'pre_hooks', 'post_hooks', 'errors'
+        """
+        with FileLock(LOCK_FILE):
+            sections = [self.get_section(name) for name in self.get_sections()]
+            
+            # Phase 1: Scan
+            plan = self.scan_deployable_changes(sections)
+            
+            # Phase 2: Execute
+            result = self.execute_deployment_plan(plan)
+            
+            return result
     
     def switch_branch(
         self, 
         target_branch: str, 
         dry_run: bool = False,
-        secret_handler: Callable[[SecretMatch], str] | None = None
+        secret_handler: Optional[Callable[[SecretMatch], str]] = None
     ) -> dict:
         """
         Switch to a different branch.
@@ -256,68 +515,158 @@ class DotManOperations:
             - pre_hooks: list of pre-deploy commands
             - post_hooks: list of post-deploy commands
             - created_branch: True if branch was newly created
+            - errors: list of error messages
         """
         current_branch = self.current_branch
-        result = {
+        result: dict[str, Any] = {
             "saved_count": 0,
             "deployed_count": 0,
             "secrets_redacted": 0,
             "pre_hooks": [],
             "post_hooks": [],
             "created_branch": False,
+            "errors": []
         }
         
         if current_branch == target_branch and not dry_run:
             return result
         
-        # Phase 1: Save current branch
-        if not dry_run:
-            saved, secrets = self.save_all(secret_handler)
-            result["saved_count"] = saved
-            result["secrets_redacted"] = len(secrets)
-            
-            # Commit
-            commit_msg = f"Auto-save from '{current_branch}' before switch to '{target_branch}'"
-            self.git.commit(commit_msg)
+        # Acquire lock for the entire switch operation
+        # Note: If dry_run is True, we don't strictly need a lock, but good to be consistent
+        import contextlib
+        lock_context = FileLock(LOCK_FILE) if not dry_run else contextlib.nullcontext()
         
-        # Phase 2: Switch git branch
-        branch_exists = self.git.branch_exists(target_branch)
-        result["created_branch"] = not branch_exists
-        
-        if not dry_run:
-            self.git.checkout(target_branch, create=not branch_exists)
+        with lock_context:
+            # Phase 1: Save current branch
+            if not dry_run:
+                save_result = self.save_all(secret_handler)
+                result["saved_count"] = save_result["saved"]
+                result["secrets_redacted"] = len(save_result["secrets"])
+                result["errors"].extend(save_result["errors"])
+                
+                # Commit
+                commit_msg = f"Auto-save from '{current_branch}' before switch to '{target_branch}'"
+                self.git.commit(commit_msg)
             
-            # Reload config for new branch
-            self.reload_config()
-        
-        # Phase 3: Deploy target branch
-        if not dry_run:
-            # Collect hooks for sections that will change
-            for section_name in self.get_sections():
-                section = self.get_section(section_name)
-                for local_path in section.paths:
-                    repo_path = section.get_repo_path(local_path, REPO_DIR)
-                    if repo_path.exists():
-                        will_change = not local_path.exists() or not compare_files(repo_path, local_path)
-                        if will_change:
-                            if section.pre_deploy:
-                                result["pre_hooks"].append(section.pre_deploy)
-                            if section.post_deploy:
-                                result["post_hooks"].append(section.post_deploy)
+            # Phase 2: Switch git branch
+            branch_exists = self.git.branch_exists(target_branch)
+            result["created_branch"] = not branch_exists
             
-            # Deduplicate hooks
-            result["pre_hooks"] = list(dict.fromkeys(result["pre_hooks"]))
-            result["post_hooks"] = list(dict.fromkeys(result["post_hooks"]))
+            if not dry_run:
+                self.git.checkout(target_branch, create=not branch_exists)
+                
+                # Reload config for new branch
+                self.reload_config()
             
-            # Deploy
-            deployed, _, _ = self.deploy_all()
-            result["deployed_count"] = deployed
+            # Phase 3: Deploy target branch
+            if not dry_run:
+                # Auto-backup before potentially destructive deployment
+                try:
+                    # Identify files that will be changed to backup them
+                    paths_to_backup = []
+                    for section_name in self.get_sections():
+                         section = self.get_section(section_name)
+                         paths_to_backup.extend([p for p in section.paths if p.exists()])
+                    
+                    if paths_to_backup:
+                        self.backups.create_backup(paths_to_backup, note=f"pre-switch-{target_branch}")
+                except Exception as e:
+                    result["errors"].append(f"Warning: Auto-backup failed: {e}")
+    
+    
+                # Two-Phase Deployment for Target Branch
+                try:
+                    sections = [self.get_section(name) for name in self.get_sections()]
+                    
+                    # Phase 1: Scan
+                    plan = self.scan_deployable_changes(sections)
+                    
+                    # Deduplicate hooks from scan
+                    result["pre_hooks"].extend(plan["pre_hooks"])
+                    result["post_hooks"].extend(plan["post_hooks"])
+                    result["errors"].extend(plan["errors"])
+                    
+                    # Deduplicate
+                    result["pre_hooks"] = list(dict.fromkeys(result["pre_hooks"]))
+                    result["post_hooks"] = list(dict.fromkeys(result["post_hooks"]))
+                    
+                    # Phase 2: Execute
+                    deploy_result = self.execute_deployment_plan(plan)
+                    
+                    result["deployed_count"] = deploy_result["deployed"]
+                    result["errors"].extend(deploy_result["errors"])
+                    
+                except Exception as e:
+                    result["errors"].append(f"Critical error during switch deployment: {e}")
+                
+                # Update global config
+                self.global_config.current_branch = target_branch
+                self.global_config.save()
             
-            # Update global config
-            self.global_config.current_branch = target_branch
-            self.global_config.save()
-        
         return result
+    
+    def revert_file(self, path: Path) -> bool:
+        """
+        Revert a specific file to its repository version.
+        
+        Args:
+            path: Absolute path to the file to revert.
+            
+        Returns:
+            True if successful, False if file not tracked or not found in repo.
+        """
+        path = path.resolve()
+        
+        # Find which section tracks this file
+        target_section = None
+        repo_source = None
+        
+        for section_name in self.get_sections():
+            section = self.get_section(section_name)
+            # Check explicit paths
+            if path in section.paths:
+                 target_section = section
+                 repo_source = section.get_repo_path(path, REPO_DIR)
+                 break
+            
+            # Check directory inclusions
+            for p in section.paths:
+                if p.is_dir() and p in path.parents:
+                    target_section = section
+                    repo_source = section.get_repo_path(path, REPO_DIR)
+                    break
+            
+            if target_section:
+                break
+        
+        if not target_section or not repo_source:
+             warn(f"File not tracked by any section: {path}")
+             return False
+
+        if not repo_source.exists():
+             warn(f"File not found in repository (branch: {self.current_branch}): {repo_source}")
+             return False
+        
+        try:
+             # Basic copy first
+             success, _ = copy_file(repo_source, path, filter_secrets_enabled=False)
+             
+             if success and target_section.secrets_filter:
+                 # Attempt to restore secrets
+                 try:
+                    content = path.read_text(encoding="utf-8")
+                    restored = self.vault.restore_secrets_in_content(
+                        content, str(path), self.current_branch
+                    )
+                    if restored != content:
+                        atomic_write_text(path, restored)
+                 except (OSError, UnicodeDecodeError):
+                     pass # Ignore binary/read errors for secrets
+
+             return success
+
+        except Exception as e:
+             raise DotManError(f"Failed to revert {path}: {e}")
     
     def audit(self) -> list[tuple[str, list[SecretMatch]]]:
         """
@@ -347,6 +696,31 @@ class DotManOperations:
                 results.append((section_name, section_matches))
         
         return results
+
+    def pre_push_audit(self) -> bool:
+        """
+        Check for secrets before pushing.
+        Returns True if safe to push, False if secrets found.
+        """
+        audit_results = self.audit()
+
+        # Check if strict mode is enabled
+        strict_mode = self.global_config.strict_mode
+
+        if not audit_results:
+            return True
+
+        print("\n🔒 Pre-push Audit: Secrets detected!")
+        for section, matches in audit_results:
+            print(f"  [{section}]: {len(matches)} secrets")
+
+        if strict_mode:
+            print("Strict mode enabled. Push aborted.")
+            return False
+
+        # Interactive
+        from .ui import confirm
+        return confirm("Secrets detected. Push anyway?", default=False)
     
     def get_status_summary(self) -> dict:
         """
@@ -360,7 +734,7 @@ class DotManOperations:
             - new: number of new files
             - deleted: number of deleted files
         """
-        summary = {
+        summary: dict[str, Any] = {
             "branch": self.current_branch,
             "sections": 0,
             "total_paths": 0,
@@ -391,7 +765,7 @@ class DotManOperations:
 
 
 # Singleton instance for convenience
-_operations: DotManOperations | None = None
+_operations: Optional[DotManOperations] = None
 
 
 def get_operations() -> DotManOperations:

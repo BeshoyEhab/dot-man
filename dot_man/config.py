@@ -1,6 +1,7 @@
 """Configuration parsing for dot-man using TOML format."""
 
 import sys
+from typing import Optional, Any, Union, cast
 from pathlib import Path
 from datetime import datetime
 
@@ -13,10 +14,8 @@ else:
     except ImportError:
         raise ImportError("Please install tomli: pip install tomli")
 
-try:
-    import tomli_w
-except ImportError:
-    tomli_w = None  # Writing will use manual formatting
+import tomlkit
+from tomlkit import TOMLDocument
 
 from .constants import (
     GLOBAL_TOML,
@@ -29,69 +28,22 @@ from .constants import (
 from .exceptions import ConfigurationError, ConfigValidationError
 
 
-def _write_toml(path: Path, data: dict) -> None:
-    """Write TOML data to file."""
-    if tomli_w:
-        path.write_bytes(tomli_w.dumps(data).encode())
+def _write_toml(path: Path, data: dict, preserve_doc: TOMLDocument | None = None) -> None:
+    """Write TOML data to file, preserving comments when possible.
+    
+    Args:
+        path: File path to write to
+        data: Dictionary of data to write
+        preserve_doc: Optional existing TOMLDocument to update (preserves comments)
+    """
+    if preserve_doc is not None:
+        # Update existing document in-place to preserve comments
+        for key, value in data.items():
+            preserve_doc[key] = value
+        path.write_text(tomlkit.dumps(preserve_doc))
     else:
-        # Manual TOML writing for simple structures
-        lines = []
-
-        def escape_string(s: str) -> str:
-            """Escape a string for TOML, handling quotes properly."""
-            # Escape backslashes first, then quotes
-            s = s.replace("\\", "\\\\")
-            s = s.replace('"', '\\"')
-            return f'"{s}"'
-
-        def write_section(name: str, section: dict, prefix: str = ""):
-            full_name = f"{prefix}.{name}" if prefix else name
-            lines.append(f"[{full_name}]")
-            for key, value in section.items():
-                if isinstance(value, dict):
-                    continue  # Handle nested dicts separately
-                elif value is None:
-                    continue
-                elif isinstance(value, bool):
-                    lines.append(f"{key} = {str(value).lower()}")
-                elif isinstance(value, str):
-                    lines.append(f"{key} = {escape_string(value)}")
-                elif isinstance(value, datetime):
-                    lines.append(f"{key} = {value.isoformat()}")
-                elif isinstance(value, list):
-                    items = ", ".join(
-                        escape_string(v) if isinstance(v, str) else str(v)
-                        for v in value
-                    )
-                    lines.append(f"{key} = [{items}]")
-                else:
-                    lines.append(f"{key} = {value}")
-            lines.append("")
-
-            # Handle nested dicts
-            for key, value in section.items():
-                if isinstance(value, dict):
-                    write_section(key, value, full_name)
-
-        # Collect top-level values first
-        top_level_lines = []
-
-        for name, section in data.items():
-            if isinstance(section, dict):
-                write_section(name, section)
-            else:
-                # Top-level simple value
-                if isinstance(section, bool):
-                    top_level_lines.append(f"{name} = {str(section).lower()}")
-                elif isinstance(section, str):
-                    top_level_lines.append(f"{name} = {escape_string(section)}")
-                else:
-                    top_level_lines.append(f"{name} = {section}")
-
-        # Prepend top-level values
-        if top_level_lines:
-            top_level_lines.append("")
-        path.write_text("\n".join(top_level_lines + lines))
+        # Create new document from dict
+        path.write_text(tomlkit.dumps(data))
 
 
 class GlobalConfig:
@@ -100,6 +52,8 @@ class GlobalConfig:
     def __init__(self):
         self._data: dict = {}
         self._path = GLOBAL_TOML
+        self._doc: TOMLDocument | None = None  # For preserving comments
+        self._dirty: bool = False
 
     def load(self) -> None:
         """Load the global configuration file.
@@ -115,7 +69,12 @@ class GlobalConfig:
                 self._migrate_from_ini(GLOBAL_CONF)
                 return
             raise ConfigurationError(f"Global config not found: {self._path}")
-        self._data = tomllib.loads(self._path.read_text())
+        
+        content = self._path.read_text()
+        self._data = tomllib.loads(content)
+        # Also parse with tomlkit to preserve comments
+        self._doc = tomlkit.parse(content)
+        self._dirty = False
 
     def _migrate_from_ini(self, old_path: Path) -> None:
         """Migrate from old INI format to TOML."""
@@ -155,6 +114,7 @@ class GlobalConfig:
         print(f"  📦 Backed up old config to {backup_path.name}")
 
         # Save new TOML
+        self._dirty = True
         self.save()
         print(f"  ✓ Created {self._path.name}")
 
@@ -162,10 +122,17 @@ class GlobalConfig:
         old_path.unlink()
         print(f"  🗑️  Removed old {old_path.name}")
 
-    def save(self) -> None:
-        """Save the global configuration file."""
+    def save(self, force: bool = False) -> None:
+        """Save the global configuration file.
+        
+        Args:
+            force: Save even if not dirty
+        """
+        if not self._dirty and not force:
+            return
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        _write_toml(self._path, self._data)
+        _write_toml(self._path, self._data, self._doc)
+        self._dirty = False
 
     def create_default(self) -> None:
         """Create a default global configuration."""
@@ -195,12 +162,13 @@ class GlobalConfig:
                 }
             },
         }
-        self.save()
+        self._dirty = True
+        self.save(force=True)
 
     @property
     def current_branch(self) -> str:
         """Get the current branch name."""
-        return self._data.get("dot-man", {}).get("current_branch", DEFAULT_BRANCH)
+        return cast(str, self._data.get("dot-man", {}).get("current_branch", DEFAULT_BRANCH))
 
     @current_branch.setter
     def current_branch(self, value: str) -> None:
@@ -208,11 +176,12 @@ class GlobalConfig:
         if "dot-man" not in self._data:
             self._data["dot-man"] = {}
         self._data["dot-man"]["current_branch"] = value
+        self._dirty = True
 
     @property
     def remote_url(self) -> str:
         """Get the remote URL."""
-        return self._data.get("remote", {}).get("url", "")
+        return cast(str, self._data.get("remote", {}).get("url", ""))
 
     @remote_url.setter
     def remote_url(self, value: str) -> None:
@@ -220,40 +189,59 @@ class GlobalConfig:
         if "remote" not in self._data:
             self._data["remote"] = {}
         self._data["remote"]["url"] = value
+        self._dirty = True
 
     @property
-    def editor(self) -> str | None:
+    def editor(self) -> Optional[str]:
         """Get the configured editor."""
-        return self._data.get("dot-man", {}).get("editor")
+        return cast(Optional[str], self._data.get("dot-man", {}).get("editor"))
 
     @editor.setter
-    def editor(self, value: str) -> None:
+    def editor(self, value: Optional[str]) -> None:
         """Set the editor."""
         if "dot-man" not in self._data:
             self._data["dot-man"] = {}
         self._data["dot-man"]["editor"] = value
+        self._dirty = True
 
     @property
     def secrets_filter_enabled(self) -> bool:
         """Check if secrets filter is enabled by default."""
-        return self._data.get("defaults", {}).get("secrets_filter", True)
+        return cast(bool, self._data.get("defaults", {}).get("secrets_filter", True))
+
+    @secrets_filter_enabled.setter
+    def secrets_filter_enabled(self, value: bool) -> None:
+        """Set whether secrets filter is enabled by default."""
+        if "defaults" not in self._data:
+            self._data["defaults"] = {}
+        self._data["defaults"]["secrets_filter"] = value
+        self._dirty = True
 
     @property
     def strict_mode(self) -> bool:
         """Check if strict mode is enabled."""
-        return self._data.get("security", {}).get("strict_mode", False)
+        return cast(bool, self._data.get("security", {}).get("strict_mode", False))
 
-    def get_defaults(self) -> dict:
+    @strict_mode.setter
+    def strict_mode(self, value: bool) -> None:
+        """Set whether strict mode is enabled."""
+        if "security" not in self._data:
+            self._data["security"] = {}
+        self._data["security"]["strict_mode"] = value
+        self._dirty = True
+
+    def get_defaults(self) -> dict[str, Any]:
         """Get default settings that apply to all sections."""
-        return self._data.get("defaults", {})
+        return cast(dict[str, Any], self._data.get("defaults", {}))
 
-    def get_template(self, name: str) -> dict | None:
+    def get_template(self, name: str) -> Optional[dict[str, Any]]:
         """Get a template by name."""
-        return self._data.get("templates", {}).get(name)
+        templates = self._data.get("templates", {})
+        return cast(Optional[dict[str, Any]], templates.get(name))
 
-    def get_all_templates(self) -> dict:
+    def get_all_templates(self) -> dict[str, Any]:
         """Get all templates."""
-        return self._data.get("templates", {})
+        return cast(dict[str, Any], self._data.get("templates", {}))
 
 
 class Section:
@@ -263,15 +251,15 @@ class Section:
         self,
         name: str,
         paths: list[Path],
-        repo_base: str | None = None,  # NOW OPTIONAL!
-        repo_path: str | None = None,
-        secrets_filter: bool | None = None,  # None = use default
-        update_strategy: str | None = None,  # None = use default
-        include: list[str] | None = None,
-        exclude: list[str] | None = None,
-        pre_deploy: str | None = None,
-        post_deploy: str | None = None,
-        inherits: list[str] | None = None,
+        repo_base: Optional[str] = None,  # NOW OPTIONAL!
+        repo_path: Optional[str] = None,
+        secrets_filter: Optional[bool] = None,  # None = use default
+        update_strategy: Optional[str] = None,  # None = use default
+        include: Optional[list[str]] = None,
+        exclude: Optional[list[str]] = None,
+        pre_deploy: Optional[str] = None,
+        post_deploy: Optional[str] = None,
+        inherits: Optional[list[str]] = None,
     ):
         self.name = name
         self.paths = paths
@@ -338,16 +326,61 @@ class Section:
         Examples:
             "shell_reload" → "source ~/.bashrc || ..."
             "nvim_sync" → "nvim --headless +PackerSync +qa"
+            "quickshell_reload" → "killall qs; qs -c ii &" (with detected config)
             "echo hello" → "echo hello" (unchanged)
         """
         if not hook:
             return None
 
         # Check if it's an alias
-        if hook in HOOK_ALIASES:
-            return HOOK_ALIASES[hook]
-
-        return hook
+        resolved = HOOK_ALIASES.get(hook, hook)
+        
+        # Replace {qs_config} placeholder with detected quickshell config dir
+        if "{qs_config}" in resolved:
+            qs_config = self._detect_quickshell_config()
+            resolved = resolved.replace("{qs_config}", qs_config)
+        
+        return resolved
+    
+    def _detect_quickshell_config(self) -> str:
+        """Detect the quickshell config directory name from section paths.
+        
+        Looks for paths like ~/.config/quickshell/<config_name> or
+        subdirectories of quickshell config.
+        
+        Returns:
+            Config directory name (e.g., "ii", "caelestea") or empty string if not found.
+        """
+        quickshell_base = Path("~/.config/quickshell").expanduser()
+        
+        for path in self.paths:
+            path_resolved = path.resolve() if path.exists() else path.expanduser()
+            
+            # Check if path is under ~/.config/quickshell
+            try:
+                rel = path_resolved.relative_to(quickshell_base)
+                # Get the first part of the relative path (the config dir)
+                parts = rel.parts
+                if parts:
+                    return parts[0]
+            except ValueError:
+                # Not under quickshell_base, try checking if the path contains 'quickshell'
+                str_path = str(path_resolved)
+                if "quickshell" in str_path.lower():
+                    # Try to extract config dir from path like /some/path/quickshell/ii/...
+                    parts = path_resolved.parts
+                    for i, part in enumerate(parts):
+                        if part.lower() == "quickshell" and i + 1 < len(parts):
+                            return parts[i + 1]
+        
+        # Fallback: check if any subdirectory exists in quickshell base
+        if quickshell_base.exists():
+            for subdir in quickshell_base.iterdir():
+                if subdir.is_dir() and not subdir.name.startswith("."):
+                    return subdir.name
+        
+        # Ultimate fallback
+        return ""
 
     def get_repo_path(self, local_path: Path, repo_dir: Path) -> Path:
         """Get the repository path for a local path."""
@@ -357,9 +390,9 @@ class Section:
         # Use repo_base + filename
         return repo_dir / self.repo_base / local_path.name
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, Any]:
         """Convert section to dictionary (only non-default values)."""
-        result = {
+        result: dict[str, Any] = {
             "paths": [str(p) for p in self.paths],
         }
 
@@ -397,6 +430,8 @@ class DotManConfig:
         self._repo_path = repo_path or REPO_DIR
         self._path = self._repo_path / DOT_MAN_TOML
         self._global_config = global_config
+        self._doc: TOMLDocument | None = None  # For preserving comments
+        self._dirty: bool = False
 
     @property
     def repo_path(self) -> Path:
@@ -418,7 +453,39 @@ class DotManConfig:
                 self._migrate_from_ini(old_path)
                 return
             raise ConfigurationError(f"Config not found: {self._path}")
-        self._data = tomllib.loads(self._path.read_text())
+        
+        content = self._path.read_text()
+        self._data = tomllib.loads(content)
+        # Also parse with tomlkit to preserve comments
+        self._doc = tomlkit.parse(content)
+        self._dirty = False
+        
+        # Validate schema on load
+        warnings = self._validate_schema()
+        if warnings:
+            import sys
+            for w in warnings:
+                print(f"⚠️  Config warning: {w}", file=sys.stderr)
+
+    def _validate_schema(self) -> list[str]:
+        """Validate config structure on load."""
+        warnings: list[str] = []
+        valid_section_keys = {
+            "paths", "repo_base", "repo_path", "secrets_filter",
+            "update_strategy", "include", "exclude", "pre_deploy",
+            "post_deploy", "inherits"
+        }
+        
+        for name, section in self._data.items():
+            if name == "templates":
+                continue
+            if isinstance(section, dict):
+                for key in section:
+                    if key not in valid_section_keys:
+                        warnings.append(f"[{name}]: Unknown key '{key}'")
+        return warnings
+
+
 
     def _migrate_from_ini(self, old_path: Path) -> None:
         """Migrate from old INI format to TOML."""
@@ -440,7 +507,7 @@ class DotManConfig:
             section_data = dict(config[section_name])
 
             # Convert old format to new format
-            new_section = {}
+            new_section: dict[str, Any] = {}
 
             # Handle local_path -> paths
             if "local_path" in section_data:
@@ -483,22 +550,32 @@ class DotManConfig:
         print(f"  📦 Backed up old config to {backup_path.name}")
 
         # Save new TOML
-        self.save()
+        self._dirty = True
+        self.save(force=True)
         print(f"  ✓ Created {self._path.name}")
 
         # Remove old file
         old_path.unlink()
         print(f"  🗑️  Removed old {old_path.name}")
 
-    def save(self) -> None:
-        """Save the dot-man.toml configuration file."""
-        _write_toml(self._path, self._data)
+    def save(self, force: bool = False) -> None:
+        """Save the dot-man.toml configuration file.
+        
+        Args:
+            force: Save even if not dirty
+        """
+        if not self._dirty and not force:
+            return
+        _write_toml(self._path, self._data, self._doc)
+        self._dirty = False
 
     def create_default(self) -> None:
         """Create minimal default config with helpful examples."""
         # Start with empty config - examples will be in comments
         self._data = {}
-        self.save()
+        self._dirty = True
+        self.save(force=True)
+
 
         # Append helpful comments and documentation with example sections
         with open(self._path, "a") as f:
@@ -619,16 +696,16 @@ class DotManConfig:
             if name != "templates" and isinstance(self._data[name], dict)
         ]
 
-    def get_local_templates(self) -> dict:
+    def get_local_templates(self) -> dict[str, Any]:
         """Get templates defined in this file."""
-        return self._data.get("templates", {})
+        return cast(dict[str, Any], self._data.get("templates", {}))
 
-    def _resolve_template(self, name: str) -> dict:
+    def _resolve_template(self, name: str) -> dict[str, Any]:
         """Resolve a template by name, checking local first then global."""
         # Check local templates
         local = self.get_local_templates().get(name)
         if local:
-            return local
+            return cast(dict[str, Any], local)
 
         # Check global templates
         if self._global_config:
@@ -708,10 +785,11 @@ class DotManConfig:
         name: str,
         paths: list[str],
         repo_base: str | None = None,
+        overwrite: bool = False,
         **kwargs,
     ) -> None:
         """Add a new section to the configuration."""
-        if name in self._data:
+        if name in self._data and not overwrite:
             raise ConfigurationError(f"Section already exists: {name}")
 
         if not paths:
@@ -754,6 +832,51 @@ class DotManConfig:
                 section_data[key] = kwargs[key]
 
         self._data[name] = section_data
+        self._dirty = True
+
+    def update_section(self, name: str, **kwargs) -> None:
+        """Update an existing section's properties.
+        
+        Args:
+            name: Section name to update
+            **kwargs: Properties to update (set to None to remove a property)
+        
+        Raises:
+            ConfigurationError: If section doesn't exist or invalid key provided
+        """
+        if name not in self._data or name == "templates":
+            raise ConfigurationError(f"Section not found: {name}")
+        
+        valid_keys = {
+            "paths", "repo_base", "repo_path", "secrets_filter",
+            "update_strategy", "include", "exclude", "pre_deploy",
+            "post_deploy", "inherits"
+        }
+        
+        for key, value in kwargs.items():
+            if key not in valid_keys:
+                raise ConfigurationError(f"Unknown key: {key}")
+            if value is None:
+                # Remove the key if set to None
+                self._data[name].pop(key, None)
+            else:
+                self._data[name][key] = value
+        
+        self._dirty = True
+
+    def remove_section(self, name: str) -> None:
+        """Remove a section from the configuration.
+        
+        Args:
+            name: Section name to remove
+            
+        Raises:
+            ConfigurationError: If section doesn't exist
+        """
+        if name not in self._data or name == "templates":
+            raise ConfigurationError(f"Section not found: {name}")
+        del self._data[name]
+        self._dirty = True
 
     def validate(self) -> list[str]:
         """Validate the configuration file. Returns list of warnings."""
@@ -783,6 +906,16 @@ class DotManConfig:
                     ):
                         warnings.append(f"[{name}]: Template not found: {template}")
 
+                # Check for invalid keys
+                valid_keys = {
+                    "paths", "repo_base", "repo_path", "secrets_filter",
+                    "update_strategy", "include", "exclude", "pre_deploy",
+                    "post_deploy", "inherits"
+                }
+                for key in self._data[name]:
+                    if key not in valid_keys:
+                        warnings.append(f"[{name}]: Unknown key '{key}'")
+
             except Exception as e:
                 warnings.append(f"[{name}]: {e}")
 
@@ -804,7 +937,7 @@ class LegacyConfigLoader:
         config = configparser.ConfigParser()
         config.read(old_path)
 
-        data = {}
+        data: dict[str, dict[str, Any]] = {}
         for section in config.sections():
             data[section] = dict(config[section])
             # Convert string booleans

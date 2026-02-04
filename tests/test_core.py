@@ -102,10 +102,13 @@ class TestFiles:
     def test_compare_files_different(self, tmp_path):
         """Should detect different files."""
         from dot_man.files import compare_files
+        import time
 
         file1 = tmp_path / "file1.txt"
         file2 = tmp_path / "file2.txt"
         file1.write_text("hello")
+        time.sleep(0.15)  # Ensure different mtime (compare_files has 0.1s tolerance)
         file2.write_text("world")
 
         assert compare_files(file1, file2) is False
+
