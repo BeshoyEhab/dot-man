@@ -32,7 +32,7 @@ def verify(fix: bool):
 
     # 1. Check config file is valid TOML
     ui.console.print("[bold]Configuration[/bold]")
-    if DOT_MAN_TOML.exists():
+    if (REPO_DIR / DOT_MAN_TOML).exists():
         try:
             sections = ops.get_sections()
             ui.console.print(
@@ -65,9 +65,7 @@ def verify(fix: bool):
                         f"[dim](section '{section_name}')[/dim]"
                     )
                 elif not os.access(p, os.R_OK):
-                    issues.append(
-                        f"Permission denied: {p} (section '{section_name}')"
-                    )
+                    issues.append(f"Permission denied: {p} (section '{section_name}')")
                     ui.console.print(
                         f"  [error]✗[/error] Cannot read: {p} "
                         f"[dim](section '{section_name}')[/dim]"
@@ -81,9 +79,7 @@ def verify(fix: bool):
                 # Check corresponding repo path
                 repo_path = section.get_repo_path(p, REPO_DIR)
                 if not repo_path.exists():
-                    ui.console.print(
-                        f"    [dim]↳ Not yet saved to repo[/dim]"
-                    )
+                    ui.console.print(f"    [dim]↳ Not yet saved to repo[/dim]")
     except Exception as e:
         issues.append(f"Section check error: {e}")
         ui.console.print(f"  [error]✗[/error] Error checking sections: {e}")
@@ -152,9 +148,7 @@ def verify(fix: bool):
     if not issues:
         success("Repository integrity verified — no issues found!")
     else:
-        ui.console.print(
-            f"[warning]Found {len(issues)} issue(s)[/warning]"
-        )
+        ui.console.print(f"[warning]Found {len(issues)} issue(s)[/warning]")
         if fixed:
             ui.console.print(f"[success]Fixed {len(fixed)} issue(s)[/success]")
         if not fix and any("orphaned" in i.lower() for i in issues):
