@@ -7,20 +7,6 @@ This module aggregates all subcommands and exposes the main entry point.
 from .interface import cli
 
 # Import all subcommands to register them with the CLI group
-from . import (
-    init_cmd,
-    add_cmd,
-    status_cmd,
-    switch_cmd,
-    deploy_cmd,
-    edit_cmd,
-    audit_cmd,
-    backup_cmd,
-    branch_cmd,
-    remote_cmd,
-    tui_cmd,
-    config_cmd,
-)
 
 def main():
     """Main entry point for the CLI."""

@@ -5,6 +5,28 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.7.0] - 2026-02-28
+
+### Added
+
+- **Doctor Command**: `dot-man doctor` runs comprehensive health checks — git availability, Python version, repo integrity, config validity, branch state, remote config, tracked files, orphaned files, and backup status.
+- **Verify Command**: `dot-man verify` validates repository integrity (config parsing, tracked path existence/permissions/broken symlinks, orphaned files, git dirty state). Use `--fix` to auto-clean orphaned files.
+- **Verbose Mode**: `dot-man --verbose` (`-v`) shows debug output on console. Separate from `--debug` which logs to file only.
+- **GitHub Actions CI**: Test matrix across Python 3.9-3.13 with Black and mypy lint checks.
+
+### Changed
+
+- **Dependencies**: Moved dev-only tools (`black`, `mypy`, `pytest`, `pytest-cov`) from production dependencies to `[project.optional-dependencies] dev`. End users no longer install dev tools.
+- **Code Quality**: Extracted duplicate `restore_file_secrets` closures into shared `_restore_file_secrets()` method with binary file skipping.
+- **Module Split**: Split monolithic `config.py` (976 lines) into `global_config.py`, `section.py`, and `dotman_config.py`. Original `config.py` is now a thin re-export module for backward compatibility.
+- **Operations Split**: Split monolithic `operations.py` (935 lines) into mixin modules: `save_deploy_ops.py`, `branch_ops.py`, `status_ops.py`. `DotManOperations` inherits all 3 mixins.
+- **Test Coverage**: Added 115+ new tests (98 → 213 total). Coverage: `core.py` 27→58%, `operations.py` 49→68%, config modules 44→72%, `audit_cmd.py` 16→32%, `config_cmd.py` 11→26%.
+- **Refactored `conftest.py`**: Migrated from nested `with` blocks to `ExitStack` pattern to avoid Python's static nesting limit.
+- **`__all__` exports**: Added explicit public API definitions to `global_config.py`, `section.py`, `dotman_config.py`, `core.py`, `files.py`.
+- **Deprecated cleanup**: Removed unused `ignore_patterns` parameter from `copy_directory()`.
+- **Logging**: Replaced raw `print()` calls in audit/orphan operations with `logging.warning()`.
+- **Documentation**: Rewrote `DEVELOPMENT.md`, `CONTRIBUTING.md`, and `docs/roadmap.md` to reflect current modular CLI package structure.
+
 ## [0.6.1] - 2026-01-23
 
 ### Added

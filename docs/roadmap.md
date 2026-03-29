@@ -47,67 +47,106 @@
 
 ---
 
-## v0.4.0 - Backup System
+## v0.4.0 - Config Refactor & Modular Architecture ✅
 
-- `dot-man backup create` - Manual backups
-- `dot-man backup list` - Show available backups
-- `dot-man backup restore` - Restore from backup
-- Auto-backup before destructive operations
-- Backup rotation (max 5)
-
----
-
-## v0.5.0 - Template Variables
-
-- `dot-man template --set KEY=VALUE`
-- `dot-man template --list`
-- Template substitution (`{{HOSTNAME}}`, `{{EMAIL}}`)
-- System variable auto-population
-- Default value syntax (`{{VAR:default}}`)
+- ✅ TOML config format with sections and templates
+- ✅ Template inheritance (`inherits = ["template1"]`)
+- ✅ Include/exclude patterns for files
+- ✅ Modular `operations.py` for business logic
+- ✅ `dot-man add` command
+- ✅ Auto-migration from INI to TOML
+- ✅ Refactored all commands to use new Section API
 
 ---
 
-## v0.6.0 - Diff & History
+## v0.5.0 - Backup & Stash System ✅
+
+- ✅ `dot-man backup create/list/restore`
+- ✅ Auto-backup before destructive operations
+- ✅ Backup rotation (max 5)
+- ✅ `dot-man stash` / `dot-man stash pop`
+- ✅ `dot-man switch --stash` and `--save-to`
+- ✅ Bug fixes & stability (v0.5.1)
+
+---
+
+## v0.6.0 - Code Quality & Robustness ✅
+
+- ✅ Atomic file operations
+- ✅ Consistent file I/O
+- ✅ Consolidate secret checking
+- ✅ Complete type hints
+- ✅ File locking
+
+---
+
+## v0.7.0 - New Commands (Current)
+
+- `dot-man verify` - Validate repo integrity
+- `dot-man clean` - Remove stale backups, orphaned files
+- `dot-man doctor` - Diagnostics and health checks
+- `--dry-run` flag for all commands
+
+---
+
+## v0.8.0 - Performance
+
+- Batch file operations
+- Parallel secret scanning
+- Lazy loading
+- Content-addressable storage
+
+---
+
+## v0.9.0 - TUI Core Actions
+
+- Sync, switch, delete branch from TUI
+- Edit config from TUI
+- Create new branch from TUI
+
+---
+
+## v0.10.0-0.11.0 - TUI Management & Polish
+
+- Per-branch config editing
+- Keyboard shortcuts overlay
+- Status bar, notifications, progress indicators
+
+---
+
+## v0.12.0 - Diff & History
 
 - `dot-man diff` - Show changes between branches
-- `dot-man diff <file>` - Show local vs repo diff
 - `dot-man log` - Show commit history
 - `dot-man restore <file> <commit>` - Restore from history
 
 ---
 
-## v0.7.0 - Multi-Machine Profiles
+## v0.13.0 - Template Variables
 
-- `dot-man profile create <name>` - Create machine-specific profiles
-- `dot-man profile list` - List available profiles
-- `dot-man profile switch <name>` - Switch between profiles
+- `dot-man template --set KEY=VALUE`
+- Template substitution (`{{HOSTNAME}}`, `{{EMAIL}}`)
+- System variable auto-population
+
+---
+
+## v0.14.0 - Multi-Machine Profiles
+
+- `dot-man profile create/list/switch`
 - Automatic profile detection based on hostname
-- Profile inheritance (e.g., `server` extends `minimal`)
+- Profile inheritance
 
 ---
 
-## v0.8.0 - Import/Migration
+## v0.15.0 - Import/Migration
 
-- `dot-man import chezmoi` - Import from chezmoi
-- `dot-man import yadm` - Import from yadm
-- `dot-man import stow` - Import from GNU Stow
-- `dot-man export` - Export to portable format
-
----
-
-## v0.9.0 - Polish & Stability
-
-- Comprehensive error messages
-- Performance optimization for large repos
-- Extended test coverage (60%+)
-- Improved TUI responsiveness
-- Bug fixes and edge case handling
+- Import from chezmoi, yadm, GNU Stow
+- Export to portable format
 
 ---
 
 ## v1.0.0 - Production Ready
 
-- `dot-man doctor` - Diagnostics and health checks
 - 80%+ test coverage
 - Full documentation site (mkdocs/sphinx)
 - PyPI publication
@@ -120,13 +159,13 @@
 - Custom secret detection patterns via config
 - User-defined hook scripts directory
 - Plugin API for extensions
-- Built-in plugin: pro-mgr integration
 
 ---
 
 ## v2.0+ - Future Ideas
 
 - Encrypted files support (GPG/age)
+- Symlink mode
 - Web dashboard for configuration management
 - Dotfile sharing/marketplace
 - CI/CD integration for dotfile testing
@@ -138,8 +177,8 @@
 
 | Metric        | Current              | v1.0.0 Target         |
 | ------------- | -------------------- | --------------------- |
-| Test Coverage | ~30%                 | 80%+                  |
-| Core Commands | 12+ commands ✅      | All commands stable   |
+| Test Coverage | ~41% (98 tests)      | 80%+                  |
+| Core Commands | 14+ commands ✅      | All commands stable   |
 | TUI           | Full-featured ✅     | Polished & responsive |
 | Documentation | README + specs ✅    | Full docs site        |
 | Performance   | ~100 files in <5s ✅ | 500+ files in <5s     |

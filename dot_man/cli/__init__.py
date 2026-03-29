@@ -30,6 +30,9 @@ from .remote_cmd import remote, sync
 from .tui_cmd import tui
 from .config_cmd import config
 from .revert_cmd import revert
+from .clean_cmd import clean
+from .doctor_cmd import doctor
+from .verify_cmd import verify
 
 __all__ = [
     'main',
@@ -41,7 +44,6 @@ __all__ = [
     'DotManGroup',
     'complete_branches',
     'get_secret_handler',
-    # Commands
     'init',
     'add',
     'status',
@@ -56,4 +58,7 @@ __all__ = [
     'tui',
     'config',
     'revert',
+    'clean',
+    'doctor',
+    'verify',
 ]

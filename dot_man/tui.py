@@ -12,11 +12,10 @@ else:
     import tomli as tomllib
 
 from textual.app import App, ComposeResult
-from textual.widgets import Header, Footer, DataTable, Static, Input, Label, Button
-from textual.containers import Container, Horizontal, Vertical, VerticalScroll
+from textual.widgets import Header, Footer, DataTable, Static, Input, Label
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.binding import Binding
 from textual.screen import ModalScreen
-from textual import events
 
 from rich.text import Text
 from rich.panel import Panel
@@ -24,7 +23,7 @@ from rich.table import Table
 
 from .core import GitManager
 from .config import GlobalConfig, DotManConfig
-from .files import compare_files, get_file_status
+from .files import compare_files
 from .tui_editor import ConfigEditorScreen, AddSectionModal
 from .exceptions import DotManError
 
@@ -111,7 +110,6 @@ class OutputModal(ModalScreen):
         with Vertical(id="output-container"):
             yield Label(f"📋 {self.output_title}", id="output-title")
             with VerticalScroll(id="output-scroll"):
-                style = "red" if self.is_error else ""
                 yield Static(self.output_text, id="output-text")
             yield Label("[Escape/Enter/q to close]", id="close-hint")
     
@@ -465,7 +463,7 @@ class SwitchPreview(Static):
             self.update(Panel(text, title="Switch Preview", border_style="dim"))
             return
         
-        text.append(f"Switch: ", style="bold")
+        text.append("Switch: ", style="bold")
         text.append(f"{from_branch}", style="yellow")
         text.append(" → ", style="dim")
         text.append(f"{to_branch}\n\n", style="green")
@@ -828,7 +826,7 @@ class DotManApp(App):
         """Handle a command from the palette."""
         name, desc, args, needs_input = cmd
         
-        if needs_input == True:
+        if needs_input:
             # Interactive command - exit TUI and run
             self.notify(f"Running {name} (interactive)...")
             self.exit(result=("run", args))

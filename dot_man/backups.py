@@ -1,10 +1,11 @@
 """Backup management for dot-man."""
 
+__all__ = ["BackupManager"]
+
 import shutil
 import json
 from pathlib import Path
 from datetime import datetime
-from typing import Iterator
 
 from .constants import DOT_MAN_DIR
 from .exceptions import BackupError
@@ -169,8 +170,47 @@ class BackupManager:
 
     def _rotate_backups(self) -> None:
         """Keep only the last MAX_BACKUPS backups."""
+        self.clean_backups(keep=MAX_BACKUPS)
+
+    def delete_backup(self, backup_id: str) -> bool:
+        """
+        Delete a specific backup by ID.
+        
+        Args:
+            backup_id: The ID of the backup to delete.
+            
+        Returns:
+            True if deleted, False if not found.
+        """
+        backup_path = self.backups_dir / backup_id
+        if not backup_path.exists():
+            return False
+        
+        try:
+            shutil.rmtree(backup_path)
+            return True
+        except OSError:
+            return False
+
+    def clean_backups(self, keep: int = 0) -> int:
+        """
+        Remove old backups, keeping the specified number of most recent ones.
+        
+        Args:
+            keep: Number of recent backups to keep.
+            
+        Returns:
+            Number of backups deleted.
+        """
         backups = self.list_backups()
-        if len(backups) > MAX_BACKUPS:
-            to_delete = backups[MAX_BACKUPS:]
-            for b in to_delete:
-                shutil.rmtree(b["path"], ignore_errors=True)
+        if len(backups) <= keep:
+            return 0
+            
+        to_delete = backups[keep:]
+        deleted_count = 0
+        
+        for b in to_delete:
+            if self.delete_backup(b["id"]):
+                deleted_count += 1
+                
+        return deleted_count

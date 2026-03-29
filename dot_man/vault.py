@@ -1,17 +1,15 @@
 """Secure vault for stashing and restoring secrets."""
 
+__all__ = ["SecretVault", "VaultError"]
+
 import json
-import base64
 import hashlib
 import threading
 from contextlib import contextmanager
-from pathlib import Path
-from typing import Optional, Dict, Any, List, Generator
+from typing import Optional, Dict, Any, Generator
 from datetime import datetime
 
 from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 from .constants import DOT_MAN_DIR
 from .exceptions import DotManError

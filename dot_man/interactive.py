@@ -1,11 +1,15 @@
 """Interactive CLI wizards for dot-man."""
 
+__all__ = [
+    "run_section_wizard", "run_global_wizard",
+    "run_templates_wizard", "edit_template",
+]
+
 from pathlib import Path
 import questionary
 from questionary import Validator, ValidationError, Style
 from rich.table import Table
 from rich.panel import Panel
-from rich.text import Text
 
 from .config import DotManConfig, GlobalConfig, Section
 from .ui import console, print_banner, success, error, warn
@@ -265,8 +269,10 @@ def run_templates_wizard(config: DotManConfig):
             for name in templates:
                 tmpl = config._data["templates"][name]
                 hooks = []
-                if tmpl.get("pre_deploy"): hooks.append("Pre")
-                if tmpl.get("post_deploy"): hooks.append("Post")
+                if tmpl.get("pre_deploy"):
+                    hooks.append("Pre")
+                if tmpl.get("post_deploy"):
+                    hooks.append("Post")
                 
                 table.add_row(
                     name,

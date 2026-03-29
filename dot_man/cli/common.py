@@ -1,6 +1,5 @@
 """Common utilities for dot-man CLI commands."""
 
-import sys
 from functools import wraps
 from typing import Callable
 

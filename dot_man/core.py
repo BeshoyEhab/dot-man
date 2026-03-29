@@ -1,12 +1,14 @@
 """Git operations wrapper for dot-man."""
 
+__all__ = ["GitManager"]
+
 from pathlib import Path
 from typing import Iterator
 
 from git import Repo, GitCommandError
 from git.exc import InvalidGitRepositoryError
 
-from .constants import REPO_DIR, DEFAULT_BRANCH, GIT_IGNORE_PATTERNS
+from .constants import REPO_DIR, GIT_IGNORE_PATTERNS
 from .exceptions import (
     GitOperationError,
     BranchNotFoundError,

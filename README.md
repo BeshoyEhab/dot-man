@@ -5,6 +5,12 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/BeshoyEhab/dot-man/actions/workflows/ci.yml">
+    <img src="https://github.com/BeshoyEhab/dot-man/actions/workflows/ci.yml/badge.svg" alt="CI">
+  </a>
+</p>
+
+<p align="center">
   <a href="#features">Features</a> •
   <a href="#installation">Installation</a> •
   <a href="#quick-start">Quick Start</a> •

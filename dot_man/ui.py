@@ -6,7 +6,6 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Prompt, Confirm
 from rich.theme import Theme
-from rich.style import Style
 
 # Custom theme for consistent branding
 theme = Theme({

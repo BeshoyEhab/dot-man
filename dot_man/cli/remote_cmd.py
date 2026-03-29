@@ -107,7 +107,7 @@ def sync_branch():
             return
         
         # Offer to rename
-        ui.console.print(f"[yellow]Branch name mismatch detected![/yellow]")
+        ui.console.print("[yellow]Branch name mismatch detected![/yellow]")
         ui.console.print()
         
         if ui.confirm(f"Rename local '{local_current}' to '{remote_default}'?"):

@@ -7,14 +7,25 @@ import os
 from pathlib import Path
 from typing import Iterator, Callable
 
-from .constants import REPO_DIR
 from .secrets import (
     filter_secrets,
     SecretMatch,
-    SecretScanner,
     SecretGuard,
     PermanentRedactGuard,
 )
+
+__all__ = [
+    "atomic_write_text",
+    "smart_save_file",
+    "copy_file",
+    "copy_directory",
+    "compare_files",
+    "get_file_status",
+    "matches_patterns",
+    "backup_file",
+    "ensure_directory",
+    "clear_comparison_cache",
+]
 
 
 def atomic_write_text(path: Path, content: str, encoding: str = "utf-8") -> None:
@@ -164,6 +175,16 @@ def ensure_directory(path: Path, mode: int = 0o755) -> None:
 _comparison_cache: dict[str, tuple[float, int, float, int, bool]] = {}
 
 
+def clear_comparison_cache() -> None:
+    """Clear the file comparison cache.
+    
+    Call this after branch switches or when files are known to have changed
+    to prevent stale cached results. Also prevents memory growth in
+    long-running processes like the TUI.
+    """
+    _comparison_cache.clear()
+
+
 def copy_file(
     source: Path,
     destination: Path,
@@ -206,7 +227,6 @@ def copy_directory(
     filter_secrets_enabled: bool = True,
     include_patterns: list[str] | None = None,
     exclude_patterns: list[str] | None = None,
-    ignore_patterns: list[str] | None = None,  # Deprecated, use exclude_patterns
     secret_handler: Callable[[SecretMatch], str] | None = None,
     follow_symlinks: bool = False,
 ) -> tuple[int, int, list[SecretMatch]]:
@@ -218,7 +238,6 @@ def copy_directory(
         filter_secrets_enabled: Whether to filter secrets
         include_patterns: Only include files matching these patterns (if specified)
         exclude_patterns: Exclude files/directories matching these patterns
-        ignore_patterns: Deprecated alias for exclude_patterns
         secret_handler: Callback for detected secrets
         follow_symlinks: Whether to follow symbolic links during traversal
 
@@ -226,9 +245,7 @@ def copy_directory(
         Tuple of (files_copied, files_failed, detected_secrets)
     """
     include_patterns = include_patterns or []
-    exclude_patterns = (
-        exclude_patterns if exclude_patterns is not None else (ignore_patterns or [])
-    )
+    exclude_patterns = exclude_patterns or []
     files_copied = 0
     files_failed = 0
     all_secrets: list[SecretMatch] = []
@@ -380,62 +397,6 @@ def get_file_status(local_path: Path, repo_path: Path) -> str:
         return "IDENTICAL"
     else:
         return "MODIFIED"
-
-
-def iter_tracked_files(
-    config_sections: list[dict],
-) -> Iterator[tuple[Path, Path, str]]:
-    """Iterate over tracked files from configuration.
-
-    Yields:
-        Tuple of (local_path, repo_path, status)
-    """
-    for section in config_sections:
-        local_path = section["local_path"]
-        repo_path = section["repo_path"]
-
-        if local_path.is_dir():
-            # Handle directory
-            repo_rels = set()
-            local_rels = set()
-
-            if repo_path.exists():
-                repo_rels = {
-                    p.relative_to(repo_path)
-                    for p in repo_path.rglob("*")
-                    if p.is_file()
-                }
-
-            if local_path.exists():
-                local_rels = {
-                    p.relative_to(local_path)
-                    for p in local_path.rglob("*")
-                    if p.is_file()
-                }
-
-            all_rels = sorted(repo_rels | local_rels)
-
-            for rel in all_rels:
-                local_file = local_path / rel
-                repo_file = repo_path / rel
-
-                in_repo = rel in repo_rels
-                in_local = rel in local_rels
-
-                if in_repo and not in_local:
-                    yield local_file, repo_file, "DELETED"
-                elif in_local and not in_repo:
-                    yield local_file, repo_file, "NEW"
-                else:
-                    # Both exist, check content
-                    if compare_files(local_file, repo_file):
-                        yield local_file, repo_file, "IDENTICAL"
-                    else:
-                        yield local_file, repo_file, "MODIFIED"
-        else:
-            # Handle file
-            status = get_file_status(local_path, repo_path)
-            yield local_path, repo_path, status
 
 
 def backup_file(path: Path) -> Path | None:

@@ -1,5 +1,10 @@
 """Secret detection patterns and filtering logic."""
 
+__all__ = [
+    "SecretScanner", "SecretMatch", "SecretPattern", "SecretGuard",
+    "PermanentRedactGuard", "Severity", "filter_secrets",
+]
+
 import re
 from dataclasses import dataclass
 from enum import Enum
@@ -392,7 +397,6 @@ class SecretScanner:
                 continue
 
             current_line = line
-            line_modified = False
 
             for pattern in self.patterns:
                 match = pattern.pattern.search(current_line)
@@ -427,7 +431,6 @@ class SecretScanner:
                             replacement_text, current_line
                         )
                         count += 1
-                        line_modified = True
 
             redacted_lines.append(current_line)
 

@@ -1,11 +1,11 @@
 """File locking mechanism to prevent concurrent operations."""
 
 from __future__ import annotations
+
+__all__ = ["FileLock", "LockError"]
 import fcntl
-import os
-import contextlib
 from pathlib import Path
-from typing import IO, Optional, Generator
+from typing import IO, Optional
 
 from .exceptions import DotManError
 

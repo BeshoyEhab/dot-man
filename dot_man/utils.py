@@ -1,5 +1,11 @@
 """Utility functions for dot-man."""
 
+__all__ = [
+    "get_editor", "open_in_editor", "human_size",
+    "get_directory_size", "count_files",
+    "is_git_installed", "get_hostname", "get_username",
+]
+
 import os
 import shutil
 import subprocess
@@ -88,27 +94,6 @@ def count_files(path: Path) -> int:
         if item.is_file():
             count += 1
     return count
-
-
-def confirm(prompt: str, default: bool = False) -> bool:
-    """Ask for user confirmation.
-
-    Args:
-        prompt: The question to ask
-        default: Default value if user just presses Enter
-
-    Returns:
-        True if user confirmed, False otherwise
-    """
-    suffix = " [Y/n]" if default else " [y/N]"
-
-    try:
-        response = input(prompt + suffix + " ").strip().lower()
-        if not response:
-            return default
-        return response in ("y", "yes")
-    except (EOFError, KeyboardInterrupt):
-        return False
 
 
 def is_git_installed() -> bool:

@@ -1,8 +1,13 @@
 """Custom exceptions for dot-man."""
 
+__all__ = [
+    "DotManError", "ConfigurationError", "ConfigValidationError",
+    "GitOperationError", "BranchNotFoundError", "NotInitializedError",
+    "BackupError", "ErrorDiagnostic",
+]
+
 from dataclasses import dataclass
 from enum import Enum
-from typing import Optional
 
 
 class ErrorCategory(Enum):

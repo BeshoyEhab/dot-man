@@ -10,8 +10,8 @@ git clone https://github.com/BeshoyEhab/dot-man.git
 cd dot-man
 
 # Create virtual environment
-python -m venv venv
-source venv/bin/activate  # or: source venv/bin/activate.fish
+python -m venv .venv
+source .venv/bin/activate  # or: source .venv/bin/activate.fish
 
 # Install in development mode with dev dependencies
 pip install -e ".[dev]"
@@ -27,18 +27,30 @@ pytest tests/ -v
 dot-man/
 ├── dot_man/              # Main package
 │   ├── __init__.py       # Package version
-│   ├── cli.py            # Click commands (~1200 lines)
-│   ├── tui.py            # Interactive TUI (textual)
+│   ├── cli/              # CLI commands (modular Click package)
+│   │   ├── main.py       # Entry point
+│   │   ├── interface.py  # Click group definition
+│   │   ├── common.py     # Shared CLI utilities (decorators, helpers)
+│   │   ├── *_cmd.py      # Individual command modules
+│   │   └── __init__.py   # CLI exports
+│   ├── operations.py     # Business logic (single source of truth)
 │   ├── core.py           # Git operations wrapper
-│   ├── config.py         # INI file parsing
+│   ├── config.py         # TOML configuration parsing
 │   ├── secrets.py        # Secret detection patterns
-│   ├── files.py          # File operations
+│   ├── vault.py          # Encrypted secret vault
+│   ├── backups.py        # Backup manager
+│   ├── lock.py           # File locking
+│   ├── files.py          # File operations (atomic writes)
+│   ├── interactive.py    # Interactive prompts
+│   ├── tui.py            # Interactive TUI (textual)
+│   ├── tui_editor.py     # TUI config editor
+│   ├── ui.py             # Rich output helpers
 │   ├── utils.py          # Helper functions
 │   ├── constants.py      # Paths, defaults, patterns
 │   └── exceptions.py     # Custom exception classes
-├── tests/                # Test suite
+├── tests/                # Test suite (98 tests)
 │   ├── conftest.py       # Pytest fixtures
-│   └── test_core.py      # Core module tests
+│   └── test_*.py         # Test modules
 ├── docs/                 # Documentation
 │   ├── roadmap.md        # Development roadmap
 │   └── specs/            # Detailed specifications
@@ -60,7 +72,7 @@ pytest tests/ -v
 pytest tests/ --cov=dot_man --cov-report=term-missing
 
 # Run specific test
-pytest tests/test_core.py::TestSecretScanner -v
+pytest tests/test_core.py -v
 ```
 
 ## Code Style
@@ -68,12 +80,15 @@ pytest tests/test_core.py::TestSecretScanner -v
 This project uses:
 
 - **Black** for formatting (line length: 88)
-- **isort** for import sorting
+- **Ruff** for linting
 - **mypy** for type checking
 
 ```bash
 # Format code
 black dot_man/ tests/
+
+# Lint code
+ruff check dot_man/ tests/
 
 # Check types
 mypy dot_man/
@@ -81,16 +96,21 @@ mypy dot_man/
 
 ## Adding a New Command
 
-1. Add the command function to `dot_man/cli.py`
-2. Use the `@main.command()` decorator
-3. Add `@require_init` if the command needs initialization
-4. Document with a docstring (shown in `--help`)
-5. Add tests to `tests/test_core.py`
+1. Create a new file `dot_man/cli/mycommand_cmd.py`
+2. Define your Click command
+3. Register it in `dot_man/cli/interface.py`
+4. Import it in `dot_man/cli/__init__.py`
+5. Add business logic to `dot_man/operations.py`
+6. Add tests to `tests/test_mycommand.py`
 
-Example:
+Example command file (`dot_man/cli/mycommand_cmd.py`):
 
 ```python
-@main.command()
+import click
+from .common import require_init, success, error
+from .interface import cli
+
+@cli.command()
 @click.option("--verbose", "-v", is_flag=True)
 @require_init
 def mycommand(verbose: bool):
@@ -98,8 +118,11 @@ def mycommand(verbose: bool):
 
     Longer description with examples.
     """
-    # Implementation here
-    pass
+    # Business logic should go in operations.py
+    from ..operations import DotManOperations
+    ops = DotManOperations()
+    # ... implementation
+    success("Done!")
 ```
 
 ## Adding Secret Patterns

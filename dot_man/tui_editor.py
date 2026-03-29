@@ -10,18 +10,15 @@ from textual.widgets import (
     Button,
     Checkbox,
     Select,
-    Static,
     ListView,
     ListItem,
-    TabbedContent,
-    TabPane,
 )
 from textual.containers import Vertical, Horizontal, VerticalScroll, Container
 from typing import Any, Optional
 from textual.binding import Binding
 from textual.message import Message
 
-from .config import DotManConfig, Section
+from .config import DotManConfig
 from .operations import get_operations
 
 

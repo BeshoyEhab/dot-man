@@ -503,7 +503,7 @@ secrets_filter = false""",
         ui.console.print(f"\n[dim]{example['explanation']}[/dim]")
 
     ui.console.print(
-        f"\n[dim]💡 Run 'dot-man config create' to add these examples to your config file[/dim]"
+        "\n[dim]💡 Run 'dot-man config create' to add these examples to your config file[/dim]"
     )
 
 

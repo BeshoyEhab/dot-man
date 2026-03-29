@@ -73,13 +73,53 @@
 
 ---
 
+## Immediate Fixes & Housekeeping
+
+### 🔴 High Priority
+
+- [x] **Move dev deps out of production** - `black`, `mypy`, `pytest`, `pytest-cov` are in main `[project.dependencies]` instead of `[project.optional-dependencies] dev`. Users install dev tools unnecessarily
+- [x] **Bump version to 0.7.0** - `pyproject.toml` still says `0.5.1` but v0.6.0 is complete. Update `pyproject.toml` and `dot_man/__init__.py`
+- [x] **Add `build/` to `.gitignore`** - The `build/` directory is currently checked into git
+
+### 🟡 Medium Priority
+
+- [x] **Update `DEVELOPMENT.md`** - Still references old single `cli.py` instead of `cli/` package, and "INI" parsing instead of TOML
+- [x] **Update `CONTRIBUTING.md`** - Same stale references as `DEVELOPMENT.md` (old project structure, single test file)
+- [x] **Sync `docs/roadmap.md` with `TODO.md`** - Roadmap thinks v0.4.0 is "Backup System" while TODO says "Config Refactor". Pick one source of truth or remove roadmap
+- [x] **Update architecture diagram** - Current diagram shows `cli.py` but project now uses `cli/` package with modular commands
+- [x] **Add GitHub Actions CI** - Run tests, enforce coverage, run `mypy` + `black` on every PR
+  - [x] `.github/workflows/ci.yml` - pytest, coverage threshold, linting
+  - [x] Badge in README for build status
+
+### 🟢 Code Quality
+
+- [x] **Split `config.py` (976 lines)** - Extracted into `global_config.py`, `section.py`, `dotman_config.py`
+- [x] **Split `operations.py` (935 lines)** - Extracted into `save_deploy_ops.py`, `branch_ops.py`, `status_ops.py` as mixins
+- [x] **Extract duplicate `restore_file_secrets()`** - Closure defined in both `deploy_section` and `execute_deployment_plan.deploy_item`, extract to a shared helper
+- [x] **Add `--verbose` / `--debug` global flag** - Referenced in error suggestions but not implemented
+
+### 📊 Test Coverage (Current: 46%, Target: 80%)
+
+- [ ] **`tui.py`** - 0% → 50%+ (at minimum test widget instantiation and key bindings)
+- [ ] **`tui_editor.py`** - 0% → 50%+
+- [x] **`core.py`** - 27% → 58% (40 new GitManager tests)
+- [x] **`operations.py`** - 49% → 59% (27 new DotManOperations tests)
+- [x] **`config.py`** - 44% → SPLIT into 3 modules (global_config 72%, section 68%, dotman_config 53%)
+- [x] **`cli/config_cmd.py`** - 11% → 26%
+- [x] **`cli/audit_cmd.py`** - 16% → 47%
+- [ ] **`cli/remote_cmd.py`** - 10% → 60%+
+- [ ] **`cli/edit_cmd.py`** - 16% → 60%+
+- [ ] **`cli/init_cmd.py`** - 30% → 60%+
+
+---
+
 ## Next Up
 
 ### v0.7.0 - New Commands
 
-- [ ] **`dot-man verify`** - Validate repo integrity, check orphaned files, verify permissions
-- [ ] **`dot-man clean`** - Remove stale backups, orphaned files in repo
-- [ ] **`dot-man doctor`** - Diagnostics and health checks
+- [x] **`dot-man verify`** - Validate repo integrity, check orphaned files, verify permissions
+- [x] **`dot-man clean`** - Remove stale backups, orphaned files in repo
+- [x] **`dot-man doctor`** - Diagnostics and health checks
 - [ ] **Dry-run for all commands** - `--dry-run` flag for deploy, save, etc.
 
 ### v0.8.0 - Performance
@@ -204,11 +244,17 @@
 ## Architecture
 
 ```
-cli.py ─┐
-        ├──> operations.py ─┬─> config.py (TOML)
-tui.py ─┘                   ├─> core.py (Git)
-                            ├─> files.py
-                            └─> secrets.py
+cli/ ────┐
+         ├──> operations.py ─┬─> config.py (re-exports)
+tui.py ──┘    (orchestrator)  │    ├─> global_config.py
+              ├ SaveDeployMixin│    ├─> section.py
+              ├ BranchMixin   │    └─> dotman_config.py
+              └ StatusMixin   ├─> core.py (Git)
+                              ├─> files.py
+                              ├─> secrets.py
+                              ├─> vault.py
+                              ├─> backups.py
+                              └─> lock.py
 ```
 
 `operations.py` is the single source of truth for all business logic.
