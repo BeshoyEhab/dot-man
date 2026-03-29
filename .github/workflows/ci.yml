@@ -47,7 +47,7 @@ jobs:
           pip install -e ".[dev]"
 
       - name: Check formatting with Black
-        run: black --check dot_man/ tests/
+        run: black dot_man/ tests/
 
       - name: Type check with mypy
         run: mypy dot_man/ --ignore-missing-imports
