@@ -5,6 +5,32 @@ All notable changes to dot-man will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-05-10
+
+### Added
+- **Pre-push quality checklist** in AGENTS.md — mandatory black, ruff, mypy, and pytest before every commit
+- **Pre-commit hooks** via `.pre-commit-config.yaml` — automatic enforcement of formatting, linting, and type checking
+- **Ruff configuration** in `pyproject.toml` — rules E, F, W, I with per-file E402 suppression
+- **Missing test fixtures** — `git_repo`, `git_repo_with_branches`, `git_repo_with_tags`, `git_repo_with_commits`
+
+### Changed
+- **CI workflow** — Black now runs with `--check` (was silently reformatting), added ruff lint step
+- **Test quality audit** — replaced 15+ weak tests (callable/hasattr/import checks) with functional tests:
+  - Secret scanning tests now exercise real file scanning
+  - Completion function tests use mocked GitManager with real invocations
+  - Operations singleton test verifies identity, not just callability
+- Black target-version updated from py38 to py39
+
+### Fixed
+- **6 mypy errors** resolved across 4 files:
+  - `global_config.py` — `no-any-return` on `current_profile` property
+  - `core.py` — `delete_tag` now uses `repo.git.tag("-d", name)` instead of `Repo.delete_tag(str)`
+  - `cli/log_cmd.py` — removed invalid `.path` attribute access on Diff objects
+  - `cli/profile_cmd.py` — fixed `getattr` misuse and `no-any-return` in `_detect_profile`
+- **137 ruff lint errors** fixed (unused imports, unused variables, bool comparison style, trailing whitespace)
+- Removed unused `socket` import in profile_cmd.py
+- Fixed 26 pre-existing test fixture errors (missing `git_repo`/`git_repo_with_tags` fixtures)
+
 ## [0.8.0] - 2026-05-10
 
 ### Removed

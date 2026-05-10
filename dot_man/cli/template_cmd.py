@@ -1,16 +1,15 @@
 """Template variables command for dot-man CLI."""
 
 import os
-import socket
 import platform
+import socket
 from pathlib import Path
 
 import click
 
 from .. import ui
+from .common import complete_template_keys, error, success, warn
 from .interface import cli as main
-from .common import error, success, warn, require_init, complete_template_keys
-
 
 # System variables that can be auto-detected
 SYSTEM_VARS = {
@@ -116,8 +115,9 @@ def template_list():
     Shows both user-defined templates and available system variables.
     """
     try:
-        from ..operations import get_operations
         from rich.table import Table
+
+        from ..operations import get_operations
 
         ops = get_operations()
         global_config = ops.global_config

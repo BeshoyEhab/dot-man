@@ -5,10 +5,10 @@ import click
 from .. import ui
 from ..constants import REPO_DIR
 from ..core import GitManager
-from ..secrets import SecretScanner, SecretGuard, PermanentRedactGuard, SecretMatch
 from ..exceptions import DotManError
+from ..secrets import PermanentRedactGuard, SecretGuard, SecretMatch, SecretScanner
+from .common import error, handle_exception, require_init, success
 from .interface import cli as main
-from .common import error, success, require_init, handle_exception
 
 
 @main.command()
@@ -52,7 +52,7 @@ def audit(strict: bool, fix: bool):
             return
 
         # Group by severity
-        from typing import List, Dict
+        from typing import Dict, List
         by_severity: Dict[str, List[SecretMatch]] = {}
         for match in matches:
             severity = match.severity.value

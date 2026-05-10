@@ -1,13 +1,12 @@
 """Tests for dot_man.core GitManager."""
 
 import pytest
-from pathlib import Path
 from git import Repo
 
 from dot_man.core import GitManager
 from dot_man.exceptions import (
-    GitOperationError,
     BranchNotFoundError,
+    GitOperationError,
     NotInitializedError,
 )
 

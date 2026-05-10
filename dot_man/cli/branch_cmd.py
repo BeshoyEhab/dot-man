@@ -4,11 +4,11 @@ import click
 from rich.table import Table
 
 from .. import ui
-from ..core import GitManager
 from ..config import GlobalConfig
+from ..core import GitManager
 from ..exceptions import DotManError
+from .common import complete_branches, error, handle_exception, require_init, success
 from .interface import cli as main
-from .common import error, success, require_init, complete_branches, handle_exception
 
 
 @main.group()

@@ -9,6 +9,7 @@ from typing import IO, Optional
 
 from .exceptions import DotManError
 
+
 class LockError(DotManError):
     """Raised when a lock cannot be acquired."""
     pass
@@ -16,7 +17,7 @@ class LockError(DotManError):
 class FileLock:
     """
     Context manager for advisory file locking using fcntl.
-    
+
     Ensures that only one process can perform critical operations (like deploy/save)
     at a time. Fails fast if the lock is held by another process.
     """

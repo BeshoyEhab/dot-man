@@ -7,8 +7,15 @@ from rich.panel import Panel
 
 from .. import ui
 from ..exceptions import DotManError
+from .common import (
+    complete_branches,
+    error,
+    handle_exception,
+    require_init,
+    success,
+    warn,
+)
 from .interface import cli as main
-from .common import error, success, warn, require_init, complete_branches, handle_exception
 
 
 @main.command()
@@ -64,20 +71,20 @@ def deploy(branch: str, force: bool, dry_run: bool):
         if not section_names:
             warn("No files configured in this branch")
             return
-            
+
         sections = [ops.get_section(name) for name in section_names]
-        
+
         # Phase 1: Scan
         if not dry_run:
             ui.console.print("Scanning for changes...")
-        
+
         plan = ops.scan_deployable_changes(sections)
-        
+
         sections_to_process = plan["sections_to_deploy"]
         pre_hooks = list(dict.fromkeys(plan["pre_hooks"]))
         post_hooks = list(dict.fromkeys(plan["post_hooks"]))
         scan_errors = plan["errors"]
-        
+
         for err in scan_errors:
             warn(err)
 
@@ -91,18 +98,18 @@ def deploy(branch: str, force: bool, dry_run: bool):
             for section, local_path, repo_path in sections_to_process:
                 action = "OVERWRITE" if local_path.exists() else "CREATE"
                 ui.console.print(f"  {action}: {local_path}")
-            
+
             if pre_hooks:
                 ui.console.print("\n[bold]Pre-Hooks:[/bold]")
                 for cmd in pre_hooks:
                     ui.console.print(f"  [dim]{cmd}[/dim]")
-            
+
             if post_hooks:
                 ui.console.print("\n[bold]Post-Hooks:[/bold]")
                 for cmd in post_hooks:
                     ui.console.print(f"  [dim]{cmd}[/dim]")
             return
-        
+
         # Confirm
         ui.console.print(f"Found {len(sections_to_process)} files to deploy.")
         if not force:
@@ -119,20 +126,20 @@ def deploy(branch: str, force: bool, dry_run: bool):
                     subprocess.run(cmd, shell=True, check=False)
                 except Exception as e:
                     warn(f"Failed to run command '{cmd}': {e}")
-        
+
         # Phase 2: Execute Deployment (Parallel)
         ui.console.print("\n[bold]Deploying files...[/bold]")
         result = ops.execute_deployment_plan(plan)
-        
+
         deployed = result["deployed"]
         exec_errors = result["errors"]
-        
+
         if exec_errors:
             for err in exec_errors:
                 ui.console.print(f"  [red]Error:[/red] {err}")
                 import logging
                 logging.error(f"Deployment error: {err}")
-        
+
         ui.console.print(f"\nDeployed: {deployed}/{len(sections_to_process)} files.")
 
         # Execute Post-Hooks
@@ -144,11 +151,11 @@ def deploy(branch: str, force: bool, dry_run: bool):
                     subprocess.run(cmd, shell=True, check=False)
                 except Exception as e:
                     warn(f"Failed to run command '{cmd}': {e}")
-        
+
         # Update global config
         ops.global_config.current_branch = branch
         ops.global_config.save()
-        
+
         success(f"Deployment complete! ({deployed} files)")
 
     except DotManError as e:

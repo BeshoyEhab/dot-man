@@ -10,12 +10,11 @@ modules directly:
 """
 
 # Re-export everything for backward compatibility
+# Also re-export constants that were previously available via config imports
+from .constants import DOT_MAN_TOML, GLOBAL_TOML, REPO_DIR  # noqa: F401
+from .dotman_config import DotManConfig, LegacyConfigLoader  # noqa: F401
 from .global_config import GlobalConfig, _write_toml  # noqa: F401
 from .section import Section  # noqa: F401
-from .dotman_config import DotManConfig, LegacyConfigLoader  # noqa: F401
-
-# Also re-export constants that were previously available via config imports
-from .constants import REPO_DIR, GLOBAL_TOML, DOT_MAN_TOML  # noqa: F401
 
 __all__ = [
     "GlobalConfig",

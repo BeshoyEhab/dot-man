@@ -1,10 +1,11 @@
 import json
-import threading
 import time
-from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
+
 import pytest
+
 from dot_man.vault import SecretVault
+
 
 @pytest.fixture
 def temp_vault_dir(tmp_path):
@@ -70,7 +71,7 @@ def test_vault_caching(vault):
     vault.stash_secret("f1", 1, "p1", "s1", "main")
 
     # Modify file behind the scenes
-    original_mtime = vault.vault_file.stat().st_mtime
+    vault.vault_file.stat().st_mtime  # noqa: F841 — ensures file is accessible
 
     # Wait to ensure mtime changes
     time.sleep(0.01)

@@ -1,13 +1,11 @@
 """Tests for CLI commands with low coverage: audit, init, config, doctor, verify."""
 
-import pytest
-from pathlib import Path
 from contextlib import ExitStack
-from click.testing import CliRunner
 from unittest.mock import patch
 
-from dot_man.cli.interface import cli
+from click.testing import CliRunner
 
+from dot_man.cli.interface import cli
 
 # ─── Init Command ──────────────────────────────────────────
 

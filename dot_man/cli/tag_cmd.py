@@ -3,8 +3,8 @@
 import click
 
 from .. import ui
+from .common import complete_tags, error, require_init, success, warn
 from .interface import cli as main
-from .common import error, success, warn, require_init, complete_tags
 
 
 @main.group()
@@ -103,8 +103,8 @@ def tag_delete(name: str, force: bool):
         dot-man tag delete -f temp-tag
     """
     try:
-        from ..operations import get_operations
         from ..core import GitOperationError
+        from ..operations import get_operations
 
         ops = get_operations()
 
@@ -145,7 +145,6 @@ def tag_switch(name: str):
         from ..operations import get_operations
 
         ops = get_operations()
-        current_branch = ops.current_branch
 
         # Check if tag exists
         tag_commit = ops.git.get_tag_commit(name)
@@ -159,7 +158,7 @@ def tag_switch(name: str):
         ui.console.print(f"  Commit: [cyan]{tag_commit}[/cyan]")
         ui.console.print()
         ui.console.print("To return to a branch, run:")
-        ui.console.print(f"  [cyan]dot-man switch <branch-name>[/cyan]")
+        ui.console.print("  [cyan]dot-man switch <branch-name>[/cyan]")
 
     except Exception as e:
         error(str(e))

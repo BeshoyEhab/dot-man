@@ -90,84 +90,50 @@
 
 ---
 
-## v0.8.0 - History & Tags + Performance (Released: 2026-05-10)
+## v0.8.0 - History & Tags + Performance ✅ (Released: 2026-05-10)
 
-- [x] `dot-man log` - Show commit history with optional diffs
-- [x] `dot-man log --stat` - Show file change statistics
-- [x] `dot-man checkout <sha|tag>` - Checkout specific commit or tag
-- [x] `dot-man tag create/list/delete/switch` - Tag management
-- [x] `switch branch@tag` - Switch to branch at tag position
-- [x] `switch <commit>` - Switch to specific commit
-- [x] `switch --save/--no-save` - Override save behavior
-- [x] `switch.default_behavior` config option
-- [x] Flexible argument order (branch can be before/after flags)
-- [x] Shell completion for tags and commits
-
-### Performance (v0.8.x)
-
-- [x] Batch file operations - Group reads/writes for faster switching
-- [x] Parallel secret scanning - Use `concurrent.futures` for large directories
-- [x] Lazy loading - Only load SecretGuard when secrets detected
-- [x] `dot-man diff` - Show changes between branches/files
-- [x] `dot-man revert --commit` - Restore file from specific commit
-- [ ] Content-addressable storage - Deferred to v1.1.0
-
-### TUI Status
-
-- [x] TUI temporarily removed for redesign (CLI provides full functionality)
+- ✅ `dot-man log` - Show commit history with optional diffs
+- ✅ `dot-man log --stat` - Show file change statistics
+- ✅ `dot-man checkout <sha|tag>` - Checkout specific commit or tag
+- ✅ `dot-man tag create/list/delete/switch` - Tag management
+- ✅ `switch branch@tag` - Switch to branch at tag position
+- ✅ `switch <commit>` - Switch to specific commit
+- ✅ `switch --save/--no-save` - Override save behavior
+- ✅ `switch.default_behavior` config option
+- ✅ Flexible argument order (branch can be before/after flags)
+- ✅ Shell completion for tags and commits
+- ✅ Batch file operations - Group reads/writes for faster switching
+- ✅ Parallel secret scanning - Use `concurrent.futures` for large directories
+- ✅ Lazy loading - Only load SecretGuard when secrets detected
+- ✅ `dot-man diff` - Show changes between branches/files
+- ✅ `dot-man revert --commit` - Restore file from specific commit
+- ✅ `dot-man template set/get/list/system` - Template variable management
+- ✅ `dot-man profile create/list/switch/detect` - Multi-machine profiles
+- ✅ TUI temporarily removed for redesign (CLI provides full functionality)
 
 ---
 
-## v0.9.0 - Diff & Restore (Completed)
+## v0.9.0 - Quality Gates & Test Audit ✅ (Released: 2026-05-10)
 
-- [x] `dot-man diff` - Show changes between branches
-- [x] `dot-man diff --branch <branch>` - Compare branches
-- [x] `dot-man diff <file>` - Show specific file changes
-- [x] `dot-man diff --staged` - Show staged changes
-- [x] `dot-man revert --commit` - Restore from history
-
----
-
-## v0.10.0 - Template Variables ✅
-
-- [x] `dot-man template set <key> <value>` - Set template variable
-- [x] `dot-man template get <key>` - Get template value
-- [x] `dot-man template list` - List all templates
-- [x] `dot-man template system` - Show auto-detected system variables
-- [x] System variables: {{HOSTNAME}}, {{USER}}, {{SHELL}}, {{OS}}, etc.
-
----
-
-## v0.11.0 - Multi-Machine Profiles ✅
-
-- [x] `dot-man profile create/list/switch` - Profile management
-- [x] Automatic profile detection based on hostname
-- [x] Profile inheritance
-- [x] Shell completions for profiles
+- ✅ Pre-push quality checklist (black, ruff, mypy, pytest)
+- ✅ Pre-commit hooks (.pre-commit-config.yaml)
+- ✅ Ruff configuration in pyproject.toml
+- ✅ 6 mypy type errors fixed
+- ✅ 137 ruff lint errors fixed
+- ✅ 15+ weak tests replaced with functional tests
+- ✅ 26 fixture errors fixed (missing git_repo fixtures)
+- ✅ CI updated: Black --check, ruff check added
+- ✅ Updated stale documentation
 
 ---
 
 ## v1.0.0 - Production Ready
 
-- [ ] `dot-man profile create/list/switch`
-- [ ] Automatic profile detection based on hostname
-- [ ] Profile inheritance
-
----
-
-## v0.12.0 - Import/Migration
-
-- [ ] Import from chezmoi, yadm, GNU Stow
-- [ ] Export to portable format
-
----
-
-## v1.0.0 - Production Ready
-
-- [ ] 80%+ test coverage (currently 60%)
+- [ ] 80%+ test coverage (currently 57%)
 - [ ] Full documentation site (mkdocs/sphinx)
 - [ ] PyPI publication
 - [ ] Stable API guarantee
+- [ ] Content-addressable storage for deduplication
 
 ---
 
@@ -176,58 +142,19 @@
 - [ ] Custom secret detection patterns via config
 - [ ] User-defined hook scripts directory
 - [ ] Plugin API for extensions
-- [ ] Content-addressable storage for deduplication
-
----
-
-## v2.0+ - Future Ideas
-
-- [ ] `dot-man template --set KEY=VALUE`
-- [ ] Template substitution (`{{HOSTNAME}}`, `{{EMAIL}}`)
-- [ ] System variable auto-population
-
----
-
-## v0.15.0 - Multi-Machine Profiles
-
-- [ ] `dot-man profile create/list/switch`
-- [ ] Automatic profile detection based on hostname
-- [ ] Profile inheritance
-
----
-
-## v0.16.0 - Import/Migration
-
 - [ ] Import from chezmoi, yadm, GNU Stow
 - [ ] Export to portable format
 
 ---
 
-## v1.0.0 - Production Ready
-
-- [ ] 80%+ test coverage (currently 44%)
-- [ ] Full documentation site (mkdocs/sphinx)
-- [ ] PyPI publication
-- [ ] Stable API guarantee
-
----
-
-## v1.1.0 - Plugin System
-
-- Custom secret detection patterns via config
-- User-defined hook scripts directory
-- Plugin API for extensions
-
----
-
 ## v2.0+ - Future Ideas
 
-- Encrypted files support (GPG/age)
-- Symlink mode
-- Web dashboard for configuration management
-- Dotfile sharing/marketplace
-- CI/CD integration for dotfile testing
-- Cloud sync backends (S3, Dropbox, etc.)
+- [ ] Encrypted files support (GPG/age)
+- [ ] Symlink mode
+- [ ] Web dashboard for configuration management
+- [ ] Dotfile sharing/marketplace
+- [ ] CI/CD integration for dotfile testing
+- [ ] Cloud sync backends (S3, Dropbox, etc.)
 
 ---
 
@@ -235,8 +162,9 @@
 
 | Metric        | Current                  | v1.0.0 Target         |
 | ------------- | ------------------------ | --------------------- |
-| Test Coverage | 60% (423 tests)          | 80%+                  |
+| Test Coverage | 57% (418 tests)          | 80%+                  |
 | Core Commands | 25+ commands ✅         | All commands stable   |
+| Lint Errors   | 0 (ruff + mypy) ✅      | 0                     |
 | TUI           | Removed for redesign    | Redesign in v1.x      |
 | Documentation | README + specs ✅        | Full docs site        |
 | Performance   | Batch ops + parallel ✅ | 500+ files in <5s     |

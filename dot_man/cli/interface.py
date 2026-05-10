@@ -4,12 +4,13 @@ This module defines the main Click group to avoid circular imports
 when subcommands need to decorate themselves with @main.command().
 """
 
-import click
 import logging
-from .. import __version__
-from .common import DotManGroup
-from .. import ui
+
+import click
+
+from .. import __version__, ui
 from ..constants import DOT_MAN_DIR
+from .common import DotManGroup
 
 
 @click.group(cls=DotManGroup)
@@ -28,7 +29,7 @@ def cli(ctx, verbose: bool, debug: bool):
 
     log_file = DOT_MAN_DIR / "dot-man.log"
     level = logging.DEBUG if (debug or verbose) else logging.INFO
-    
+
     # Configure file logging
     logging.basicConfig(
         filename=str(log_file),
@@ -48,7 +49,7 @@ def cli(ctx, verbose: bool, debug: bool):
         ui.console.print("[dim]Verbose mode enabled[/dim]")
     elif debug:
         ui.console.print("[dim]Debug logging enabled (see dot-man.log)[/dim]")
-    
+
     # Store flags in context for subcommands
     ctx.ensure_object(dict)
     ctx.obj['DEBUG'] = debug

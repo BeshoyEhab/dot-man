@@ -1,14 +1,15 @@
 """Audit, status, and orphan management mixin for DotManOperations."""
 
 from __future__ import annotations
+
+import logging
+import os
 from abc import abstractmethod
 from pathlib import Path
-from typing import Any, Iterator, Optional
-import os
-import logging
+from typing import Any, Iterator
 
-from .secrets import SecretScanner, SecretMatch
 from .constants import REPO_DIR
+from .secrets import SecretMatch, SecretScanner
 
 logger = logging.getLogger(__name__)
 

@@ -2,13 +2,12 @@
 
 __all__ = ["Section"]
 
-from typing import Optional, Any
 from pathlib import Path
+from typing import Any, Optional
 
 from .constants import (
-    VALID_UPDATE_STRATEGIES,
-    HOOK_ALIASES,
     DEFAULT_IGNORED_DIRECTORIES,
+    HOOK_ALIASES,
 )
 
 
@@ -107,28 +106,28 @@ class Section:
 
         # Check if it's an alias
         resolved = HOOK_ALIASES.get(hook, hook)
-        
+
         # Replace {qs_config} placeholder with detected quickshell config dir
         if "{qs_config}" in resolved:
             qs_config = self._detect_quickshell_config()
             resolved = resolved.replace("{qs_config}", qs_config)
-        
+
         return resolved
-    
+
     def _detect_quickshell_config(self) -> str:
         """Detect the quickshell config directory name from section paths.
-        
+
         Looks for paths like ~/.config/quickshell/<config_name> or
         subdirectories of quickshell config.
-        
+
         Returns:
             Config directory name (e.g., "ii", "caelestea") or empty string if not found.
         """
         quickshell_base = Path("~/.config/quickshell").expanduser()
-        
+
         for path in self.paths:
             path_resolved = path.resolve() if path.exists() else path.expanduser()
-            
+
             # Check if path is under ~/.config/quickshell
             try:
                 rel = path_resolved.relative_to(quickshell_base)
@@ -145,13 +144,13 @@ class Section:
                     for i, part in enumerate(parts):
                         if part.lower() == "quickshell" and i + 1 < len(parts):
                             return parts[i + 1]
-        
+
         # Fallback: check if any subdirectory exists in quickshell base
         if quickshell_base.exists():
             for subdir in quickshell_base.iterdir():
                 if subdir.is_dir() and not subdir.name.startswith("."):
                     return subdir.name
-        
+
         # Ultimate fallback
         return ""
 

@@ -11,7 +11,7 @@ This file contains instructions for AI models working on the dot-man project.
 - **Language**: Python 3.9+
 - **CLI Framework**: Click
 - **Testing**: pytest
-- **Current Version**: 0.8.0 (Beta)
+- **Current Version**: 0.9.0 (Beta)
 
 ---
 
@@ -27,6 +27,42 @@ When making changes, always update these files as needed:
 | `docs/roadmap.md` | Update version status, add completed items |
 | `pyproject.toml` | Bump version for releases |
 | `AGENTS.md` | Add new guidelines as project evolves |
+
+---
+
+## Pre-Push Quality Checklist
+
+**Before EVERY commit/push, run ALL checks in order. All MUST pass with zero errors.**
+
+```bash
+# 1. Format code
+black dot_man/ tests/
+
+# 2. Lint (must be 0 errors)
+ruff check dot_man/ tests/
+
+# 3. Type check (must be 0 errors)
+mypy dot_man/ --ignore-missing-imports
+
+# 4. Run tests (all must pass)
+pytest tests/ -v
+
+# 5. Coverage check (must not decrease)
+pytest --cov=dot_man --cov-report=term
+```
+
+**If ANY check fails, fix before committing. Do NOT push with known lint, type, or test errors.**
+
+### Pre-commit Hooks
+
+The project uses `pre-commit` for automatic enforcement. After cloning:
+
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+This runs Black, ruff, and mypy automatically on every `git commit`.
 
 ---
 
@@ -102,6 +138,7 @@ When writing tests, follow these guidelines:
 3. **Test real CLI commands** - Use `CliRunner` from Click
 4. **Assert real behavior** - Check actual values, not just existence
 5. **Clean up after tests** - Use fixtures properly
+6. **Never write existence-only tests** - Tests that only check `hasattr()`, `callable()`, `is not None`, or just import a module are NOT acceptable
 
 ### Example of Strong Test
 
@@ -146,6 +183,11 @@ def test_also_weak():  # DON'T DO THIS
     from dot_man.config import Section
     section = Section(name="test", paths=[], repo_base="test")
     _ = section.name  # Just accessing, no assertion
+
+def test_import_check():  # DON'T DO THIS
+    """Weak test - just checks if something is importable/callable."""
+    from dot_man.interactive import run_global_wizard
+    assert callable(run_global_wizard)  # This tests Python, not our code
 ```
 
 ### Test File Location
@@ -215,18 +257,21 @@ Without `tests/__init__.py`, pytest will fail with `ModuleNotFoundError`.
 ## Code Style
 
 - **Format**: Black (line length 88)
-- **Type Checking**: mypy
-- **Linting**: ruff
+- **Type Checking**: mypy (`--ignore-missing-imports`, 0 errors required)
+- **Linting**: ruff (rules: E, F, W, I — configured in `pyproject.toml`)
 
 ```bash
 # Format code
 black dot_man/ tests/
 
-# Type check
-mypy dot_man/
-
 # Lint
 ruff check dot_man/ tests/
+
+# Auto-fix lint issues
+ruff check dot_man/ tests/ --fix
+
+# Type check
+mypy dot_man/ --ignore-missing-imports
 ```
 
 ---
@@ -241,6 +286,7 @@ ruff check dot_man/ tests/
 4. Add tests in `tests/test_<command>_cmd.py`
 5. Update `README.md` command tables
 6. Update `CHANGELOG.md`
+7. **Run the full Pre-Push Quality Checklist**
 
 ### When adding a new module:
 
@@ -249,6 +295,7 @@ ruff check dot_man/ tests/
 3. Add type hints throughout
 4. Add tests in `tests/test_<module>.py`
 5. Update `CHANGELOG.md`
+6. **Run the full Pre-Push Quality Checklist**
 
 ### When fixing a bug:
 
@@ -256,6 +303,7 @@ ruff check dot_man/ tests/
 2. Fix the bug
 3. Verify the test passes
 4. Update `CHANGELOG.md` if significant
+5. **Run the full Pre-Push Quality Checklist**
 
 ### When adding a feature:
 
@@ -263,6 +311,7 @@ ruff check dot_man/ tests/
 2. Write tests for it
 3. Update `CHANGELOG.md`
 4. Update `TODO.md` to mark complete if applicable
+5. **Run the full Pre-Push Quality Checklist**
 
 ---
 
@@ -271,15 +320,18 @@ ruff check dot_man/ tests/
 When releasing a new version:
 
 1. ✅ Update `pyproject.toml` version (e.g., 0.8.0 → 0.9.0)
-2. ✅ Update `CHANGELOG.md` - move "Unreleased" to version date
-3. ✅ Update `TODO.md` - mark completed items with ✅
-4. ✅ Update `README.md` - update "What's New" section
-5. ✅ Update `docs/roadmap.md` - update version status
-6. ✅ Run full test suite: `pytest`
-7. ✅ Run coverage: `pytest --cov=dot_man`
-8. ✅ Run linting: `ruff check dot_man/ tests/`
-9. ✅ Run type check: `mypy dot_man/`
-10. ✅ Create git commit and tag
+2. ✅ Update `dot_man/__init__.py` version
+3. ✅ Update `CHANGELOG.md` - move "Unreleased" to version date
+4. ✅ Update `TODO.md` - mark completed items with ✅
+5. ✅ Update `README.md` - update "What's New" section
+6. ✅ Update `docs/roadmap.md` - update version status
+7. ✅ Run full quality gate:
+   - `black --check dot_man/ tests/`
+   - `ruff check dot_man/ tests/`
+   - `mypy dot_man/ --ignore-missing-imports`
+   - `pytest tests/ -v`
+   - `pytest --cov=dot_man --cov-report=term`
+8. ✅ Create git commit and tag
 
 ---
 

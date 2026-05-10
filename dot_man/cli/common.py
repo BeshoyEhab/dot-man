@@ -8,7 +8,7 @@ import click
 from .. import ui
 from ..constants import DOT_MAN_DIR, REPO_DIR
 from ..core import GitManager
-from ..secrets import SecretGuard, SecretMatch, PermanentRedactGuard
+from ..secrets import PermanentRedactGuard, SecretGuard, SecretMatch
 
 
 def error(message: str, exit_code: int = 1) -> None:
@@ -28,21 +28,21 @@ def warn(message: str) -> None:
 
 def handle_exception(exc: BaseException, context: str = "Operation") -> None:
     """Handle exceptions with user-friendly diagnostics.
-    
+
     Uses ErrorDiagnostic to categorize errors and provide helpful suggestions.
     This is the centralized exception handler for all CLI commands.
     """
-    from ..exceptions import ErrorDiagnostic, DotManError
-    
+    from ..exceptions import DotManError, ErrorDiagnostic
+
     if isinstance(exc, DotManError):
         error(str(exc), exc.exit_code)
         return
-    
+
     if isinstance(exc, KeyboardInterrupt):
         ui.console.print()
         warn("Operation cancelled by user")
         raise SystemExit(130)
-    
+
     # At this point exc is known to be an Exception (not KeyboardInterrupt)
     diagnostic = ErrorDiagnostic.from_exception(exc)  # type: ignore[arg-type]
     ui.console.print()
@@ -87,10 +87,10 @@ import re
 
 def parse_branch_arg(arg: str) -> dict:
     """Parse branch argument with @tag or commit SHA support.
-    
+
     Args:
         arg: Branch string like "work", "work@tag", or "abc1234"
-        
+
     Returns:
         dict with keys: type (branch|tag|commit), base, target
     """
@@ -99,21 +99,21 @@ def parse_branch_arg(arg: str) -> dict:
     if match:
         base = match.group(1)
         target = match.group(2)
-        
+
         if not base:
             base = "HEAD"
-        
+
         # Check if target looks like a commit SHA (7+ hex chars)
         if re.match(r'^[a-f0-9]{7,40}$', target):
             return {"type": "commit", "base": base, "target": target}
-        
+
         # Otherwise it's a tag
         return {"type": "tag", "base": base, "target": target}
-    
+
     # Check if entire arg looks like a commit SHA
     if re.match(r'^[a-f0-9]{7,40}$', arg):
         return {"type": "commit", "base": "HEAD", "target": arg}
-    
+
     # Check if arg is a tag (before checking if it's a branch)
     try:
         git = GitManager()
@@ -122,7 +122,7 @@ def parse_branch_arg(arg: str) -> dict:
     except Exception as e:
         import logging
         logging.debug(f"Could not check tags: {e}")
-    
+
     # Plain branch name
     return {"type": "branch", "base": arg, "target": arg}
 
@@ -132,7 +132,7 @@ def complete_switch_args(ctx, param, incomplete):
     try:
         git = GitManager()
         results = []
-        
+
         # Add branches
         branches = git.list_branches()
         for b in branches:
@@ -145,7 +145,7 @@ def complete_switch_args(ctx, param, incomplete):
                     for tag in git.list_tags():
                         if tag.startswith(incomplete.split("@")[1] if len(incomplete.split("@")) > 1 else ""):
                             results.append(f"{b}@{tag}")
-        
+
         # Add tags
         tags = git.list_tags()
         for t in tags:
@@ -155,12 +155,12 @@ def complete_switch_args(ctx, param, incomplete):
                 prefix = incomplete.split("@")[0]
                 if prefix and t.startswith(incomplete.split("@")[1]):
                     results.append(f"{prefix}@{t}")
-        
+
         # Add recent commits (first 7 chars)
         for commit in git.get_commits(count=10):
             if commit["sha"].startswith(incomplete):
                 results.append(commit["sha"])
-        
+
         return list(set(results))
     except Exception as e:
         import logging
@@ -213,7 +213,7 @@ def complete_config_keys(ctx, param, incomplete):
     """Shell completion callback for config keys."""
     try:
         from ..global_config import GlobalConfig
-        gc = GlobalConfig()
+        GlobalConfig()  # validate it loads
         keys = [
             "dot-man.current_branch",
             "remote.url",

@@ -2,14 +2,11 @@
 
 import os
 import shutil
-from pathlib import Path
-
-import click
 
 from .. import ui
-from ..constants import DOT_MAN_DIR, REPO_DIR, DOT_MAN_TOML, GLOBAL_TOML
+from ..constants import DOT_MAN_DIR, DOT_MAN_TOML, GLOBAL_TOML, REPO_DIR
+from .common import error, require_init, success
 from .interface import cli as main
-from .common import error, success, warn, require_init
 
 
 @main.command("doctor")
@@ -84,7 +81,7 @@ def doctor():
     if DOT_MAN_DIR.exists():
         check_pass("Config directory exists", str(DOT_MAN_DIR))
     else:
-        check_fail("Config directory missing", f"Run 'dot-man init'")
+        check_fail("Config directory missing", "Run 'dot-man init'")
 
     if REPO_DIR.exists():
         check_pass("Repository directory exists", str(REPO_DIR))

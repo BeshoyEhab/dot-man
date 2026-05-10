@@ -4,8 +4,8 @@ import click
 from rich.table import Table
 
 from .. import ui
+from .common import error, require_init, success
 from .interface import cli as main
-from .common import error, success, require_init
 
 
 @main.group()
@@ -26,20 +26,20 @@ def backup_create(note: str):
         from ..operations import get_operations
 
         ops = get_operations()
-        
+
         # Collect all tracked files
         paths_to_backup = []
         for section_name in ops.get_sections():
             section = ops.get_section(section_name)
             paths_to_backup.extend([p for p in section.paths if p.exists()])
-        
+
         if not paths_to_backup:
             ui.warn("No tracked files found to backup.")
             return
 
         ui.console.print("[bold]Creating backup...[/bold]")
         backup_id = ops.backups.create_backup(paths_to_backup, note=note)
-        
+
         if backup_id:
             success(f"Backup created: [cyan]{backup_id}[/cyan]")
         else:
@@ -83,14 +83,14 @@ def backup_list():
 @require_init
 def backup_restore(backup_id: str, force: bool):
     """Restore files from a backup snapshot.
-    
+
     WARNING: This will overwrite current local files with the backup version.
     """
     try:
         from ..operations import get_operations
 
         ops = get_operations()
-        
+
         if not force:
             if not ui.confirm(f"Restore backup '{backup_id}'? This will overwrite local files."):
                 return

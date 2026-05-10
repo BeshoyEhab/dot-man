@@ -6,11 +6,11 @@ import click
 import questionary
 
 from .. import ui
-from ..constants import REPO_DIR, DOT_MAN_TOML, GLOBAL_TOML
 from ..config import GlobalConfig
+from ..constants import DOT_MAN_TOML, GLOBAL_TOML, REPO_DIR
 from ..exceptions import DotManError
+from .common import error, require_init, success, warn
 from .interface import cli as main
-from .common import error, success, warn, require_init
 
 
 @main.command()
@@ -25,7 +25,12 @@ def edit(editor: str | None, edit_global: bool, raw: bool):
     Use --global to edit the global configuration.
     """
     try:
-        from ..interactive import run_section_wizard, run_global_wizard, run_templates_wizard, custom_style
+        from ..interactive import (
+            custom_style,
+            run_global_wizard,
+            run_section_wizard,
+            run_templates_wizard,
+        )
 
         # Determine target file path
         if edit_global:
@@ -44,17 +49,17 @@ def edit(editor: str | None, edit_global: bool, raw: bool):
 
         # Interactive Mode
         from ..operations import get_operations
-        
+
         try:
             ops = get_operations()
-            
+
             while True:
                 ops.reload_config()
                 sections = ops.get_sections()
-                
+
                 choices = []
                 choices.append(questionary.Choice("⚙️  Global Configuration", value="global"))
-                
+
                 if sections:
                     choices.append(questionary.Separator("--- Sections ---"))
                     for name in sections:
@@ -77,14 +82,14 @@ def edit(editor: str | None, edit_global: bool, raw: bool):
 
                 if not selection or selection == "quit":
                     break
-                
+
                 if selection == "global":
                     run_global_wizard(ops.global_config)
-                
+
                 elif selection == "raw":
                     _open_raw_editor(target, desc, editor)
                     break
-                
+
                 elif selection == "add_new":
                     path_str = questionary.path("Path to file or directory:", style=custom_style).ask()
                     if path_str:
@@ -93,12 +98,12 @@ def edit(editor: str | None, edit_global: bool, raw: bool):
                             if not path.exists():
                                 warn(f"Path does not exist: {path}")
                                 continue
-                            
+
                             section_name = questionary.text("Section Name:", default=path.stem, style=custom_style).ask()
                             if section_name:
                                 from .add_cmd import add
                                 ctx = click.get_current_context()
-                                ctx.invoke(add, path=str(path), section=section_name, repo_base=None, 
+                                ctx.invoke(add, path=str(path), section=section_name, repo_base=None,
                                           exclude=(), include=(), inherits=(), post_deploy=None, pre_deploy=None)
                                 ui.console.print()
                                 ui.console.print("Press Enter to continue...")
@@ -127,7 +132,7 @@ def edit(editor: str | None, edit_global: bool, raw: bool):
 def _open_raw_editor(target: Path, desc: str, editor: str | None = None):
     """Helper to open raw editor."""
     from ..utils import get_editor, open_in_editor
-    
+
     global_config = GlobalConfig()
     try:
         global_config.load()
@@ -140,5 +145,5 @@ def _open_raw_editor(target: Path, desc: str, editor: str | None = None):
 
     if not open_in_editor(target, editor_cmd):
         error(f"Editor '{editor_cmd}' exited with error")
-    
+
     success(f"Edited {desc}")

@@ -1,13 +1,13 @@
 """Tests for dot_man.config — GlobalConfig, Section, DotManConfig."""
 
-import pytest
 from pathlib import Path
 from unittest.mock import patch
 
-from dot_man.config import GlobalConfig, Section, DotManConfig
-from dot_man.exceptions import ConfigurationError, ConfigValidationError
-from dot_man.constants import DEFAULT_IGNORED_DIRECTORIES, DEFAULT_BRANCH, HOOK_ALIASES
+import pytest
 
+from dot_man.config import DotManConfig, GlobalConfig, Section
+from dot_man.constants import DEFAULT_BRANCH, DEFAULT_IGNORED_DIRECTORIES, HOOK_ALIASES
+from dot_man.exceptions import ConfigurationError, ConfigValidationError
 
 # ─── GlobalConfig ──────────────────────────────────────────
 

@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import hashlib
-import shutil
 import os
+import shutil
 from pathlib import Path
-from typing import Iterator, Callable
+from typing import Callable
 
 from .secrets import (
-    filter_secrets,
     SecretMatch,
+    filter_secrets,
 )
 
 __all__ = [
@@ -195,7 +195,7 @@ _comparison_cache: dict[str, tuple[float, int, float, int, bool]] = {}
 
 def clear_comparison_cache() -> None:
     """Clear the file comparison cache.
-    
+
     Call this after branch switches or when files are known to have changed
     to prevent stale cached results. Also prevents memory growth in
     long-running processes like the TUI.

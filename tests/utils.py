@@ -5,13 +5,13 @@ across all test files to reduce duplication and improve test coverage.
 """
 
 import os
-import pytest
+from contextlib import ExitStack
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-from contextlib import ExitStack
+
+import pytest
 from click.testing import CliRunner
 from git import Repo
-
 
 # =============================================================================
 # Fixtures
@@ -38,143 +38,143 @@ def mock_dot_man_dir(tmp_path):
     dot_man = tmp_path / ".config" / "dot-man"
     repo = dot_man / "repo"
     backups = dot_man / "backups"
-    
+
     dot_man.mkdir(parents=True)
     repo.mkdir()
     backups.mkdir()
-    
+
     # Create minimal git repo
     (repo / ".git").mkdir()
-    
+
     return dot_man
 
 
 @pytest.fixture
 def git_repo(tmp_path):
     """Create a git repository with initial commit.
-    
+
     Returns:
         Path to the repo directory
     """
     repo_dir = tmp_path / "repo"
     repo_dir.mkdir()
     repo = Repo.init(repo_dir)
-    
+
     # Configure git
     with repo.config_writer() as config:
         config.set_value("user", "name", "Test User")
         config.set_value("user", "email", "test@test.com")
-    
+
     # Create initial commit
     (repo_dir / "test.txt").write_text("test content")
     repo.index.add(["test.txt"])
     repo.index.commit("Initial commit")
-    
+
     return repo_dir
 
 
 @pytest.fixture
 def git_repo_with_branches(tmp_path):
     """Create a git repo with multiple branches.
-    
+
     Returns:
         Path to the repo directory
     """
     repo_dir = tmp_path / "repo"
     repo_dir.mkdir()
     repo = Repo.init(repo_dir)
-    
+
     with repo.config_writer() as config:
         config.set_value("user", "name", "Test User")
         config.set_value("user", "email", "test@test.com")
-    
+
     # Initial commit
     (repo_dir / "test.txt").write_text("test")
     repo.index.add(["test.txt"])
     repo.index.commit("Initial")
-    
+
     # Create branches
     repo.create_head("main")
     repo.create_head("work")
     repo.create_head("feature")
-    
+
     return repo_dir
 
 
 @pytest.fixture
 def git_repo_with_tags(tmp_path):
     """Create a git repo with tags.
-    
+
     Returns:
         Path to the repo directory
     """
     repo_dir = tmp_path / "repo"
     repo_dir.mkdir()
     repo = Repo.init(repo_dir)
-    
+
     with repo.config_writer() as config:
         config.set_value("user", "name", "Test User")
         config.set_value("user", "email", "test@test.com")
-    
+
     # Initial commit
     (repo_dir / "test.txt").write_text("test")
     repo.index.add(["test.txt"])
     repo.index.commit("Initial")
-    
+
     # Create tags
     repo.create_tag("v1.0")
     repo.create_tag("v2.0")
     repo.create_tag("beta")
-    
+
     return repo_dir
 
 
 @pytest.fixture
 def git_repo_with_commits(tmp_path):
     """Create a git repo with multiple commits.
-    
+
     Returns:
         Path to the repo directory
     """
     repo_dir = tmp_path / "repo"
     repo_dir.mkdir()
     repo = Repo.init(repo_dir)
-    
+
     with repo.config_writer() as config:
         config.set_value("user", "name", "Test User")
         config.set_value("user", "email", "test@test.com")
-    
+
     # Create multiple commits
     for i in range(5):
         (repo_dir / f"file{i}.txt").write_text(f"content {i}")
         repo.index.add([f"file{i}.txt"])
         repo.index.commit(f"Commit {i}")
-    
+
     return repo_dir
 
 
 @pytest.fixture
 def dot_man_dirs(tmp_path):
     """Create complete dot-man directory structure.
-    
+
     Returns:
         dict with paths: home, dot_man_dir, repo_dir, backups_dir, global_toml
     """
     home = tmp_path / "home"
     home.mkdir()
-    
+
     dot_man_dir = home / ".config" / "dot-man"
     repo_dir = dot_man_dir / "repo"
     backups_dir = dot_man_dir / "backups"
     global_toml = dot_man_dir / "global.toml"
-    
+
     dot_man_dir.mkdir(parents=True)
     repo_dir.mkdir()
     backups_dir.mkdir()
-    
+
     # Create minimal git repo
     Repo.init(repo_dir)
-    
+
     # Create global config
     global_toml.write_text("""
 [dot-man]
@@ -191,7 +191,7 @@ url = ""
 [switch]
 default_behavior = "save"
 """)
-    
+
     return {
         "home": home,
         "dot_man_dir": dot_man_dir,
@@ -204,7 +204,7 @@ default_behavior = "save"
 @pytest.fixture
 def mock_git_manager():
     """Create a mock GitManager with common methods.
-    
+
     Returns:
         MagicMock configured as GitManager
     """
@@ -220,7 +220,7 @@ def mock_git_manager():
             for i in range(5)
         ]
         instance.get_tag_commit.return_value = "abc1234"
-        
+
         mock.return_value = instance
         yield instance
 
@@ -228,7 +228,7 @@ def mock_git_manager():
 @pytest.fixture
 def patch_all_dirs(dot_man_dirs):
     """Patch all dot-man directories globally.
-    
+
     Use this fixture to set up the environment for integration tests.
     """
     patches = [
@@ -245,7 +245,7 @@ def patch_all_dirs(dot_man_dirs):
         patch("dot_man.cli.interface.DOT_MAN_DIR", dot_man_dirs["dot_man_dir"]),
         patch.dict(os.environ, {"HOME": str(dot_man_dirs["home"])}),
     ]
-    
+
     with ExitStack() as stack:
         for p in patches:
             stack.enter_context(p)
@@ -297,14 +297,14 @@ def assert_cli_help(runner, command: str, expected_keywords: list[str]) -> None:
 
 class TestCLIHelpBase:
     """Base class for testing CLI help commands.
-    
+
     Subclass and define:
         - command: the CLI command to test
         - expected_keywords: list of keywords expected in help
     """
     command = None
     expected_keywords = []
-    
+
     def test_help(self, runner):
         """Test command --help shows expected keywords."""
         assert_cli_help(runner, self.command, self.expected_keywords)
@@ -312,22 +312,22 @@ class TestCLIHelpBase:
 
 class TestBranchOperationsBase:
     """Base class for testing branch operations.
-    
+
     Subclass and define:
         - get_git_manager(): returns GitManager instance
     """
-    
+
     def test_list_branches(self):
         """Test listing branches."""
         git = self.get_git_manager()
         branches = git.list_branches()
         assert isinstance(branches, list)
-    
+
     def test_branch_exists(self):
         """Test checking branch existence."""
         git = self.get_git_manager()
         git.branch_exists("main")
-    
+
     def test_current_branch(self):
         """Test getting current branch."""
         git = self.get_git_manager()
@@ -337,13 +337,13 @@ class TestBranchOperationsBase:
 
 class TestTagOperationsBase:
     """Base class for testing tag operations."""
-    
+
     def test_list_tags(self):
         """Test listing tags."""
         git = self.get_git_manager()
         tags = git.list_tags()
         assert isinstance(tags, list)
-    
+
     def test_get_tag_commit(self):
         """Test getting tag commit SHA."""
         git = self.get_git_manager()

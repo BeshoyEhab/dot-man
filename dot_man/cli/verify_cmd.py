@@ -1,14 +1,13 @@
 """Verify command for dot-man CLI - validate repository integrity."""
 
 import os
-from pathlib import Path
 
 import click
 
 from .. import ui
-from ..constants import REPO_DIR, DOT_MAN_TOML
+from ..constants import DOT_MAN_TOML, REPO_DIR
+from .common import require_init, success
 from .interface import cli as main
-from .common import error, success, warn, require_init
 
 
 @main.command("verify")
@@ -79,7 +78,7 @@ def verify(fix: bool):
                 # Check corresponding repo path
                 repo_path = section.get_repo_path(p, REPO_DIR)
                 if not repo_path.exists():
-                    ui.console.print(f"    [dim]↳ Not yet saved to repo[/dim]")
+                    ui.console.print("    [dim]↳ Not yet saved to repo[/dim]")
     except Exception as e:
         issues.append(f"Section check error: {e}")
         ui.console.print(f"  [error]✗[/error] Error checking sections: {e}")

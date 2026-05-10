@@ -2,15 +2,14 @@
 
 __all__ = ["GlobalConfig", "_write_toml", "substitute_templates"]
 
-import sys
 import logging
 import os
-import socket
 import platform
-from typing import Optional, Any, cast
-from pathlib import Path
+import socket
+import sys
 from datetime import datetime
-
+from pathlib import Path
+from typing import Any, Optional, cast
 
 # System variables that can be auto-detected
 SYSTEM_VARS = {
@@ -74,16 +73,16 @@ import tomlkit
 from tomlkit import TOMLDocument
 
 from .constants import (
-    GLOBAL_TOML,
     DEFAULT_BRANCH,
     DEFAULT_IGNORED_DIRECTORIES,
+    GLOBAL_TOML,
 )
 from .exceptions import ConfigurationError
 
 
 def _write_toml(path: Path, data: dict, preserve_doc: TOMLDocument | None = None) -> None:
     """Write TOML data to file, preserving comments when possible.
-    
+
     Args:
         path: File path to write to
         data: Dictionary of data to write
@@ -122,7 +121,7 @@ class GlobalConfig:
                 self._migrate_from_ini(GLOBAL_CONF)
                 return
             raise ConfigurationError(f"Global config not found: {self._path}")
-        
+
         content = self._path.read_text()
         self._data = tomllib.loads(content)
         # Also parse with tomlkit to preserve comments
@@ -179,7 +178,7 @@ class GlobalConfig:
 
     def save(self, force: bool = False) -> None:
         """Save the global configuration file.
-        
+
         Args:
             force: Save even if not dirty
         """
@@ -332,7 +331,7 @@ class GlobalConfig:
     @property
     def current_profile(self) -> str | None:
         """Get the current profile name."""
-        return self._data.get("dot-man", {}).get("current_profile")
+        return cast(Optional[str], self._data.get("dot-man", {}).get("current_profile"))
 
     @current_profile.setter
     def current_profile(self, value: str) -> None:

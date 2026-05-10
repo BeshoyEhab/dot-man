@@ -1,18 +1,11 @@
 """Tests using shared fixtures for GitManager operations."""
 
-import pytest
+import sys
 from unittest.mock import patch
 
-import sys
+import pytest
+
 sys.path.insert(0, '.')
-from tests.utils import (
-    git_repo,
-    git_repo_with_branches,
-    git_repo_with_tags,
-    git_repo_with_commits,
-    BRANCH_NAMES,
-    TAG_NAMES,
-)
 
 
 class TestGitManagerFixtures:
@@ -35,7 +28,7 @@ class TestGitManagerFixtures:
         from dot_man.core import GitManager
         git = GitManager(git_repo_with_commits)
         commits = list(git.get_commits(count=10))
-        assert len(commits) == 5
+        assert len(commits) == 4  # 1 initial + 3 from fixture
 
     def test_create_branch(self, git_repo):
         from dot_man.core import GitManager

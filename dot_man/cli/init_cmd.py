@@ -1,18 +1,18 @@
 """Init command for dot-man CLI."""
 
-import sys
 import shutil
+import sys
 from pathlib import Path
 
 import click
 
 from .. import ui
-from ..constants import DOT_MAN_DIR, REPO_DIR, BACKUPS_DIR, FILE_PERMISSIONS
-from ..config import GlobalConfig, DotManConfig
+from ..config import DotManConfig, GlobalConfig
+from ..constants import BACKUPS_DIR, DOT_MAN_DIR, FILE_PERMISSIONS, REPO_DIR
 from ..core import GitManager
 from ..utils import is_git_installed
+from .common import error, handle_exception, success, warn
 from .interface import cli as main
-from .common import error, success, warn, handle_exception
 
 
 @main.command()
@@ -140,14 +140,14 @@ def run_setup_wizard(
                 # Ask user
                 while True:
                     choice = ui.ask(
-                        f"    Which one to track? (1-{len(options)})", 
+                        f"    Which one to track? (1-{len(options)})",
                         default=str(len(options))
                     )
                     try:
                         idx = int(choice) - 1
                         if 0 <= idx < len(options):
                             selected_path = options[idx]
-                            
+
                             # Determine section name
                             if selected_path == path:
                                 final_section = section_name

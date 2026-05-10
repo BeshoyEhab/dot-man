@@ -1,6 +1,5 @@
-import json
-from pathlib import Path
 import pytest
+
 from dot_man.secrets import SecretGuard, SecretMatch, SecretScanner, filter_secrets
 
 

@@ -7,18 +7,18 @@ import click
 
 from .. import ui
 from ..constants import REPO_DIR
-from ..files import compare_files
 from ..exceptions import DotManError
-from .interface import cli as main
+from ..files import compare_files
 from .common import (
-    error,
-    success,
-    warn,
-    require_init,
     complete_switch_args,
+    error,
     get_secret_handler,
     parse_branch_arg,
+    require_init,
+    success,
+    warn,
 )
+from .interface import cli as main
 
 
 class BranchParamType(click.ParamType):
@@ -190,7 +190,6 @@ def _handle_tag_switch(ops, current_branch, base_branch, tag_name, save_mode, dr
 
 def _handle_branch_switch(ops, current_branch, target_branch, save_mode, dry_run, force):
     """Handle switching to a regular branch."""
-    from ..files import compare_files
 
     # Check if already on target branch
     if current_branch == target_branch and not dry_run:

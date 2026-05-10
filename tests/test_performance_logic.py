@@ -1,9 +1,7 @@
-import pytest
-import os
-from pathlib import Path
-from dot_man.files import copy_directory
-from dot_man.config import GlobalConfig, Section, DotManConfig
+from dot_man.config import DotManConfig, GlobalConfig
 from dot_man.constants import DEFAULT_IGNORED_DIRECTORIES
+from dot_man.files import copy_directory
+
 
 class TestPerformanceLogic:
     """Test verification of performance optimizations and configuration logic."""

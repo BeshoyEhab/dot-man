@@ -14,22 +14,22 @@ The DotManOperations class inherits from all mixins and adds:
     - Singleton management (get_operations, reset_operations)
 """
 
-from pathlib import Path
-from typing import Iterator, Any, Optional, TypedDict
 import os
+from pathlib import Path
+from typing import Iterator, Optional, TypedDict
 
-from .config import GlobalConfig, DotManConfig, Section
+from .backups import BackupManager
+from .branch_ops import BranchMixin
+from .config import DotManConfig, GlobalConfig, Section
+from .constants import REPO_DIR
 from .core import GitManager
 from .files import get_file_status
-from .constants import REPO_DIR
-from .vault import SecretVault
-from .backups import BackupManager
+from .lock import FileLock  # noqa: F401 (re-exported for test_lock.py)
 
 # Import mixins
-from .save_deploy_ops import SaveDeployMixin, LOCK_FILE  # noqa: F401 (re-exported)
-from .branch_ops import BranchMixin
+from .save_deploy_ops import LOCK_FILE, SaveDeployMixin  # noqa: F401 (re-exported)
 from .status_ops import StatusMixin
-from .lock import FileLock  # noqa: F401 (re-exported for test_lock.py)
+from .vault import SecretVault
 
 
 class DeploymentPlan(TypedDict):
@@ -42,11 +42,11 @@ class DeploymentPlan(TypedDict):
 class DotManOperations(SaveDeployMixin, BranchMixin, StatusMixin):
     """
     Centralized operations class that handles all dot-man business logic.
-    
+
     This provides a clean API for CLI, TUI, and any future interfaces.
     All operations go through this class to ensure consistency.
     """
-    
+
     def __init__(self):
         self._global_config: Optional[GlobalConfig] = None
         self._dotman_config: Optional[DotManConfig] = None
@@ -60,7 +60,7 @@ class DotManOperations(SaveDeployMixin, BranchMixin, StatusMixin):
         if self._backups is None:
             self._backups = BackupManager()
         return self._backups
-    
+
     @property
     def vault(self) -> SecretVault:
         """Get or load secret vault."""
@@ -75,7 +75,7 @@ class DotManOperations(SaveDeployMixin, BranchMixin, StatusMixin):
             self._global_config = GlobalConfig()
             self._global_config.load()
         return self._global_config
-    
+
     @property
     def dotman_config(self) -> DotManConfig:
         """Get or load dot-man configuration for current branch."""
@@ -83,41 +83,41 @@ class DotManOperations(SaveDeployMixin, BranchMixin, StatusMixin):
             self._dotman_config = DotManConfig(global_config=self.global_config)
             self._dotman_config.load()
         return self._dotman_config
-    
+
     @property
     def git(self) -> GitManager:
         """Get git manager."""
         if self._git is None:
             self._git = GitManager()
         return self._git
-    
+
     def reload_config(self) -> None:
         """Reload configurations (e.g., after branch switch)."""
         self._dotman_config = None  # Force reload on next access
-    
+
     @property
     def current_branch(self) -> str:
         """Get current branch name."""
         return self.global_config.current_branch
-    
+
     def get_sections(self) -> list[str]:
         """Get all section names in current branch."""
         return self.dotman_config.get_section_names()
-    
+
     def get_section(self, name: str) -> Section:
         """Get a resolved section by name."""
         return self.dotman_config.get_section(name)
-    
+
     def iter_section_paths(self, section: Section) -> Iterator[tuple[Path, Path, str]]:
         """
         Iterate over all paths in a section with their status.
-        
+
         Yields:
             (local_path, repo_path, status)
         """
         for local_path in section.paths:
             repo_path = section.get_repo_path(local_path, REPO_DIR)
-            
+
             if local_path.is_dir():
                 # For directories, iterate over files inside
                 if local_path.exists():
@@ -146,11 +146,11 @@ class DotManOperations(SaveDeployMixin, BranchMixin, StatusMixin):
                                 continue
                             if section.include and not self._matches_patterns(rel, section.include):
                                 continue
-                            
+
                             repo_file = repo_path / rel
                             status = get_file_status(local_file, repo_file)
                             yield local_file, repo_file, status
-                
+
                 # Also check repo for files that might be deleted locally
                 if repo_path.exists():
                     excludes = (section.exclude or []) + (section.ignored_directories or [])
@@ -159,19 +159,19 @@ class DotManOperations(SaveDeployMixin, BranchMixin, StatusMixin):
                         if repo_file.is_file():
                             rel = repo_file.relative_to(repo_path)
                             local_file = local_path / rel
-                            
+
                             if excludes and self._matches_patterns(rel, excludes):
                                 continue
                             if section.include and not self._matches_patterns(rel, section.include):
                                 continue
-                                
+
                             if not local_file.exists():
                                 yield local_file, repo_file, "DELETED"
             else:
                 # Single file
                 status = get_file_status(local_path, repo_path)
                 yield local_path, repo_path, status
-    
+
     def _matches_patterns(self, path: Path, patterns: list[str]) -> bool:
         """Check if path matches any pattern."""
         from fnmatch import fnmatch

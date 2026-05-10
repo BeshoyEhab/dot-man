@@ -24,7 +24,7 @@ GLOBAL_CONF = DOT_MAN_DIR / "global.conf"
 # Branch-specific configuration file (inside repo)
 DOT_MAN_TOML = "dot-man.toml"
 
-# Legacy config file (for migration)  
+# Legacy config file (for migration)
 DOT_MAN_INI = "dot-man.ini"
 
 # Template variables storage

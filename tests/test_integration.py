@@ -1,10 +1,10 @@
 """Integration tests for init, config, log, and tag commands."""
 
+import os
+from unittest.mock import patch
+
 import pytest
 from click.testing import CliRunner
-from unittest.mock import patch
-from pathlib import Path
-import os
 
 
 class TestInitCommandIntegration:
@@ -24,27 +24,25 @@ class TestConfigCommandIntegration:
         """Test config list command."""
         from dot_man.cli.interface import cli
         runner = CliRunner()
-        
+
         with self._get_patches(integration_runner):
-            result = runner.invoke(cli, ["config", "list"])
+            runner.invoke(cli, ["config", "list"])
             # May fail due to missing patches, but tests the code path
 
     def test_config_get_current_branch(self, integration_runner):
         """Test config get dot-man.current_branch."""
         from dot_man.cli.interface import cli
         runner = CliRunner()
-        
+
         with self._get_patches(integration_runner):
-            result = runner.invoke(cli, ["config", "get", "dot-man.current_branch"])
+            runner.invoke(cli, ["config", "get", "dot-man.current_branch"])
             # Result varies based on setup
 
     @staticmethod
     def _get_patches(integration_runner):
         """Get patches from integration_runner fixture context."""
         from contextlib import ExitStack
-        from unittest.mock import patch
-        import os
-        
+
         # Get tmp_path from fixture - we'll need to create a new one
         # For simplicity, we create patches inline
         return ExitStack()
@@ -56,7 +54,7 @@ class TestGlobalConfigDirectly:
     def test_global_config_load_existing(self, tmp_path):
         """Test loading existing global config."""
         from dot_man.global_config import GlobalConfig
-        
+
         # Create a minimal config
         dot_man_dir = tmp_path / ".config" / "dot-man"
         dot_man_dir.mkdir(parents=True)
@@ -68,16 +66,16 @@ current_branch = "main"
 [defaults]
 secrets_filter = true
 """)
-        
+
         with patch("dot_man.constants.GLOBAL_TOML", global_toml):
-            config = GlobalConfig()
+            GlobalConfig()
             # Config loading would fail because file doesn't match expected structure
             # but we've tested the code path
 
     def test_global_config_properties(self):
         """Test global config properties work correctly."""
         from dot_man.global_config import GlobalConfig
-        
+
         config = GlobalConfig()
         config._data = {
             "dot-man": {"current_branch": "main"},
@@ -87,7 +85,7 @@ secrets_filter = true
             "templates": {},
             "switch": {"default_behavior": "save"}
         }
-        
+
         assert config.current_branch == "main"
         assert config.secrets_filter_enabled is True
         assert config.remote_url == ""
@@ -101,81 +99,81 @@ class TestGitManagerIntegration:
     def test_git_manager_list_branches(self, tmp_path):
         """Test GitManager can list branches."""
         from git import Repo
-        
+
         # Create temp repo
         repo_dir = tmp_path / "repo"
         repo_dir.mkdir()
         repo = Repo.init(repo_dir)
-        
+
         # Create initial commit so we can create a branch
         (repo_dir / "test.txt").write_text("test")
         repo.index.add(["test.txt"])
         repo.index.commit("Initial")
-        
+
         # Create a branch
         repo.create_head("main")
-        
+
         from dot_man.core import GitManager
         git = GitManager(repo_dir)
-        
+
         branches = git.list_branches()
         assert "main" in branches
 
     def test_git_manager_list_tags_empty(self, tmp_path):
         """Test GitManager lists empty tags."""
         from git import Repo
-        
+
         repo_dir = tmp_path / "repo"
         repo_dir.mkdir()
         Repo.init(repo_dir)
-        
+
         from dot_man.core import GitManager
         git = GitManager(repo_dir)
-        
+
         tags = git.list_tags()
         assert tags == []
 
     def test_git_manager_commit(self, tmp_path):
         """Test GitManager can make commits."""
         from git import Repo
-        
+
         repo_dir = tmp_path / "repo"
         repo_dir.mkdir()
         repo = Repo.init(repo_dir)
-        
+
         # Configure git
         with repo.config_writer() as config:
             config.set_value("user", "name", "Test")
             config.set_value("user", "email", "test@test.com")
-        
+
         # Create a file and commit
         (repo_dir / "test.txt").write_text("test")
-        
+
         from dot_man.core import GitManager
         git = GitManager(repo_dir)
-        
+
         commit_sha = git.commit("Test commit")
         assert commit_sha is not None
 
     def test_git_manager_get_commits(self, tmp_path):
         """Test GitManager can get commits."""
         from git import Repo
-        
+
         repo_dir = tmp_path / "repo"
         repo_dir.mkdir()
         repo = Repo.init(repo_dir)
-        
+
         with repo.config_writer() as config:
             config.set_value("user", "name", "Test")
             config.set_value("user", "email", "test@test.com")
-        
+
         (repo_dir / "test.txt").write_text("test")
         repo.index.add(["test.txt"])
         repo.index.commit("First commit")
-        
+
         from dot_man.core import GitManager
         git = GitManager(repo_dir)
-        
+
         commits = list(git.get_commits(count=5))
         assert len(commits) >= 1
         assert commits[0]["message"] == "First commit"
@@ -183,30 +181,30 @@ class TestGitManagerIntegration:
     def test_git_manager_create_and_delete_tag(self, tmp_path):
         """Test creating and deleting tags."""
         from git import Repo
-        
+
         repo_dir = tmp_path / "repo"
         repo_dir.mkdir()
         repo = Repo.init(repo_dir)
-        
+
         with repo.config_writer() as config:
             config.set_value("user", "name", "Test")
             config.set_value("user", "email", "test@test.com")
-        
+
         (repo_dir / "test.txt").write_text("test")
         repo.index.add(["test.txt"])
         repo.index.commit("First commit")
-        
+
         from dot_man.core import GitManager
         git = GitManager(repo_dir)
-        
+
         # Create tag
         git.create_tag("v1")
         assert "v1" in git.list_tags()
-        
+
         # Get tag commit
         tag_commit = git.get_tag_commit("v1")
         assert tag_commit is not None
-        
+
         # Delete tag
         git.delete_tag("v1")
         assert "v1" not in git.list_tags()
@@ -218,7 +216,7 @@ class TestParseBranchArgEdgeCases:
     def test_parse_very_long_sha(self):
         """Test parsing very long SHA."""
         from dot_man.cli.common import parse_branch_arg
-        
+
         long_sha = "a" * 40
         result = parse_branch_arg(long_sha)
         assert result["type"] == "commit"
@@ -226,7 +224,7 @@ class TestParseBranchArgEdgeCases:
     def test_parse_short_sha(self):
         """Test parsing short SHA (less than 7 chars)."""
         from dot_man.cli.common import parse_branch_arg
-        
+
         # 6 chars - not enough to be considered SHA
         result = parse_branch_arg("abc123")
         # Falls through to branch since < 7 chars
@@ -235,7 +233,7 @@ class TestParseBranchArgEdgeCases:
     def test_parse_branch_with_hyphen(self):
         """Test parsing branch with hyphen."""
         from dot_man.cli.common import parse_branch_arg
-        
+
         result = parse_branch_arg("feature-branch")
         assert result["type"] == "branch"
         assert result["target"] == "feature-branch"
@@ -243,7 +241,7 @@ class TestParseBranchArgEdgeCases:
     def test_parse_branch_with_slash(self):
         """Test parsing branch with slash."""
         from dot_man.cli.common import parse_branch_arg
-        
+
         result = parse_branch_arg("feature/test")
         # May be parsed as tag if it matches a tag
         assert result["type"] in ["branch", "tag"]
@@ -255,27 +253,27 @@ class TestBranchParamType:
     def test_branch_param_type_convert(self):
         """Test BranchParamType convert method."""
         from dot_man.cli.switch_cmd import BranchParamType
-        
+
         param_type = BranchParamType()
-        
+
         result = param_type.convert("main", None, None)
         assert result["type"] == "branch"
 
     def test_branch_param_type_convert_commit(self):
         """Test BranchParamType convert with commit."""
         from dot_man.cli.switch_cmd import BranchParamType
-        
+
         param_type = BranchParamType()
-        
+
         result = param_type.convert("abc1234", None, None)
         assert result["type"] == "commit"
 
     def test_branch_param_type_convert_empty(self):
         """Test BranchParamType convert with empty value."""
         from dot_man.cli.switch_cmd import BranchParamType
-        
+
         param_type = BranchParamType()
-        
+
         result = param_type.convert("", None, None)
         assert result is None
 
@@ -285,14 +283,14 @@ class TestBranchParamType:
 def integration_runner(tmp_path):
     """Setup runner with initialized repo context."""
     from contextlib import ExitStack
-    from click.testing import CliRunner
     from unittest.mock import patch
-    import os
+
+    from click.testing import CliRunner
+
     from dot_man.cli.interface import cli
-    import dot_man.cli.init_cmd
 
     runner = CliRunner()
-    
+
     # Setup home and repo env
     home = tmp_path / "home"
     home.mkdir()
@@ -300,7 +298,7 @@ def integration_runner(tmp_path):
     repo_dir = dot_man_dir / "repo"
     backups_dir = dot_man_dir / "backups"
     global_toml = dot_man_dir / "global.toml"
-    
+
     # Patch constants everywhere they are used
     patches = [
         patch("dot_man.constants.DOT_MAN_DIR", dot_man_dir),
@@ -331,18 +329,18 @@ def integration_runner(tmp_path):
     with ExitStack() as stack:
         for p in patches:
             stack.enter_context(p)
-        
+
         from dot_man.operations import reset_operations
         reset_operations()
-        
+
         result = runner.invoke(cli, ["init", "--force", "--no-wizard"])
         if result.exit_code != 0:
             print(f"Init failed: {result.output}")
-        
+
         from dot_man.core import GitManager
         git = GitManager(repo_dir)
         with git.repo.config_writer() as config:
             config.set_value("user", "name", "Tester")
             config.set_value("user", "email", "test@example.com")
-        
+
         yield runner

@@ -2,10 +2,10 @@
 
 __all__ = ["BackupManager"]
 
-import shutil
 import json
-from pathlib import Path
+import shutil
 from datetime import datetime
+from pathlib import Path
 
 from .constants import DOT_MAN_DIR
 from .exceptions import BackupError
@@ -45,10 +45,10 @@ class BackupManager:
 
         backup_id = self._get_backup_name(note)
         backup_path = self.backups_dir / backup_id
-        
+
         try:
             backup_path.mkdir()
-            
+
             # Metadata to store original paths relative to home or absolute
             manifest = {}
             count = 0
@@ -62,18 +62,18 @@ class BackupManager:
                 # For simplicity, we flattening somewhat or mirroring full path?
                 # Mirroring full path is safest to avoid collisions.
                 # E.g. /home/user/.bashrc -> backup/home/user/.bashrc
-                
+
                 # Strip root anchor to make it relative
-                rel_path = path.relative_to(path.anchor) 
+                rel_path = path.relative_to(path.anchor)
                 dest = backup_path / rel_path
-                
+
                 dest.parent.mkdir(parents=True, exist_ok=True)
-                
+
                 if path.is_file():
                     shutil.copy2(path, dest)
                 elif path.is_dir():
                     shutil.copytree(path, dest)
-                
+
                 manifest[str(rel_path)] = str(path)
                 count += 1
 
@@ -101,7 +101,7 @@ class BackupManager:
     def list_backups(self) -> list[dict]:
         """
         List all available backups.
-        
+
         Returns:
             List of dicts with keys: id, date, note, path
         """
@@ -122,14 +122,14 @@ class BackupManager:
                         "note": note,
                         "path": p
                     })
-        
+
         # Sort by ID (timestamp) descending
         return sorted(backups, key=lambda x: x["id"], reverse=True)
 
     def restore_backup(self, backup_id: str) -> bool:
         """
         Restore files from a backup.
-        
+
         Args:
            backup_id: The ID (folder name) of the backup to restore.
         """
@@ -143,26 +143,26 @@ class BackupManager:
 
         try:
             manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
-            
+
             for rel_path_str, original_path_str in manifest.items():
                 start_source = backup_path / rel_path_str
                 original_path = Path(original_path_str)
-                
+
                 if start_source.exists():
                     # Ensure parent exists
                     original_path.parent.mkdir(parents=True, exist_ok=True)
-                    
+
                     if original_path.exists():
                         if original_path.is_dir():
                             shutil.rmtree(original_path)
                         else:
                             original_path.unlink()
-                    
+
                     if start_source.is_dir():
                         shutil.copytree(start_source, original_path)
                     else:
                         shutil.copy2(start_source, original_path)
-                        
+
             return True
 
         except (OSError, json.JSONDecodeError) as e:
@@ -175,17 +175,17 @@ class BackupManager:
     def delete_backup(self, backup_id: str) -> bool:
         """
         Delete a specific backup by ID.
-        
+
         Args:
             backup_id: The ID of the backup to delete.
-            
+
         Returns:
             True if deleted, False if not found.
         """
         backup_path = self.backups_dir / backup_id
         if not backup_path.exists():
             return False
-        
+
         try:
             shutil.rmtree(backup_path)
             return True
@@ -195,22 +195,22 @@ class BackupManager:
     def clean_backups(self, keep: int = 0) -> int:
         """
         Remove old backups, keeping the specified number of most recent ones.
-        
+
         Args:
             keep: Number of recent backups to keep.
-            
+
         Returns:
             Number of backups deleted.
         """
         backups = self.list_backups()
         if len(backups) <= keep:
             return 0
-            
+
         to_delete = backups[keep:]
         deleted_count = 0
-        
+
         for b in to_delete:
             if self.delete_backup(b["id"]):
                 deleted_count += 1
-                
+
         return deleted_count

@@ -1,6 +1,5 @@
 """Tests for dot-man core modules."""
 
-import pytest
 from pathlib import Path
 
 
@@ -14,7 +13,7 @@ class TestSecretScanner:
         scanner = SecretScanner()
         content = "export API_KEY=sk_live_123456789abcdef"
         matches = list(scanner.scan_content(content))
-        
+
         assert len(matches) == 1
         assert matches[0].pattern_name == "Generic API Key"
 
@@ -25,7 +24,7 @@ class TestSecretScanner:
         scanner = SecretScanner()
         content = "-----BEGIN RSA PRIVATE KEY-----\nMIIE..."
         matches = list(scanner.scan_content(content))
-        
+
         assert len(matches) >= 1
         assert any(m.pattern_name == "Private Key" for m in matches)
 
@@ -37,7 +36,7 @@ class TestSecretScanner:
         # Note: Don't use 'EXAMPLE' as it triggers false positive (contains 'example')
         content = "AWS_KEY=AKIAIOSFODNN7TESTKEY1"  # AKIA + 16 chars
         matches = list(scanner.scan_content(content))
-        
+
         assert len(matches) >= 1
 
     def test_ignores_false_positives(self):
@@ -47,7 +46,7 @@ class TestSecretScanner:
         scanner = SecretScanner()
         content = "api_key = your_key_here"
         matches = list(scanner.scan_content(content))
-        
+
         assert len(matches) == 0
 
     def test_redact_content(self):
@@ -58,7 +57,7 @@ class TestSecretScanner:
         # Use a pattern that will definitely match
         content = "api_key=my_super_secret_key_12345\nOTHER=normal"
         redacted, count = scanner.redact_content(content)
-        
+
         assert count >= 1
         assert "my_super_secret" not in redacted
 
@@ -101,8 +100,9 @@ class TestFiles:
 
     def test_compare_files_different(self, tmp_path):
         """Should detect different files."""
-        from dot_man.files import compare_files
         import time
+
+        from dot_man.files import compare_files
 
         file1 = tmp_path / "file1.txt"
         file2 = tmp_path / "file2.txt"

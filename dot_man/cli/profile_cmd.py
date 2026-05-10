@@ -1,13 +1,10 @@
 """Profile command for dot-man CLI - Multi-machine configuration profiles."""
 
-import os
-import socket
-
 import click
 
 from .. import ui
+from .common import complete_profiles, error, require_init, success, warn
 from .interface import cli as main
-from .common import error, success, warn, require_init, complete_profiles
 
 
 @main.group()
@@ -261,7 +258,7 @@ def profile_set_branch(name: str, branch: str):
         ops = get_operations()
         global_config = ops.global_config
 
-        profiles = getattr(global_config._data, {}).get("profiles", {})
+        profiles = global_config._data.get("profiles", {})
 
         if name not in profiles:
             error(f"Profile '{name}' does not exist", exit_code=1)
@@ -281,16 +278,16 @@ def _detect_profile(global_config) -> str | None:
     import socket
 
     hostname = socket.gethostname()
-    profiles = getattr(global_config, "_data", {}).get("profiles", {})
+    profiles: dict = global_config._data.get("profiles", {})
 
     for name, data in profiles.items():
         hostnames = data.get("hostnames", [])
         if hostname in hostnames:
-            return name
+            return str(name)
 
         # Also check for partial matches (e.g., "laptop" matches "work-laptop")
         for h in hostnames:
             if h in hostname or hostname in h:
-                return name
+                return str(name)
 
     return None

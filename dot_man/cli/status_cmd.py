@@ -3,15 +3,15 @@
 from pathlib import Path
 
 import click
-from rich.table import Table
 from rich.panel import Panel
+from rich.table import Table
 
 from .. import ui
 from ..constants import REPO_DIR
 from ..exceptions import DotManError
 from ..secrets import SecretScanner
+from .common import error, handle_exception, require_init
 from .interface import cli as main
-from .common import error, require_init, handle_exception
 
 
 @main.command()

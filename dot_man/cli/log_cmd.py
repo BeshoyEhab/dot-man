@@ -1,12 +1,12 @@
 """Log command for dot-man CLI."""
 
-import click
-
 from pathlib import Path
 
+import click
+
 from .. import ui
+from .common import complete_branches, complete_tags, error, require_init, success, warn
 from .interface import cli as main
-from .common import error, warn, success, require_init, complete_tags, complete_branches
 
 
 @main.command()
@@ -118,7 +118,6 @@ def diff(file: Path | None, branch: str | None, staged: bool):
     """
     try:
         from ..operations import get_operations
-        from rich.table import Table
 
         ops = get_operations()
         git = ops.git
@@ -129,11 +128,10 @@ def diff(file: Path | None, branch: str | None, staged: bool):
             if not staged_files:
                 warn("No staged changes")
                 return
-            
+
             ui.console.print("[bold]Staged Changes:[/bold]")
             for f in staged_files:
-                status = f.a_path if hasattr(f, 'a_path') else f.path
-                ui.console.print(f"  {status}")
+                ui.console.print(f"  {f.a_path}")
             return
 
         if branch:
@@ -141,7 +139,7 @@ def diff(file: Path | None, branch: str | None, staged: bool):
             current = ops.current_branch
             ui.console.print(f"[bold]Comparing[/bold] [cyan]{current}[/cyan] [bold]vs[/bold] [cyan]{branch}[/cyan]")
             ui.console.print()
-            
+
             diff_result = git.repo.git.diff(f"{branch}...{current}")
             if diff_result:
                 ui.console.print(diff_result[:5000])
@@ -152,7 +150,7 @@ def diff(file: Path | None, branch: str | None, staged: bool):
         elif file:
             # Show diff for specific file
             target_file = file.expanduser().resolve()
-            
+
             # Find which section this file belongs to
             from ..constants import REPO_DIR
             for section_name in ops.get_sections():
@@ -160,18 +158,18 @@ def diff(file: Path | None, branch: str | None, staged: bool):
                 for tracked_path in section.paths:
                     if tracked_path.resolve() == target_file:
                         repo_path = section.get_repo_path(tracked_path, REPO_DIR)
-                        
+
                         # Compare local vs repo
                         if target_file.exists():
                             local_content = target_file.read_text()
                         else:
                             local_content = ""
-                            
+
                         if repo_path.exists():
                             repo_content = repo_path.read_text()
                         else:
                             repo_content = ""
-                            
+
                         if local_content == repo_content:
                             success("File is identical to repository version")
                         else:
@@ -181,14 +179,14 @@ def diff(file: Path | None, branch: str | None, staged: bool):
                             )
                             ui.console.print(diff_result[:3000])
                         return
-            
+
             error(f"File not tracked: {target_file}")
         else:
             # Show uncommitted changes (working tree vs staging)
             if not git.is_dirty():
                 success("No uncommitted changes")
                 return
-                
+
             ui.console.print("[bold]Uncommitted Changes:[/bold]")
             diff_result = git.repo.git.diff(patch=True)
             ui.console.print(diff_result[:5000])
@@ -251,7 +249,6 @@ def checkout(target: str):
 def _checkout_commit(ops, current_branch: str, commit_sha: str):
     """Checkout a specific commit."""
     from .. import ui
-    from .common import success, warn
 
     # Check if it's a valid commit
     try:
@@ -271,12 +268,12 @@ def _checkout_commit(ops, current_branch: str, commit_sha: str):
     # Checkout the commit
     ops.git.checkout_commit(commit_sha)
 
-    ui.console.print(f"Note: You are in [bold]detached HEAD[/bold] state")
+    ui.console.print("Note: You are in [bold]detached HEAD[/bold] state")
     ui.console.print(f"  Commit: [cyan]{commit_sha}[/cyan]")
     ui.console.print(f"  Message: {commit_obj.message.strip().split(chr(10))[0][:60]}")
     ui.console.print()
     ui.console.print("To return to a branch, run:")
-    ui.console.print(f"  [cyan]dot-man switch <branch-name>[/cyan]")
+    ui.console.print("  [cyan]dot-man switch <branch-name>[/cyan]")
 
 
 def _checkout_tag(ops, current_branch: str, tag_name: str):
@@ -306,4 +303,4 @@ def _checkout_tag(ops, current_branch: str, tag_name: str):
     ui.console.print(f"  Commit: [cyan]{tag_commit}[/cyan]")
     ui.console.print()
     ui.console.print("To return to a branch, run:")
-    ui.console.print(f"  [cyan]dot-man switch <branch-name>[/cyan]")
+    ui.console.print("  [cyan]dot-man switch <branch-name>[/cyan]")

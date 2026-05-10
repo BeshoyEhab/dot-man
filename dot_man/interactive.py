@@ -6,14 +6,14 @@ __all__ = [
 ]
 
 from pathlib import Path
+
 import questionary
-from questionary import Validator, ValidationError, Style
-from rich.table import Table
+from questionary import Style, ValidationError, Validator
 from rich.panel import Panel
+from rich.table import Table
 
 from .config import DotManConfig, GlobalConfig, Section
-from .ui import console, print_banner, success, error, warn
-
+from .ui import console, error, print_banner, success, warn
 
 # Questionary Custom Style
 custom_style = Style([
@@ -53,7 +53,7 @@ class PathValidator(Validator):
         if not path.is_absolute():
             # We generally prefer absolute paths or at least valid ones
             pass # Relative paths are okay if intended
-            
+
 class UrlValidator(Validator):
     def validate(self, document):
         if not document.text:
@@ -72,7 +72,7 @@ def print_section_dashboard(section: Section):
 
     paths = ", ".join(str(p) for p in section.paths)
     inherits = ", ".join(section.inherits) if section.inherits else "[dim]None[/dim]"
-    
+
     table.add_row("Paths", paths)
     table.add_row("Repo Base", section.repo_base)
     table.add_row("Update Strategy", section.update_strategy)
@@ -91,12 +91,12 @@ def print_section_dashboard(section: Section):
 def run_section_wizard(config: DotManConfig, section_name: str):
     """Run interactive wizard to edit a section."""
     section = config.get_section(section_name)
-    
+
     while True:
         console.clear()
         print_section_dashboard(section)
         console.print()
-        
+
         # Using clean text, relying on style for selection highlight
         choices = [
             questionary.Choice("Edit Paths", value="paths"),
@@ -110,12 +110,12 @@ def run_section_wizard(config: DotManConfig, section_name: str):
             questionary.Choice("Save & Return", value="save", shortcut_key="s"),
             questionary.Choice("Cancel", value="cancel", shortcut_key="q"),
         ]
-        
+
         field = questionary.select("Select action:", choices=choices, style=custom_style).ask()
-        
+
         if not field or field == "cancel":
             return
-            
+
         if field == "save":
             try:
                 # Fix paths to be relative if possible
@@ -153,19 +153,19 @@ def run_section_wizard(config: DotManConfig, section_name: str):
                 error(f"Failed to save: {e}")
                 input("Press Enter to continue...")
                 continue
-        
+
         # Field Editing
         if field == "paths":
             current = ", ".join(str(p) for p in section.paths)
             val = questionary.text("Paths (comma separated):", default=current, validate=PathValidator, style=custom_style).ask()
             if val:
                 section.paths = [Path(p.strip()) for p in val.split(",") if p.strip()]
-        
+
         elif field == "repo_base":
             val = questionary.text("Repo Base Directory:", default=section.repo_base, style=custom_style).ask()
             if val:
                 section.repo_base = val
-                
+
         elif field == "update_strategy":
             val = questionary.select(
                 "Update Strategy:",
@@ -175,21 +175,21 @@ def run_section_wizard(config: DotManConfig, section_name: str):
             ).ask()
             if val:
                 section.update_strategy = val
-                
+
         elif field == "secrets_filter":
             # Toggle logic since it's a checkbox essentially
             section.secrets_filter = not section.secrets_filter
-            
+
         elif field == "inherits":
             current = ", ".join(section.inherits)
             val = questionary.text("Inherits templates (comma separated):", default=current, style=custom_style).ask()
             if val is not None:
                 section.inherits = [t.strip() for t in val.split(",") if t.strip()]
-                
+
         elif field == "pre_deploy":
             val = questionary.text("Pre-deploy Hook:", default=section.pre_deploy or "", style=custom_style).ask()
             section.pre_deploy = val if val else None
-            
+
         elif field == "post_deploy":
             val = questionary.text("Post-deploy Hook:", default=section.post_deploy or "", style=custom_style).ask()
             section.post_deploy = val if val else None
@@ -217,7 +217,7 @@ def run_global_wizard(config: GlobalConfig):
         console.clear()
         print_global_dashboard(config)
         console.print()
-        
+
         choices = [
             questionary.Choice("Edit Default Editor", value="editor"),
             questionary.Choice("Edit Remote URL", value="remote_url"),
@@ -226,12 +226,12 @@ def run_global_wizard(config: GlobalConfig):
             questionary.Choice("Save & Return", value="save", shortcut_key="s"),
             questionary.Choice("Cancel", value="cancel", shortcut_key="q"),
         ]
-        
+
         field = questionary.select("Select action:", choices=choices, style=custom_style).ask()
-        
+
         if not field or field == "cancel":
             return
-            
+
         if field == "save":
             config.save()
             success("Global config updated.")
@@ -240,11 +240,11 @@ def run_global_wizard(config: GlobalConfig):
         if field == "editor":
             val = questionary.text("Editor Command:", default=config.editor or "", style=custom_style).ask()
             config.editor = val if val else None
-            
+
         elif field == "remote_url":
             val = questionary.text("Remote URL:", default=config.remote_url, validate=UrlValidator, style=custom_style).ask()
             config.remote_url = val if val else ""
-            
+
         elif field == "secrets_filter":
              current = config.secrets_filter_enabled
              # Toggle
@@ -258,14 +258,14 @@ def run_templates_wizard(config: DotManConfig):
     while True:
         console.clear()
         print_banner("Templates Manager")
-        
+
         templates = config.get_local_templates()
         if templates:
             table = Table(title="Available Templates", show_header=True)
             table.add_column("Name", style="green")
             table.add_column("Update Strategy")
             table.add_column("Hooks")
-            
+
             for name in templates:
                 tmpl = config._data["templates"][name]
                 hooks = []
@@ -273,7 +273,7 @@ def run_templates_wizard(config: DotManConfig):
                     hooks.append("Pre")
                 if tmpl.get("post_deploy"):
                     hooks.append("Post")
-                
+
                 table.add_row(
                     name,
                     tmpl.get("update_strategy", "default"),
@@ -286,16 +286,16 @@ def run_templates_wizard(config: DotManConfig):
         if templates:
             for name in templates:
                 choices.append(questionary.Choice(f"Edit {name}", value=name))
-        
+
         choices.append(questionary.Separator())
         choices.append(questionary.Choice("Add New Template", value="add_new"))
         choices.append(questionary.Choice("Back", value="back", shortcut_key="q"))
-        
+
         selection = questionary.select("Manage Templates:", choices=choices, use_shortcuts=True, style=custom_style).ask()
-        
+
         if not selection or selection == "back":
             return
-            
+
         if selection == "add_new":
             name = questionary.text("Template Name:", style=custom_style).ask()
             if name:
@@ -312,26 +312,26 @@ def run_templates_wizard(config: DotManConfig):
 def edit_template(config: DotManConfig, name: str):
     """Edit a specific template."""
     template = config._data["templates"][name]
-    
+
     while True:
         console.clear()
-        
+
         # Mini dashboard for template
         table = Table(title=None, box=None, show_header=False, padding=(0, 2))
         table.add_column("Key", style="cyan bold")
         table.add_column("Value")
-        
+
         table.add_row("Pre-deploy Hook", template.get("pre_deploy", "[dim]None[/dim]"))
         table.add_row("Post-deploy Hook", template.get("post_deploy", "[dim]None[/dim]"))
         table.add_row("Update Strategy", template.get("update_strategy", "Default"))
-        
+
         console.print(Panel(
             table,
             title=f"[magenta bold]Template: {name}[/magenta bold]",
             border_style="cyan"
         ))
         console.print()
-        
+
         choices = [
             questionary.Choice("Edit Pre-deploy Hook", value="pre_deploy"),
             questionary.Choice("Edit Post-deploy Hook", value="post_deploy"),
@@ -340,13 +340,13 @@ def edit_template(config: DotManConfig, name: str):
             questionary.Choice("Save & Return", value="save", shortcut_key="s"),
             questionary.Choice("Delete Template", value="delete"),
         ]
-        
+
         field = questionary.select("Edit Template Field:", choices=choices, use_shortcuts=True, style=custom_style).ask()
-        
+
         if not field or field == "save":
             config.save()
             return
-            
+
         if field == "delete":
             if questionary.confirm(f"Delete template '{name}'?", style=custom_style).ask():
                 del config._data["templates"][name]

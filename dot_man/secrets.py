@@ -5,24 +5,22 @@ __all__ = [
     "PermanentRedactGuard", "Severity", "filter_secrets",
 ]
 
-import re
+import hashlib
+import json
 import logging
+import re
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
+from typing import Callable, Iterable, Iterator, TypedDict
 
-from typing import Iterable, Iterator, Callable
-from .constants import SECRET_REDACTION_TEXT, DOT_MAN_DIR
-
-import json
-import hashlib
-from datetime import datetime
-from typing import TypedDict
+from .constants import DOT_MAN_DIR, SECRET_REDACTION_TEXT
 
 
 def _canonicalize_path(file_path: Path | str) -> str:
     """Resolve path to canonical absolute form for consistent matching.
-    
+
     This ensures that ~/file, /home/user/file, and ./file all resolve
     to the same canonical path for reliable secret ignore list matching.
     """
@@ -380,7 +378,7 @@ class SecretScanner:
 
         Args:
             content: Text content to redact
-            callback: Optional function that takes a SecretMatch and returns a string action ("REDACT") 
+            callback: Optional function that takes a SecretMatch and returns a string action ("REDACT")
                       OR the replacement string itself.
                       If it returns "REDACT", default redaction text is used.
                       If it returns anything else (and not "KEEP"), that string is used as replacement.
@@ -416,7 +414,7 @@ class SecretScanner:
                             matched_text=matched_text,
                         )
                         result = callback(secret_match)
-                        
+
                         if result == "KEEP" or result == "IGNORE":
                             should_redact = False
                         elif result == "REDACT":
@@ -450,10 +448,10 @@ def filter_secrets(
         Note: Only secrets that were actually redacted are returned, not ignored ones.
     """
     scanner = SecretScanner()
-    
+
     # Track which secrets were actually redacted
     redacted_secrets: list[SecretMatch] = []
-    
+
     def tracking_callback(match: SecretMatch) -> str:
         if callback:
             result = callback(match)
@@ -465,6 +463,6 @@ def filter_secrets(
             # No callback = always redact
             redacted_secrets.append(match)
             return "REDACT"
-    
+
     filtered_content, _ = scanner.redact_content(content, tracking_callback, file_path)
     return filtered_content, redacted_secrets

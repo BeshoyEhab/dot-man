@@ -48,7 +48,7 @@ dot-man/
 │   ├── utils.py          # Helper functions
 │   ├── constants.py      # Paths, defaults, patterns
 │   └── exceptions.py     # Custom exception classes
-├── tests/                # Test suite (98 tests)
+├── tests/                # Test suite (418+ tests)
 │   ├── conftest.py       # Pytest fixtures
 │   └── test_*.py         # Test modules
 ├── docs/                 # Documentation

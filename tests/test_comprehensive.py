@@ -1,8 +1,6 @@
 """Tests for section configuration and parsing - simplified."""
 
-import pytest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
 
 
 class TestSectionConfig:
@@ -21,12 +19,12 @@ class TestConfigFileParsing:
     def test_load_config_file(self, tmp_path):
         """Test loading a config file."""
         from dot_man.config import DotManConfig
-        
+
         config_file = tmp_path / "dot-man.toml"
         config_file.write_text("[bashrc]\npaths = ['~/.bashrc']")
-        
+
         # Just verify it doesn't crash - actual loading is complex
-        config = DotManConfig(config_file)
+        DotManConfig(config_file)
         assert config_file.exists()
 
 

@@ -5,13 +5,13 @@ __all__ = ["GitManager"]
 from pathlib import Path
 from typing import Iterator
 
-from git import Repo, GitCommandError
+from git import GitCommandError, Repo
 from git.exc import InvalidGitRepositoryError
 
-from .constants import REPO_DIR, GIT_IGNORE_PATTERNS
+from .constants import GIT_IGNORE_PATTERNS, REPO_DIR
 from .exceptions import (
-    GitOperationError,
     BranchNotFoundError,
+    GitOperationError,
     NotInitializedError,
 )
 
@@ -103,7 +103,7 @@ class GitManager:
 
     def checkout_commit(self, sha: str) -> None:
         """Checkout a specific commit (creates detached HEAD).
-        
+
         Args:
             sha: Full or partial commit SHA
         """
@@ -116,10 +116,10 @@ class GitManager:
 
     def get_tag_commit(self, tag_name: str) -> str | None:
         """Get the commit SHA that a tag points to.
-        
+
         Args:
             tag_name: Name of the tag
-            
+
         Returns:
             Commit SHA (7 chars) or None if tag not found
         """
@@ -133,7 +133,7 @@ class GitManager:
 
     def create_tag(self, name: str, ref: str = "HEAD", message: str | None = None) -> None:
         """Create a tag at a specific commit.
-        
+
         Args:
             name: Tag name
             ref: Commit reference (default: HEAD)
@@ -146,7 +146,7 @@ class GitManager:
 
     def delete_tag(self, name: str) -> None:
         """Delete a tag.
-        
+
         Args:
             name: Tag name to delete
         """
@@ -154,9 +154,9 @@ class GitManager:
             # Check if tag exists
             if name not in self.list_tags():
                 raise BranchNotFoundError(f"Tag not found: {name}")
-            
-            # GitPython's delete_tag method
-            self.repo.delete_tag(name)
+
+            # Use git command directly (delete_tag expects TagReference, not str)
+            self.repo.git.tag("-d", name)
         except BranchNotFoundError:
             raise
         except (GitCommandError, OSError) as e:
@@ -286,37 +286,37 @@ class GitManager:
 
     def pull(self, rebase: bool = True) -> str:
         """Pull from origin remote.
-        
+
         Automatically stashes uncommitted changes before pulling and
         restores them after.
-        
+
         Returns:
             Summary message of what happened.
         """
         if not self.has_remote():
             raise GitOperationError("No remote configured. Use 'dot-man remote set <url>' first.")
-        
+
         stashed = False
         try:
             current = self.current_branch()
             # Check if remote branch exists
             remote_refs = [ref.name for ref in self.repo.remotes.origin.refs]
             remote_branch = f"origin/{current}"
-            
+
             if remote_branch not in remote_refs:
                 return f"Remote branch '{current}' not found. Nothing to pull."
-            
+
             # Stash uncommitted changes if dirty
             if self.is_dirty():
                 self.repo.git.stash("save", "dot-man-auto-stash")
                 stashed = True
-            
+
             # Perform the pull
             if rebase:
                 result = self.repo.git.pull("--rebase", "origin", current)
             else:
                 result = self.repo.git.pull("origin", current)
-            
+
             # Restore stashed changes
             if stashed:
                 try:
@@ -329,7 +329,7 @@ class GitManager:
                         f"Run 'git stash pop' manually to restore them.\n"
                         f"Error: {stash_error.stderr}"
                     )
-            
+
             return result if result else "Already up to date."
         except GitCommandError as e:
             # Restore stash even on error
@@ -338,7 +338,7 @@ class GitManager:
                     self.repo.git.stash("pop")
                 except Exception:
                     pass  # Best effort
-            
+
             if "CONFLICT" in str(e.stdout) or "conflict" in str(e.stderr):
                 raise GitOperationError(
                     "Merge conflict detected. Please resolve conflicts in:\n"
@@ -357,7 +357,7 @@ class GitManager:
 
     def push(self, set_upstream: bool = True) -> str:
         """Push to origin remote.
-        
+
         Returns:
             Summary message of what happened.
         """
@@ -381,20 +381,20 @@ class GitManager:
 
     def get_branch_stats(self, branch_name: str) -> dict:
         """Get stats for a specific branch.
-        
+
         Returns:
             Dictionary with: commit_count, last_commit_date, last_commit_msg, file_count
         """
         try:
             branch = self.repo.heads[branch_name]
             commits = list(self.repo.iter_commits(branch, max_count=100))
-            
+
             last_commit = commits[0] if commits else None
-            
+
             # Count files in branch
             tree = branch.commit.tree
-            file_count = sum(1 for _ in tree.traverse() if _.type == 'blob')  # type: ignore 
-            
+            file_count = sum(1 for _ in tree.traverse() if _.type == 'blob')  # type: ignore
+
             return {
                 "commit_count": len(commits),
                 "last_commit_date": last_commit.committed_datetime.strftime("%Y-%m-%d %H:%M") if last_commit else "N/A",
@@ -447,27 +447,27 @@ class GitManager:
 
     def get_sync_status(self) -> dict:
         """Get sync status with remote.
-        
+
         Returns:
             Dictionary with: ahead, behind, remote_configured
         """
         if not self.has_remote():
             return {"ahead": 0, "behind": 0, "remote_configured": False}
-        
+
         try:
             self.fetch()
             current = self.current_branch()
             remote_branch = f"origin/{current}"
-            
+
             # Check if remote branch exists
             remote_refs = [ref.name for ref in self.repo.remotes.origin.refs]
             if remote_branch not in remote_refs:
                 return {"ahead": 0, "behind": 0, "remote_configured": True, "remote_branch_exists": False}
-            
+
             # Count ahead/behind
             ahead = len(list(self.repo.iter_commits(f"{remote_branch}..{current}")))
             behind = len(list(self.repo.iter_commits(f"{current}..{remote_branch}")))
-            
+
             return {
                 "ahead": ahead,
                 "behind": behind,
@@ -479,11 +479,11 @@ class GitManager:
 
     def get_file_from_branch(self, branch: str, file_path: str) -> str | None:
         """Read a file's content from a specific branch without checkout.
-        
+
         Args:
             branch: Branch name to read from
             file_path: Relative path within the repo
-            
+
         Returns:
             File content as string, or None if file doesn't exist
         """

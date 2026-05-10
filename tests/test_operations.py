@@ -1,8 +1,9 @@
 """Tests for dot_man.operations DotManOperations."""
 
-import pytest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+
+import pytest
 
 from dot_man.operations import DotManOperations
 

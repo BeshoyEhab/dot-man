@@ -4,8 +4,8 @@ import click
 
 from .. import ui
 from ..constants import REPO_DIR
+from .common import error, require_init, success
 from .interface import cli as main
-from .common import error, success, require_init
 
 
 @main.command("clean")
@@ -18,7 +18,7 @@ from .common import error, success, require_init
 @require_init
 def clean(backups: bool, orphans: bool, clean_all: bool, keep: int, force: bool, dry_run: bool):
     """Clean stale backups and orphaned files.
-    
+
     Removes old backups and files in the repository that are no longer tracked
     by any configuration section.
     """
@@ -29,7 +29,7 @@ def clean(backups: bool, orphans: bool, clean_all: bool, keep: int, force: bool,
     try:
         from ..operations import get_operations
         ops = get_operations()
-        
+
         # 1. Clean Backups
         if backups or clean_all:
             ui.console.print("[bold]Checking backups...[/bold]")
@@ -59,7 +59,7 @@ def clean(backups: bool, orphans: bool, clean_all: bool, keep: int, force: bool,
         if orphans or clean_all:
             ui.console.print("[bold]Checking for orphaned files...[/bold]")
             orphaned_files = ops.get_orphaned_files()
-            
+
             if not orphaned_files:
                 ui.console.print("  No orphaned files found.")
                 return
@@ -77,6 +77,6 @@ def clean(backups: bool, orphans: bool, clean_all: bool, keep: int, force: bool,
                 if force or ui.confirm(f"Found {len(orphaned_files)} orphaned files. Delete them?"):
                     deleted_files = ops.clean_orphaned_files(dry_run=False)
                     success(f"Deleted {len(deleted_files)} orphaned files.")
-                    
+
     except Exception as e:
         error(f"Failed to clean: {e}")

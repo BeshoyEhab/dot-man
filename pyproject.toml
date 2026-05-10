@@ -1,6 +1,6 @@
 [project]
 name = "dot-man"
-version = "0.8.0"
+version = "0.9.0"
 description = "Dotfile manager with git-powered branching"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -44,6 +44,7 @@ dev = [
     "mypy>=1.14.1",
     "textual>=0.40",
     "ruff>=0.4.0",
+    "pre-commit>=3.0.0",
 ]
 
 [project.scripts]
@@ -63,7 +64,20 @@ include = ["dot_man*"]
 
 [tool.black]
 line-length = 88
-target-version = ["py38"]
+target-version = ["py39"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I"]
+ignore = ["E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"dot_man/global_config.py" = ["E402"]
+"dot_man/dotman_config.py" = ["E402"]
+"dot_man/cli/common.py" = ["E402"]
 
 [tool.mypy]
 python_version = "3.10"

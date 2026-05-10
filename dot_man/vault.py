@@ -2,12 +2,12 @@
 
 __all__ = ["SecretVault", "VaultError"]
 
-import json
 import hashlib
+import json
 import threading
 from contextlib import contextmanager
-from typing import Optional, Dict, Any, Generator
 from datetime import datetime
+from typing import Any, Dict, Generator, Optional
 
 from cryptography.fernet import Fernet
 
@@ -15,6 +15,7 @@ from .constants import DOT_MAN_DIR
 from .exceptions import DotManError
 from .files import atomic_write_text
 from .lock import FileLock, LockError
+
 
 class VaultError(DotManError):
     """Vault operation failed."""
@@ -170,8 +171,8 @@ class SecretVault:
 
         # If not batch mode, we must acquire FileLock to prevent inter-process races.
         # Retry logic for lock contention
-        import time
         import random
+        import time
         retries = 0
         max_retries = 50
 
@@ -219,7 +220,7 @@ class SecretVault:
             if (s["file_path"] == str(file_path) and
                 s["secret_hash"] == secret_hash and
                 s["branch"] == branch):
-                
+
                 # Update location info
                 self._data["secrets"][i] = entry
                 updated = True
@@ -251,7 +252,7 @@ class SecretVault:
                     except (ValueError, TypeError): # + cryptography exceptions if imported
                         return None
             return None
-        
+
     def get_secret_by_hash(self, secret_hash: str) -> Optional[str]:
         """Retrieve and decrypt a secret by its hash."""
         with self._lock:
@@ -274,16 +275,16 @@ class SecretVault:
         # Lock provided by get_secret_by_hash calls, but we should probably lock the whole operation
         # to prevent reloading in loop if file changes (unlikely)
         # But get_secret_by_hash does its own locking and loading.
-        
+
         # Regex to find ***REDACTED:<HASH>***
         import re
         pattern = re.compile(r"\*\*\*REDACTED:([a-fA-F0-9]{64})\*\*\*")
-        
+
         def replace_match(match):
             secret_hash = match.group(1)
             restored = self.get_secret_by_hash(secret_hash)
             if restored:
                 return restored
             return match.group(0) # Keep redaction if not found
-            
+
         return pattern.sub(replace_match, content)

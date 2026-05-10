@@ -2,10 +2,10 @@
 
 __all__ = ["DotManConfig", "LegacyConfigLoader"]
 
-import sys
 import logging
-from typing import Any, cast
+import sys
 from pathlib import Path
+from typing import Any, cast
 
 # Python 3.11+ has tomllib built-in, otherwise use tomli
 if sys.version_info >= (3, 11):
@@ -19,8 +19,8 @@ else:
 import tomlkit
 
 from .constants import (
-    REPO_DIR,
     DOT_MAN_TOML,
+    REPO_DIR,
     VALID_UPDATE_STRATEGIES,
 )
 from .exceptions import ConfigurationError, ConfigValidationError
@@ -61,17 +61,16 @@ class DotManConfig:
                 self._migrate_from_ini(old_path)
                 return
             raise ConfigurationError(f"Config not found: {self._path}")
-        
+
         content = self._path.read_text()
         self._data = tomllib.loads(content)
         # Also parse with tomlkit to preserve comments
         self._doc = tomlkit.parse(content)
         self._dirty = False
-        
+
         # Validate schema on load
         warnings = self._validate_schema()
         if warnings:
-            import sys
             for w in warnings:
                 logging.warning("Config warning: %s", w)
 
@@ -83,7 +82,7 @@ class DotManConfig:
             "update_strategy", "include", "exclude", "pre_deploy",
             "post_deploy", "inherits", "ignored_directories", "follow_symlinks"
         }
-        
+
         for name, section in self._data.items():
             if name == "templates":
                 continue
@@ -166,7 +165,7 @@ class DotManConfig:
 
     def save(self, force: bool = False) -> None:
         """Save the dot-man.toml configuration file.
-        
+
         Args:
             force: Save even if not dirty
         """
@@ -445,23 +444,23 @@ class DotManConfig:
 
     def update_section(self, name: str, **kwargs) -> None:
         """Update an existing section's properties.
-        
+
         Args:
             name: Section name to update
             **kwargs: Properties to update (set to None to remove a property)
-        
+
         Raises:
             ConfigurationError: If section doesn't exist or invalid key provided
         """
         if name not in self._data or name == "templates":
             raise ConfigurationError(f"Section not found: {name}")
-        
+
         valid_keys = {
             "paths", "repo_base", "repo_path", "secrets_filter",
             "update_strategy", "include", "exclude", "pre_deploy",
             "post_deploy", "inherits", "ignored_directories", "follow_symlinks"
         }
-        
+
         for key, value in kwargs.items():
             if key not in valid_keys:
                 raise ConfigurationError(f"Unknown key: {key}")
@@ -470,15 +469,15 @@ class DotManConfig:
                 self._data[name].pop(key, None)
             else:
                 self._data[name][key] = value
-        
+
         self._dirty = True
 
     def remove_section(self, name: str) -> None:
         """Remove a section from the configuration.
-        
+
         Args:
             name: Section name to remove
-            
+
         Raises:
             ConfigurationError: If section doesn't exist
         """

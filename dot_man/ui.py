@@ -1,10 +1,11 @@
 """Centralized UI module for dot-man using Rich."""
 
 import sys
-from typing import Optional, Any
+from typing import Any, Optional
+
 from rich.console import Console
 from rich.panel import Panel
-from rich.prompt import Prompt, Confirm
+from rich.prompt import Confirm, Prompt
 from rich.theme import Theme
 
 # Custom theme for consistent branding

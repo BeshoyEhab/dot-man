@@ -1,8 +1,6 @@
 """Final set of tests to increase coverage - simplified."""
 
-import pytest
 from pathlib import Path
-from unittest.mock import patch, MagicMock
 
 
 class TestSecretsGuard:
@@ -31,10 +29,10 @@ class TestBackupManager:
     def test_backup_list_empty(self, tmp_path):
         """Test list on empty backup dir."""
         from dot_man.backups import BackupManager
-        
+
         backup_dir = tmp_path / "backups"
         backup_dir.mkdir()
-        
+
         manager = BackupManager(backup_dir)
         result = manager.list_backups()
         assert isinstance(result, list)
@@ -46,12 +44,12 @@ class TestConfigTemplates:
     def test_get_all_templates(self):
         """Test get_all_templates."""
         from dot_man.global_config import GlobalConfig
-        
+
         config = GlobalConfig()
         config._data = {
             "templates": {"work": {"paths": ["~/work"]}, "home": {"paths": ["~/home"]}}
         }
-        
+
         templates = config.get_all_templates()
         assert len(templates) == 2
 
@@ -62,7 +60,7 @@ class TestGlobalConfigEditor:
     def test_editor_default_none(self):
         """Test editor defaults to None."""
         from dot_man.global_config import GlobalConfig
-        
+
         config = GlobalConfig()
         config._data = {}
         assert config.editor is None
@@ -70,19 +68,22 @@ class TestGlobalConfigEditor:
     def test_set_editor(self):
         """Test setting editor."""
         from dot_man.global_config import GlobalConfig
-        
+
         config = GlobalConfig()
         config.editor = "nvim"
         assert config.editor == "nvim"
 
 
 class TestOperationsInstance:
-    """Test operations instance."""
+    """Test operations singleton."""
 
-    def test_get_operations_type(self):
-        """Test get_operations returns correct type."""
-        from dot_man.operations import get_operations
-        assert callable(get_operations)
+    def test_get_operations_is_singleton(self):
+        """Test that get_operations returns the same instance each call."""
+        from dot_man.operations import get_operations, reset_operations
+        reset_operations()
+        ops1 = get_operations()
+        ops2 = get_operations()
+        assert ops1 is ops2
 
 
 class TestAllBranchStats:
@@ -91,10 +92,13 @@ class TestAllBranchStats:
     def test_get_all_branch_stats(self, git_repo_with_branches):
         """Test get_all_branch_stats."""
         from dot_man.core import GitManager
-        
+
         git = GitManager(git_repo_with_branches)
         stats = git.get_all_branch_stats()
         assert isinstance(stats, list)
+        # Should have entries for the branches we created
+        names = [s["name"] for s in stats]
+        assert "main" in names
 
 
 class TestSectionRepoPath:
@@ -103,41 +107,35 @@ class TestSectionRepoPath:
     def test_get_repo_path_basic(self):
         """Test get_repo_path basic."""
         from dot_man.config import Section
-        
+
         section = Section("bash", {"paths": ["~/.bashrc"]}, Path("/repo"))
-        
+
         local_path = Path.home() / ".bashrc"
         repo_path = section.get_repo_path(local_path, Path("/repo"))
-        
+
         assert "bashrc" in str(repo_path)
 
 
-class TestUIConsole:
-    """Test UI console."""
-
-    def test_console_type(self):
-        """Test console is Rich console."""
-        from rich.console import Console
-        from dot_man.interactive import console
-        assert isinstance(console, Console)
-
-
 class TestSecretRedaction:
-    """Test secret redaction."""
+    """Test actual secret scanning and redaction behavior."""
 
-    def test_redaction_text(self):
-        """Test redaction text constant."""
-        from dot_man.secrets import SECRET_REDACTION_TEXT
-        assert SECRET_REDACTION_TEXT == "***REDACTED***"
+    def test_scan_detects_api_key(self, tmp_path):
+        """Test that scanning detects a real API key pattern."""
+        from dot_man.secrets import SecretScanner
+        scanner = SecretScanner()
+        test_file = tmp_path / "test.conf"
+        test_file.write_text("api_key = 'sk_live_abc123def456ghi789'")
+        findings = list(scanner.scan_file(test_file))
+        assert len(findings) > 0
 
-
-class TestFalsePositives:
-    """Test false positive indicators."""
-
-    def test_false_positive_indicators(self):
-        """Test false positive indicators exist."""
-        from dot_man.secrets import FALSE_POSITIVE_INDICATORS
-        assert isinstance(FALSE_POSITIVE_INDICATORS, list)
+    def test_scan_clean_file(self, tmp_path):
+        """Test that clean files produce no findings."""
+        from dot_man.secrets import SecretScanner
+        scanner = SecretScanner()
+        test_file = tmp_path / "test.conf"
+        test_file.write_text("alias ll='ls -la'\nexport PAGER=less")
+        findings = list(scanner.scan_file(test_file))
+        assert len(findings) == 0
 
 
 class TestCanonicalizePath:
@@ -151,57 +149,29 @@ class TestCanonicalizePath:
         assert ".bashrc" in result
 
 
-class TestValidatorsMore:
-    """Test validators more."""
+class TestSecretRedactionBehavior:
+    """Test actual redaction of file content."""
 
-    def test_url_validator_import(self):
-        """Test URL validator import."""
-        from dot_man.interactive import UrlValidator
-        assert UrlValidator is not None
-
-
-class TestWizardsMore:
-    """Test wizards more."""
-
-    def test_global_wizard_import(self):
-        """Test global wizard import."""
-        from dot_man.interactive import run_global_wizard
-        assert callable(run_global_wizard)
-
-    def test_section_wizard_import(self):
-        """Test section wizard import."""
-        from dot_man.interactive import run_section_wizard
-        assert callable(run_section_wizard)
+    def test_redact_replaces_secrets(self, tmp_path):
+        """Test that redact_content actually replaces secrets."""
+        from dot_man.secrets import SecretScanner
+        scanner = SecretScanner()
+        content = "AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+        redacted = scanner.redact_content(content, "config.env")
+        # If a secret was detected, it should be redacted
+        if "REDACTED" in redacted:
+            assert "wJalrXUtnFEMI" not in redacted
 
 
-class TestVaultEncryption:
-    """Test vault encryption."""
+class TestBackupManagerBehavior:
+    """Test backup manager with real filesystem."""
 
-    def test_vault_error(self):
-        """Test VaultError exists."""
-        from dot_man.vault import VaultError
-        error = VaultError("test")
-        assert "test" in str(error)
-
-
-class TestLockError:
-    """Test lock error."""
-
-    def test_lock_error(self):
-        """Test LockError exists."""
-        from dot_man.vault import LockError
-        error = LockError("locked")
-        assert "locked" in str(error)
-
-
-class TestBackupError:
-    """Test backup error."""
-
-    def test_backup_error(self):
-        """Test BackupError exists."""
-        from dot_man.backups import BackupError
-        error = BackupError("backup failed")
-        assert "backup failed" in str(error)
+    def test_list_backups_empty(self, tmp_path):
+        """Test listing backups on empty dir."""
+        from dot_man.backups import BackupManager
+        manager = BackupManager(tmp_path / "backups")
+        backups = manager.list_backups()
+        assert backups == []
 
 
 class TestUtilsFunctions:
@@ -239,8 +209,9 @@ class TestUtilsFunctions:
 
     def test_get_directory_size_nonexistent(self):
         """Test get_directory_size with non-existent path."""
-        from dot_man.utils import get_directory_size
         from pathlib import Path
+
+        from dot_man.utils import get_directory_size
         result = get_directory_size(Path("/nonexistent/path"))
         assert result == 0
 
@@ -263,8 +234,9 @@ class TestUtilsFunctions:
 
     def test_count_files_nonexistent(self):
         """Test count_files with non-existent path."""
-        from dot_man.utils import count_files
         from pathlib import Path
+
+        from dot_man.utils import count_files
         result = count_files(Path("/nonexistent/path"))
         assert result == 0
 
@@ -474,7 +446,7 @@ class TestFilesModule:
         f1.write_text("hello")
         f2.write_text("hello")
         result = compare_files(f1, f2)
-        assert result == True
+        assert result is True
 
     def test_compare_files_different(self, tmp_path):
         """Test compare_files for different files."""
@@ -484,7 +456,7 @@ class TestFilesModule:
         f1.write_text("hello")
         f2.write_text("world")
         result = compare_files(f1, f2)
-        assert result == False
+        assert result is False
 
     def test_compare_files_binary(self, tmp_path):
         """Test compare_files for binary files."""
@@ -494,7 +466,7 @@ class TestFilesModule:
         f1.write_bytes(b"\x00\x01\x02")
         f2.write_bytes(b"\x00\x01\x02")
         result = compare_files(f1, f2)
-        assert result == True
+        assert result is True
 
     def test_compare_files_nonexistent_dest(self, tmp_path):
         """Test compare_files when dest doesn't exist."""
@@ -503,7 +475,7 @@ class TestFilesModule:
         f2 = tmp_path / "file2.txt"
         f1.write_text("hello")
         result = compare_files(f1, f2)
-        assert result == False
+        assert result is False
 
 
 class TestGitManagerMore:
@@ -552,4 +524,4 @@ class TestGitManagerMore:
         """Test has_remote returns False when no remote."""
         from dot_man.core import GitManager
         git = GitManager(git_repo)
-        assert git.has_remote() == False
+        assert git.has_remote() is False

@@ -35,11 +35,14 @@ class ErrorDiagnostic:
     def from_exception(cls, exc: Exception) -> "ErrorDiagnostic":
         """Factory to create diagnostics from common exceptions."""
         import builtins
+
         from .exceptions import (
-            SecretsDetectedError, GitOperationError,
-            ConfigurationError, DiskSpaceError
+            ConfigurationError,
+            DiskSpaceError,
+            GitOperationError,
+            SecretsDetectedError,
         )
-        
+
         if isinstance(exc, KeyboardInterrupt):
             return cls(
                 ErrorCategory.INTERRUPTED,
@@ -98,7 +101,7 @@ class ErrorDiagnostic:
                 str(exc),
                 "Check that the required program is installed and in PATH"
             )
-        
+
         # Fallback
         return cls(
             ErrorCategory.UNKNOWN,

@@ -8,8 +8,8 @@ from rich.table import Table
 from .. import ui
 from ..config import GlobalConfig
 from ..exceptions import ConfigurationError
+from .common import complete_config_keys, error, require_init, success
 from .interface import cli as main
-from .common import error, success, require_init, complete_config_keys
 
 
 @main.group()
@@ -159,8 +159,8 @@ def config_create(with_examples: bool, minimal: bool, force: bool):
         dot-man config create --minimal --force
     """
     try:
-        from ..constants import DOT_MAN_TOML, REPO_DIR
         from ..config import DotManConfig
+        from ..constants import DOT_MAN_TOML, REPO_DIR
 
         config_path = REPO_DIR / DOT_MAN_TOML
 
@@ -295,10 +295,10 @@ def config_tutorial(section: str | None, interactive: bool):
 
 def _show_section_examples(section: str):
     """Show examples for a specific section."""
+    from typing import Any
+
     from rich.panel import Panel
     from rich.syntax import Syntax
-
-    from typing import Any
     examples: dict[str, dict[str, Any]] = {
         "basic": {
             "title": "Basic File Tracking",

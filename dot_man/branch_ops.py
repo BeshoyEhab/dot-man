@@ -1,18 +1,18 @@
 """Branch and revert operations mixin for DotManOperations."""
 
-from abc import abstractmethod, abstractproperty
+from abc import abstractmethod
 from pathlib import Path
-from typing import Any, Callable, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
-from .files import copy_file, atomic_write_text, clear_comparison_cache
-from .secrets import SecretMatch
 from .constants import REPO_DIR
 from .exceptions import DotManError
+from .files import atomic_write_text, clear_comparison_cache, copy_file
 from .lock import FileLock
+from .secrets import SecretMatch
 from .ui import warn
 
 if TYPE_CHECKING:
-    from .config import Section
+    pass
 
 LOCK_FILE = REPO_DIR.parent / ".lock"
 
