@@ -171,6 +171,34 @@ mypy dot_man/
 
 1.  Update version in `pyproject.toml` and `dot_man/__init__.py`.
 2.  Update `CHANGELOG.md`.
-3.  Tag the release: `git tag v0.7.0`.
-4.  Push tags: `git push --tags`.
-5.  Build and publish (CI/CD handles this usually).
+3.  Update `TODO.md` - move completed items, add next milestones.
+4.  Update `docs/roadmap.md` - mark release as complete, update metrics.
+5.  Tag the release: `git tag v0.7.0`.
+6.  Push tags: `git push --tags`.
+7.  Build and publish (CI/CD handles this usually).
+
+---
+
+## 🏃 Current Development Focus
+
+### v0.8.0 - Performance
+- Batch file operations
+- Parallel secret scanning
+- Lazy loading
+- Content-addressable storage
+
+### v0.9.0 - TUI Core Actions
+- Sync from TUI
+- Switch from TUI
+- Delete branch from TUI
+- Edit config from TUI
+
+### v0.12.0 - Diff & History (Highly Requested)
+- `dot-man diff` - Show changes between branches
+- `dot-man log` - Show commit history
+- `dot-man restore <file> <commit>` - Restore from history
+
+### v0.13.0 - Template Variables
+- `dot-man template --set KEY=VALUE`
+- Template substitution (`{{HOSTNAME}}`, `{{EMAIL}}`)
+- System variable auto-population

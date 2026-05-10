@@ -33,6 +33,10 @@ from .revert_cmd import revert
 from .clean_cmd import clean
 from .doctor_cmd import doctor
 from .verify_cmd import verify
+from .log_cmd import log, checkout, diff
+from .tag_cmd import tag
+from .template_cmd import template
+from .profile_cmd import profile
 
 __all__ = [
     'main',
@@ -61,4 +65,10 @@ __all__ = [
     'clean',
     'doctor',
     'verify',
+    'log',
+    'checkout',
+    'diff',
+    'tag',
+    'template',
+    'profile',
 ]

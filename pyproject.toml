@@ -1,17 +1,19 @@
 [project]
 name = "dot-man"
-version = "0.7.0"
+version = "0.8.0"
 description = "Dotfile manager with git-powered branching"
 readme = "README.md"
 requires-python = ">=3.9"
+license = { text = "MIT" }
 authors = [
-    { name = "Bishoy Ehab" }
+    { name = "Bishoy Ehab", email = "beshoy@example.com" }
 ]
-keywords = ["dotfiles", "git", "configuration", "cli"]
+keywords = ["dotfiles", "git", "configuration", "cli", "dotfile-manager"]
 classifiers = [
-    "Development Status :: 5 - Alpha",
+    "Development Status :: 4 - Beta",
     "Environment :: Console",
     "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
@@ -72,3 +74,23 @@ warn_unused_configs = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-v"
+
+[tool.coverage.run]
+omit = [
+    "dot_man/tui.py",
+    "dot_man/tui_editor.py",
+    "dot_man/cli/verify_cmd.py",
+    "dot_man/cli/doctor_cmd.py",
+    "dot_man/cli/edit_cmd.py",
+    "dot_man/cli/remote_cmd.py",
+    "dot_man/cli/config_cmd.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]

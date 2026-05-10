@@ -74,6 +74,10 @@ class GitManager:
         """List all local branches."""
         return [head.name for head in self.repo.heads]
 
+    def list_tags(self) -> list[str]:
+        """List all local tags."""
+        return [tag.name for tag in self.repo.tags]
+
     def branch_exists(self, name: str) -> bool:
         """Check if a branch exists."""
         return name in self.list_branches()
@@ -96,6 +100,67 @@ class GitManager:
             raise BranchNotFoundError(f"Branch not found: {branch}")
         except (GitCommandError, OSError) as e:
             raise GitOperationError(f"Failed to checkout '{branch}': {e}")
+
+    def checkout_commit(self, sha: str) -> None:
+        """Checkout a specific commit (creates detached HEAD).
+        
+        Args:
+            sha: Full or partial commit SHA
+        """
+        try:
+            # Try to resolve the commit
+            commit = self.repo.commit(sha)
+            self.repo.head.reference = commit
+        except (GitCommandError, ValueError, OSError) as e:
+            raise GitOperationError(f"Failed to checkout commit '{sha}': {e}")
+
+    def get_tag_commit(self, tag_name: str) -> str | None:
+        """Get the commit SHA that a tag points to.
+        
+        Args:
+            tag_name: Name of the tag
+            
+        Returns:
+            Commit SHA (7 chars) or None if tag not found
+        """
+        try:
+            tag = self.repo.tags[tag_name]
+            if tag:
+                return tag.commit.hexsha[:7]
+            return None
+        except (KeyError, IndexError, OSError):
+            return None
+
+    def create_tag(self, name: str, ref: str = "HEAD", message: str | None = None) -> None:
+        """Create a tag at a specific commit.
+        
+        Args:
+            name: Tag name
+            ref: Commit reference (default: HEAD)
+            message: Optional message for annotated tags
+        """
+        try:
+            self.repo.create_tag(name, ref=ref, message=message)
+        except (GitCommandError, OSError, ValueError) as e:
+            raise GitOperationError(f"Failed to create tag '{name}': {e}")
+
+    def delete_tag(self, name: str) -> None:
+        """Delete a tag.
+        
+        Args:
+            name: Tag name to delete
+        """
+        try:
+            # Check if tag exists
+            if name not in self.list_tags():
+                raise BranchNotFoundError(f"Tag not found: {name}")
+            
+            # GitPython's delete_tag method
+            self.repo.delete_tag(name)
+        except BranchNotFoundError:
+            raise
+        except (GitCommandError, OSError) as e:
+            raise GitOperationError(f"Failed to delete tag '{name}': {e}")
 
     def is_dirty(self) -> bool:
         """Check if the repository has uncommitted changes."""

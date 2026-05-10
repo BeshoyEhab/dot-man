@@ -9,7 +9,7 @@ from .. import ui
 from ..config import GlobalConfig
 from ..exceptions import ConfigurationError
 from .interface import cli as main
-from .common import error, success, require_init
+from .common import error, success, require_init, complete_config_keys
 
 
 @main.group()
@@ -51,7 +51,7 @@ def config_list():
 
 
 @config.command("get")
-@click.argument("key")
+@click.argument("key", shell_complete=complete_config_keys)
 def config_get(key: str):
     """Get a configuration value.
 
@@ -81,7 +81,7 @@ def config_get(key: str):
 
 
 @config.command("set")
-@click.argument("key")
+@click.argument("key", shell_complete=complete_config_keys)
 @click.argument("value")
 def config_set(key: str, value: str):
     """Set a configuration value.
