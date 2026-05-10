@@ -1,12 +1,65 @@
 """Global configuration management for dot-man."""
 
-__all__ = ["GlobalConfig", "_write_toml"]
+__all__ = ["GlobalConfig", "_write_toml", "substitute_templates"]
 
 import sys
 import logging
+import os
+import socket
+import platform
 from typing import Optional, Any, cast
 from pathlib import Path
 from datetime import datetime
+
+
+# System variables that can be auto-detected
+SYSTEM_VARS = {
+    "HOSTNAME": lambda: socket.gethostname(),
+    "USER": lambda: os.environ.get("USER", os.environ.get("USERNAME", "unknown")),
+    "HOME": lambda: str(Path.home()),
+    "OS": lambda: platform.system(),
+    "OS_VERSION": lambda: platform.version(),
+    "ARCH": lambda: platform.machine(),
+    "SHELL": lambda: os.environ.get("SHELL", "/bin/sh"),
+    "EDITOR": lambda: os.environ.get("EDITOR", os.environ.get("VISUAL", "vim")),
+    "EMAIL": lambda: None,
+    "DOMAIN": lambda: socket.getfqdn(),
+}
+
+
+def substitute_templates(text: str, user_templates: dict | None = None) -> str:
+    """Substitute template variables in a string.
+
+    Args:
+        text: String containing template placeholders like {{HOSTNAME}}
+        user_templates: Optional dict of user-defined templates
+
+    Returns:
+        String with all substitutions applied
+    """
+    if not text:
+        return text
+
+    result = text
+
+    # First replace system variables
+    for var_name, getter in SYSTEM_VARS.items():
+        placeholder = f"{{{{{var_name}}}}}"
+        if placeholder in result:
+            try:
+                val = getter()
+                if val:
+                    result = result.replace(placeholder, str(val))
+            except Exception as e:
+                logging.debug(f"Could not get system variable {var_name}: {e}")
+
+    # Then replace user-defined templates
+    if user_templates:
+        for key, value in user_templates.items():
+            placeholder = f"{{{{{key}}}}}"
+            result = result.replace(placeholder, str(value))
+
+    return result
 
 # Python 3.11+ has tomllib built-in, otherwise use tomli
 if sys.version_info >= (3, 11):
@@ -158,6 +211,9 @@ class GlobalConfig:
                 "strict_mode": False,
                 "audit_on_commit": True,
             },
+            "switch": {
+                "default_behavior": "save",
+            },
             # Example template
             "templates": {
                 "example": {
@@ -249,6 +305,39 @@ class GlobalConfig:
         templates = self._data.get("templates", {})
         return cast(Optional[dict[str, Any]], templates.get(name))
 
+    @property
+    def switch_default_behavior(self) -> str:
+        """Get default switch behavior (save or no-save)."""
+        return cast(str, self._data.get("switch", {}).get("default_behavior", "save"))
+
+    @switch_default_behavior.setter
+    def switch_default_behavior(self, value: str) -> None:
+        """Set default switch behavior."""
+        if value not in ("save", "no-save"):
+            raise ConfigurationError("switch.default_behavior must be 'save' or 'no-save'")
+        if "switch" not in self._data:
+            self._data["switch"] = {}
+        self._data["switch"]["default_behavior"] = value
+        self._dirty = True
+
     def get_all_templates(self) -> dict[str, Any]:
         """Get all templates."""
         return cast(dict[str, Any], self._data.get("templates", {}))
+
+    @property
+    def profiles(self) -> dict[str, Any]:
+        """Get all profiles."""
+        return cast(dict[str, Any], self._data.get("profiles", {}))
+
+    @property
+    def current_profile(self) -> str | None:
+        """Get the current profile name."""
+        return self._data.get("dot-man", {}).get("current_profile")
+
+    @current_profile.setter
+    def current_profile(self, value: str) -> None:
+        """Set the current profile."""
+        if "dot-man" not in self._data:
+            self._data["dot-man"] = {}
+        self._data["dot-man"]["current_profile"] = value
+        self._dirty = True

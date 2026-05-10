@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import shutil
 import os
 from pathlib import Path
@@ -10,8 +11,6 @@ from typing import Iterator, Callable
 from .secrets import (
     filter_secrets,
     SecretMatch,
-    SecretGuard,
-    PermanentRedactGuard,
 )
 
 __all__ = [
@@ -25,7 +24,25 @@ __all__ = [
     "backup_file",
     "ensure_directory",
     "clear_comparison_cache",
+    "get_content_hash",
 ]
+
+
+def get_content_hash(content: str) -> str:
+    """Get SHA256 hash of content for deduplication."""
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+
+
+def _get_secret_guard():
+    """Lazy load SecretGuard only when needed."""
+    from .secrets import SecretGuard
+    return SecretGuard()
+
+
+def _get_redact_guard():
+    """Lazy load PermanentRedactGuard only when needed."""
+    from .secrets import PermanentRedactGuard
+    return PermanentRedactGuard()
 
 
 def atomic_write_text(path: Path, content: str, encoding: str = "utf-8") -> None:
@@ -69,7 +86,7 @@ def smart_save_file(
     """
     detected_secrets: list[SecretMatch] = []
 
-    if not src_path.exists() or not src_path.is_file():
+    if not src_path.is_file():
         return False, []
 
     # 1. Read source
@@ -80,12 +97,13 @@ def smart_save_file(
         # Binary file or read error - fallback to direct copy if different
         return _handle_binary_copy(src_path, dest_path, check_secrets)
 
-    # 2. Filter secrets
+    # 2. Filter secrets (lazy load guards only when needed)
     final_content = src_content
+    detected_secrets = []
     if check_secrets:
-        # Wrap handler to include implicit Guard checking
-        allow_guard = SecretGuard()
-        redact_guard = PermanentRedactGuard()
+        # Use lazy-loaded guards
+        allow_guard = _get_secret_guard()
+        redact_guard = _get_redact_guard()
 
         def wrapped_handler(match: SecretMatch) -> str:
             # Check allow list first
@@ -109,7 +127,7 @@ def smart_save_file(
 
     # 3. Compare with destination
     should_save = True
-    if dest_path.exists() and dest_path.is_file():
+    if dest_path.is_file():
         try:
             # Check permissions first
             src_stat = src_path.stat()

@@ -50,10 +50,10 @@ class StatusMixin:
             for local_path in section.paths:
                 repo_path = section.get_repo_path(local_path, REPO_DIR)
 
-                if repo_path.is_file() and repo_path.exists():
+                if repo_path.is_file():
                     matches = list(scanner.scan_file(repo_path))
                     section_matches.extend(matches)
-                elif repo_path.is_dir() and repo_path.exists():
+                elif repo_path.is_dir():
                     matches = list(scanner.scan_directory(repo_path))
                     section_matches.extend(matches)
 

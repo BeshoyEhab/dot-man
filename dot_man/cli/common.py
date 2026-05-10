@@ -82,12 +82,157 @@ def require_init(func):
     return wrapper
 
 
+import re
+
+
+def parse_branch_arg(arg: str) -> dict:
+    """Parse branch argument with @tag or commit SHA support.
+    
+    Args:
+        arg: Branch string like "work", "work@tag", or "abc1234"
+        
+    Returns:
+        dict with keys: type (branch|tag|commit), base, target
+    """
+    # Pattern: branch@tag
+    match = re.match(r'^(.+)@(.+)$', arg)
+    if match:
+        base = match.group(1)
+        target = match.group(2)
+        
+        if not base:
+            base = "HEAD"
+        
+        # Check if target looks like a commit SHA (7+ hex chars)
+        if re.match(r'^[a-f0-9]{7,40}$', target):
+            return {"type": "commit", "base": base, "target": target}
+        
+        # Otherwise it's a tag
+        return {"type": "tag", "base": base, "target": target}
+    
+    # Check if entire arg looks like a commit SHA
+    if re.match(r'^[a-f0-9]{7,40}$', arg):
+        return {"type": "commit", "base": "HEAD", "target": arg}
+    
+    # Check if arg is a tag (before checking if it's a branch)
+    try:
+        git = GitManager()
+        if arg in git.list_tags():
+            return {"type": "tag", "base": "HEAD", "target": arg}
+    except Exception as e:
+        import logging
+        logging.debug(f"Could not check tags: {e}")
+    
+    # Plain branch name
+    return {"type": "branch", "base": arg, "target": arg}
+
+
+def complete_switch_args(ctx, param, incomplete):
+    """Shell completion callback for switch (branches, tags, commits)."""
+    try:
+        git = GitManager()
+        results = []
+        
+        # Add branches
+        branches = git.list_branches()
+        for b in branches:
+            if b.startswith(incomplete):
+                results.append(b)
+            # Also add branch@tag suggestions for tags
+            if "@" in incomplete:
+                prefix = incomplete.split("@")[0]
+                if b.startswith(prefix) and b != prefix:
+                    for tag in git.list_tags():
+                        if tag.startswith(incomplete.split("@")[1] if len(incomplete.split("@")) > 1 else ""):
+                            results.append(f"{b}@{tag}")
+        
+        # Add tags
+        tags = git.list_tags()
+        for t in tags:
+            if t.startswith(incomplete):
+                results.append(t)
+            if "@" in incomplete:
+                prefix = incomplete.split("@")[0]
+                if prefix and t.startswith(incomplete.split("@")[1]):
+                    results.append(f"{prefix}@{t}")
+        
+        # Add recent commits (first 7 chars)
+        for commit in git.get_commits(count=10):
+            if commit["sha"].startswith(incomplete):
+                results.append(commit["sha"])
+        
+        return list(set(results))
+    except Exception as e:
+        import logging
+        logging.debug(f"Completion error: {e}")
+        return []
+
+
 def complete_branches(ctx, param, incomplete):
     """Shell completion callback for branches."""
     try:
         git = GitManager()
         branches = git.list_branches()
         return [b for b in branches if b.startswith(incomplete)]
+    except Exception:
+        return []
+
+
+def complete_tags(ctx, param, incomplete):
+    """Shell completion callback for tags."""
+    try:
+        git = GitManager()
+        tags = git.list_tags()
+        return [t for t in tags if t.startswith(incomplete)]
+    except Exception:
+        return []
+
+
+def complete_commits(ctx, param, incomplete):
+    """Shell completion callback for commits."""
+    try:
+        git = GitManager()
+        commits = git.get_commits(count=50)
+        return [c["sha"][:7] for c in commits if c["sha"].startswith(incomplete)]
+    except Exception:
+        return []
+
+
+def complete_template_keys(ctx, param, incomplete):
+    """Shell completion callback for template keys."""
+    try:
+        from ..global_config import GlobalConfig
+        gc = GlobalConfig()
+        templates = gc.get_all_templates()
+        return [k for k in templates.keys() if k.startswith(incomplete)]
+    except Exception:
+        return []
+
+
+def complete_config_keys(ctx, param, incomplete):
+    """Shell completion callback for config keys."""
+    try:
+        from ..global_config import GlobalConfig
+        gc = GlobalConfig()
+        keys = [
+            "dot-man.current_branch",
+            "remote.url",
+            "security.strict_mode",
+            "switch.default_behavior",
+            "secrets_filter_enabled",
+        ]
+        return [k for k in keys if k.startswith(incomplete)]
+    except Exception:
+        return []
+
+
+def complete_profiles(ctx, param, incomplete):
+    """Shell completion callback for profiles."""
+    try:
+        from ..global_config import GlobalConfig
+        gc = GlobalConfig()
+        profiles = gc._data.get("profiles", {})
+        return [k for k in profiles.keys() if k.startswith(incomplete)]
     except Exception:
         return []
 

@@ -6,6 +6,7 @@ __all__ = [
 ]
 
 import re
+import logging
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -77,8 +78,8 @@ class BaseSecretGuard:
 
             content = json.dumps(self._secrets, indent=2)
             self.list_path.write_text(content, encoding="utf-8")
-        except OSError:
-            pass
+        except OSError as e:
+            logging.warning(f"Could not save secrets list: {e}")
 
     def _compute_hash(self, content: str) -> str:
         """Compute SHA256 hash of the content."""
