@@ -41,11 +41,58 @@ dot-man audit --strict
 - 🔐 **Secret detection** - Automatically redacts API keys, passwords, tokens
 - 🔄 **Save & deploy** - One command to save current state and switch configs
 - ☁️ **Remote sync** - Push/pull dotfiles across machines with `dot-man sync`
-- 🖥️ **Interactive TUI** - Visual dashboard for branch management (optional)
 - ⚡ **Pre/Post hooks** - Run commands before/after deploying (e.g., reload config)
 - 📝 **Edit in place** - Opens your `$EDITOR` for quick changes
 - 🛡️ **Dry-run mode** - Preview changes before making them
 - 🐚 **Shell completions** - Bash, Zsh, and Fish support
+- 🏷️ **Tags** - Tag commits for fast navigation
+- 📜 **History & Diff** - View commit history, compare branches, restore files
+- 📊 **Diff & Restore** - Compare changes between branches, restore from history
+
+---
+
+## Current Status
+
+| Metric | Value |
+|--------|-------|
+| Version | 0.8.0 (Beta) |
+| Test Coverage | 60% |
+| Commands | 25+ |
+| Python | 3.9+ |
+
+### What's New in 0.8.0
+
+- `dot-man diff` - Show changes between branches or files
+  - `dot-man diff` - Show uncommitted changes
+  - `dot-man diff --branch main` - Compare branches
+  - `dot-man diff <file>` - Show specific file changes
+  - `dot-man diff --staged` - Show staged changes
+- `dot-man log` - Show commit history with `--diff` and `--stat`
+- `dot-man checkout <sha|tag>` - Checkout specific commit or tag
+- `dot-man tag create/list/delete/switch` - Tag management
+- `dot-man revert <file> -c <commit>` - Restore file from specific commit
+- `dot-man template` - Template variables
+  - `dot-man template set KEY VALUE` - Set template variable
+  - `dot-man template list` - List templates + system vars
+  - `dot-man template system` - Show auto-detected vars
+  - System vars: `{{HOSTNAME}}`, `{{USER}}`, `{{SHELL}}`, etc.
+- `dot-man profile` - Multi-machine profiles
+  - `dot-man profile create <name>` - Create profile
+  - `dot-man profile switch <name>` - Switch to profile
+  - `dot-man profile detect` - Auto-detect by hostname
+  - Profile inheritance support
+- `switch branch@tag` - Switch to branch at tag position
+- `switch <commit>` - Switch to specific commit
+- `switch --save/--no-save` - Control save behavior
+- `switch.default_behavior` config option
+- Performance optimizations (batch ops, parallel scanning, lazy loading)
+
+### Roadmap to V1.0
+
+- [ ] Increase test coverage to 80%+
+- [ ] PyPI publication
+- [ ] Full documentation site
+- [ ] Stable API guarantee
 
 ---
 
@@ -54,13 +101,7 @@ dot-man audit --strict
 ### With pipx (Recommended)
 
 ```bash
-# Basic install
 pipx install git+https://github.com/BeshoyEhab/dot-man.git
-
-# With interactive TUI (recommended)
-pipx install "dot-man[tui]" --pip-args="git+https://github.com/BeshoyEhab/dot-man.git"
-# Or after basic install:
-pipx inject dot-man textual
 ```
 
 ### From Source
@@ -75,9 +116,6 @@ cd dot-man
 
 ```bash
 pip install git+https://github.com/BeshoyEhab/dot-man.git
-
-# With TUI:
-pip install "git+https://github.com/BeshoyEhab/dot-man.git#egg=dot-man[tui]"
 ```
 
 ### Uninstall
@@ -149,14 +187,42 @@ dot-man switch main  # Saves work, deploys main
 
 ### Core Commands
 
-| Command                   | Description                                   |
-| ------------------------- | --------------------------------------------- |
-| `dot-man init`            | Initialize repository at `~/.config/dot-man/` |
-| `dot-man status`          | Show tracked files and their status           |
-| `dot-man switch <branch>` | Save current config, switch to branch, deploy |
-| `dot-man edit`            | Open `dot-man.toml` in your editor            |
-| `dot-man deploy <branch>` | One-way deploy (for new machines)             |
-| `dot-man audit`           | Scan repository for secrets                   |
+| Command                        | Description                                   |
+| ------------------------------ | --------------------------------------------- |
+| `dot-man init`                 | Initialize repository at `~/.config/dot-man/` |
+| `dot-man status`              | Show tracked files and their status           |
+| `dot-man switch <target>`      | Switch to branch, tag, or commit              |
+| `dot-man edit`                 | Open `dot-man.toml` in your editor            |
+| `dot-man deploy <branch>`      | One-way deploy (for new machines)             |
+| `dot-man audit`                | Scan repository for secrets                   |
+| `dot-man log`                  | Show commit history with optional diffs      |
+| `dot-man checkout <target>`   | Checkout a specific commit or tag (detached)  |
+| `dot-man diff`                 | Show changes between branches or files       |
+| `dot-man revert <file>`        | Revert file to repository version            |
+| `dot-man revert <file> -c <sha>` | Restore file from specific commit            |
+| `dot-man template`            | Manage template variables                    |
+| `dot-man profile`            | Manage machine-specific profiles            |
+
+### Switch Enhancements
+
+The `switch` command now supports multiple target types:
+
+```bash
+dot-man switch work              # Switch to branch
+dot-man switch work@tag          # Switch to branch at tag position
+dot-man switch abc1234          # Switch to specific commit
+dot-man switch my-tag           # Switch to tag
+
+# Override default save behavior
+dot-man switch work --save       # Force save current changes
+dot-man switch work --no-save    # Force discard current changes
+dot-man switch --save work       # Flexible argument order
+```
+
+Set a default behavior preference:
+```bash
+dot-man config set switch.default_behavior no-save
+```
 
 ### Remote & Sync
 
@@ -175,65 +241,81 @@ dot-man switch main  # Saves work, deploys main
 | `dot-man branch list`          | List all configuration branches       |
 | `dot-man branch delete <name>` | Delete a branch (prompts if unmerged) |
 
-### Configuration
+### Tags
 
-| Command                                    | Description                                    |
-| ------------------------------------------ | ---------------------------------------------- |
-| `dot-man config tutorial`                  | Interactive configuration tutorial             |
-| `dot-man config tutorial --interactive`    | Step-by-step guided tutorial with explanations |
-| `dot-man config tutorial --section <name>` | Show examples for specific config aspects      |
-| `dot-man config create`                    | Create dot-man.toml with examples              |
-| `dot-man config create --minimal`          | Create minimal dot-man.toml without examples   |
-| `dot-man config list`                      | List all global configuration values           |
-| `dot-man config get <key>`                 | Get a configuration value                      |
-| `dot-man config set <key> <val>`           | Set a configuration value                      |
-| `dot-man edit`                             | Open `dot-man.toml` in your editor             |
+Tags allow you to mark specific commits for fast navigation:
+
+| Command                        | Description                           |
+| ------------------------------ | ------------------------------------- |
+| `dot-man tag list`             | List all tags                         |
+| `dot-man tag create <name>`    | Create tag at current commit          |
+| `dot-man tag create <name> <sha>` | Create tag at specific commit     |
+| `dot-man tag delete <name>`    | Delete a tag                          |
+| `dot-man tag switch <name>`    | Switch to tag (checkout tag)          |
+
+### Diff & History
+
+Compare changes and restore from history:
+
+```bash
+# Show uncommitted changes
+dot-man diff
+
+# Compare current branch with main
+dot-man diff --branch main
+
+# Show changes for a specific file
+dot-man diff ~/.bashrc
+
+# Show staged changes
+dot-man diff --staged
+
+# Show last 20 commits with diffs
+dot-man log --diff -n 20
+
+# Restore file from specific commit
+dot-man revert ~/.bashrc -c abc1234
+
+# View commit history for a file
+dot-man log -- path/to/file
+```
+
+### Profile Variables
+
+Profiles allow different machine-specific configurations:
+
+```bash
+# Create a profile
+dot-man profile create work-laptop -h laptop -h work-laptop -i minimal
+
+# Set the branch for a profile
+dot-man profile set-branch work-laptop work-main
+
+# Auto-detect profile by hostname
+dot-man profile detect
+
+# Switch to a profile
+dot-man profile switch work-laptop
+```
+
+**Profile inheritance**: Profiles can inherit from another profile.
 
 ### Utilities
 
 | Command         | Description                                  |
 | --------------- | -------------------------------------------- |
-| `dot-man tui`   | Interactive TUI dashboard (requires `[tui]`) |
 | `dot-man repo`  | Print repository path for direct access      |
 | `dot-man shell` | Open a shell in the repository directory     |
-
-### Interactive TUI
-
-Launch with `dot-man tui` for a visual dashboard:
-
-```
-┌─ dot-man ─────────────────────────────────────────────────────┐
-│  Branches     │  Switch Preview      │  Files (3)             │
-│  ✓ main       │  Switch: main → work │  ~/.bashrc    ✓       │
-│    work       │  Actions:            │  ~/.gitconfig ✓        │
-│    server     │  1. Save to 'main'   │  ~/.vimrc     modified │
-│               │  2. Deploy 'work'    │                        │
-└───────────────────────────────────────────────────────────────┘
-```
-
-**Keybindings:**
-
-| Key     | Action                              |
-| ------- | ----------------------------------- |
-| `Enter` | Switch to selected branch           |
-| `c`     | Open command palette (all commands) |
-| `s`     | Sync with remote                    |
-| `d`     | Deploy selected branch              |
-| `e`     | Edit config file                    |
-| `a`     | Run security audit                  |
-| `r`     | Refresh display                     |
-| `?`     | Show help                           |
-| `q`     | Quit                                |
-
-**Command Palette** (`c` key): Search and execute any dot-man command:
-
-- `status`, `audit`, `branch list`, `remote get/set`, `sync`, `setup`, `repo`
+| `dot-man verify` | Validate repository integrity                |
+| `dot-man doctor` | Run diagnostics and health checks            |
 
 ### Options
 
 ```bash
 dot-man switch work --dry-run   # Preview without changes
 dot-man switch work --force     # Skip confirmation
+dot-man switch work --save      # Save current changes before switching
+dot-man switch work --no-save   # Discard current changes
 dot-man sync --push-only        # Only push, don't pull
 dot-man sync --pull-only        # Only pull, don't push
 dot-man audit --strict          # Exit with error if secrets found
@@ -267,6 +349,22 @@ update_strategy = "rename_old"
 paths = ["~/.ssh/config"]
 secrets_filter = true
 ```
+
+### Global Configuration
+
+Global settings are stored in `~/.config/dot-man/global.toml`. Use `dot-man config` to manage them:
+
+```bash
+# View current settings
+dot-man config list
+
+# Set switch default behavior (save or no-save)
+dot-man config set switch.default_behavior no-save
+```
+
+| Setting                     | Values         | Description                           |
+| --------------------------- | -------------- | ------------------------------------- |
+| `switch.default_behavior`  | save / no-save | Default for switch command            |
 
 ### Options
 

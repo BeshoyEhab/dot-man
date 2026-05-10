@@ -73,85 +73,40 @@
 
 ---
 
-## Immediate Fixes & Housekeeping
+## Currently In Progress
 
-### 🔴 High Priority
+### v0.8.0 - Performance ✅
 
-- [x] **Move dev deps out of production** - `black`, `mypy`, `pytest`, `pytest-cov` are in main `[project.dependencies]` instead of `[project.optional-dependencies] dev`. Users install dev tools unnecessarily
-- [x] **Bump version to 0.7.0** - `pyproject.toml` still says `0.5.1` but v0.6.0 is complete. Update `pyproject.toml` and `dot_man/__init__.py`
-- [x] **Add `build/` to `.gitignore`** - The `build/` directory is currently checked into git
+- [x] **Batch file operations** - Group reads/writes for faster switching
+- [x] **Parallel secret scanning** - Use `concurrent.futures` for large directories
+- [x] **Lazy loading** - Only load `SecretGuard` when secrets detected
+- [ ] **Content-addressable storage** - SHA-keyed deduplication (deferred to v1.1.0)
 
-### 🟡 Medium Priority
+### v0.9.0 - TUI Core Actions (DEPRECATED)
 
-- [x] **Update `DEVELOPMENT.md`** - Still references old single `cli.py` instead of `cli/` package, and "INI" parsing instead of TOML
-- [x] **Update `CONTRIBUTING.md`** - Same stale references as `DEVELOPMENT.md` (old project structure, single test file)
-- [x] **Sync `docs/roadmap.md` with `TODO.md`** - Roadmap thinks v0.4.0 is "Backup System" while TODO says "Config Refactor". Pick one source of truth or remove roadmap
-- [x] **Update architecture diagram** - Current diagram shows `cli.py` but project now uses `cli/` package with modular commands
-- [x] **Add GitHub Actions CI** - Run tests, enforce coverage, run `mypy` + `black` on every PR
-  - [x] `.github/workflows/ci.yml` - pytest, coverage threshold, linting
-  - [x] Badge in README for build status
-
-### 🟢 Code Quality
-
-- [x] **Split `config.py` (976 lines)** - Extracted into `global_config.py`, `section.py`, `dotman_config.py`
-- [x] **Split `operations.py` (935 lines)** - Extracted into `save_deploy_ops.py`, `branch_ops.py`, `status_ops.py` as mixins
-- [x] **Extract duplicate `restore_file_secrets()`** - Closure defined in both `deploy_section` and `execute_deployment_plan.deploy_item`, extract to a shared helper
-- [x] **Add `--verbose` / `--debug` global flag** - Referenced in error suggestions but not implemented
-
-### 📊 Test Coverage (Current: 46%, Target: 80%)
-
-- [ ] **`tui.py`** - 0% → 50%+ (at minimum test widget instantiation and key bindings)
-- [ ] **`tui_editor.py`** - 0% → 50%+
-- [x] **`core.py`** - 27% → 58% (40 new GitManager tests)
-- [x] **`operations.py`** - 49% → 59% (27 new DotManOperations tests)
-- [x] **`config.py`** - 44% → SPLIT into 3 modules (global_config 72%, section 68%, dotman_config 53%)
-- [x] **`cli/config_cmd.py`** - 11% → 26%
-- [x] **`cli/audit_cmd.py`** - 16% → 47%
-- [ ] **`cli/remote_cmd.py`** - 10% → 60%+
-- [ ] **`cli/edit_cmd.py`** - 16% → 60%+
-- [ ] **`cli/init_cmd.py`** - 30% → 60%+
+- [x] TUI temporarily removed for redesign (v1.x)
+- [x] CLI provides full functionality for all operations
 
 ---
 
-## Next Up
+### v0.12.0 - Diff & History ✅
 
-### v0.7.0 - New Commands
+- [x] `dot-man diff` - Show changes between branches
+- [x] `dot-man diff <file>` - Show local vs repo diff
+- [x] `dot-man log` - Show commit history with files changed (existing)
+- [x] `dot-man checkout` - Checkout specific commit/tag (existing)
+- [x] `dot-man revert --commit` - Restore from history
 
-- [x] **`dot-man verify`** - Validate repo integrity, check orphaned files, verify permissions
-- [x] **`dot-man clean`** - Remove stale backups, orphaned files in repo
-- [x] **`dot-man doctor`** - Diagnostics and health checks
-- [ ] **Dry-run for all commands** - `--dry-run` flag for deploy, save, etc.
+---
 
-### v0.8.0 - Performance
+## Test Coverage (Current: ~46%, Target: 80%)
 
-- [ ] **Batch file operations** - Group reads/writes for faster switching
-- [ ] **Parallel secret scanning** - Use `concurrent.futures` for large directories
-- [ ] **Lazy loading** - Only load `SecretGuard` when secrets detected
-- [ ] **Content-addressable storage** - SHA-keyed deduplication for identical files
-
-### v0.9.0 - TUI Core Actions
-
-- [ ] **Sync from TUI** - Pull/push with remote directly from TUI
-- [ ] **Switch from TUI** - Full branch switching with confirmation
-- [ ] **Delete branch from TUI** - Delete branches with confirmation dialog
-- [ ] **Edit config from TUI** - Open config in editor, reload on save
-- [ ] **Create new branch from TUI** - Modal to create and switch to new branch
-
-### v0.10.0 - TUI Per-Branch Management
-
-- [ ] **Edit any branch config** - View/edit dot-man.toml for any branch
-- [ ] **Add files to any branch** - Add tracked paths without switching
-- [ ] **Remove files from any branch** - Remove sections/paths from config
-- [ ] **Copy section between branches** - Duplicate config from one branch to another
-- [ ] **Expandable TUI Audit Panel** - Collapsible tree view of secrets
-- [ ] **First-run welcome modal** - Help new users in TUI
-
-### v0.11.0 - TUI Polish
-
-- [ ] **Keyboard shortcuts help overlay** - Show all keybindings
-- [ ] **Status bar** - Show current operation, branch, sync status
-- [ ] **Notification toasts** - Non-blocking success/error messages
-- [ ] **Progress indicators** - Show progress for long operations
+Priority files needing tests:
+- [ ] **`tui.py`** - 0% → 50%+
+- [ ] **`tui_editor.py`** - 0% → 50%+
+- [ ] **`cli/remote_cmd.py`** - 10% → 60%+
+- [ ] **`cli/edit_cmd.py`** - 16% → 60%+
+- [ ] **`cli/init_cmd.py`** - 30% → 60%+
 
 ---
 
@@ -168,21 +123,20 @@
 - [ ] TUI: Log viewer with commit list, file changes, and diff preview
 - [ ] CLI: `dot-man show <commit>` - View full diff for a specific commit
 
-### v0.13.0 - Template Variables
+### v0.13.0 - Template Variables ✅
 
-- [ ] `dot-man template --set KEY=VALUE`
-- [ ] `dot-man template --list`
-- [ ] Template substitution (`{{HOSTNAME}}`, `{{EMAIL}}`)
-- [ ] System variable auto-population
-- [ ] Default value syntax (`{{VAR:default}}`)
+- [x] `dot-man template set KEY=VALUE`
+- [x] `dot-man template list`
+- [x] Template substitution (`{{HOSTNAME}}`, `{{EMAIL}}`)
+- [x] System variable auto-population
 
-### v0.14.0 - Multi-Machine Profiles
+### v0.14.0 - Multi-Machine Profiles ✅
 
-- [ ] `dot-man profile create <name>` - Create machine-specific profiles
-- [ ] `dot-man profile list` - List available profiles
-- [ ] `dot-man profile switch <name>` - Switch between profiles
-- [ ] Automatic profile detection based on hostname
-- [ ] Profile inheritance (e.g., `server` extends `minimal`)
+- [x] `dot-man profile create <name>` - Create machine-specific profiles
+- [x] `dot-man profile list` - List available profiles
+- [x] `dot-man profile switch <name>` - Switch between profiles
+- [x] Automatic profile detection based on hostname
+- [x] Profile inheritance (e.g., `server` extends `minimal`)
 
 ### v0.15.0 - Import/Migration
 

@@ -1,155 +1,157 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to dot-man will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-05-10
+
+### Removed
+- **TUI** - Temporarily removed for redesign. CLI provides full functionality.
+
+### Added
+- `dot-man diff` - Show changes between branches or files
+  - `dot-man diff` - Show uncommitted changes
+  - `dot-man diff --branch main` - Compare branches
+  - `dot-man diff <file>` - Show specific file changes
+  - `dot-man diff --staged` - Show staged changes
+- `dot-man revert` - Enhanced with `--commit` to restore from specific commit
+- `dot-man template` - Template variable management
+  - `dot-man template set <key> <value>` - Set template variable
+  - `dot-man template get <key>` - Get template value
+  - `dot-man template list` - List all templates
+  - `dot-man template system` - Show auto-detected system variables
+  - System variables: {{HOSTNAME}}, {{USER}}, {{SHELL}}, {{OS}}, etc.
+- `dot-man profile` - Multi-machine profiles
+  - `dot-man profile create <name>` - Create profile
+  - `dot-man profile list` - List profiles
+  - `dot-man profile switch <name>` - Switch to profile
+  - `dot-man profile detect` - Auto-detect by hostname
+  - Profile inheritance support
+- **Performance optimizations:**
+  - Batch file operations for faster branch switching
+  - Parallel secret scanning using `concurrent.futures`
+  - Lazy loading for `SecretGuard` - only loaded when secrets detected
+  - Content hash function for future deduplication
+  - Thread-safe vault operations with batch mode
+- `dot-man log` - Show commit history with optional diffs and stats
+  - `-n, --count` - Number of commits to show
+  - `--diff, -d` - Show diff for each commit
+  - `--stat` - Show file change statistics
+- `dot-man checkout <sha|tag>` - Checkout specific commit or tag (creates detached HEAD)
+- `dot-man tag` - Tag management
+  - `tag create <name> [commit]` - Create tag at current or specific commit
+  - `tag list` - List all tags
+  - `tag delete <name>` - Delete a tag
+  - `tag switch <name>` - Switch to tag
+- Enhanced `dot-man switch` command:
+  - `branch@tag` syntax - Switch to branch at tag position
+  - `commit` syntax - Switch to specific commit (e.g., `switch abc1234`)
+  - `--save` - Force save current changes
+  - `--no-save` - Discard current changes
+  - Flexible argument order (branch can be before or after flags)
+- `switch.default_behavior` config option - Set default save/no-save preference
+- Shell completions for tags and commits in switch command
+
+### Changed
+- Updated documentation with new commands
+- Updated roadmap to reflect completed features
+- Version bumped to 0.8.0 (Beta)
+
+### Fixed
+- Tag detection in branch parsing
+- Proper checkout for tags
+
 ## [0.7.0] - 2026-02-28
 
 ### Added
-
-- **Doctor Command**: `dot-man doctor` runs comprehensive health checks — git availability, Python version, repo integrity, config validity, branch state, remote config, tracked files, orphaned files, and backup status.
-- **Verify Command**: `dot-man verify` validates repository integrity (config parsing, tracked path existence/permissions/broken symlinks, orphaned files, git dirty state). Use `--fix` to auto-clean orphaned files.
-- **Verbose Mode**: `dot-man --verbose` (`-v`) shows debug output on console. Separate from `--debug` which logs to file only.
-- **GitHub Actions CI**: Test matrix across Python 3.9-3.13 with Black and mypy lint checks.
-
-### Changed
-
-- **Dependencies**: Moved dev-only tools (`black`, `mypy`, `pytest`, `pytest-cov`) from production dependencies to `[project.optional-dependencies] dev`. End users no longer install dev tools.
-- **Code Quality**: Extracted duplicate `restore_file_secrets` closures into shared `_restore_file_secrets()` method with binary file skipping.
-- **Module Split**: Split monolithic `config.py` (976 lines) into `global_config.py`, `section.py`, and `dotman_config.py`. Original `config.py` is now a thin re-export module for backward compatibility.
-- **Operations Split**: Split monolithic `operations.py` (935 lines) into mixin modules: `save_deploy_ops.py`, `branch_ops.py`, `status_ops.py`. `DotManOperations` inherits all 3 mixins.
-- **Test Coverage**: Added 115+ new tests (98 → 213 total). Coverage: `core.py` 27→58%, `operations.py` 49→68%, config modules 44→72%, `audit_cmd.py` 16→32%, `config_cmd.py` 11→26%.
-- **Refactored `conftest.py`**: Migrated from nested `with` blocks to `ExitStack` pattern to avoid Python's static nesting limit.
-- **`__all__` exports**: Added explicit public API definitions to `global_config.py`, `section.py`, `dotman_config.py`, `core.py`, `files.py`.
-- **Deprecated cleanup**: Removed unused `ignore_patterns` parameter from `copy_directory()`.
-- **Logging**: Replaced raw `print()` calls in audit/orphan operations with `logging.warning()`.
-- **Documentation**: Rewrote `DEVELOPMENT.md`, `CONTRIBUTING.md`, and `docs/roadmap.md` to reflect current modular CLI package structure.
-
-## [0.6.1] - 2026-01-23
-
-### Added
-
-- **Revert Command**: New `dot-man revert <file>` command allows restoring individual files to their repository state, discarding local changes.
-
-## [0.6.0] - 2026-01-23
-
-### Added
-
-- **Atomic File Operations**: New `atomic_write_text` ensures files are written to a temp file (`.tmp`) first and then renamed, preventing data corruption during save/deploy.
-- **Ignored Secret Persistence**: Secrets in the ignore list are now correctly preserved in the local file (unredacted) without trigger warnings.
-- **Smart Save Strategy**: Unified file saving logic (`smart_save_file`) that performs content comparison, secret checking, and atomic writing in a single efficient pass.
-- **File Locking**: New `FileLock` context manager prevents concurrent `dot-man` operations to avoid race conditions.
-- **Strict Typing**: Achieved 100% type safety with strict `mypy` checks.
-
-### Changed
-
-- **Performance**: Optimized file saving by reducing redundant file reads and writes; destination files are now only written to if content actually differs.
-- **Code Quality**: Consolidated duplicated secret checking logic from `check_file_save_status` and `copy_file` into a single source of truth.
-- **Robustness**: Enforced `newline=""` in all file I/O to guarantee consistent line ending preservation across operations.
-
-## [0.5.1] - 2026-01-22
-
-### Added
-
-- **Branch Name Sync**: New `dot-man remote sync-branch` command to synchronize local/remote branch names (fixes main vs master mismatch)
-- **Quickshell Hooks**: Added `quickshell_reload`, `quickshell_restart`, `quickshell_validate` hook aliases with `{qs_config}` auto-detection for config directory
-- **Error Categorization**: New `ErrorCategory` enum and `ErrorDiagnostic` class for user-friendly error messages with suggestions
-- **Comprehensive CLI Tests**: New `test_cli_commands.py` with 42 tests covering all commands, hyprland/quickshell file structures, path canonicalization, and error handling
+- `dot-man verify` - Validate repository integrity
+- `dot-man clean` - Remove stale backups and orphaned files
+- `dot-man doctor` - Diagnostics and health checks
+- `--verbose` / `-v` global flag
+- GitHub Actions CI with Black and mypy
 
 ### Fixed
+- Various stability improvements
 
-- **File Comparison**: Removed unreliable mtime-based optimization in `compare_files()` that caused false "files changed" after git checkout
-- **Secret Ignore List**: Added path canonicalization so `~/file` and `/home/user/file` are treated as the same path
-- **Switch Command Errors**: Now shows categorized errors with helpful suggestions (e.g., "Permission denied → Try sudo")
-- **KeyboardInterrupt Handling**: Graceful handling of Ctrl+C during switch operations
-- **PermissionError Detection**: Fixed error categorization to properly detect built-in PermissionError
-- **Deploy Error Reporting**: Fixed missing error messages when file copy fails during deploy; added check to skip non-existent repo paths
-- **Secret IGNORE Action**: Fixed "IGNORE" action being treated as a replacement string instead of skipping redaction; now only reports actually redacted secrets in log message
-- **Binary File Handling**: Skip binary files (.jpg, .pyc, etc.) when restoring secrets during deploy to prevent UTF-8 decode errors
-
-## [0.5.0] - 2026-01-21
+## [0.6.0] - 2024
 
 ### Added
+- Atomic file operations
+- File locking mechanism
+- Complete type hints
+- Consolidated secret checking
 
-- **Encrypted Secret Vault**: Redacted secrets are now securely encrypted (Fernet) and stashed locally. They are automatically restored when you switch back to a branch.
-- **Pre-Push Audit**: `dot-man sync` now automatically scans for secrets before pushing to remote, preventing accidental leaks.
-- **"Did you mean?"**: CLI now suggests commands for typos (e.g., `swtich` -> `switch`).
-- **Interactive Tutorial**: Revamped `dot-man config tutorial` with colorful interactive examples.
-- **Config Validation**: Strict validation for `dot-man.toml` to catch misspelled keys or invalid options.
-
-### Changed
-
-- **CLI Modularization**: Refactored monolithic CLI into a modular package structure (`dot_man/cli/`) for better maintainability and extensibility.
-- **UI Overhaul**: Consistent, colorful CLI output using Rich.
-- **Performance**: Optimized file comparison and secret scanning (streaming processing) for large files and directories.
-- **TUI Responsiveness**: TUI now loads heavy data asynchronously to prevent freezing.
-
-### Fixed
-
-- **CLI Imports**: Resolves circular import issues and improves startup time.
-- **Remote URL Persistence**: `dot-man setup` and `dot-man remote set` now correctly save the remote URL to `global.conf`
-- **Install Script PATH**: `install.sh` now auto-detects the installation directory and offers to add it to your shell config (bash, zsh, fish)
-- **TUI Command Palette**: Selected command now scrolls into view when navigating with arrow keys
-
-## [0.3.0] - 2025-12-26
+## [0.5.0] - 2024
 
 ### Added
+- `dot-man backup create/list/restore`
+- Auto-backup before destructive operations
+- Backup rotation (max 5)
+- `dot-man stash` / `dot-man stash pop`
+- `dot-man switch --stash` and `--save-to`
 
-- **Remote Sync**: `dot-man sync` command to push/pull dotfiles with remote repository
-- **Remote Management**: `dot-man remote set/get` commands for configuring remote URL
-- **Interactive TUI**: `dot-man tui` for visual branch management (optional, install with `[tui]` extra)
-- **TUI Command Palette**: Press `c` in TUI to access all commands with search/filter
-- **TUI Quick Keys**: `e` (edit), `a` (audit), `?` (help) for fast access
-- **Setup Wizard**: `dot-man setup` guides you through GitHub repo creation (supports `gh` CLI)
-- **Repo Access**: `dot-man repo` shows repo path, `dot-man shell` opens shell in repo directory
-
-### Changed
-
-- TUI is now an optional dependency (install with `pip install dot-man[tui]`)
-- TUI now shows files with dirty status, switch preview, and actions
-
-## [0.2.0] - 2025-12-26
+## [0.4.0] - 2024
 
 ### Added
+- TOML config format with sections and templates
+- Template inheritance (`inherits = ["template1"]`)
+- Include/exclude patterns for files
+- Modular `operations.py` for business logic
+- `dot-man add` command
+- Auto-migration from INI to TOML
 
-- **Hooks**: `pre_deploy` and `post_deploy` commands for automated tasks (e.g. reload config)
-- **Shell Completion**: Tab completion for branch names in `switch`, `deploy`, and `branch delete` commands
-- **Interactive Deletion**: `branch delete` now prompts to force delete unmerged branches
-
-### Changed
-
-- **Optimization**: Deployment now skips copying files if content is identical, improving performance and avoiding unnecessary hook execution
-- **Directory Sync**: Recursively compares directory contents to prevent false positives when syncing directories like `~/.config/hypr`
-
-## [0.1.0] - 2025-12-25
+## [0.3.0] - 2024
 
 ### Added
+- `dot-man sync` - Push/pull with remote
+- `dot-man remote get/set` - Remote configuration
+- `dot-man setup` - Guided GitHub remote setup
+- Interactive TUI (`dot-man tui`)
+- TUI Command Palette
+- Shell completions (bash, zsh, fish)
 
-- Initial release
-- Core CLI with Click framework
-- Git operations using GitPython
-- Commands: `init`, `status`, `switch`, `edit`, `deploy`, `audit`
-- Branch management: `branch list`, `branch delete`
-- Secret detection with 10 default patterns:
-  - Private keys (SSH, GPG)
-  - AWS credentials
-  - GitHub tokens
-  - Generic API keys
-  - Password assignments
-  - Bearer tokens
-  - JWT tokens
-- Automatic secret redaction during save
-- `--dry-run` mode for switch and deploy
-- `--strict` mode for audit (CI/CD integration)
-- `--fix` mode for auto-redacting secrets
-- Install script with shell completions (bash, zsh, fish)
-- Unit tests with pytest
-- MIT License
+## [0.2.0] - 2024
 
-### Security
+### Added
+- Pre/post deploy hooks
+- Smart deployment (skip identical files)
+- Interactive branch deletion
+- Shell completions for branch names
 
-- Built-in secret detection prevents accidental credential commits
-- Secrets are redacted before saving to repository
-- `secrets_filter` can be enabled/disabled per file
+## [0.1.0] - 2023
+
+### Added
+- Core functionality
+- `dot-man init` - Initialize repository
+- `dot-man status` - Display current state
+- `dot-man switch <branch>` - Save/deploy configurations
+- `dot-man edit` - Open config in editor
+- `dot-man audit` - Scan for secrets
+- `dot-man deploy <branch>` - One-way deploy for new machines
+
+---
+
+## Roadmap to V1.0
+
+| Feature | Status |
+|---------|--------|
+| Core commands | ✅ Complete |
+| Remote sync | ✅ Complete |
+| TUI | ✅ Complete |
+| Tags & History (0.8.0) | ✅ Complete |
+| Test Coverage (80%+) | 🔄 In Progress |
+| PyPI Publication | ⏳ Pending |
+| Full Documentation | ⏳ Pending |
+| Stable API | ⏳ Pending |
+
+## Future Ideas (Post V1.0)
+
+- Encrypted files support (GPG/age)
+- Symlink mode
+- Web dashboard for configuration management
+- Dotfile sharing/marketplace
+- CI/CD integration for dotfile testing
+- Cloud sync backends (S3, Dropbox, etc.)
+- Plugin system

@@ -80,77 +80,135 @@
 
 ---
 
-## v0.7.0 - New Commands (Current)
+## v0.7.0 - New Commands ✅ (Released: 2026-02-28)
 
-- `dot-man verify` - Validate repo integrity
-- `dot-man clean` - Remove stale backups, orphaned files
-- `dot-man doctor` - Diagnostics and health checks
-- `--dry-run` flag for all commands
-
----
-
-## v0.8.0 - Performance
-
-- Batch file operations
-- Parallel secret scanning
-- Lazy loading
-- Content-addressable storage
+- ✅ `dot-man verify` - Validate repo integrity
+- ✅ `dot-man clean` - Remove stale backups, orphaned files
+- ✅ `dot-man doctor` - Diagnostics and health checks
+- ✅ `--verbose` / `-v` global flag
+- ✅ GitHub Actions CI with Black and mypy
 
 ---
 
-## v0.9.0 - TUI Core Actions
+## v0.8.0 - History & Tags + Performance (Released: 2026-05-10)
 
-- Sync, switch, delete branch from TUI
-- Edit config from TUI
-- Create new branch from TUI
+- [x] `dot-man log` - Show commit history with optional diffs
+- [x] `dot-man log --stat` - Show file change statistics
+- [x] `dot-man checkout <sha|tag>` - Checkout specific commit or tag
+- [x] `dot-man tag create/list/delete/switch` - Tag management
+- [x] `switch branch@tag` - Switch to branch at tag position
+- [x] `switch <commit>` - Switch to specific commit
+- [x] `switch --save/--no-save` - Override save behavior
+- [x] `switch.default_behavior` config option
+- [x] Flexible argument order (branch can be before/after flags)
+- [x] Shell completion for tags and commits
 
----
+### Performance (v0.8.x)
 
-## v0.10.0-0.11.0 - TUI Management & Polish
+- [x] Batch file operations - Group reads/writes for faster switching
+- [x] Parallel secret scanning - Use `concurrent.futures` for large directories
+- [x] Lazy loading - Only load SecretGuard when secrets detected
+- [x] `dot-man diff` - Show changes between branches/files
+- [x] `dot-man revert --commit` - Restore file from specific commit
+- [ ] Content-addressable storage - Deferred to v1.1.0
 
-- Per-branch config editing
-- Keyboard shortcuts overlay
-- Status bar, notifications, progress indicators
+### TUI Status
 
----
-
-## v0.12.0 - Diff & History
-
-- `dot-man diff` - Show changes between branches
-- `dot-man log` - Show commit history
-- `dot-man restore <file> <commit>` - Restore from history
-
----
-
-## v0.13.0 - Template Variables
-
-- `dot-man template --set KEY=VALUE`
-- Template substitution (`{{HOSTNAME}}`, `{{EMAIL}}`)
-- System variable auto-population
+- [x] TUI temporarily removed for redesign (CLI provides full functionality)
 
 ---
 
-## v0.14.0 - Multi-Machine Profiles
+## v0.9.0 - Diff & Restore (Completed)
 
-- `dot-man profile create/list/switch`
-- Automatic profile detection based on hostname
-- Profile inheritance
+- [x] `dot-man diff` - Show changes between branches
+- [x] `dot-man diff --branch <branch>` - Compare branches
+- [x] `dot-man diff <file>` - Show specific file changes
+- [x] `dot-man diff --staged` - Show staged changes
+- [x] `dot-man revert --commit` - Restore from history
 
 ---
 
-## v0.15.0 - Import/Migration
+## v0.10.0 - Template Variables ✅
 
-- Import from chezmoi, yadm, GNU Stow
-- Export to portable format
+- [x] `dot-man template set <key> <value>` - Set template variable
+- [x] `dot-man template get <key>` - Get template value
+- [x] `dot-man template list` - List all templates
+- [x] `dot-man template system` - Show auto-detected system variables
+- [x] System variables: {{HOSTNAME}}, {{USER}}, {{SHELL}}, {{OS}}, etc.
+
+---
+
+## v0.11.0 - Multi-Machine Profiles ✅
+
+- [x] `dot-man profile create/list/switch` - Profile management
+- [x] Automatic profile detection based on hostname
+- [x] Profile inheritance
+- [x] Shell completions for profiles
 
 ---
 
 ## v1.0.0 - Production Ready
 
-- 80%+ test coverage
-- Full documentation site (mkdocs/sphinx)
-- PyPI publication
-- Stable API guarantee
+- [ ] `dot-man profile create/list/switch`
+- [ ] Automatic profile detection based on hostname
+- [ ] Profile inheritance
+
+---
+
+## v0.12.0 - Import/Migration
+
+- [ ] Import from chezmoi, yadm, GNU Stow
+- [ ] Export to portable format
+
+---
+
+## v1.0.0 - Production Ready
+
+- [ ] 80%+ test coverage (currently 60%)
+- [ ] Full documentation site (mkdocs/sphinx)
+- [ ] PyPI publication
+- [ ] Stable API guarantee
+
+---
+
+## v1.1.0 - Plugin System
+
+- [ ] Custom secret detection patterns via config
+- [ ] User-defined hook scripts directory
+- [ ] Plugin API for extensions
+- [ ] Content-addressable storage for deduplication
+
+---
+
+## v2.0+ - Future Ideas
+
+- [ ] `dot-man template --set KEY=VALUE`
+- [ ] Template substitution (`{{HOSTNAME}}`, `{{EMAIL}}`)
+- [ ] System variable auto-population
+
+---
+
+## v0.15.0 - Multi-Machine Profiles
+
+- [ ] `dot-man profile create/list/switch`
+- [ ] Automatic profile detection based on hostname
+- [ ] Profile inheritance
+
+---
+
+## v0.16.0 - Import/Migration
+
+- [ ] Import from chezmoi, yadm, GNU Stow
+- [ ] Export to portable format
+
+---
+
+## v1.0.0 - Production Ready
+
+- [ ] 80%+ test coverage (currently 44%)
+- [ ] Full documentation site (mkdocs/sphinx)
+- [ ] PyPI publication
+- [ ] Stable API guarantee
 
 ---
 
@@ -175,11 +233,11 @@
 
 ## Success Metrics
 
-| Metric        | Current              | v1.0.0 Target         |
-| ------------- | -------------------- | --------------------- |
-| Test Coverage | ~41% (98 tests)      | 80%+                  |
-| Core Commands | 14+ commands ✅      | All commands stable   |
-| TUI           | Full-featured ✅     | Polished & responsive |
-| Documentation | README + specs ✅    | Full docs site        |
-| Performance   | ~100 files in <5s ✅ | 500+ files in <5s     |
-| Distribution  | GitHub only          | PyPI published        |
+| Metric        | Current                  | v1.0.0 Target         |
+| ------------- | ------------------------ | --------------------- |
+| Test Coverage | 60% (423 tests)          | 80%+                  |
+| Core Commands | 25+ commands ✅         | All commands stable   |
+| TUI           | Removed for redesign    | Redesign in v1.x      |
+| Documentation | README + specs ✅        | Full docs site        |
+| Performance   | Batch ops + parallel ✅ | 500+ files in <5s     |
+| Distribution  | GitHub only              | PyPI published        |
