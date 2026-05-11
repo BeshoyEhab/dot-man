@@ -38,7 +38,10 @@ BRANCH = BranchParamType()
 
 @main.command()
 @click.option(
-    "--dry-run", "-n", is_flag=True, help="Show what would happen without making changes"
+    "--dry-run",
+    "-n",
+    is_flag=True,
+    help="Show what would happen without making changes",
 )
 @click.option("--force", "-f", is_flag=True, help="Skip confirmation prompts")
 @click.option(
@@ -55,7 +58,9 @@ BRANCH = BranchParamType()
     default=None,
     help="Discard current changes before switching",
 )
-@click.argument("branch", type=BRANCH, required=False, shell_complete=complete_switch_args)
+@click.argument(
+    "branch", type=BRANCH, required=False, shell_complete=complete_switch_args
+)
 @require_init
 def switch(branch, dry_run: bool, force: bool, save_mode):
     """Switch to a different configuration branch, tag, or commit.
@@ -105,7 +110,13 @@ def switch(branch, dry_run: bool, force: bool, save_mode):
         # Handle tag switch
         if target_type == "tag":
             _handle_tag_switch(
-                ops, current_branch, parsed["base"], target_name, save_mode, dry_run, force
+                ops,
+                current_branch,
+                parsed["base"],
+                target_name,
+                save_mode,
+                dry_run,
+                force,
             )
             return
 
@@ -121,6 +132,7 @@ def switch(branch, dry_run: bool, force: bool, save_mode):
         warn("Operation cancelled by user")
     except Exception as e:
         from ..exceptions import ErrorDiagnostic
+
         diagnostic = ErrorDiagnostic.from_exception(e)
         ui.console.print()
         ui.console.print(f"[red bold]{diagnostic.title}[/red bold]")
@@ -153,7 +165,9 @@ def _handle_commit_switch(ops, current_branch, commit_sha, save_mode, dry_run, f
     ui.console.print("  Use 'dot-man switch <branch>' to return to a branch")
 
 
-def _handle_tag_switch(ops, current_branch, base_branch, tag_name, save_mode, dry_run, force):
+def _handle_tag_switch(
+    ops, current_branch, base_branch, tag_name, save_mode, dry_run, force
+):
     """Handle switching to a tag (optionally on a specific branch)."""
     ui.console.print(f"[bold]Switching to tag[/bold] [cyan]{tag_name}[/cyan]...")
 
@@ -170,7 +184,9 @@ def _handle_tag_switch(ops, current_branch, base_branch, tag_name, save_mode, dr
         ui.console.print(f"[bold]Saving current branch '{current_branch}'...[/bold]")
         secret_handler = get_secret_handler()
         save_result = ops.save_all(secret_handler)
-        commit_msg = f"Auto-save from '{current_branch}' before switch to tag {tag_name}"
+        commit_msg = (
+            f"Auto-save from '{current_branch}' before switch to tag {tag_name}"
+        )
         ops.git.commit(commit_msg)
         ui.console.print(f"  Saved {save_result['saved']} files")
 
@@ -188,7 +204,9 @@ def _handle_tag_switch(ops, current_branch, base_branch, tag_name, save_mode, dr
     success(f"Switched to tag '{tag_name}'")
 
 
-def _handle_branch_switch(ops, current_branch, target_branch, save_mode, dry_run, force):
+def _handle_branch_switch(
+    ops, current_branch, target_branch, save_mode, dry_run, force
+):
     """Handle switching to a regular branch."""
 
     # Check if already on target branch
@@ -210,7 +228,9 @@ def _handle_branch_switch(ops, current_branch, target_branch, save_mode, dry_run
             section = ops.get_section(section_name)
             for local_path, repo_path, status in ops.iter_section_paths(section):
                 if status != "IDENTICAL":
-                    ui.console.print(f"  Would {'save' if save_mode == 'save' else 'discard'}: {local_path} [{status}]")
+                    ui.console.print(
+                        f"  Would {'save' if save_mode == 'save' else 'discard'}: {local_path} [{status}]"
+                    )
     else:
         if save_mode == "save":
             secret_handler = get_secret_handler()
@@ -255,7 +275,9 @@ def _handle_branch_switch(ops, current_branch, target_branch, save_mode, dry_run
 
     # Phase 3: Deploy new branch files
     ui.console.print()
-    ui.console.print(f"[bold]Phase 3:[/bold] Deploying '{target_branch}' configuration...")
+    ui.console.print(
+        f"[bold]Phase 3:[/bold] Deploying '{target_branch}' configuration..."
+    )
 
     deployed_count = 0
     if dry_run:
@@ -269,9 +291,13 @@ def _handle_branch_switch(ops, current_branch, target_branch, save_mode, dry_run
                     ui.console.print(f"  Would deploy: {local_path}")
                     if will_change:
                         if section.pre_deploy:
-                            ui.console.print(f"    [dim]Pre-hook:[/dim] {section.pre_deploy}")
+                            ui.console.print(
+                                f"    [dim]Pre-hook:[/dim] {section.pre_deploy}"
+                            )
                         if section.post_deploy:
-                            ui.console.print(f"    [dim]Post-hook:[/dim] {section.post_deploy}")
+                            ui.console.print(
+                                f"    [dim]Post-hook:[/dim] {section.post_deploy}"
+                            )
                     else:
                         ui.console.print("    [dim](No changes needed)[/dim]")
     else:

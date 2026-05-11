@@ -78,9 +78,18 @@ class DotManConfig:
         """Validate config structure on load."""
         warnings: list[str] = []
         valid_section_keys = {
-            "paths", "repo_base", "repo_path", "secrets_filter",
-            "update_strategy", "include", "exclude", "pre_deploy",
-            "post_deploy", "inherits", "ignored_directories", "follow_symlinks"
+            "paths",
+            "repo_base",
+            "repo_path",
+            "secrets_filter",
+            "update_strategy",
+            "include",
+            "exclude",
+            "pre_deploy",
+            "post_deploy",
+            "inherits",
+            "ignored_directories",
+            "follow_symlinks",
         }
 
         for name, section in self._data.items():
@@ -456,9 +465,18 @@ class DotManConfig:
             raise ConfigurationError(f"Section not found: {name}")
 
         valid_keys = {
-            "paths", "repo_base", "repo_path", "secrets_filter",
-            "update_strategy", "include", "exclude", "pre_deploy",
-            "post_deploy", "inherits", "ignored_directories", "follow_symlinks"
+            "paths",
+            "repo_base",
+            "repo_path",
+            "secrets_filter",
+            "update_strategy",
+            "include",
+            "exclude",
+            "pre_deploy",
+            "post_deploy",
+            "inherits",
+            "ignored_directories",
+            "follow_symlinks",
         }
 
         for key, value in kwargs.items():
@@ -516,9 +534,18 @@ class DotManConfig:
 
                 # Check for invalid keys
                 valid_keys = {
-                    "paths", "repo_base", "repo_path", "secrets_filter",
-                    "update_strategy", "include", "exclude", "pre_deploy",
-                    "post_deploy", "inherits", "ignored_directories", "follow_symlinks"
+                    "paths",
+                    "repo_base",
+                    "repo_path",
+                    "secrets_filter",
+                    "update_strategy",
+                    "include",
+                    "exclude",
+                    "pre_deploy",
+                    "post_deploy",
+                    "inherits",
+                    "ignored_directories",
+                    "follow_symlinks",
                 }
                 for key in self._data[name]:
                     if key not in valid_keys:

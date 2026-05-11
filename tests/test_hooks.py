@@ -1,4 +1,3 @@
-
 from unittest.mock import patch
 
 import pytest
@@ -24,18 +23,21 @@ def mock_config(tmp_path):
     repo_file.write_text("content")
 
     # Mock constants
-    with patch("dot_man.cli.common.DOT_MAN_DIR", dot_man_dir), \
-         patch("dot_man.cli.common.REPO_DIR", repo_dir), \
-         patch("dot_man.cli.switch_cmd.REPO_DIR", repo_dir), \
-         patch("dot_man.operations.REPO_DIR", repo_dir), \
-         patch("dot_man.config.REPO_DIR", repo_dir), \
-         patch("dot_man.constants.REPO_DIR", repo_dir):
+    with (
+        patch("dot_man.cli.common.DOT_MAN_DIR", dot_man_dir),
+        patch("dot_man.cli.common.REPO_DIR", repo_dir),
+        patch("dot_man.cli.switch_cmd.REPO_DIR", repo_dir),
+        patch("dot_man.operations.REPO_DIR", repo_dir),
+        patch("dot_man.config.REPO_DIR", repo_dir),
+        patch("dot_man.constants.REPO_DIR", repo_dir),
+    ):
         yield {
             "config_file": config_file,
             "local_file": local_file,
             "repo_file": repo_file,
-            "repo_dir": repo_dir
+            "repo_dir": repo_dir,
         }
+
 
 def test_config_parses_hooks(mock_config):
     """Test that config parser handles hooks correctly."""
@@ -47,7 +49,7 @@ def test_config_parses_hooks(mock_config):
         ["~/test_file.txt"],
         "test_file.txt",
         pre_deploy="echo pre",
-        post_deploy="echo post"
+        post_deploy="echo post",
     )
     # Save to disk
     config.save()
@@ -65,21 +67,31 @@ def test_config_parses_hooks(mock_config):
 def test_switch_runs_hooks(integration_runner):
     """Test that switch command runs hooks."""
     from pathlib import Path
+
     home = Path.home()
     (home / "testfile.txt").write_text("content")
 
     # Add with hooks
-    result = integration_runner.invoke(cli, [
-        "add", str(home / "testfile.txt"),
-        "--section", "hooks_test",
-        "--pre-deploy", "echo PRE-HOOK-RUN",
-        "--post-deploy", "echo POST-HOOK-RUN"
-    ], input="y\n")
+    result = integration_runner.invoke(
+        cli,
+        [
+            "add",
+            str(home / "testfile.txt"),
+            "--section",
+            "hooks_test",
+            "--pre-deploy",
+            "echo PRE-HOOK-RUN",
+            "--post-deploy",
+            "echo POST-HOOK-RUN",
+        ],
+        input="y\n",
+    )
     assert result.exit_code == 0
 
     # Create a dev branch and switch to it using git directly
     from dot_man.constants import REPO_DIR
     from dot_man.core import GitManager
+
     git = GitManager(REPO_DIR)
     git.repo.create_head("dev")
     git.repo.git.checkout("dev")
@@ -89,6 +101,7 @@ def test_switch_runs_hooks(integration_runner):
 
     # Reset operations to clean state
     from dot_man.operations import reset_operations
+
     reset_operations()
 
     branches = git.list_branches()
@@ -99,6 +112,7 @@ def test_switch_runs_hooks(integration_runner):
     assert result.exit_code == 0
     assert "PRE-HOOK-RUN" in result.output
     assert "POST-HOOK-RUN" in result.output
+
 
 def test_deploy_runs_hooks(integration_runner):
     """Test that deploy command runs hooks."""
@@ -112,11 +126,18 @@ def test_deploy_runs_hooks(integration_runner):
     local_file.write_text("v1")
 
     # Add with hooks
-    result = integration_runner.invoke(cli, [
-        "add", str(local_file),
-        "--section", "deploy_hooks",
-        "--post-deploy", "echo DEPLOY-HOOK-RUN"
-    ], input="y\n")
+    result = integration_runner.invoke(
+        cli,
+        [
+            "add",
+            str(local_file),
+            "--section",
+            "deploy_hooks",
+            "--post-deploy",
+            "echo DEPLOY-HOOK-RUN",
+        ],
+        input="y\n",
+    )
     assert result.exit_code == 0
 
     # Determine default branch

@@ -12,7 +12,9 @@ from .exceptions import DotManError
 
 class LockError(DotManError):
     """Raised when a lock cannot be acquired."""
+
     pass
+
 
 class FileLock:
     """
@@ -41,7 +43,9 @@ class FileLock:
             # Lock is held by another process
             if self._fd:
                 self._fd.close()
-            raise LockError(f"Could not acquire lock on {self.lock_file}. Is another dot-man process running?")
+            raise LockError(
+                f"Could not acquire lock on {self.lock_file}. Is another dot-man process running?"
+            )
         except OSError as e:
             if self._fd:
                 self._fd.close()

@@ -210,7 +210,11 @@ class TestConfigCommand:
         result = runner.invoke(cli, ["config", "--help"])
 
         assert result.exit_code == 0
-        assert "list" in result.output.lower() or "get" in result.output.lower() or "tutorial" in result.output.lower()
+        assert (
+            "list" in result.output.lower()
+            or "get" in result.output.lower()
+            or "tutorial" in result.output.lower()
+        )
 
 
 class TestAddCommand:
@@ -335,7 +339,10 @@ class TestErrorHandling:
 
         diagnostic = ErrorDiagnostic.from_exception(PermissionError("/etc/test"))
         assert diagnostic.category == ErrorCategory.PERMISSION
-        assert "sudo" in diagnostic.suggestion.lower() or "permission" in diagnostic.suggestion.lower()
+        assert (
+            "sudo" in diagnostic.suggestion.lower()
+            or "permission" in diagnostic.suggestion.lower()
+        )
 
     def test_file_not_found_handling(self):
         """Commands should handle missing files gracefully."""

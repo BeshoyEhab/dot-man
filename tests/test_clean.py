@@ -18,7 +18,7 @@ def test_clean_backups(integration_runner):
     assert res.exit_code == 0
     reset_operations()
 
-    res = integration_runner.invoke(cli, ["switch", "main"]) # Commit initial state
+    res = integration_runner.invoke(cli, ["switch", "main"])  # Commit initial state
     reset_operations()
 
     integration_runner.invoke(cli, ["backup", "create", "b1"])
@@ -36,7 +36,9 @@ def test_clean_backups(integration_runner):
     reset_operations()
 
     # Clean keeping 1
-    result = integration_runner.invoke(cli, ["clean", "--backups", "--keep", "1", "--force"])
+    result = integration_runner.invoke(
+        cli, ["clean", "--backups", "--keep", "1", "--force"]
+    )
     assert result.exit_code == 0
     # Rich wraps text, so check substring without looking for newline match exactly
     assert "Deleted 2 old" in result.output
@@ -48,6 +50,7 @@ def test_clean_backups(integration_runner):
     assert "b1" not in result.output
     assert "b2" not in result.output
 
+
 def test_clean_orphans(integration_runner):
     from dot_man.constants import REPO_DIR
     from dot_man.operations import reset_operations
@@ -57,7 +60,9 @@ def test_clean_orphans(integration_runner):
     (home / "tracked.txt").write_text("tracked content")
 
     # Use explicit section name to know repo path
-    result = integration_runner.invoke(cli, ["add", str(home / "tracked.txt"), "-s", "tracked"], input="y\n")
+    result = integration_runner.invoke(
+        cli, ["add", str(home / "tracked.txt"), "-s", "tracked"], input="y\n"
+    )
     assert result.exit_code == 0
     reset_operations()
 
@@ -92,12 +97,16 @@ def test_clean_orphans(integration_runner):
     # Check if empty dir removed
     assert not (repo_dir / "orphan_dir").exists()
 
+
 def test_clean_all(integration_runner):
     """Test cleaning both orphans and backups."""
     from dot_man.operations import reset_operations
+
     home = Path.home()
     (home / "data").write_text("data")
-    integration_runner.invoke(cli, ["add", str(home / "data"), "-s", "data"], input="y\n")
+    integration_runner.invoke(
+        cli, ["add", str(home / "data"), "-s", "data"], input="y\n"
+    )
     reset_operations()
     integration_runner.invoke(cli, ["switch", "main"])
     reset_operations()
@@ -108,6 +117,7 @@ def test_clean_all(integration_runner):
 
     # Orphan
     from dot_man.constants import REPO_DIR
+
     (REPO_DIR / "orphan.txt").touch()
 
     result = integration_runner.invoke(cli, ["clean", "--all", "--force"])

@@ -27,6 +27,7 @@ def mock_dot_man_dir(tmp_path):
 
     return dot_man
 
+
 @pytest.fixture
 def integration_runner(tmp_path):
     """Setup runner with initialized repo context."""
@@ -81,6 +82,7 @@ def integration_runner(tmp_path):
 
         # We need to manually reset operations singleton to ensure it picks up new config
         from dot_man.operations import reset_operations
+
         reset_operations()
 
         # Force init to see if it works with force
@@ -92,6 +94,7 @@ def integration_runner(tmp_path):
 
         # Configure user/email for git to avoid errors
         from dot_man.core import GitManager
+
         git = GitManager(repo_dir)
         with git.repo.config_writer() as config:
             config.set_value("user", "name", "Tester")

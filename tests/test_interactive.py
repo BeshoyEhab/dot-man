@@ -37,7 +37,7 @@ class TestValidators:
             "http://example.com",
             "git@github.com:user/repo.git",
             "ssh://user@host/repo",
-            "", # Empty often allowed as skip
+            "",  # Empty often allowed as skip
         ]
         for url in valid_urls:
             doc_mock = MagicMock()
@@ -119,13 +119,15 @@ class TestWizards:
         mock_config.add_section.assert_called_once()
         call_args = mock_config.add_section.call_args[1]
         assert call_args["name"] == "test_section"
-        assert call_args["paths"] == ["/tmp/bar"] # It was updated to string
+        assert call_args["paths"] == ["/tmp/bar"]  # It was updated to string
 
         mock_config.save.assert_called_once()
 
     @patch("dot_man.interactive.questionary")
     @patch("dot_man.interactive.console")
-    def test_run_section_wizard_cancel(self, mock_console, mock_questionary, mock_config):
+    def test_run_section_wizard_cancel(
+        self, mock_console, mock_questionary, mock_config
+    ):
         """Test canceling wizard."""
         mock_questionary.select.return_value.ask.return_value = "cancel"
 
@@ -135,7 +137,9 @@ class TestWizards:
 
     @patch("dot_man.interactive.questionary")
     @patch("dot_man.interactive.console")
-    def test_run_global_wizard_edit_editor(self, mock_console, mock_questionary, mock_global_config):
+    def test_run_global_wizard_edit_editor(
+        self, mock_console, mock_questionary, mock_global_config
+    ):
         """Test editing global editor."""
         # 1. Select "editor"
         # 2. Select "save"
@@ -151,11 +155,16 @@ class TestWizards:
 
     @patch("dot_man.interactive.questionary")
     @patch("dot_man.interactive.console")
-    def test_run_global_wizard_toggle_secrets(self, mock_console, mock_questionary, mock_global_config):
+    def test_run_global_wizard_toggle_secrets(
+        self, mock_console, mock_questionary, mock_global_config
+    ):
         """Test toggling global secrets filter."""
         # 1. Select "secrets_filter" to toggle
         # 2. Select "save"
-        mock_questionary.select.return_value.ask.side_effect = ["secrets_filter", "save"]
+        mock_questionary.select.return_value.ask.side_effect = [
+            "secrets_filter",
+            "save",
+        ]
 
         # Initial state is True (from fixture)
         # So after toggle it should be False

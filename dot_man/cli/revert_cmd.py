@@ -13,7 +13,12 @@ from .interface import cli as main
 @main.command("revert")
 @click.argument("path", type=click.Path(path_type=Path))
 @click.option("--force", is_flag=True, help="Skip confirmation prompt")
-@click.option("--commit", "-c", help="Restore from specific commit SHA", shell_complete=complete_commits)
+@click.option(
+    "--commit",
+    "-c",
+    help="Restore from specific commit SHA",
+    shell_complete=complete_commits,
+)
 @require_init
 def revert(path: Path, force: bool, commit: str | None):
     """Revert a file to its repository version.
@@ -36,15 +41,21 @@ def revert(path: Path, force: bool, commit: str | None):
 
         if commit:
             # Restore from specific commit
-            ui.console.print(f"Restoring [cyan]{target_path}[/cyan] from commit [yellow]{commit}[/yellow]...")
+            ui.console.print(
+                f"Restoring [cyan]{target_path}[/cyan] from commit [yellow]{commit}[/yellow]..."
+            )
 
             # Find the file in git history
             try:
                 # Get the file content from the commit
-                file_content = ops.git.repo.git.show(f"{commit}:{target_path.relative_to(REPO_DIR.parent)}")
+                file_content = ops.git.repo.git.show(
+                    f"{commit}:{target_path.relative_to(REPO_DIR.parent)}"
+                )
 
                 if not force:
-                    if not ui.confirm(f"Overwrite '{target_path}' with version from {commit}?"):
+                    if not ui.confirm(
+                        f"Overwrite '{target_path}' with version from {commit}?"
+                    ):
                         return
 
                 # Write the content

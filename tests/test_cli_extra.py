@@ -14,6 +14,7 @@ class TestInitCommand:
     def test_init_creates_repo(self, tmp_path):
         """Test that init creates the repo structure."""
         import os
+
         runner = CliRunner()
         home = tmp_path / "home"
         home.mkdir()
@@ -56,7 +57,11 @@ class TestAuditCommand:
         """Test that audit runs and exits 0."""
         result = integration_runner.invoke(cli, ["audit"])
         assert result.exit_code == 0
-        assert "audit" in result.output.lower() or "scan" in result.output.lower() or "secret" in result.output.lower()
+        assert (
+            "audit" in result.output.lower()
+            or "scan" in result.output.lower()
+            or "secret" in result.output.lower()
+        )
 
 
 # ─── Config Command ────────────────────────────────────────
@@ -71,7 +76,9 @@ class TestConfigCommand:
 
     def test_config_get_branch(self, integration_runner):
         """Test getting current branch from config."""
-        result = integration_runner.invoke(cli, ["config", "get", "dot-man.current_branch"])
+        result = integration_runner.invoke(
+            cli, ["config", "get", "dot-man.current_branch"]
+        )
         assert result.exit_code == 0
         assert "main" in result.output
 

@@ -204,8 +204,10 @@ update_strategy = "rename_old"
     (repo_dir / "dot-man.toml").write_text(toml_content)
 
     global_toml = tmp_path / "global.toml"
-    with patch("dot_man.global_config.GLOBAL_TOML", global_toml), \
-         patch("dot_man.config.REPO_DIR", repo_dir):
+    with (
+        patch("dot_man.global_config.GLOBAL_TOML", global_toml),
+        patch("dot_man.config.REPO_DIR", repo_dir),
+    ):
         gc = GlobalConfig()
         gc.create_default()
         gc.load()
@@ -263,8 +265,10 @@ class TestDotManConfig:
             '[bad]\npaths = ["/tmp/f"]\nunknown_key = "oops"\n'
         )
         global_toml = tmp_path / "global.toml"
-        with patch("dot_man.global_config.GLOBAL_TOML", global_toml), \
-             patch("dot_man.config.REPO_DIR", repo_dir):
+        with (
+            patch("dot_man.global_config.GLOBAL_TOML", global_toml),
+            patch("dot_man.config.REPO_DIR", repo_dir),
+        ):
             gc = GlobalConfig()
             gc.create_default()
             gc.load()
@@ -278,8 +282,10 @@ class TestDotManConfig:
             '[bad]\npaths = ["/tmp/f"]\nupdate_strategy = "invalid"\n'
         )
         global_toml = tmp_path / "global.toml"
-        with patch("dot_man.global_config.GLOBAL_TOML", global_toml), \
-             patch("dot_man.config.REPO_DIR", repo_dir):
+        with (
+            patch("dot_man.global_config.GLOBAL_TOML", global_toml),
+            patch("dot_man.config.REPO_DIR", repo_dir),
+        ):
             gc = GlobalConfig()
             gc.create_default()
             gc.load()
@@ -293,8 +299,10 @@ class TestDotManConfig:
         repo_dir.mkdir()
         (repo_dir / "dot-man.toml").write_text("[empty]\n")
         global_toml = tmp_path / "global.toml"
-        with patch("dot_man.global_config.GLOBAL_TOML", global_toml), \
-             patch("dot_man.config.REPO_DIR", repo_dir):
+        with (
+            patch("dot_man.global_config.GLOBAL_TOML", global_toml),
+            patch("dot_man.config.REPO_DIR", repo_dir),
+        ):
             gc = GlobalConfig()
             gc.create_default()
             gc.load()
@@ -317,8 +325,10 @@ class TestDotManConfig:
         repo_dir = tmp_path / "repo"
         repo_dir.mkdir()
         global_toml = tmp_path / "global.toml"
-        with patch("dot_man.global_config.GLOBAL_TOML", global_toml), \
-             patch("dot_man.config.REPO_DIR", repo_dir):
+        with (
+            patch("dot_man.global_config.GLOBAL_TOML", global_toml),
+            patch("dot_man.config.REPO_DIR", repo_dir),
+        ):
             gc = GlobalConfig()
             gc.create_default()
             gc.load()

@@ -14,6 +14,7 @@ def temp_vault_dir(tmp_path):
     config_dir.mkdir(parents=True)
     return config_dir
 
+
 @pytest.fixture
 def vault(temp_vault_dir):
     """Create a vault instance using temp dir."""
@@ -23,12 +24,11 @@ def vault(temp_vault_dir):
     v.key_file = temp_vault_dir / ".key"
     return v
 
+
 def test_vault_basic_ops(vault):
     """Test basic stash and get operations."""
     # Stash
-    h = vault.stash_secret(
-        "file1.txt", 10, "test", "mysecret", "main"
-    )
+    h = vault.stash_secret("file1.txt", 10, "test", "mysecret", "main")
     assert h
 
     # Get
@@ -38,6 +38,7 @@ def test_vault_basic_ops(vault):
     # Get by hash
     secret_by_hash = vault.get_secret_by_hash(h)
     assert secret_by_hash == "mysecret"
+
 
 def test_vault_batching(vault):
     """Test that batching defers writes."""
@@ -64,6 +65,7 @@ def test_vault_batching(vault):
     # Verify content
     data = json.loads(vault.vault_file.read_text())
     assert len(data["secrets"]) == 2
+
 
 def test_vault_caching(vault):
     """Test that load uses cache."""
@@ -102,14 +104,13 @@ def test_vault_caching(vault):
     # We can rely on logic correctness or coverage.
     pass
 
+
 def test_vault_concurrency(vault):
     """Test concurrent stashing."""
     count = 100
 
     def worker(i):
-        vault.stash_secret(
-            f"file_{i}", i, "pattern", f"secret_{i}", "main"
-        )
+        vault.stash_secret(f"file_{i}", i, "pattern", f"secret_{i}", "main")
 
     with ThreadPoolExecutor(max_workers=8) as executor:
         futures = [executor.submit(worker, i) for i in range(count)]
@@ -125,14 +126,13 @@ def test_vault_concurrency(vault):
         s = vault.get_secret(f"file_{i}", i, "main")
         assert s == f"secret_{i}"
 
+
 def test_vault_concurrency_with_batch(vault):
     """Test concurrent stashing inside a batch."""
     count = 100
 
     def worker(i):
-        vault.stash_secret(
-            f"file_{i}", i, "pattern", f"secret_{i}", "main"
-        )
+        vault.stash_secret(f"file_{i}", i, "pattern", f"secret_{i}", "main")
 
     with vault.batch():
         with ThreadPoolExecutor(max_workers=8) as executor:
@@ -143,6 +143,7 @@ def test_vault_concurrency_with_batch(vault):
     # Verify all 100 are present
     data = json.loads(vault.vault_file.read_text())
     assert len(data["secrets"]) == count
+
 
 def test_atomic_write_robustness(vault):
     """Verify atomic write doesn't leave partial files."""

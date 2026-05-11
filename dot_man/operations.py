@@ -121,9 +121,13 @@ class DotManOperations(SaveDeployMixin, BranchMixin, StatusMixin):
             if local_path.is_dir():
                 # For directories, iterate over files inside
                 if local_path.exists():
-                    excludes = (section.exclude or []) + (section.ignored_directories or [])
+                    excludes = (section.exclude or []) + (
+                        section.ignored_directories or []
+                    )
 
-                    for root, dirs, files in os.walk(local_path, followlinks=section.follow_symlinks):
+                    for root, dirs, files in os.walk(
+                        local_path, followlinks=section.follow_symlinks
+                    ):
                         root_path = Path(root)
 
                         if excludes:
@@ -144,7 +148,9 @@ class DotManOperations(SaveDeployMixin, BranchMixin, StatusMixin):
 
                             if excludes and self._matches_patterns(rel, excludes):
                                 continue
-                            if section.include and not self._matches_patterns(rel, section.include):
+                            if section.include and not self._matches_patterns(
+                                rel, section.include
+                            ):
                                 continue
 
                             repo_file = repo_path / rel
@@ -153,7 +159,9 @@ class DotManOperations(SaveDeployMixin, BranchMixin, StatusMixin):
 
                 # Also check repo for files that might be deleted locally
                 if repo_path.exists():
-                    excludes = (section.exclude or []) + (section.ignored_directories or [])
+                    excludes = (section.exclude or []) + (
+                        section.ignored_directories or []
+                    )
 
                     for repo_file in repo_path.rglob("*"):
                         if repo_file.is_file():
@@ -162,7 +170,9 @@ class DotManOperations(SaveDeployMixin, BranchMixin, StatusMixin):
 
                             if excludes and self._matches_patterns(rel, excludes):
                                 continue
-                            if section.include and not self._matches_patterns(rel, section.include):
+                            if section.include and not self._matches_patterns(
+                                rel, section.include
+                            ):
                                 continue
 
                             if not local_file.exists():
@@ -175,6 +185,7 @@ class DotManOperations(SaveDeployMixin, BranchMixin, StatusMixin):
     def _matches_patterns(self, path: Path, patterns: list[str]) -> bool:
         """Check if path matches any pattern."""
         from fnmatch import fnmatch
+
         name = path.name
         for pattern in patterns:
             if fnmatch(name, pattern) or fnmatch(str(path), pattern):

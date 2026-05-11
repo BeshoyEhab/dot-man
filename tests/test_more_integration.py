@@ -23,6 +23,7 @@ class TestGitManagerBranches:
         repo.create_head("feature")
 
         from dot_man.core import GitManager
+
         git = GitManager(repo_dir)
 
         assert git.branch_exists("feature") is True
@@ -40,6 +41,7 @@ class TestGitManagerBranches:
         repo.index.commit("Initial")
 
         from dot_man.core import GitManager
+
         git = GitManager(repo_dir)
 
         assert git.branch_exists("nonexistent") is False
@@ -57,6 +59,7 @@ class TestGitManagerBranches:
         repo.index.commit("Initial")
 
         from dot_man.core import GitManager
+
         git = GitManager(repo_dir)
 
         git.create_branch("new-branch")
@@ -77,6 +80,7 @@ class TestGitManagerBranches:
         repo.create_head("feature")
 
         from dot_man.core import GitManager
+
         git = GitManager(repo_dir)
 
         git.checkout("feature")
@@ -95,6 +99,7 @@ class TestGitManagerBranches:
         repo.index.commit("Initial")
 
         from dot_man.core import GitManager
+
         git = GitManager(repo_dir)
 
         git.checkout("new-branch", create=True)
@@ -113,6 +118,7 @@ class TestGitManagerBranches:
         repo.index.commit("Initial")
 
         from dot_man.core import GitManager
+
         git = GitManager(repo_dir)
 
         assert git.is_dirty() is False
@@ -133,6 +139,7 @@ class TestGitManagerBranches:
         (repo_dir / "new.txt").write_text("new")
 
         from dot_man.core import GitManager
+
         git = GitManager(repo_dir)
 
         assert git.is_dirty() is True
@@ -154,6 +161,7 @@ class TestGitManagerStatus:
         repo.index.commit("Initial")
 
         from dot_man.core import GitManager
+
         git = GitManager(repo_dir)
 
         status = git.get_status()
@@ -175,6 +183,7 @@ class TestGitManagerStatus:
         (repo_dir / "untracked.txt").write_text("untracked")
 
         from dot_man.core import GitManager
+
         git = GitManager(repo_dir)
 
         status = git.get_status()
@@ -196,6 +205,7 @@ class TestGitManagerStatus:
         test_file.write_text("modified")
 
         from dot_man.core import GitManager
+
         git = GitManager(repo_dir)
 
         status = git.get_status()
@@ -220,6 +230,7 @@ class TestGitManagerCommits:
         (repo_dir / "test.txt").write_text("test")
 
         from dot_man.core import GitManager
+
         git = GitManager(repo_dir)
 
         commit_sha = git.commit("Test commit message")
@@ -242,6 +253,7 @@ class TestGitManagerCommits:
         repo.index.commit("Initial")
 
         from dot_man.core import GitManager
+
         git = GitManager(repo_dir)
 
         # No changes
@@ -261,6 +273,7 @@ class TestGitManagerRemote:
         Repo.init(repo_dir)
 
         from dot_man.core import GitManager
+
         git = GitManager(repo_dir)
 
         assert git.has_remote() is False
@@ -274,6 +287,7 @@ class TestGitManagerRemote:
         Repo.init(repo_dir)
 
         from dot_man.core import GitManager
+
         git = GitManager(repo_dir)
 
         git.set_remote("https://github.com/user/repo.git")
@@ -328,6 +342,7 @@ class TestConstants:
     def test_default_branch(self):
         """Test DEFAULT_BRANCH constant."""
         from dot_man.constants import DEFAULT_BRANCH
+
         assert DEFAULT_BRANCH == "main"
 
 

@@ -94,7 +94,9 @@ def deploy(branch: str, force: bool, dry_run: bool):
 
         # Display Plan / Dry Run
         if dry_run:
-            ui.console.print(f"\n[bold]Dry Run Summary - {len(sections_to_process)} files to deploy:[/bold]")
+            ui.console.print(
+                f"\n[bold]Dry Run Summary - {len(sections_to_process)} files to deploy:[/bold]"
+            )
             for section, local_path, repo_path in sections_to_process:
                 action = "OVERWRITE" if local_path.exists() else "CREATE"
                 ui.console.print(f"  {action}: {local_path}")
@@ -138,6 +140,7 @@ def deploy(branch: str, force: bool, dry_run: bool):
             for err in exec_errors:
                 ui.console.print(f"  [red]Error:[/red] {err}")
                 import logging
+
                 logging.error(f"Deployment error: {err}")
 
         ui.console.print(f"\nDeployed: {deployed}/{len(sections_to_process)} files.")

@@ -141,7 +141,7 @@ def run_setup_wizard(
                 while True:
                     choice = ui.ask(
                         f"    Which one to track? (1-{len(options)})",
-                        default=str(len(options))
+                        default=str(len(options)),
                     )
                     try:
                         idx = int(choice) - 1
@@ -156,7 +156,9 @@ def run_setup_wizard(
                                 final_section = selected_path.name
                                 final_path_str = str(selected_path)
 
-                            if ui.confirm(f"    Track '{final_section}'?", default=True):
+                            if ui.confirm(
+                                f"    Track '{final_section}'?", default=True
+                            ):
                                 files_to_add.append((final_path_str, final_section))
                             break
                         else:
@@ -167,12 +169,16 @@ def run_setup_wizard(
 
         if path.exists():
             found_count += 1
-            ui.console.print(f"  [green]✓[/green] Found: [cyan]{path_str}[/cyan] ({desc})")
+            ui.console.print(
+                f"  [green]✓[/green] Found: [cyan]{path_str}[/cyan] ({desc})"
+            )
             if ui.confirm("    Track this?", default=True):
                 files_to_add.append((path_str, section_name))
 
     if found_count == 0:
-        ui.console.print("  [dim]No common dotfiles detected in default locations[/dim]")
+        ui.console.print(
+            "  [dim]No common dotfiles detected in default locations[/dim]"
+        )
         ui.console.print()
     else:
         ui.console.print()
@@ -243,6 +249,7 @@ def run_setup_wizard(
     if ui.confirm("Set up remote repository for syncing? (optional)", default=False):
         ui.console.print()
         from .remote_cmd import setup
+
         ctx = click.Context(setup)
         ctx.invoke(setup)
 
@@ -293,5 +300,7 @@ def show_quick_start():
         "  dot-man switch work                [dim]# Create work branch[/dim]"
     )
     ui.console.print()
-    ui.console.print("[dim]💡 Tip: Config is at ~/.config/dot-man/repo/dot-man.toml[/dim]")
+    ui.console.print(
+        "[dim]💡 Tip: Config is at ~/.config/dot-man/repo/dot-man.toml[/dim]"
+    )
     ui.console.print()

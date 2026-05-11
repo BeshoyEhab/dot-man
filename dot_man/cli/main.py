@@ -8,9 +8,11 @@ from .interface import cli
 
 # Import all subcommands to register them with the CLI group
 
+
 def main():
     """Main entry point for the CLI."""
     cli()
+
 
 if __name__ == "__main__":
     main()

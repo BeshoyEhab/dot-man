@@ -1,7 +1,6 @@
 """More tests for files module."""
 
 
-
 class TestFilesBasic:
     """Test basic file functions."""
 

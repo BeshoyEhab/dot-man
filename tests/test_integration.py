@@ -13,6 +13,7 @@ class TestInitCommandIntegration:
     def test_init_is_initialized(self, integration_runner):
         """Test init has run and repo exists."""
         from dot_man.constants import REPO_DIR
+
         assert REPO_DIR.exists()
         assert (REPO_DIR / ".git").exists()
 
@@ -23,6 +24,7 @@ class TestConfigCommandIntegration:
     def test_config_list(self, integration_runner):
         """Test config list command."""
         from dot_man.cli.interface import cli
+
         runner = CliRunner()
 
         with self._get_patches(integration_runner):
@@ -32,6 +34,7 @@ class TestConfigCommandIntegration:
     def test_config_get_current_branch(self, integration_runner):
         """Test config get dot-man.current_branch."""
         from dot_man.cli.interface import cli
+
         runner = CliRunner()
 
         with self._get_patches(integration_runner):
@@ -83,7 +86,7 @@ secrets_filter = true
             "remote": {"url": ""},
             "security": {"strict_mode": False},
             "templates": {},
-            "switch": {"default_behavior": "save"}
+            "switch": {"default_behavior": "save"},
         }
 
         assert config.current_branch == "main"
@@ -114,6 +117,7 @@ class TestGitManagerIntegration:
         repo.create_head("main")
 
         from dot_man.core import GitManager
+
         git = GitManager(repo_dir)
 
         branches = git.list_branches()
@@ -128,6 +132,7 @@ class TestGitManagerIntegration:
         Repo.init(repo_dir)
 
         from dot_man.core import GitManager
+
         git = GitManager(repo_dir)
 
         tags = git.list_tags()
@@ -150,6 +155,7 @@ class TestGitManagerIntegration:
         (repo_dir / "test.txt").write_text("test")
 
         from dot_man.core import GitManager
+
         git = GitManager(repo_dir)
 
         commit_sha = git.commit("Test commit")
@@ -172,6 +178,7 @@ class TestGitManagerIntegration:
         repo.index.commit("First commit")
 
         from dot_man.core import GitManager
+
         git = GitManager(repo_dir)
 
         commits = list(git.get_commits(count=5))
@@ -195,6 +202,7 @@ class TestGitManagerIntegration:
         repo.index.commit("First commit")
 
         from dot_man.core import GitManager
+
         git = GitManager(repo_dir)
 
         # Create tag
@@ -331,6 +339,7 @@ def integration_runner(tmp_path):
             stack.enter_context(p)
 
         from dot_man.operations import reset_operations
+
         reset_operations()
 
         result = runner.invoke(cli, ["init", "--force", "--no-wizard"])
@@ -338,6 +347,7 @@ def integration_runner(tmp_path):
             print(f"Init failed: {result.output}")
 
         from dot_man.core import GitManager
+
         git = GitManager(repo_dir)
         with git.repo.config_writer() as config:
             config.set_value("user", "name", "Tester")

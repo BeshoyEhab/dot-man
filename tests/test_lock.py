@@ -23,6 +23,7 @@ def test_lock_acquire_release(tmp_path):
     with lock:
         pass
 
+
 def test_lock_concurrency(tmp_path):
     """Test that second acquisition fails when lock is held."""
     lock_path = tmp_path / ".lock"
@@ -45,6 +46,7 @@ def test_lock_concurrency(tmp_path):
 
     t.join()
 
+
 def test_operations_lock_integration(monkeypatch, tmp_path):
     """Verify operations allow successful execution with lock."""
     # Mock REPO_DIR/LOCK_FILE to use tmp_path
@@ -57,12 +59,15 @@ def test_operations_lock_integration(monkeypatch, tmp_path):
     class MockLock:
         def __init__(self, path):
             self.path = path
+
         def __enter__(self):
             pass
+
         def __exit__(self, *args):
             pass
 
     import dot_man.operations
+
     monkeypatch.setattr(dot_man.operations, "FileLock", MockLock)
 
     # Mock get_sections to avoid config loading

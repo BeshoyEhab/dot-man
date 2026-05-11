@@ -1,8 +1,13 @@
 """Secret detection patterns and filtering logic."""
 
 __all__ = [
-    "SecretScanner", "SecretMatch", "SecretPattern", "SecretGuard",
-    "PermanentRedactGuard", "Severity", "filter_secrets",
+    "SecretScanner",
+    "SecretMatch",
+    "SecretPattern",
+    "SecretGuard",
+    "PermanentRedactGuard",
+    "Severity",
+    "filter_secrets",
 ]
 
 import hashlib
@@ -62,6 +67,7 @@ class BaseSecretGuard:
         try:
             content = self.list_path.read_text(encoding="utf-8")
             from typing import cast
+
             return cast(list[AllowedSecret], json.loads(content))
         except (FileNotFoundError, json.JSONDecodeError):
             return []
@@ -156,7 +162,6 @@ class PermanentRedactGuard(BaseSecretGuard):
     ) -> None:
         """Add a secret to the permanent redact list."""
         self._add_to_list(file_path, line_content, pattern_name)
-
 
 
 class Severity(Enum):

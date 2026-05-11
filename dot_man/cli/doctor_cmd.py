@@ -68,7 +68,9 @@ def doctor():
     # 2. Python version
     import sys
 
-    py_version = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    py_version = (
+        f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    )
     if sys.version_info >= (3, 9):
         check_pass("Python version", py_version)
     else:
@@ -196,7 +198,10 @@ def doctor():
         if backup_list:
             check_pass("Backups available", f"{len(backup_list)} backup(s)")
         else:
-            check_warn("No backups", "Backups are created automatically before destructive operations")
+            check_warn(
+                "No backups",
+                "Backups are created automatically before destructive operations",
+            )
     except Exception as e:
         check_warn("Could not check backups", str(e))
 

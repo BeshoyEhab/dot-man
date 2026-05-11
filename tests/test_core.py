@@ -81,10 +81,7 @@ class TestFiles:
         """Should return correct status for missing files."""
         from dot_man.files import get_file_status
 
-        status = get_file_status(
-            Path("/nonexistent/file1"),
-            Path("/nonexistent/file2")
-        )
+        status = get_file_status(Path("/nonexistent/file1"), Path("/nonexistent/file2"))
         assert status == "MISSING"
 
     def test_compare_files_identical(self, tmp_path):
@@ -111,4 +108,3 @@ class TestFiles:
         file2.write_text("world")
 
         assert compare_files(file1, file2) is False
-

@@ -27,11 +27,7 @@ class TestPerformanceLogic:
         (src / "node_modules" / "subdir" / "ignored_deep.txt").write_text("ignored")
 
         # Copy with exclude
-        copy_directory(
-            src,
-            dest,
-            exclude_patterns=["node_modules"]
-        )
+        copy_directory(src, dest, exclude_patterns=["node_modules"])
 
         assert (dest / "valid.txt").exists()
         assert not (dest / "node_modules").exists()
@@ -82,7 +78,7 @@ class TestPerformanceLogic:
         global_conf._data = {
             "defaults": {
                 "ignored_directories": ["global_ignore"],
-                "follow_symlinks": True
+                "follow_symlinks": True,
             }
         }
 
@@ -95,8 +91,8 @@ class TestPerformanceLogic:
             "section2": {
                 "paths": ["~/.config/section2"],
                 "ignored_directories": ["local_ignore"],
-                "follow_symlinks": False
-            }
+                "follow_symlinks": False,
+            },
         }
 
         s1 = config.get_section("section1")

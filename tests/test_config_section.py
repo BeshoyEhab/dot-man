@@ -14,7 +14,7 @@ class TestSectionClass:
             name="test",
             paths=[Path("/home/test")],
             repo_base="test",
-            update_strategy="replace"
+            update_strategy="replace",
         )
         assert section.name == "test"
         assert len(section.paths) == 1
@@ -28,7 +28,7 @@ class TestSectionClass:
             name="test",
             paths=[Path("/home/test")],
             repo_base="test",
-            update_strategy="replace"
+            update_strategy="replace",
         )
 
         repo_dir = Path("/repo")
@@ -44,7 +44,7 @@ class TestSectionClass:
             paths=[Path("/home/test")],
             repo_base="test",
             pre_deploy="echo 'pre'",
-            post_deploy="echo 'post'"
+            post_deploy="echo 'post'",
         )
         assert section.pre_deploy == "echo 'pre'"
         assert section.post_deploy == "echo 'post'"
@@ -57,7 +57,7 @@ class TestSectionClass:
             name="test",
             paths=[Path("/home/test")],
             repo_base="test",
-            secrets_filter=True
+            secrets_filter=True,
         )
         assert section.secrets_filter is True
 
@@ -139,7 +139,7 @@ class TestSectionUpdateStrategies:
             name="test",
             paths=[Path("/home/test")],
             repo_base="test",
-            update_strategy="replace"
+            update_strategy="replace",
         )
         assert section.update_strategy == "replace"
 
@@ -151,7 +151,7 @@ class TestSectionUpdateStrategies:
             name="test",
             paths=[Path("/home/test")],
             repo_base="test",
-            update_strategy="rename_old"
+            update_strategy="rename_old",
         )
         assert section.update_strategy == "rename_old"
 
@@ -163,6 +163,6 @@ class TestSectionUpdateStrategies:
             name="test",
             paths=[Path("/home/test")],
             repo_base="test",
-            update_strategy="ignore"
+            update_strategy="ignore",
         )
         assert section.update_strategy == "ignore"

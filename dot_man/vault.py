@@ -19,7 +19,9 @@ from .lock import FileLock, LockError
 
 class VaultError(DotManError):
     """Vault operation failed."""
+
     pass
+
 
 class SecretVault:
     """
@@ -153,12 +155,14 @@ class SecretVault:
                     if not self._batch_mode and self._dirty:
                         self.save()
 
-    def stash_secret(self,
-                     file_path: str,
-                     line_number: int,
-                     pattern_name: str,
-                     secret_value: str,
-                     branch: str) -> str:
+    def stash_secret(
+        self,
+        file_path: str,
+        line_number: int,
+        pattern_name: str,
+        secret_value: str,
+        branch: str,
+    ) -> str:
         """
         Encrypt and store a secret.
         Returns the SHA256 hash of the secret value for ID purposes.
@@ -167,12 +171,15 @@ class SecretVault:
         # We need thread lock to check batch mode.
         with self._lock:
             if self._batch_mode:
-                return self._perform_stash(file_path, line_number, pattern_name, secret_value, branch)
+                return self._perform_stash(
+                    file_path, line_number, pattern_name, secret_value, branch
+                )
 
         # If not batch mode, we must acquire FileLock to prevent inter-process races.
         # Retry logic for lock contention
         import random
         import time
+
         retries = 0
         max_retries = 50
 
@@ -180,7 +187,9 @@ class SecretVault:
             try:
                 with FileLock(self.lock_file_path):
                     with self._lock:
-                        return self._perform_stash(file_path, line_number, pattern_name, secret_value, branch)
+                        return self._perform_stash(
+                            file_path, line_number, pattern_name, secret_value, branch
+                        )
             except LockError:
                 if retries >= max_retries:
                     raise
@@ -188,12 +197,14 @@ class SecretVault:
                 # Sleep between 0.05s and 0.15s
                 time.sleep(0.05 + random.random() * 0.1)
 
-    def _perform_stash(self,
-                       file_path: str,
-                       line_number: int,
-                       pattern_name: str,
-                       secret_value: str,
-                       branch: str) -> str:
+    def _perform_stash(
+        self,
+        file_path: str,
+        line_number: int,
+        pattern_name: str,
+        secret_value: str,
+        branch: str,
+    ) -> str:
         """Internal stash logic, assumes locks are held."""
         self.load()
         f = self._get_fernet()
@@ -202,7 +213,7 @@ class SecretVault:
         secret_hash = hashlib.sha256(secret_value.encode()).hexdigest()
 
         # Encrypt
-        encrypted = f.encrypt(secret_value.encode()).decode('utf-8')
+        encrypted = f.encrypt(secret_value.encode()).decode("utf-8")
 
         entry = {
             "file_path": str(file_path),
@@ -211,15 +222,17 @@ class SecretVault:
             "secret_hash": secret_hash,
             "encrypted_value": encrypted,
             "branch": branch,
-            "added_at": datetime.now().isoformat()
+            "added_at": datetime.now().isoformat(),
         }
 
         # Check if already exists (update if so)
         updated = False
         for i, s in enumerate(self._data["secrets"]):
-            if (s["file_path"] == str(file_path) and
-                s["secret_hash"] == secret_hash and
-                s["branch"] == branch):
+            if (
+                s["file_path"] == str(file_path)
+                and s["secret_hash"] == secret_hash
+                and s["branch"] == branch
+            ):
 
                 # Update location info
                 self._data["secrets"][i] = entry
@@ -236,20 +249,29 @@ class SecretVault:
 
         return secret_hash
 
-    def get_secret(self, file_path: str, line_number: int, branch: str) -> Optional[str]:
+    def get_secret(
+        self, file_path: str, line_number: int, branch: str
+    ) -> Optional[str]:
         """Retrieve and decrypt a secret."""
         with self._lock:
             self.load()
             f = self._get_fernet()
 
             for s in self._data["secrets"]:
-                if (s["file_path"] == str(file_path) and
-                    s["line_number"] == line_number and
-                    s["branch"] == branch):
+                if (
+                    s["file_path"] == str(file_path)
+                    and s["line_number"] == line_number
+                    and s["branch"] == branch
+                ):
                     try:
-                        decrypted = f.decrypt(s["encrypted_value"].encode()).decode('utf-8')
+                        decrypted = f.decrypt(s["encrypted_value"].encode()).decode(
+                            "utf-8"
+                        )
                         return decrypted
-                    except (ValueError, TypeError): # + cryptography exceptions if imported
+                    except (
+                        ValueError,
+                        TypeError,
+                    ):  # + cryptography exceptions if imported
                         return None
             return None
 
@@ -262,13 +284,17 @@ class SecretVault:
             for s in self._data["secrets"]:
                 if s["secret_hash"] == secret_hash:
                     try:
-                        decrypted = f.decrypt(s["encrypted_value"].encode()).decode('utf-8')
+                        decrypted = f.decrypt(s["encrypted_value"].encode()).decode(
+                            "utf-8"
+                        )
                         return decrypted
                     except (ValueError, TypeError):
                         continue
             return None
 
-    def restore_secrets_in_content(self, content: str, file_path: str, branch: str) -> str:
+    def restore_secrets_in_content(
+        self, content: str, file_path: str, branch: str
+    ) -> str:
         """
         Restore secrets in content by replacing placeholders with actual values from vault.
         """
@@ -278,6 +304,7 @@ class SecretVault:
 
         # Regex to find ***REDACTED:<HASH>***
         import re
+
         pattern = re.compile(r"\*\*\*REDACTED:([a-fA-F0-9]{64})\*\*\*")
 
         def replace_match(match):
@@ -285,6 +312,6 @@ class SecretVault:
             restored = self.get_secret_by_hash(secret_hash)
             if restored:
                 return restored
-            return match.group(0) # Keep redaction if not found
+            return match.group(0)  # Keep redaction if not found
 
         return pattern.sub(replace_match, content)

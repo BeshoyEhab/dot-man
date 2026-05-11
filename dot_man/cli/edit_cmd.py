@@ -16,7 +16,9 @@ from .interface import cli as main
 @main.command()
 @click.option("--editor", help="Editor to use (default: config or $VISUAL or $EDITOR)")
 @click.option("--global", "edit_global", is_flag=True, help="Edit global configuration")
-@click.option("--raw", is_flag=True, help="Use raw text editor instead of interactive TUI")
+@click.option(
+    "--raw", is_flag=True, help="Use raw text editor instead of interactive TUI"
+)
 @require_init
 def edit(editor: str | None, edit_global: bool, raw: bool):
     """Open the configuration file in your text editor.
@@ -58,26 +60,38 @@ def edit(editor: str | None, edit_global: bool, raw: bool):
                 sections = ops.get_sections()
 
                 choices = []
-                choices.append(questionary.Choice("⚙️  Global Configuration", value="global"))
+                choices.append(
+                    questionary.Choice("⚙️  Global Configuration", value="global")
+                )
 
                 if sections:
                     choices.append(questionary.Separator("--- Sections ---"))
                     for name in sections:
-                        choices.append(questionary.Choice(f"📄 {name}", value=f"section:{name}"))
+                        choices.append(
+                            questionary.Choice(f"📄 {name}", value=f"section:{name}")
+                        )
                 else:
                     choices.append(questionary.Separator("--- No Sections ---"))
 
                 choices.append(questionary.Separator("--- Actions ---"))
-                choices.append(questionary.Choice("➕ Add New Section", value="add_new"))
-                choices.append(questionary.Choice("📝 Edit Templates", value="templates"))
-                choices.append(questionary.Choice("📝 Open Raw File (Advanced)", value="raw"))
-                choices.append(questionary.Choice("🚪 Quit", value="quit", shortcut_key="q"))
+                choices.append(
+                    questionary.Choice("➕ Add New Section", value="add_new")
+                )
+                choices.append(
+                    questionary.Choice("📝 Edit Templates", value="templates")
+                )
+                choices.append(
+                    questionary.Choice("📝 Open Raw File (Advanced)", value="raw")
+                )
+                choices.append(
+                    questionary.Choice("🚪 Quit", value="quit", shortcut_key="q")
+                )
 
                 selection = questionary.select(
                     "What would you like to configure?",
                     choices=choices,
                     use_shortcuts=True,
-                    style=custom_style
+                    style=custom_style,
                 ).ask()
 
                 if not selection or selection == "quit":
@@ -91,7 +105,9 @@ def edit(editor: str | None, edit_global: bool, raw: bool):
                     break
 
                 elif selection == "add_new":
-                    path_str = questionary.path("Path to file or directory:", style=custom_style).ask()
+                    path_str = questionary.path(
+                        "Path to file or directory:", style=custom_style
+                    ).ask()
                     if path_str:
                         try:
                             path = Path(path_str).expanduser()
@@ -99,12 +115,24 @@ def edit(editor: str | None, edit_global: bool, raw: bool):
                                 warn(f"Path does not exist: {path}")
                                 continue
 
-                            section_name = questionary.text("Section Name:", default=path.stem, style=custom_style).ask()
+                            section_name = questionary.text(
+                                "Section Name:", default=path.stem, style=custom_style
+                            ).ask()
                             if section_name:
                                 from .add_cmd import add
+
                                 ctx = click.get_current_context()
-                                ctx.invoke(add, path=str(path), section=section_name, repo_base=None,
-                                          exclude=(), include=(), inherits=(), post_deploy=None, pre_deploy=None)
+                                ctx.invoke(
+                                    add,
+                                    path=str(path),
+                                    section=section_name,
+                                    repo_base=None,
+                                    exclude=(),
+                                    include=(),
+                                    inherits=(),
+                                    post_deploy=None,
+                                    pre_deploy=None,
+                                )
                                 ui.console.print()
                                 ui.console.print("Press Enter to continue...")
                                 input()

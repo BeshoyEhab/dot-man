@@ -53,7 +53,11 @@ class Section:
 
         self.inherits = inherits or []
 
-        self.ignored_directories = ignored_directories if ignored_directories is not None else DEFAULT_IGNORED_DIRECTORIES
+        self.ignored_directories = (
+            ignored_directories
+            if ignored_directories is not None
+            else DEFAULT_IGNORED_DIRECTORIES
+        )
         self.follow_symlinks = follow_symlinks if follow_symlinks is not None else False
 
     def _generate_repo_base(self) -> str:
@@ -191,8 +195,8 @@ class Section:
             result["inherits"] = self.inherits
 
         if self.ignored_directories != DEFAULT_IGNORED_DIRECTORIES:
-             result["ignored_directories"] = self.ignored_directories
+            result["ignored_directories"] = self.ignored_directories
         if self.follow_symlinks is not False:
-             result["follow_symlinks"] = self.follow_symlinks
+            result["follow_symlinks"] = self.follow_symlinks
 
         return result

@@ -51,12 +51,7 @@ def status(verbose: bool, secrets: bool):
         status_items = list(ops.get_detailed_status())
 
         # Calculate summary from items
-        summary = {
-            "modified": 0,
-            "new": 0,
-            "deleted": 0,
-            "identical": 0
-        }
+        summary = {"modified": 0, "new": 0, "deleted": 0, "identical": 0}
 
         section_names_set = set()
         for item in status_items:
@@ -101,7 +96,9 @@ def status(verbose: bool, secrets: bool):
         for section_name, group in groupby(status_items, key=lambda x: x["section"]):
             if displayed_sections >= 10:
                 file_table.add_row(
-                    f"[dim]... +{len(all_section_names) - 10} more sections[/dim]", "", ""
+                    f"[dim]... +{len(all_section_names) - 10} more sections[/dim]",
+                    "",
+                    "",
                 )
                 break
 
@@ -170,6 +167,7 @@ def status(verbose: bool, secrets: bool):
         if secrets_found:
             ui.console.print()
             from .common import warn
+
             warn(
                 f"{len(secrets_found)} potential secrets detected. Run 'dot-man audit' for details."
             )

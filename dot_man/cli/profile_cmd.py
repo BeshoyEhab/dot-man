@@ -33,7 +33,11 @@ def profile_list():
         global_config = ops.global_config
 
         profiles = global_config.profiles if hasattr(global_config, "profiles") else {}
-        current = global_config.current_profile if hasattr(global_config, "current_profile") else None
+        current = (
+            global_config.current_profile
+            if hasattr(global_config, "current_profile")
+            else None
+        )
 
         from rich.table import Table
 
@@ -66,7 +70,9 @@ def profile_list():
 @profile.command("create")
 @click.argument("name")
 @click.option("--inherits", "-i", help="Profile to inherit from")
-@click.option("--hostname", "-h", multiple=True, help="Hostnames that match this profile")
+@click.option(
+    "--hostname", "-h", multiple=True, help="Hostnames that match this profile"
+)
 def profile_create(name: str, inherits: str | None, hostname: tuple):
     """Create a new profile.
 
@@ -192,10 +198,13 @@ def profile_switch(name: str):
         # Try to switch to branch (if it exists)
         if branch in ops.git.list_branches():
             from .switch_cmd import switch
+
             ctx = click.Context(switch)
             ctx.invoke(switch, branch=branch, dry_run=False, force=True)
         else:
-            ui.console.print(f"[yellow]Branch '{branch}' does not exist - profile saved but no branch switched[/yellow]")
+            ui.console.print(
+                f"[yellow]Branch '{branch}' does not exist - profile saved but no branch switched[/yellow]"
+            )
 
         success(f"Switched to profile '{name}'")
 
@@ -219,13 +228,21 @@ def profile_detect():
         detected = _detect_profile(global_config)
 
         if detected:
-            current = global_config.current_profile if hasattr(global_config, "current_profile") else None
+            current = (
+                global_config.current_profile
+                if hasattr(global_config, "current_profile")
+                else None
+            )
 
             if detected == current:
-                ui.console.print(f"[green]Already on matching profile: {detected}[/green]")
+                ui.console.print(
+                    f"[green]Already on matching profile: {detected}[/green]"
+                )
             else:
                 ui.console.print(f"[yellow]Detected profile: {detected}[/yellow]")
-                ui.console.print(f"  Run 'dot-man profile switch {detected}' to activate")
+                ui.console.print(
+                    f"  Run 'dot-man profile switch {detected}' to activate"
+                )
         else:
             warn("No matching profile found")
 

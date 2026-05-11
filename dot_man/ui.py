@@ -9,19 +9,22 @@ from rich.prompt import Confirm, Prompt
 from rich.theme import Theme
 
 # Custom theme for consistent branding
-theme = Theme({
-    "info": "cyan",
-    "success": "green",
-    "warning": "yellow",
-    "error": "red bold",
-    "highlight": "magenta bold",
-    "dim": "dim",
-    "key": "blue bold",
-    "value": "white",
-})
+theme = Theme(
+    {
+        "info": "cyan",
+        "success": "green",
+        "warning": "yellow",
+        "error": "red bold",
+        "highlight": "magenta bold",
+        "dim": "dim",
+        "key": "blue bold",
+        "value": "white",
+    }
+)
 
 console = Console(theme=theme)
 error_console = Console(theme=theme, stderr=True)
+
 
 def print_banner(title: str, subtitle: str = "") -> None:
     """Print a styled banner."""
@@ -37,17 +40,21 @@ def print_banner(title: str, subtitle: str = "") -> None:
         )
     )
 
+
 def info(message: str) -> None:
     """Print an info message."""
     console.print(f"[info]ℹ[/info]  {message}")
+
 
 def success(message: str) -> None:
     """Print a success message."""
     console.print(f"[success]✓[/success] {message}")
 
+
 def warn(message: str) -> None:
     """Print a warning message."""
     console.print(f"[warning]⚠[/warning] {message}")
+
 
 def error(message: str, exit_code: int = 1) -> None:
     """Print an error message and optionally exit."""
@@ -55,22 +62,33 @@ def error(message: str, exit_code: int = 1) -> None:
     if exit_code != 0:
         sys.exit(exit_code)
 
+
 def confirm(question: str, default: bool = False) -> bool:
     """Ask a yes/no question."""
     return Confirm.ask(f"[bold]{question}[/bold]", default=default, console=console)
 
-def ask(question: str, default: Any = None, choices: Optional[list[str]] = None, show_default: bool = True) -> Any:
+
+def ask(
+    question: str,
+    default: Any = None,
+    choices: Optional[list[str]] = None,
+    show_default: bool = True,
+) -> Any:
     """Ask for user input."""
     return Prompt.ask(
         f"[bold]{question}[/bold]",
         default=default,
         choices=choices,
         show_default=show_default,
-        console=console
+        console=console,
     )
 
-def suggest_command(mistake: str, choices: list[str], cutoff: float = 0.6) -> Optional[str]:
+
+def suggest_command(
+    mistake: str, choices: list[str], cutoff: float = 0.6
+) -> Optional[str]:
     """Suggest a command based on Levenshtein distance."""
     import difflib
+
     matches = difflib.get_close_matches(mistake, choices, n=1, cutoff=cutoff)
     return matches[0] if matches else None

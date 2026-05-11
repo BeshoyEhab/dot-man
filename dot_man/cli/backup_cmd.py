@@ -92,7 +92,9 @@ def backup_restore(backup_id: str, force: bool):
         ops = get_operations()
 
         if not force:
-            if not ui.confirm(f"Restore backup '{backup_id}'? This will overwrite local files."):
+            if not ui.confirm(
+                f"Restore backup '{backup_id}'? This will overwrite local files."
+            ):
                 return
 
         ui.console.print(f"[bold]Restoring backup {backup_id}...[/bold]")

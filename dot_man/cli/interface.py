@@ -15,8 +15,8 @@ from .common import DotManGroup
 
 @click.group(cls=DotManGroup)
 @click.version_option(version=__version__, prog_name="dot-man")
-@click.option('--verbose', '-v', is_flag=True, help='Show detailed output on console')
-@click.option('--debug', is_flag=True, help='Enable debug logging to file')
+@click.option("--verbose", "-v", is_flag=True, help="Show detailed output on console")
+@click.option("--debug", is_flag=True, help="Enable debug logging to file")
 @click.pass_context
 def cli(ctx, verbose: bool, debug: bool):
     """dot-man: The Dotfile Manager for Professionals."""
@@ -25,7 +25,7 @@ def cli(ctx, verbose: bool, debug: bool):
         try:
             DOT_MAN_DIR.mkdir(parents=True, exist_ok=True)
         except OSError:
-            pass # Init command will handle main creation
+            pass  # Init command will handle main creation
 
     log_file = DOT_MAN_DIR / "dot-man.log"
     level = logging.DEBUG if (debug or verbose) else logging.INFO
@@ -34,8 +34,8 @@ def cli(ctx, verbose: bool, debug: bool):
     logging.basicConfig(
         filename=str(log_file),
         level=level,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        filemode='a'
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+        filemode="a",
     )
 
     # If verbose, also log to console
@@ -43,7 +43,7 @@ def cli(ctx, verbose: bool, debug: bool):
         console_handler = logging.StreamHandler()
         console_handler.setLevel(logging.DEBUG)
         console_handler.setFormatter(
-            logging.Formatter('[dim]%(levelname)s:[/dim] %(message)s')
+            logging.Formatter("[dim]%(levelname)s:[/dim] %(message)s")
         )
         logging.getLogger().addHandler(console_handler)
         ui.console.print("[dim]Verbose mode enabled[/dim]")
@@ -52,5 +52,5 @@ def cli(ctx, verbose: bool, debug: bool):
 
     # Store flags in context for subcommands
     ctx.ensure_object(dict)
-    ctx.obj['DEBUG'] = debug
-    ctx.obj['VERBOSE'] = verbose
+    ctx.obj["DEBUG"] = debug
+    ctx.obj["VERBOSE"] = verbose

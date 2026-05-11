@@ -208,7 +208,7 @@ def mock_git_manager():
     Returns:
         MagicMock configured as GitManager
     """
-    with patch('dot_man.core.GitManager') as mock:
+    with patch("dot_man.core.GitManager") as mock:
         instance = MagicMock()
         instance.current_branch.return_value = "main"
         instance.list_branches.return_value = ["main", "work", "feature"]
@@ -216,7 +216,12 @@ def mock_git_manager():
         instance.branch_exists.return_value = True
         instance.is_dirty.return_value = False
         instance.get_commits.return_value = [
-            {"sha": f"{'a'*(7+i)}", "message": f"Commit {i}", "author": "Test", "date": "2026-05-10T10:00:00"}
+            {
+                "sha": f"{'a'*(7+i)}",
+                "message": f"Commit {i}",
+                "author": "Test",
+                "date": "2026-05-10T10:00:00",
+            }
             for i in range(5)
         ]
         instance.get_tag_commit.return_value = "abc1234"
@@ -273,7 +278,9 @@ def create_file(path: Path, content: str = "test") -> None:
     path.write_text(content)
 
 
-def create_git_commit(repo_dir: Path, filename: str, content: str, message: str) -> None:
+def create_git_commit(
+    repo_dir: Path, filename: str, content: str, message: str
+) -> None:
     """Create a git commit with a file."""
     repo = Repo(repo_dir)
     file_path = repo_dir / filename
@@ -302,6 +309,7 @@ class TestCLIHelpBase:
         - command: the CLI command to test
         - expected_keywords: list of keywords expected in help
     """
+
     command = None
     expected_keywords = []
 

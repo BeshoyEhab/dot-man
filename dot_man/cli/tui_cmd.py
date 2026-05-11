@@ -1,6 +1,5 @@
 """TUI command for dot-man CLI."""
 
-
 from .. import ui
 from .common import require_init
 from .interface import cli as main

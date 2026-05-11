@@ -30,9 +30,7 @@ class GitManager:
             try:
                 self._repo = Repo(self._repo_path)
             except InvalidGitRepositoryError:
-                raise NotInitializedError(
-                    f"Not a git repository: {self._repo_path}"
-                )
+                raise NotInitializedError(f"Not a git repository: {self._repo_path}")
         return self._repo
 
     def is_initialized(self) -> bool:
@@ -131,7 +129,9 @@ class GitManager:
         except (KeyError, IndexError, OSError):
             return None
 
-    def create_tag(self, name: str, ref: str = "HEAD", message: str | None = None) -> None:
+    def create_tag(
+        self, name: str, ref: str = "HEAD", message: str | None = None
+    ) -> None:
         """Create a tag at a specific commit.
 
         Args:
@@ -250,6 +250,7 @@ class GitManager:
         except GitCommandError as e:
             if "not fully merged" in str(e.stderr):
                 from .exceptions import BranchNotMergedError
+
                 raise BranchNotMergedError(f"Branch '{name}' is not fully merged")
             raise GitOperationError(f"Failed to delete branch '{name}': {e}")
         except OSError as e:
@@ -278,7 +279,9 @@ class GitManager:
     def fetch(self) -> None:
         """Fetch from origin remote."""
         if not self.has_remote():
-            raise GitOperationError("No remote configured. Use 'dot-man remote set <url>' first.")
+            raise GitOperationError(
+                "No remote configured. Use 'dot-man remote set <url>' first."
+            )
         try:
             self.repo.remotes.origin.fetch()
         except (GitCommandError, ValueError) as e:
@@ -294,7 +297,9 @@ class GitManager:
             Summary message of what happened.
         """
         if not self.has_remote():
-            raise GitOperationError("No remote configured. Use 'dot-man remote set <url>' first.")
+            raise GitOperationError(
+                "No remote configured. Use 'dot-man remote set <url>' first."
+            )
 
         stashed = False
         try:
@@ -362,7 +367,9 @@ class GitManager:
             Summary message of what happened.
         """
         if not self.has_remote():
-            raise GitOperationError("No remote configured. Use 'dot-man remote set <url>' first.")
+            raise GitOperationError(
+                "No remote configured. Use 'dot-man remote set <url>' first."
+            )
         try:
             current = self.current_branch()
             if set_upstream:
@@ -393,12 +400,20 @@ class GitManager:
 
             # Count files in branch
             tree = branch.commit.tree
-            file_count = sum(1 for _ in tree.traverse() if _.type == 'blob')  # type: ignore
+            file_count = sum(1 for _ in tree.traverse() if _.type == "blob")  # type: ignore
 
             return {
                 "commit_count": len(commits),
-                "last_commit_date": last_commit.committed_datetime.strftime("%Y-%m-%d %H:%M") if last_commit else "N/A",
-                "last_commit_msg": str(last_commit.message).strip().split("\n")[0][:50] if last_commit else "N/A",
+                "last_commit_date": (
+                    last_commit.committed_datetime.strftime("%Y-%m-%d %H:%M")
+                    if last_commit
+                    else "N/A"
+                ),
+                "last_commit_msg": (
+                    str(last_commit.message).strip().split("\n")[0][:50]
+                    if last_commit
+                    else "N/A"
+                ),
                 "file_count": file_count,
             }
         except (GitCommandError, ValueError, IndexError, OSError):
@@ -462,7 +477,12 @@ class GitManager:
             # Check if remote branch exists
             remote_refs = [ref.name for ref in self.repo.remotes.origin.refs]
             if remote_branch not in remote_refs:
-                return {"ahead": 0, "behind": 0, "remote_configured": True, "remote_branch_exists": False}
+                return {
+                    "ahead": 0,
+                    "behind": 0,
+                    "remote_configured": True,
+                    "remote_branch_exists": False,
+                }
 
             # Count ahead/behind
             ahead = len(list(self.repo.iter_commits(f"{remote_branch}..{current}")))
@@ -490,10 +510,10 @@ class GitManager:
         try:
             # Use git show to read file from branch
             from typing import cast
+
             return cast(str | None, self.repo.git.show(f"{branch}:{file_path}"))
         except GitCommandError:
             # File doesn't exist in that branch
             return None
         except (GitCommandError, ValueError, OSError):
             return None
-

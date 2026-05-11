@@ -36,12 +36,14 @@ def get_content_hash(content: str) -> str:
 def _get_secret_guard():
     """Lazy load SecretGuard only when needed."""
     from .secrets import SecretGuard
+
     return SecretGuard()
 
 
 def _get_redact_guard():
     """Lazy load PermanentRedactGuard only when needed."""
     from .secrets import PermanentRedactGuard
+
     return PermanentRedactGuard()
 
 
@@ -322,7 +324,7 @@ def copy_directory(
                     src_file,
                     dest_path,
                     secret_handler=secret_handler,
-                    check_secrets=filter_secrets_enabled
+                    check_secrets=filter_secrets_enabled,
                 )
                 all_secrets.extend(secrets)
                 if saved:

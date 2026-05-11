@@ -60,6 +60,7 @@ def substitute_templates(text: str, user_templates: dict | None = None) -> str:
 
     return result
 
+
 # Python 3.11+ has tomllib built-in, otherwise use tomli
 if sys.version_info >= (3, 11):
     import tomllib
@@ -80,7 +81,9 @@ from .constants import (
 from .exceptions import ConfigurationError
 
 
-def _write_toml(path: Path, data: dict, preserve_doc: TOMLDocument | None = None) -> None:
+def _write_toml(
+    path: Path, data: dict, preserve_doc: TOMLDocument | None = None
+) -> None:
     """Write TOML data to file, preserving comments when possible.
 
     Args:
@@ -227,7 +230,9 @@ class GlobalConfig:
     @property
     def current_branch(self) -> str:
         """Get the current branch name."""
-        return cast(str, self._data.get("dot-man", {}).get("current_branch", DEFAULT_BRANCH))
+        return cast(
+            str, self._data.get("dot-man", {}).get("current_branch", DEFAULT_BRANCH)
+        )
 
     @current_branch.setter
     def current_branch(self, value: str) -> None:
@@ -313,7 +318,9 @@ class GlobalConfig:
     def switch_default_behavior(self, value: str) -> None:
         """Set default switch behavior."""
         if value not in ("save", "no-save"):
-            raise ConfigurationError("switch.default_behavior must be 'save' or 'no-save'")
+            raise ConfigurationError(
+                "switch.default_behavior must be 'save' or 'no-save'"
+            )
         if "switch" not in self._data:
             self._data["switch"] = {}
         self._data["switch"]["default_behavior"] = value

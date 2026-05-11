@@ -111,7 +111,9 @@ def config_set(key: str, value: str):
                 current[part] = {}
             current = current[part]
             if not isinstance(current, dict):
-                error(f"Key path conflict: '{'.'.join(parts[: i + 1])}' is not a section")
+                error(
+                    f"Key path conflict: '{'.'.join(parts[: i + 1])}' is not a section"
+                )
 
         current[parts[-1]] = val
         cfg.save()
@@ -166,7 +168,9 @@ def config_create(with_examples: bool, minimal: bool, force: bool):
 
         # Check if file exists
         if config_path.exists() and not force:
-            if not ui.confirm(f"Config file already exists at {config_path}. Overwrite?"):
+            if not ui.confirm(
+                f"Config file already exists at {config_path}. Overwrite?"
+            ):
                 ui.console.print("Cancelled.")
                 return
 
@@ -251,7 +255,9 @@ def config_tutorial(section: str | None, interactive: bool):
 
     for key, title, desc in menu_options:
         if key in ["I", "C", "Q"]:
-            ui.console.print(f"  [yellow]{key}[/yellow] - [bold]{title}[/bold] - {desc}")
+            ui.console.print(
+                f"  [yellow]{key}[/yellow] - [bold]{title}[/bold] - {desc}"
+            )
         else:
             ui.console.print(f"  [cyan]{key}[/cyan] - [bold]{title}[/bold] - {desc}")
 
@@ -299,6 +305,7 @@ def _show_section_examples(section: str):
 
     from rich.panel import Panel
     from rich.syntax import Syntax
+
     examples: dict[str, dict[str, Any]] = {
         "basic": {
             "title": "Basic File Tracking",
@@ -595,9 +602,13 @@ paths = ["~/.gitconfig"]"""
     ui.console.print(
         "\n[bold cyan]📂 Step 2: Directory Tracking with Patterns[/bold cyan]"
     )
-    ui.console.print("When tracking directories, you can include/exclude specific files.")
+    ui.console.print(
+        "When tracking directories, you can include/exclude specific files."
+    )
 
-    ui.console.print("\n[bold green]✅ Neovim Config with Smart Exclusions:[/bold green]")
+    ui.console.print(
+        "\n[bold green]✅ Neovim Config with Smart Exclusions:[/bold green]"
+    )
     ui.console.print()
 
     config_text = """[nvim]

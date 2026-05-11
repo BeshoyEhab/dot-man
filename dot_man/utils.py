@@ -1,9 +1,14 @@
 """Utility functions for dot-man."""
 
 __all__ = [
-    "get_editor", "open_in_editor", "human_size",
-    "get_directory_size", "count_files",
-    "is_git_installed", "get_hostname", "get_username",
+    "get_editor",
+    "open_in_editor",
+    "human_size",
+    "get_directory_size",
+    "count_files",
+    "is_git_installed",
+    "get_hostname",
+    "get_username",
 ]
 
 import os

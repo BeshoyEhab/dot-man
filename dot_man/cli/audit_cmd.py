@@ -53,6 +53,7 @@ def audit(strict: bool, fix: bool):
 
         # Group by severity
         from typing import Dict, List
+
         by_severity: Dict[str, List[SecretMatch]] = {}
         for match in matches:
             severity = match.severity.value

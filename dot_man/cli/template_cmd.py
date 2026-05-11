@@ -133,7 +133,10 @@ def template_list():
             for key, value in sorted(templates.items()):
                 table.add_row(key, str(value))
         else:
-            table.add_row("[dim]No templates defined[/dim]", "[dim]Use 'dot-man template set'[/dim]")
+            table.add_row(
+                "[dim]No templates defined[/dim]",
+                "[dim]Use 'dot-man template set'[/dim]",
+            )
 
         ui.console.print(table)
         ui.console.print()
@@ -192,7 +195,9 @@ def template_system():
 
         ui.console.print(table)
         ui.console.print()
-        ui.console.print("[dim]Tip: Use {{HOSTNAME}}, {{USER}}, {{SHELL}} etc. in your dotfiles[/dim]")
+        ui.console.print(
+            "[dim]Tip: Use {{HOSTNAME}}, {{USER}}, {{SHELL}} etc. in your dotfiles[/dim]"
+        )
 
     except Exception as e:
         error(str(e))

@@ -131,7 +131,9 @@ def sync_branch():
             ui.info("Keeping current branch name")
             ui.console.print()
             ui.console.print("Tip: You can also set upstream manually with:")
-            ui.console.print(f"  [cyan]git push -u origin {local_current}:{remote_default}[/cyan]")
+            ui.console.print(
+                f"  [cyan]git push -u origin {local_current}:{remote_default}[/cyan]"
+            )
 
     except DotManError as e:
         error(str(e), e.exit_code)
@@ -178,6 +180,7 @@ def sync(push_only: bool, pull_only: bool):
             # Push (unless pull-only)
             if not pull_only:
                 from ..operations import get_operations
+
                 ops = get_operations()
                 if ops.pre_push_audit():
                     ui.console.print("[bold]Pushing...[/bold]")
@@ -272,10 +275,21 @@ def setup():
                         ui.console.print()
                         ui.console.print("[yellow]Repository already exists![/yellow]")
                         ui.console.print()
-                        if ui.confirm(f"Connect to existing repository '{repo_name}' instead?"):
+                        if ui.confirm(
+                            f"Connect to existing repository '{repo_name}' instead?"
+                        ):
                             # Get the repo URL using gh
                             url_result = subprocess.run(
-                                ["gh", "repo", "view", repo_name, "--json", "url", "-q", ".url"],
+                                [
+                                    "gh",
+                                    "repo",
+                                    "view",
+                                    repo_name,
+                                    "--json",
+                                    "url",
+                                    "-q",
+                                    ".url",
+                                ],
                                 capture_output=True,
                                 text=True,
                             )
@@ -287,20 +301,33 @@ def setup():
                                     global_config.load()
                                     global_config.remote_url = existing_url
                                     global_config.save()
-                                    success(f"Connected to existing repository: {existing_url}")
+                                    success(
+                                        f"Connected to existing repository: {existing_url}"
+                                    )
 
                                     # Offer to push or pull
                                     ui.console.print()
                                     action = ui.ask(
                                         "Remote may have existing content. What would you like to do?",
-                                        choices=["pull (fetch remote content)", "push (overwrite remote)", "skip"],
-                                        default="skip"
+                                        choices=[
+                                            "pull (fetch remote content)",
+                                            "push (overwrite remote)",
+                                            "skip",
+                                        ],
+                                        default="skip",
                                     )
 
                                     if action.startswith("push"):
-                                        if ui.confirm("[red]This will OVERWRITE the remote repository![/red] Continue?"):
+                                        if ui.confirm(
+                                            "[red]This will OVERWRITE the remote repository![/red] Continue?"
+                                        ):
                                             try:
-                                                git.repo.git.push("--force", "-u", "origin", git.current_branch())
+                                                git.repo.git.push(
+                                                    "--force",
+                                                    "-u",
+                                                    "origin",
+                                                    git.current_branch(),
+                                                )
                                                 success("Force pushed to remote!")
                                             except Exception as push_error:
                                                 error(f"Push failed: {push_error}")
@@ -379,18 +406,28 @@ def setup():
 
                 if "rejected" in push_err_str or "non-fast-forward" in push_err_str:
                     ui.console.print()
-                    ui.console.print("[yellow]Push rejected - remote has existing content![/yellow]")
+                    ui.console.print(
+                        "[yellow]Push rejected - remote has existing content![/yellow]"
+                    )
                     ui.console.print()
                     action = ui.ask(
                         "What would you like to do?",
-                        choices=["force-push (overwrite remote)", "pull (fetch remote first)", "skip"],
-                        default="skip"
+                        choices=[
+                            "force-push (overwrite remote)",
+                            "pull (fetch remote first)",
+                            "skip",
+                        ],
+                        default="skip",
                     )
 
                     if action.startswith("force"):
-                        if ui.confirm("[red]This will OVERWRITE the remote repository![/red] Are you sure?"):
+                        if ui.confirm(
+                            "[red]This will OVERWRITE the remote repository![/red] Are you sure?"
+                        ):
                             try:
-                                git.repo.git.push("--force", "-u", "origin", git.current_branch())
+                                git.repo.git.push(
+                                    "--force", "-u", "origin", git.current_branch()
+                                )
                                 success("Force pushed to remote!")
                             except Exception as force_error:
                                 error(f"Force push failed: {force_error}")
@@ -406,7 +443,9 @@ def setup():
                         except Exception as pull_error:
                             error(f"Pull failed: {pull_error}")
                     else:
-                        ui.console.print("Skipped. You can sync later with: [cyan]dot-man sync[/cyan]")
+                        ui.console.print(
+                            "Skipped. You can sync later with: [cyan]dot-man sync[/cyan]"
+                        )
                 else:
                     error(f"Push failed: {push_error}")
     except DotManError as e:

@@ -52,6 +52,7 @@ def handle_exception(exc: BaseException, context: str = "Operation") -> None:
     ui.console.print(f"[dim]💡 {diagnostic.suggestion}[/dim]")
     raise SystemExit(1)
 
+
 class DotManGroup(click.Group):
     """Custom Click Group to provide suggestions for typos."""
 
@@ -95,7 +96,7 @@ def parse_branch_arg(arg: str) -> dict:
         dict with keys: type (branch|tag|commit), base, target
     """
     # Pattern: branch@tag
-    match = re.match(r'^(.+)@(.+)$', arg)
+    match = re.match(r"^(.+)@(.+)$", arg)
     if match:
         base = match.group(1)
         target = match.group(2)
@@ -104,14 +105,14 @@ def parse_branch_arg(arg: str) -> dict:
             base = "HEAD"
 
         # Check if target looks like a commit SHA (7+ hex chars)
-        if re.match(r'^[a-f0-9]{7,40}$', target):
+        if re.match(r"^[a-f0-9]{7,40}$", target):
             return {"type": "commit", "base": base, "target": target}
 
         # Otherwise it's a tag
         return {"type": "tag", "base": base, "target": target}
 
     # Check if entire arg looks like a commit SHA
-    if re.match(r'^[a-f0-9]{7,40}$', arg):
+    if re.match(r"^[a-f0-9]{7,40}$", arg):
         return {"type": "commit", "base": "HEAD", "target": arg}
 
     # Check if arg is a tag (before checking if it's a branch)
@@ -121,6 +122,7 @@ def parse_branch_arg(arg: str) -> dict:
             return {"type": "tag", "base": "HEAD", "target": arg}
     except Exception as e:
         import logging
+
         logging.debug(f"Could not check tags: {e}")
 
     # Plain branch name
@@ -143,7 +145,11 @@ def complete_switch_args(ctx, param, incomplete):
                 prefix = incomplete.split("@")[0]
                 if b.startswith(prefix) and b != prefix:
                     for tag in git.list_tags():
-                        if tag.startswith(incomplete.split("@")[1] if len(incomplete.split("@")) > 1 else ""):
+                        if tag.startswith(
+                            incomplete.split("@")[1]
+                            if len(incomplete.split("@")) > 1
+                            else ""
+                        ):
                             results.append(f"{b}@{tag}")
 
         # Add tags
@@ -164,6 +170,7 @@ def complete_switch_args(ctx, param, incomplete):
         return list(set(results))
     except Exception as e:
         import logging
+
         logging.debug(f"Completion error: {e}")
         return []
 
@@ -202,6 +209,7 @@ def complete_template_keys(ctx, param, incomplete):
     """Shell completion callback for template keys."""
     try:
         from ..global_config import GlobalConfig
+
         gc = GlobalConfig()
         templates = gc.get_all_templates()
         return [k for k in templates.keys() if k.startswith(incomplete)]
@@ -213,6 +221,7 @@ def complete_config_keys(ctx, param, incomplete):
     """Shell completion callback for config keys."""
     try:
         from ..global_config import GlobalConfig
+
         GlobalConfig()  # validate it loads
         keys = [
             "dot-man.current_branch",
@@ -230,6 +239,7 @@ def complete_profiles(ctx, param, incomplete):
     """Shell completion callback for profiles."""
     try:
         from ..global_config import GlobalConfig
+
         gc = GlobalConfig()
         profiles = gc._data.get("profiles", {})
         return [k for k in profiles.keys() if k.startswith(incomplete)]
@@ -269,7 +279,9 @@ def get_secret_handler() -> Callable[[SecretMatch], str]:
         ui.console.print(
             "  2. [yellow]Protect (replace with ***REDACTED*** this time)[/yellow]"
         )
-        ui.console.print("  3. [blue]Add to skip list (skip this line every time)[/blue]")
+        ui.console.print(
+            "  3. [blue]Add to skip list (skip this line every time)[/blue]"
+        )
         ui.console.print("  4. [red]Protect forever (always replace in repo)[/red]")
         ui.console.print()
 
@@ -281,9 +293,7 @@ def get_secret_handler() -> Callable[[SecretMatch], str]:
         elif choice == "2":
             return "REDACT"
         elif choice == "3":
-            guard.add_allowed(
-                match.file, match.line_content, match.pattern_name
-            )
+            guard.add_allowed(match.file, match.line_content, match.pattern_name)
             ui.info("Added to skip list.")
             return "IGNORE"
         elif choice == "4":

@@ -13,6 +13,7 @@ def test_atomic_write_text(tmp_path):
     # Check no temp file remains
     assert not (tmp_path / "atomic.txt.tmp").exists()
 
+
 def test_atomic_write_text_overwrite(tmp_path):
     dest = tmp_path / "overwrite.txt"
     dest.write_text("Old Content", encoding="utf-8")
@@ -21,6 +22,7 @@ def test_atomic_write_text_overwrite(tmp_path):
     atomic_write_text(dest, new_content)
 
     assert dest.read_text(encoding="utf-8") == new_content
+
 
 def test_smart_save_file_identical(tmp_path):
     src = tmp_path / "src.txt"
@@ -38,6 +40,7 @@ def test_smart_save_file_identical(tmp_path):
     assert not saved
     assert not secrets
 
+
 def test_smart_save_file_modified_content(tmp_path):
     src = tmp_path / "src_mod.txt"
     dest = tmp_path / "dest_mod.txt"
@@ -50,6 +53,7 @@ def test_smart_save_file_modified_content(tmp_path):
     assert saved
     assert dest.read_text(encoding="utf-8") == "New Content"
 
+
 def test_smart_save_file_new_dest(tmp_path):
     src = tmp_path / "src_new.txt"
     dest = tmp_path / "dest_new.txt"
@@ -61,6 +65,7 @@ def test_smart_save_file_new_dest(tmp_path):
     assert saved
     assert dest.exists()
     assert dest.read_text(encoding="utf-8") == "Content"
+
 
 def test_smart_save_file_secrets(tmp_path):
     src = tmp_path / "src_secret.txt"
@@ -83,6 +88,7 @@ password = 'super_secret'
     assert "***REDACTED***" in dest_content
     # But source remains untouched? (smart_save doesn't touch source)
     assert src.read_text(encoding="utf-8") == content
+
 
 def test_smart_save_file_secrets_handler_keep(tmp_path):
     src = tmp_path / "src_keep.txt"
@@ -108,6 +114,7 @@ def test_smart_save_file_secrets_handler_keep(tmp_path):
     saved_again, secrets_again = smart_save_file(src, dest, secret_handler=handler)
     assert not saved_again
 
+
 def test_smart_save_file_ignored_secret(tmp_path):
     src = tmp_path / "src_ignored.txt"
     dest = tmp_path / "dest_ignored.txt"
@@ -126,5 +133,3 @@ def test_smart_save_file_ignored_secret(tmp_path):
     dest_content = dest.read_text(encoding="utf-8")
     assert "password = 'ignore_this_secret'" in dest_content
     assert "***REDACTED***" not in dest_content
-
-

@@ -16,7 +16,9 @@ def test_revert_file(temp_home, mock_dot_man_dir, monkeypatch):
     monkeypatch.setattr("dot_man.constants.REPO_DIR", mock_dot_man_dir / "repo")
     # Patch consumers of REPO_DIR
     monkeypatch.setattr("dot_man.config.REPO_DIR", mock_dot_man_dir / "repo")
-    monkeypatch.setattr("dot_man.global_config.GLOBAL_TOML", mock_dot_man_dir / "global.toml")
+    monkeypatch.setattr(
+        "dot_man.global_config.GLOBAL_TOML", mock_dot_man_dir / "global.toml"
+    )
     monkeypatch.setattr("dot_man.dotman_config.REPO_DIR", mock_dot_man_dir / "repo")
     monkeypatch.setattr("dot_man.operations.REPO_DIR", mock_dot_man_dir / "repo")
     monkeypatch.setattr("dot_man.save_deploy_ops.REPO_DIR", mock_dot_man_dir / "repo")
@@ -38,11 +40,14 @@ def test_revert_file(temp_home, mock_dot_man_dir, monkeypatch):
 
     # 4. Add section tracking this file
     config_file = mock_dot_man_dir / "repo" / "dot-man.toml"
-    config_file.write_text(f"""
+    config_file.write_text(
+        f"""
     [bash]
     paths = ["{local_file}"]
     repo_path = ".bashrc"
-    """, encoding="utf-8")
+    """,
+        encoding="utf-8",
+    )
 
     # Reload config
     get_operations().reload_config()
@@ -56,6 +61,7 @@ def test_revert_file(temp_home, mock_dot_man_dir, monkeypatch):
     assert "Reverted" in result.output
     assert local_file.read_text() == "alias ll='ls -l'"
 
+
 def test_revert_untracked_file(temp_home, mock_dot_man_dir, monkeypatch):
     """Test reverting a file that is not tracked."""
     runner = CliRunner()
@@ -65,7 +71,9 @@ def test_revert_untracked_file(temp_home, mock_dot_man_dir, monkeypatch):
     monkeypatch.setattr("dot_man.constants.REPO_DIR", mock_dot_man_dir / "repo")
     # Patch consumers of REPO_DIR
     monkeypatch.setattr("dot_man.config.REPO_DIR", mock_dot_man_dir / "repo")
-    monkeypatch.setattr("dot_man.global_config.GLOBAL_TOML", mock_dot_man_dir / "global.toml")
+    monkeypatch.setattr(
+        "dot_man.global_config.GLOBAL_TOML", mock_dot_man_dir / "global.toml"
+    )
     monkeypatch.setattr("dot_man.dotman_config.REPO_DIR", mock_dot_man_dir / "repo")
     monkeypatch.setattr("dot_man.operations.REPO_DIR", mock_dot_man_dir / "repo")
     monkeypatch.setattr("dot_man.save_deploy_ops.REPO_DIR", mock_dot_man_dir / "repo")
@@ -81,8 +89,9 @@ def test_revert_untracked_file(temp_home, mock_dot_man_dir, monkeypatch):
 
     result = runner.invoke(main_cli, ["revert", str(untracked_file), "--force"])
 
-    assert result.exit_code == 0 # Command runs successfully but warns
+    assert result.exit_code == 0  # Command runs successfully but warns
     assert "not tracked" in result.output
+
 
 def test_revert_interactive_abort(temp_home, mock_dot_man_dir, monkeypatch):
     """Test aborting revert in interactive mode."""
@@ -93,7 +102,9 @@ def test_revert_interactive_abort(temp_home, mock_dot_man_dir, monkeypatch):
     monkeypatch.setattr("dot_man.constants.REPO_DIR", mock_dot_man_dir / "repo")
     # Patch consumers of REPO_DIR
     monkeypatch.setattr("dot_man.config.REPO_DIR", mock_dot_man_dir / "repo")
-    monkeypatch.setattr("dot_man.global_config.GLOBAL_TOML", mock_dot_man_dir / "global.toml")
+    monkeypatch.setattr(
+        "dot_man.global_config.GLOBAL_TOML", mock_dot_man_dir / "global.toml"
+    )
     monkeypatch.setattr("dot_man.dotman_config.REPO_DIR", mock_dot_man_dir / "repo")
     monkeypatch.setattr("dot_man.operations.REPO_DIR", mock_dot_man_dir / "repo")
     monkeypatch.setattr("dot_man.save_deploy_ops.REPO_DIR", mock_dot_man_dir / "repo")

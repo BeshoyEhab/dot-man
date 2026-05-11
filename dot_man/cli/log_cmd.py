@@ -41,6 +41,7 @@ def log(count: int, diff: bool, stat: bool):
 
             # Format date nicely
             from datetime import datetime
+
             try:
                 dt = datetime.fromisoformat(date)
                 date_str = dt.strftime("%Y-%m-%d %H:%M")
@@ -105,7 +106,12 @@ def log(count: int, diff: bool, stat: bool):
 
 @main.command("diff")
 @click.argument("file", required=False, type=click.Path(path_type=Path))
-@click.option("--branch", "-b", help="Compare with another branch", shell_complete=complete_branches)
+@click.option(
+    "--branch",
+    "-b",
+    help="Compare with another branch",
+    shell_complete=complete_branches,
+)
 @click.option("--staged", is_flag=True, help="Show staged changes")
 @require_init
 def diff(file: Path | None, branch: str | None, staged: bool):
@@ -137,14 +143,18 @@ def diff(file: Path | None, branch: str | None, staged: bool):
         if branch:
             # Compare current branch with another branch
             current = ops.current_branch
-            ui.console.print(f"[bold]Comparing[/bold] [cyan]{current}[/cyan] [bold]vs[/bold] [cyan]{branch}[/cyan]")
+            ui.console.print(
+                f"[bold]Comparing[/bold] [cyan]{current}[/cyan] [bold]vs[/bold] [cyan]{branch}[/cyan]"
+            )
             ui.console.print()
 
             diff_result = git.repo.git.diff(f"{branch}...{current}")
             if diff_result:
                 ui.console.print(diff_result[:5000])
                 if len(diff_result) > 5000:
-                    ui.console.print(f"\n[dim]... {len(diff_result) - 5000} more lines[/dim]")
+                    ui.console.print(
+                        f"\n[dim]... {len(diff_result) - 5000} more lines[/dim]"
+                    )
             else:
                 success("No differences found")
         elif file:
@@ -153,6 +163,7 @@ def diff(file: Path | None, branch: str | None, staged: bool):
 
             # Find which section this file belongs to
             from ..constants import REPO_DIR
+
             for section_name in ops.get_sections():
                 section = ops.get_section(section_name)
                 for tracked_path in section.paths:
@@ -191,7 +202,9 @@ def diff(file: Path | None, branch: str | None, staged: bool):
             diff_result = git.repo.git.diff(patch=True)
             ui.console.print(diff_result[:5000])
             if len(diff_result) > 5000:
-                ui.console.print(f"\n[dim]... {len(diff_result) - 5000} more lines[/dim]")
+                ui.console.print(
+                    f"\n[dim]... {len(diff_result) - 5000} more lines[/dim]"
+                )
 
     except Exception as e:
         error(str(e))

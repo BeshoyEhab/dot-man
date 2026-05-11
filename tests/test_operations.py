@@ -284,9 +284,7 @@ class TestRestoreFileSecrets:
 
     def test_skips_binary(self, ops_env):
         ops = ops_env["ops"]
-        result = ops._restore_file_secrets(
-            Path("/fake/file.jpg"), "/original", "main"
-        )
+        result = ops._restore_file_secrets(Path("/fake/file.jpg"), "/original", "main")
         assert result is None
 
     def test_skips_various_binary_extensions(self, ops_env):
@@ -311,7 +309,5 @@ class TestRestoreFileSecrets:
         # Create a real text file
         test_file = ops_env["home"] / "test_restore.txt"
         test_file.write_text("no secrets here")
-        result = ops._restore_file_secrets(
-            test_file, str(test_file), "main"
-        )
+        result = ops._restore_file_secrets(test_file, str(test_file), "main")
         assert result is None  # No error

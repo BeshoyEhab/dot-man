@@ -9,6 +9,7 @@ class TestSecretsGuard:
     def test_guard_allow(self):
         """Test allowed secret."""
         from dot_man.secrets import SecretGuard
+
         guard = SecretGuard()
         result = guard.is_allowed("file.txt", "some text", "pattern")
         assert result is False
@@ -20,6 +21,7 @@ class TestSecretPatterns:
     def test_pattern_count(self):
         """Test pattern count."""
         from dot_man.secrets import DEFAULT_PATTERNS
+
         assert len(DEFAULT_PATTERNS) >= 10
 
 
@@ -80,6 +82,7 @@ class TestOperationsInstance:
     def test_get_operations_is_singleton(self):
         """Test that get_operations returns the same instance each call."""
         from dot_man.operations import get_operations, reset_operations
+
         reset_operations()
         ops1 = get_operations()
         ops2 = get_operations()
@@ -122,6 +125,7 @@ class TestSecretRedaction:
     def test_scan_detects_api_key(self, tmp_path):
         """Test that scanning detects a real API key pattern."""
         from dot_man.secrets import SecretScanner
+
         scanner = SecretScanner()
         test_file = tmp_path / "test.conf"
         test_file.write_text("api_key = 'sk_live_abc123def456ghi789'")
@@ -131,6 +135,7 @@ class TestSecretRedaction:
     def test_scan_clean_file(self, tmp_path):
         """Test that clean files produce no findings."""
         from dot_man.secrets import SecretScanner
+
         scanner = SecretScanner()
         test_file = tmp_path / "test.conf"
         test_file.write_text("alias ll='ls -la'\nexport PAGER=less")
@@ -144,6 +149,7 @@ class TestCanonicalizePath:
     def test_canonicalize_tilde(self):
         """Test canonicalizing tilde path."""
         from dot_man.secrets import _canonicalize_path
+
         result = _canonicalize_path("~/.bashrc")
         assert "~" not in result
         assert ".bashrc" in result
@@ -155,6 +161,7 @@ class TestSecretRedactionBehavior:
     def test_redact_replaces_secrets(self, tmp_path):
         """Test that redact_content actually replaces secrets."""
         from dot_man.secrets import SecretScanner
+
         scanner = SecretScanner()
         content = "AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
         redacted = scanner.redact_content(content, "config.env")
@@ -169,6 +176,7 @@ class TestBackupManagerBehavior:
     def test_list_backups_empty(self, tmp_path):
         """Test listing backups on empty dir."""
         from dot_man.backups import BackupManager
+
         manager = BackupManager(tmp_path / "backups")
         backups = manager.list_backups()
         assert backups == []
@@ -180,30 +188,35 @@ class TestUtilsFunctions:
     def test_human_size_bytes(self):
         """Test human_size with bytes."""
         from dot_man.utils import human_size
+
         assert "B" in human_size(500)
         assert "500" in human_size(500)
 
     def test_human_size_kb(self):
         """Test human_size with KB."""
         from dot_man.utils import human_size
+
         result = human_size(1024)
         assert "KB" in result
 
     def test_human_size_mb(self):
         """Test human_size with MB."""
         from dot_man.utils import human_size
+
         result = human_size(1024 * 1024)
         assert "MB" in result
 
     def test_human_size_gb(self):
         """Test human_size with GB."""
         from dot_man.utils import human_size
+
         result = human_size(1024 * 1024 * 1024)
         assert "GB" in result
 
     def test_human_size_large(self):
         """Test human_size with large value (PB)."""
         from dot_man.utils import human_size
+
         result = human_size(1024 * 1024 * 1024 * 1024 * 1024)
         assert "PB" in result
 
@@ -212,12 +225,14 @@ class TestUtilsFunctions:
         from pathlib import Path
 
         from dot_man.utils import get_directory_size
+
         result = get_directory_size(Path("/nonexistent/path"))
         assert result == 0
 
     def test_get_directory_size_file(self, tmp_path):
         """Test get_directory_size with a file."""
         from dot_man.utils import get_directory_size
+
         test_file = tmp_path / "test.txt"
         test_file.write_text("hello")
         result = get_directory_size(test_file)
@@ -226,6 +241,7 @@ class TestUtilsFunctions:
     def test_get_directory_size_directory(self, tmp_path):
         """Test get_directory_size with a directory."""
         from dot_man.utils import get_directory_size
+
         subdir = tmp_path / "subdir"
         subdir.mkdir()
         (subdir / "file.txt").write_text("hello")
@@ -237,12 +253,14 @@ class TestUtilsFunctions:
         from pathlib import Path
 
         from dot_man.utils import count_files
+
         result = count_files(Path("/nonexistent/path"))
         assert result == 0
 
     def test_count_files_file(self, tmp_path):
         """Test count_files with a file."""
         from dot_man.utils import count_files
+
         test_file = tmp_path / "test.txt"
         test_file.write_text("hello")
         result = count_files(test_file)
@@ -251,6 +269,7 @@ class TestUtilsFunctions:
     def test_count_files_directory(self, tmp_path):
         """Test count_files with a directory."""
         from dot_man.utils import count_files
+
         subdir = tmp_path / "subdir"
         subdir.mkdir()
         (subdir / "file1.txt").write_text("hello")
@@ -261,12 +280,14 @@ class TestUtilsFunctions:
     def test_is_git_installed(self):
         """Test is_git_installed."""
         from dot_man.utils import is_git_installed
+
         result = is_git_installed()
         assert isinstance(result, bool)
 
     def test_get_hostname(self):
         """Test get_hostname."""
         from dot_man.utils import get_hostname
+
         result = get_hostname()
         assert isinstance(result, str)
         assert len(result) > 0
@@ -274,6 +295,7 @@ class TestUtilsFunctions:
     def test_get_username(self):
         """Test get_username."""
         from dot_man.utils import get_username
+
         result = get_username()
         assert isinstance(result, str)
         assert len(result) > 0
@@ -285,6 +307,7 @@ class TestGitTagOperations:
     def test_list_tags_empty(self, git_repo):
         """Test list_tags when no tags exist."""
         from dot_man.core import GitManager
+
         git = GitManager(git_repo)
         tags = git.list_tags()
         assert tags == []
@@ -292,6 +315,7 @@ class TestGitTagOperations:
     def test_list_tags_with_tags(self, git_repo_with_tags):
         """Test list_tags with tags."""
         from dot_man.core import GitManager
+
         git = GitManager(git_repo_with_tags)
         tags = git.list_tags()
         assert len(tags) > 0
@@ -299,6 +323,7 @@ class TestGitTagOperations:
     def test_get_tag_commit(self, git_repo_with_tags):
         """Test get_tag_commit."""
         from dot_man.core import GitManager
+
         git = GitManager(git_repo_with_tags)
         tags = git.list_tags()
         if tags:
@@ -309,6 +334,7 @@ class TestGitTagOperations:
     def test_create_tag(self, git_repo):
         """Test create_tag."""
         from dot_man.core import GitManager
+
         git = GitManager(git_repo)
         git.create_tag("test-tag")
         tags = git.list_tags()
@@ -317,6 +343,7 @@ class TestGitTagOperations:
     def test_create_tag_annotated(self, git_repo):
         """Test create_tag with message (annotated tag)."""
         from dot_man.core import GitManager
+
         git = GitManager(git_repo)
         git.create_tag("annotated-tag", message="Test annotation")
         tags = git.list_tags()
@@ -325,6 +352,7 @@ class TestGitTagOperations:
     def test_delete_tag(self, git_repo_with_tags):
         """Test delete_tag."""
         from dot_man.core import GitManager
+
         git = GitManager(git_repo_with_tags)
         tags_before = git.list_tags()
         if tags_before:
@@ -339,6 +367,7 @@ class TestGlobalConfigMore:
     def test_global_config_get_defaults(self, tmp_path, monkeypatch):
         """Test get_defaults returns dict."""
         from dot_man.global_config import GlobalConfig
+
         config_file = tmp_path / "global.toml"
         config_file.write_text("[defaults]\nsecrets_filter = true\n")
         monkeypatch.setattr("dot_man.global_config.GLOBAL_TOML", config_file)
@@ -349,6 +378,7 @@ class TestGlobalConfigMore:
     def test_global_config_get_template_nonexistent(self, tmp_path, monkeypatch):
         """Test get_template returns None for nonexistent."""
         from dot_man.global_config import GlobalConfig
+
         config_file = tmp_path / "global.toml"
         config_file.write_text("")
         monkeypatch.setattr("dot_man.global_config.GLOBAL_TOML", config_file)
@@ -359,6 +389,7 @@ class TestGlobalConfigMore:
     def test_global_config_get_all_templates(self, tmp_path, monkeypatch):
         """Test get_all_templates returns dict."""
         from dot_man.global_config import GlobalConfig
+
         config_file = tmp_path / "global.toml"
         config_file.write_text("")
         monkeypatch.setattr("dot_man.global_config.GLOBAL_TOML", config_file)
@@ -369,6 +400,7 @@ class TestGlobalConfigMore:
     def test_switch_default_behavior_property(self, tmp_path, monkeypatch):
         """Test switch_default_behavior property default."""
         from dot_man.global_config import GlobalConfig
+
         config_file = tmp_path / "global.toml"
         config_file.write_text("")
         monkeypatch.setattr("dot_man.global_config.GLOBAL_TOML", config_file)
@@ -382,6 +414,7 @@ class TestFilesModule:
     def test_ensure_directory(self, tmp_path):
         """Test ensure_directory creates directories."""
         from dot_man.files import ensure_directory
+
         test_dir = tmp_path / "sub" / "deep" / "dir"
         ensure_directory(test_dir)
         assert test_dir.exists()
@@ -390,12 +423,14 @@ class TestFilesModule:
     def test_ensure_directory_existing(self, tmp_path):
         """Test ensure_directory with existing directory."""
         from dot_man.files import ensure_directory
+
         ensure_directory(tmp_path)
         assert tmp_path.exists()
 
     def test_atomic_write_text(self, tmp_path):
         """Test atomic_write_text creates file."""
         from dot_man.files import atomic_write_text
+
         test_file = tmp_path / "test.txt"
         atomic_write_text(test_file, "hello world")
         assert test_file.exists()
@@ -404,6 +439,7 @@ class TestFilesModule:
     def test_atomic_write_text_overwrite(self, tmp_path):
         """Test atomic_write_text overwrites file."""
         from dot_man.files import atomic_write_text
+
         test_file = tmp_path / "test.txt"
         atomic_write_text(test_file, "first")
         atomic_write_text(test_file, "second")
@@ -412,6 +448,7 @@ class TestFilesModule:
     def test_get_file_status_new(self, tmp_path):
         """Test get_file_status for new file."""
         from dot_man.files import get_file_status
+
         src = tmp_path / "source.txt"
         dest = tmp_path / "dest.txt"
         src.write_text("content")
@@ -421,6 +458,7 @@ class TestFilesModule:
     def test_get_file_status_modified(self, tmp_path):
         """Test get_file_status for modified file."""
         from dot_man.files import get_file_status
+
         src = tmp_path / "source.txt"
         dest = tmp_path / "dest.txt"
         src.write_text("new content")
@@ -431,6 +469,7 @@ class TestFilesModule:
     def test_get_file_status_identical(self, tmp_path):
         """Test get_file_status for identical file."""
         from dot_man.files import get_file_status
+
         src = tmp_path / "source.txt"
         dest = tmp_path / "dest.txt"
         src.write_text("same content")
@@ -441,6 +480,7 @@ class TestFilesModule:
     def test_compare_files_identical(self, tmp_path):
         """Test compare_files for identical files."""
         from dot_man.files import compare_files
+
         f1 = tmp_path / "file1.txt"
         f2 = tmp_path / "file2.txt"
         f1.write_text("hello")
@@ -451,6 +491,7 @@ class TestFilesModule:
     def test_compare_files_different(self, tmp_path):
         """Test compare_files for different files."""
         from dot_man.files import compare_files
+
         f1 = tmp_path / "file1.txt"
         f2 = tmp_path / "file2.txt"
         f1.write_text("hello")
@@ -461,6 +502,7 @@ class TestFilesModule:
     def test_compare_files_binary(self, tmp_path):
         """Test compare_files for binary files."""
         from dot_man.files import compare_files
+
         f1 = tmp_path / "bin1"
         f2 = tmp_path / "bin2"
         f1.write_bytes(b"\x00\x01\x02")
@@ -471,6 +513,7 @@ class TestFilesModule:
     def test_compare_files_nonexistent_dest(self, tmp_path):
         """Test compare_files when dest doesn't exist."""
         from dot_man.files import compare_files
+
         f1 = tmp_path / "file1.txt"
         f2 = tmp_path / "file2.txt"
         f1.write_text("hello")
@@ -484,6 +527,7 @@ class TestGitManagerMore:
     def test_add_all(self, git_repo):
         """Test add_all stages all changes."""
         from dot_man.core import GitManager
+
         git = GitManager(git_repo)
         (git_repo / "new.txt").write_text("content")
         git.add_all()
@@ -493,6 +537,7 @@ class TestGitManagerMore:
     def test_commit_changes(self, git_repo):
         """Test commit creates a commit."""
         from dot_man.core import GitManager
+
         git = GitManager(git_repo)
         (git_repo / "new.txt").write_text("content")
         result = git.commit("Test commit")
@@ -502,6 +547,7 @@ class TestGitManagerMore:
     def test_commit_nothing_to_commit(self, git_repo):
         """Test commit returns None when nothing to commit."""
         from dot_man.core import GitManager
+
         git = GitManager(git_repo)
         result = git.commit("Empty commit")
         assert result is None
@@ -509,6 +555,7 @@ class TestGitManagerMore:
     def test_current_branch(self, git_repo):
         """Test current_branch returns branch name."""
         from dot_man.core import GitManager
+
         git = GitManager(git_repo)
         branch = git.current_branch()
         assert branch == "main" or branch == "master"
@@ -516,6 +563,7 @@ class TestGitManagerMore:
     def test_get_all_branch_stats(self, git_repo_with_branches):
         """Test get_all_branch_stats returns list."""
         from dot_man.core import GitManager
+
         git = GitManager(git_repo_with_branches)
         stats = git.get_all_branch_stats()
         assert isinstance(stats, list)
@@ -523,5 +571,6 @@ class TestGitManagerMore:
     def test_has_remote_false(self, git_repo):
         """Test has_remote returns False when no remote."""
         from dot_man.core import GitManager
+
         git = GitManager(git_repo)
         assert git.has_remote() is False

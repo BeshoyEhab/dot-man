@@ -1,4 +1,3 @@
-
 from unittest.mock import patch
 
 from dot_man.cli import complete_branches
@@ -23,6 +22,7 @@ def test_complete_branches_filtering(mock_git):
 
     # Test no match
     assert complete_branches(None, None, "z") == []
+
 
 @patch("dot_man.cli.common.GitManager")
 def test_complete_branches_error_handling(mock_git):

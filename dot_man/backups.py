@@ -116,12 +116,9 @@ class BackupManager:
                 if len(parts) >= 2:
                     date_str = f"{parts[0]} {parts[1][:2]}:{parts[1][2:4]}"
                     note = parts[2] if len(parts) > 2 else "auto"
-                    backups.append({
-                        "id": p.name,
-                        "date": date_str,
-                        "note": note,
-                        "path": p
-                    })
+                    backups.append(
+                        {"id": p.name, "date": date_str, "note": note, "path": p}
+                    )
 
         # Sort by ID (timestamp) descending
         return sorted(backups, key=lambda x: x["id"], reverse=True)
@@ -139,7 +136,7 @@ class BackupManager:
 
         manifest_file = backup_path / "manifest.json"
         if not manifest_file.exists():
-             raise BackupError(f"Backup '{backup_id}' is corrupt (missing manifest)")
+            raise BackupError(f"Backup '{backup_id}' is corrupt (missing manifest)")
 
         try:
             manifest = json.loads(manifest_file.read_text(encoding="utf-8"))
@@ -166,7 +163,7 @@ class BackupManager:
             return True
 
         except (OSError, json.JSONDecodeError) as e:
-             raise BackupError(f"Failed to restore backup '{backup_id}': {e}")
+            raise BackupError(f"Failed to restore backup '{backup_id}': {e}")
 
     def _rotate_backups(self) -> None:
         """Keep only the last MAX_BACKUPS backups."""
