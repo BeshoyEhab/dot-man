@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import hashlib
 import os
 import shutil
 from pathlib import Path
@@ -12,6 +11,7 @@ from .secrets import (
     SecretMatch,
     filter_secrets,
 )
+from .utils import sha256_hex
 
 __all__ = [
     "atomic_write_text",
@@ -30,7 +30,7 @@ __all__ = [
 
 def get_content_hash(content: str) -> str:
     """Get SHA256 hash of content for deduplication."""
-    return hashlib.sha256(content.encode("utf-8")).hexdigest()
+    return sha256_hex(content)
 
 
 def _get_secret_guard():

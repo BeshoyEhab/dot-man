@@ -2,7 +2,6 @@
 
 __all__ = ["SecretVault", "VaultError"]
 
-import hashlib
 import json
 import threading
 from contextlib import contextmanager
@@ -15,6 +14,7 @@ from .constants import DOT_MAN_DIR
 from .exceptions import DotManError
 from .files import atomic_write_text
 from .lock import FileLock, LockError
+from .utils import sha256_hex
 
 
 class VaultError(DotManError):
@@ -210,7 +210,7 @@ class SecretVault:
         f = self._get_fernet()
 
         # Compute hash for identification (to avoid duplicates or find later)
-        secret_hash = hashlib.sha256(secret_value.encode()).hexdigest()
+        secret_hash = sha256_hex(secret_value)
 
         # Encrypt
         encrypted = f.encrypt(secret_value.encode()).decode("utf-8")

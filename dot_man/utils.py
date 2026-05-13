@@ -9,12 +9,24 @@ __all__ = [
     "is_git_installed",
     "get_hostname",
     "get_username",
+    "sha256_hex",
 ]
 
+import hashlib
 import os
 import shutil
 import subprocess
 from pathlib import Path
+
+
+def sha256_hex(content: str, encoding: str = "utf-8") -> str:
+    """Return the SHA-256 hex-digest of *content*.
+
+    This is the single canonical implementation used throughout dot-man;
+    ``files.get_content_hash``, ``BaseSecretGuard._compute_hash``, and
+    ``SecretVault._perform_stash`` all delegate here to avoid duplication.
+    """
+    return hashlib.sha256(content.encode(encoding)).hexdigest()
 
 
 def get_editor() -> str:

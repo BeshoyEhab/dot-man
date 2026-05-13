@@ -80,7 +80,7 @@
 - [x] **Batch file operations** - Group reads/writes for faster switching
 - [x] **Parallel secret scanning** - Use `concurrent.futures` for large directories
 - [x] **Lazy loading** - Only load `SecretGuard` when secrets detected
-- [ ] **Content-addressable storage** - SHA-keyed deduplication (deferred to v1.1.0)
+- [x] **Content-addressable storage** - SHA-keyed deduplication (consolidated `sha256_hex` into `utils.py`)
 
 ### v0.9.0 - TUI Core Actions (DEPRECATED)
 

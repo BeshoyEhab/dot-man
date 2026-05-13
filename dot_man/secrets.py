@@ -10,7 +10,6 @@ __all__ = [
     "filter_secrets",
 ]
 
-import hashlib
 import json
 import logging
 import re
@@ -21,6 +20,7 @@ from pathlib import Path
 from typing import Callable, Iterable, Iterator, TypedDict
 
 from .constants import DOT_MAN_DIR, SECRET_REDACTION_TEXT
+from .utils import sha256_hex
 
 
 def _canonicalize_path(file_path: Path | str) -> str:
@@ -87,7 +87,7 @@ class BaseSecretGuard:
 
     def _compute_hash(self, content: str) -> str:
         """Compute SHA256 hash of the content."""
-        return hashlib.sha256(content.encode("utf-8")).hexdigest()
+        return sha256_hex(content)
 
     def _is_in_list(
         self, file_path: Path | str, line_content: str, pattern_name: str

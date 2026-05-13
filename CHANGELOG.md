@@ -30,6 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **137 ruff lint errors** fixed (unused imports, unused variables, bool comparison style, trailing whitespace)
 - Removed unused `socket` import in profile_cmd.py
 - Fixed 26 pre-existing test fixture errors (missing `git_repo`/`git_repo_with_tags` fixtures)
+- **SHA-keyed deduplication** - Consolidated three duplicate `hashlib.sha256` implementations (`files.get_content_hash`, `BaseSecretGuard._compute_hash`, `SecretVault._perform_stash`) into a single `utils.sha256_hex` helper
 
 ## [0.8.0] - 2026-05-10
 
