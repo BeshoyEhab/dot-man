@@ -20,13 +20,21 @@ class TestValidators:
         """Test that valid paths (or empty) are accepted."""
         validator = PathValidator()
 
-        # Empty is allowed (skipped)
+        # Empty is allowed (skipped) - should not raise
         doc_mock = MagicMock()
         doc_mock.text = ""
         validator.validate(doc_mock)
 
-        # Absolute or relative paths technically passed by our simple validator
+        # Absolute path - should not raise
         doc_mock.text = "/tmp/foo"
+        validator.validate(doc_mock)
+
+        # Relative path - should not raise
+        doc_mock.text = "relative/path"
+        validator.validate(doc_mock)
+
+        # Path with tilde - should not raise
+        doc_mock.text = "~/some/path"
         validator.validate(doc_mock)
 
     def test_url_validator_valid(self):
@@ -42,7 +50,11 @@ class TestValidators:
         for url in valid_urls:
             doc_mock = MagicMock()
             doc_mock.text = url
-            validator.validate(doc_mock)
+            # Valid URLs should not raise any exception
+            try:
+                validator.validate(doc_mock)
+            except Exception as e:
+                pytest.fail(f"Valid URL '{url}' raised exception: {e}")
 
     def test_url_validator_invalid(self):
         """Test invalid URLs raise ValidationError."""

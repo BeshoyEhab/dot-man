@@ -49,30 +49,37 @@ def test_lock_concurrency(tmp_path):
 
 def test_operations_lock_integration(monkeypatch, tmp_path):
     """Verify operations allow successful execution with lock."""
-    # Mock REPO_DIR/LOCK_FILE to use tmp_path
-    op = get_operations()
-    # We can't easily patch LOCK_FILE global, but we can patch FileLock
-    # to use our tmp path if we were mocking it.
-    # Instead, let's just ensure get_operations().save_all() calls FileLock.
+    import dot_man.operations
+    import dot_man.save_deploy_ops
 
-    # Mock FileLock
-    class MockLock:
+    # Track whether lock was used
+    lock_used = {"entered": False, "exited": False}
+
+    class TrackedLock:
         def __init__(self, path):
             self.path = path
 
         def __enter__(self):
-            pass
+            lock_used["entered"] = True
 
         def __exit__(self, *args):
-            pass
+            lock_used["exited"] = True
 
-    import dot_man.operations
+    # Get operations instance and patch FileLock in save_deploy_ops where it's actually used
+    op = get_operations()
+    monkeypatch.setattr(dot_man.save_deploy_ops, "FileLock", TrackedLock)
 
-    monkeypatch.setattr(dot_man.operations, "FileLock", MockLock)
+    # Mock get_sections to return empty to avoid config loading issues
+    monkeypatch.setattr(op, "get_sections", lambda: {})
 
-    # Mock get_sections to avoid config loading
-    monkeypatch.setattr(op, "get_sections", lambda: [])
+    # Run save_all - should use the lock
+    result = op.save_all()
 
-    # Just running save_all with empty config shouldn't crash
-    # This verifies the indentation/syntax issues are gone
-    op.save_all()
+    # Verify lock was used
+    assert lock_used["entered"], "FileLock was not entered"
+    assert lock_used["exited"], "FileLock was not exited"
+
+    # Verify result structure
+    assert "saved" in result
+    assert "secrets" in result
+    assert "errors" in result
