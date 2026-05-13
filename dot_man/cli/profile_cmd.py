@@ -115,6 +115,9 @@ def profile_create(name: str, inherits: str | None, hostname: tuple):
         if hostname:
             ui.console.print(f"  Hostnames: {', '.join(hostname)}")
 
+        ui.hint(f"Run 'dot-man profile set-branch {name} <branch>' to link a branch")
+        ui.hint("Or run 'dot-man profile detect' to auto-detect this profile")
+
     except Exception as e:
         error(str(e))
 

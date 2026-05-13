@@ -234,6 +234,103 @@ class GitManager:
         except (GitCommandError, ValueError, OSError):
             return
 
+    def get_commits_detailed(
+        self, count: int = 20, branch: str | None = None
+    ) -> list[dict]:
+        """Get detailed commits with file changes, tags, and stats.
+
+        Args:
+            count: Maximum number of commits to return
+            branch: Optional branch to limit commits to (default: current branch)
+
+        Returns:
+            List of dicts with detailed commit info:
+            - sha: 7-char commit hash
+            - full_sha: Full 40-char commit hash
+            - message: First line of commit message
+            - full_message: Full commit message
+            - author: Author name
+            - author_email: Author email
+            - date: ISO datetime
+            - relative_date: Human-readable date ("2 days ago")
+            - files: List of changed files (up to 5)
+            - files_more: Number of additional files if > 5
+            - insertions: Total insertions
+            - deletions: Total deletions
+            - tags: List of tags pointing to this commit
+            - is_merge: Whether this is a merge commit
+            - parent_count: Number of parents
+        """
+        commits = []
+        try:
+            ref = branch if branch and self.branch_exists(branch) else None
+            for commit in self.repo.iter_commits(ref, max_count=count):
+                files = list(commit.stats.files.keys())
+                shown_files = files[:5]
+                more = len(files) - 5 if len(files) > 5 else None
+
+                commits.append(
+                    {
+                        "sha": commit.hexsha[:7],
+                        "full_sha": commit.hexsha,
+                        "message": str(commit.message).strip().split("\n")[0],
+                        "full_message": commit.message.strip(),
+                        "author": commit.author.name,
+                        "author_email": commit.author.email,
+                        "date": commit.committed_datetime.strftime("%Y-%m-%d %H:%M"),
+                        "relative_date": self._relative_date(commit.committed_datetime),
+                        "files": shown_files,
+                        "files_more": more,
+                        "insertions": commit.stats.total.get("insertions", 0),
+                        "deletions": commit.stats.total.get("deletions", 0),
+                        "tags": self._get_tags_for_commit(commit.hexsha),
+                        "is_merge": len(commit.parents) > 1,
+                        "parent_count": len(commit.parents),
+                    }
+                )
+        except (GitCommandError, ValueError, OSError):
+            pass
+        return commits
+
+    def _relative_date(self, dt) -> str:
+        """Get human-readable relative date."""
+        from datetime import datetime, timezone
+
+        now = datetime.now(timezone.utc)
+        diff = now - dt.replace(tzinfo=timezone.utc)
+
+        seconds = diff.total_seconds()
+        if seconds < 60:
+            return "just now"
+        minutes = seconds / 60
+        if minutes < 60:
+            return f"{int(minutes)} min ago"
+        hours = minutes / 60
+        if hours < 24:
+            return f"{int(hours)} hours ago"
+        days = hours / 24
+        if days < 7:
+            return f"{int(days)} days ago"
+        weeks = days / 7
+        if weeks < 4:
+            return f"{int(weeks)} weeks ago"
+        months = days / 30
+        if months < 12:
+            return f"{int(months)} months ago"
+        years = days / 365
+        return f"{int(years)} years ago"
+
+    def _get_tags_for_commit(self, sha: str) -> list[str]:
+        """Get tags that point to a specific commit."""
+        tags = []
+        try:
+            for tag in self.repo.tags:
+                if tag.commit.hexsha.startswith(sha[:7]):
+                    tags.append(tag.name)
+        except Exception:
+            pass
+        return tags
+
     def delete_branch(self, name: str, force: bool = False) -> None:
         """Delete a branch."""
         if not self.branch_exists(name):

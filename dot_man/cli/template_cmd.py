@@ -78,6 +78,9 @@ def template_set(key: str, value: str | None, from_env: str | None):
         global_config.save()
 
         success(f"Template '{key}' = '{value}'")
+        ui.hint(
+            f"Use [cyan]{{{{{key}}}}}[/cyan] in your dotfiles to reference this value"
+        )
 
     except Exception as e:
         error(str(e))

@@ -62,7 +62,13 @@ def branch_delete(name: str, force: bool):
         global_config.load()
 
         if name == global_config.current_branch:
-            error("Cannot delete the active branch. Switch to another branch first.")
+            branches = git.list_branches()
+            available = [b for b in branches if b != name]
+            error(
+                f"Cannot delete the active branch '{name}'.\n"
+                f"  💡 Switch to another branch first: dot-man navigate <branch>\n"
+                f"  Available branches: {', '.join(available) if available else '(none)'}"
+            )
 
         if not git.branch_exists(name):
             error(f"Branch '{name}' not found")

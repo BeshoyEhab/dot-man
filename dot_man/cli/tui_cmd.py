@@ -5,23 +5,40 @@ from .common import require_init
 from .interface import cli as main
 
 
-@main.command()
+@main.command(help="⚠️ TUI is under development. Use CLI commands instead.")
 @require_init
 def tui():
     """Interactive TUI for managing dotfiles.
 
-    Note: The TUI is currently under redesign. The CLI provides all
-    core functionality. Use commands like:
+    The TUI is currently under development. For now, use the CLI commands:
 
-    - dot-man status      - Show current state
-    - dot-man switch      - Switch branches
-    - dot-man edit        - Edit configuration
-    - dot-man audit       - Scan for secrets
-    - dot-man sync        - Sync with remote
+    Navigation:
+      dot-man navigate <target>     # Switch configurations (recommended)
+      dot-man status                 # Show current state
 
-    The TUI will return in a future version with improved design.
+    Configuration:
+      dot-man edit                   # Edit dot-man.toml
+      dot-man config                 # Manage settings
+
+    Files:
+      dot-man add <path>             # Add file to tracking
+      dot-man revert <file>          # Restore from branch
+
+    Utilities:
+      dot-man audit                  # Scan for secrets
+      dot-man doctor                 # Diagnose issues
+
+    Run [cyan]dot-man --help[/cyan] to see all commands.
     """
-    ui.console.print("[yellow]TUI is temporarily unavailable.[/yellow]")
     ui.console.print()
-    ui.console.print("Use the CLI commands instead:")
-    ui.console.print("  [cyan]dot-man --help[/cyan] to see all available commands")
+    ui.console.print("[bold]📺 Interactive TUI[/bold]")
+    ui.console.print()
+    ui.console.print("[yellow]The TUI is under development.[/yellow]")
+    ui.console.print()
+    ui.console.print("[bold]Quick Navigation:[/bold]")
+    ui.console.print("  [cyan]dot-man navigate --help[/cyan]  # Switch configurations")
+    ui.console.print("  [cyan]dot-man status[/cyan]            # Show current state")
+    ui.console.print()
+    ui.console.print("[bold]Need help?[/bold]")
+    ui.console.print("  [cyan]dot-man --help[/cyan]            # All commands")
+    ui.console.print("  [cyan]dot-man doctor[/cyan]           # Diagnose issues")

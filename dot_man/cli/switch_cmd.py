@@ -1,4 +1,7 @@
-"""Switch command for dot-man CLI."""
+"""Switch command for dot-man CLI.
+
+DEPRECATED: Use 'navigate' command instead.
+"""
 
 import os
 import subprocess
@@ -36,7 +39,7 @@ class BranchParamType(click.ParamType):
 BRANCH = BranchParamType()
 
 
-@main.command()
+@main.command(deprecated=True, help="⚠️ DEPRECATED: Use 'dot-man navigate' instead")
 @click.option(
     "--dry-run",
     "-n",
@@ -81,7 +84,17 @@ def switch(branch, dry_run: bool, force: bool, save_mode):
         dot-man switch work --no-save
         dot-man switch --save work
         dot-man switch abc1234
+
+    ⚠️ DEPRECATED: Use 'dot-man navigate' instead.
+        dot-man navigate work
+        dot-man navigate work --preview
+        dot-man navigate --help
     """
+    ui.console.print(
+        "[yellow bold]⚠️ WARNING:[/yellow bold] [yellow]'switch' is deprecated.[/yellow]\n"
+        "  Use [cyan]dot-man navigate[/cyan] instead.\n"
+        "  Run [cyan]dot-man navigate --help[/cyan] to see the new command.\n"
+    )
     try:
         from ..operations import get_operations
 

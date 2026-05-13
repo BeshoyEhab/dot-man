@@ -303,7 +303,7 @@ class TestSetupWizard:
         assert "~/.mycustom" in content
 
     def test_wizard_quickshell_multiple_subdirs(self, clean_env, tmp_path):
-        """Test the Quickshell disambiguation prompt."""
+        """Test auto-detection of Quickshell configs and auto-hooks."""
         runner, dot_man_dir, repo_dir, _, _ = clean_env
 
         fake_home = tmp_path / "home"
@@ -312,30 +312,26 @@ class TestSetupWizard:
         (qs_dir / "dir1").mkdir()
         (qs_dir / "dir2").mkdir()
 
-        # confirm for final add, then False for custom, False for remote
-        confirm_answers = iter([True, False, False])
+        # confirm for both qs configs, then False for custom, False for remote
+        confirm_answers = iter([True, True, False, False])
 
         def fake_confirm(msg, **_kw):
             return next(confirm_answers, False)
 
-        # Ask: first 'invalid', then '1' (track dir1)
-        ask_answers = iter(["invalid", "1", ""])
-
-        def fake_ask(msg, **_kw):
-            return next(ask_answers, "")
-
-        with (
-            patch("dot_man.ui.confirm", side_effect=fake_confirm),
-            patch("dot_man.ui.ask", side_effect=fake_ask),
-        ):
+        with (patch("dot_man.ui.confirm", side_effect=fake_confirm),):
             result = runner.invoke(cli, ["init", "--force"])
 
         assert result.exit_code == 0, result.output
-        assert "Please enter a number" in result.output
+        assert "Quickshell - dir1" in result.output
+        assert "Quickshell - dir2" in result.output
+        assert "Auto-detected post_deploy hook" in result.output
 
         content = (repo_dir / "dot-man.toml").read_text()
-        assert "[dir1]" in content
-        assert "~/.config/quickshell/dir1" in content
+        assert "[qs-dir1]" in content or "[qs-dir2]" in content
+        assert (
+            "~/.config/quickshell/dir1" in content
+            or "~/.config/quickshell/dir2" in content
+        )
 
     def test_wizard_remote_setup_prompt(self, clean_env):
         """Test the remote setup prompt."""

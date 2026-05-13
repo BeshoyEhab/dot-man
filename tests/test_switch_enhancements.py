@@ -23,11 +23,12 @@ class TestSwitchEnhancements:
         assert "--no-save" in result.output
 
     def test_switch_help_shows_new_syntax(self, runner):
-        """Switch help should show new syntax examples."""
+        """Switch help should show deprecation notice and reference navigate."""
         result = runner.invoke(cli, ["switch", "--help"])
 
         assert result.exit_code == 0
-        assert "@" in result.output  # branch@tag syntax
+        assert "DEPRECATED" in result.output
+        assert "navigate" in result.output.lower()
 
     def test_switch_without_init(self, runner, tmp_path):
         """Switch should handle uninitialized state."""
@@ -156,8 +157,11 @@ class TestCompletionFunctions:
         with patch("dot_man.cli.common.GitManager") as mock_git:
             mock_git.return_value.list_branches.return_value = ["main", "work", "dev"]
             mock_git.return_value.list_tags.return_value = ["v1.0"]
+            mock_git.return_value.current_branch.return_value = "main"
+            mock_git.return_value.get_commits_detailed.return_value = []
             result = complete_switch_args(None, None, "w")
-            assert "work" in result
+            values = [item.value if hasattr(item, "value") else item for item in result]
+            assert "work" in values
 
     def test_complete_tags_returns_matching(self):
         """complete_tags should return matching tag names."""

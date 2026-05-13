@@ -74,6 +74,10 @@ def integration_runner(tmp_path):
         patch("dot_man.cli.common.DOT_MAN_DIR", dot_man_dir),
         patch("dot_man.cli.common.REPO_DIR", repo_dir),
         patch.dict(os.environ, {"HOME": str(home)}),
+        patch(
+            "dot_man.config_detector.ConfigDetector.QUICKSHELL_BASE_PATHS",
+            [str(home / ".config/quickshell")],
+        ),
     ]
 
     with ExitStack() as stack:

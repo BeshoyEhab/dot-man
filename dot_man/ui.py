@@ -92,3 +92,33 @@ def suggest_command(
 
     matches = difflib.get_close_matches(mistake, choices, n=1, cutoff=cutoff)
     return matches[0] if matches else None
+
+
+def hint(message: str) -> None:
+    """Print a helpful hint or suggestion."""
+    console.print(f"[dim]💡 {message}[/dim]")
+
+
+def next_steps(steps: list[str]) -> None:
+    """Print 'what to do next' suggestions.
+
+    Args:
+        steps: List of suggested next actions with commands
+    """
+    if not steps:
+        return
+
+    console.print()
+    console.print("[bold]📋 Next Steps:[/bold]")
+    for i, step in enumerate(steps, 1):
+        console.print(f"  [cyan]{i}.[/cyan] {step}")
+
+
+def section(title: str, content: str) -> None:
+    """Print a titled section with content."""
+    console.print()
+    console.print(f"[bold cyan]┌{'─' * (len(title) + 2)}┐[/bold cyan]")
+    console.print(f"[bold cyan]│[/bold cyan]  {title}  [bold cyan]│[/bold cyan]")
+    console.print(f"[bold cyan]└{'─' * (len(title) + 2)}┘[/bold cyan]")
+    if content:
+        console.print(f"  {content}")

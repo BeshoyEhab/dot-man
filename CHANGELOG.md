@@ -5,6 +5,68 @@ All notable changes to dot-man will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **Unified `navigate` command** - Single command for switching branches, tags, and commits with:
+  - `--preview, -p` - Preview changes before switching
+  - `--diff, -d` - Show full diff when previewing
+  - `--files-only` - Show only commits that changed tracked files
+- **Global hooks system** - Hooks directory (`~/.config/dot-man/hooks/`) with:
+  - `pre_switch`, `post_switch` hooks
+  - `pre_checkout`, `post_checkout` hooks
+  - Environment variables: `DOTMAN_HOOK_COMMAND`, `DOTMAN_HOOK_PHASE`, `DOTMAN_SOURCE`, `DOTMAN_TARGET`
+- **`dot-man hooks` command** - Manage hooks:
+  - `dot-man hooks list` - List available hooks
+  - `dot-man hooks create pre|post <name>` - Create hook script
+  - `dot-man hooks delete pre|post <name>` - Delete hook script
+- **Branch diff preview** - See changed files between branches when using `--preview`
+- **Commit diff display** - Show files changed in each commit with `--files-only`
+- **Enhanced commit display** - `get_commits_detailed()` shows:
+  - Tags, merge status, insertions/deletions
+  - Relative dates ("2 days ago")
+  - File changes per commit
+- **Improved shell completions** - Context-aware with dates and messages
+- **`ui.next_steps()`** - New function for "what to do next" hints
+- **`ui.hint()`** - New function for helpful hints
+- **`ui.section()`** - New function for titled sections
+- **Auto-detection for Quickshell configs** - `config_detector.py` with:
+  - `ConfigDetector.detect_quickshell_configs()` - Detects all quickshell subdirs
+  - `get_auto_hooks_for_config()` - Suggests hooks for popular configs (hyprland, nvim, kitty, etc.)
+  - Auto-detects config names like `caelestea`, `end-4`, `illogical-impulse`
+- **Auto-suggest hooks during init** - Quickshell and other popular configs get automatic `post_deploy` hooks
+- **Universal file merge system** (`merge.py`) - Manage content across all branches with markers:
+  - `UniversalMergeManager` - Extract, inject, and remove managed regions
+  - Markers: `# >>> dot-man:start <<<` and `# >>> dot-man:end <<<`
+- **Comprehensive hook library** - 25+ reload commands for:
+  - Shells: bash, zsh, fish
+  - Window managers: hyprland, sway, i3, awesome
+  - Terminals: kitty, alacritty, wezterm
+  - Bars: polybar, waybar
+  - Editors: nvim, vim, emacs
+  - Tools: tmux, starship, fzf
+  - `get_hook_for_config()` - Auto-detect appropriate hook
+  - `list_all_hooks()` - List hooks by category
+  - `reload_all_dots()` - Generate commands to reload all configs
+- **Auto-detect hooks on branch switch** - When switching branches, dot-man now:
+  - Detects which files changed between branches
+  - Identifies corresponding configs (nvim, hyprland, quickshell, etc.)
+  - Automatically adds relevant reload hooks to post_hooks
+  - `get_changed_files_between_branches()` - Get diff between branches
+  - `detect_hooks_for_changed_files()` - Map files to appropriate hooks
+
+### Changed
+- **`switch` command** - Marked as DEPRECATED, shows warning and points to `navigate`
+- **`checkout` command** - Marked as DEPRECATED, shows warning and points to `navigate`
+- **`tui` command** - Updated help text with quick navigation commands
+- **Commit display** - Now uses box format and shows detailed info (tags, stats, files)
+- **Branch diff preview** - Now uses box format with emoji indicators (🔀, 📁, 📌)
+
+### Deprecated
+- `switch` → Use `navigate` instead
+- `checkout` → Use `navigate` instead
+- `tag switch` → Use `navigate` instead
+
 ## [0.9.0] - 2026-05-10
 
 ### Added
