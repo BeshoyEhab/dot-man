@@ -5,100 +5,74 @@ from pathlib import Path
 import click
 
 from .. import ui
-from .common import complete_branches, complete_tags, error, require_init, success, warn
+from .common import complete_branches, complete_tags, error, require_init, success
 from .interface import cli as main
 
 
 @main.command()
-@click.option("-n", "--count", default=10, help="Number of commits to show")
-@click.option("--diff", "-d", is_flag=True, help="Show diff for each commit")
+@click.argument("file", required=False, type=click.Path(path_type=Path))
+@click.option("-n", "--count", type=int, help="Number of commits to show")
+@click.option(
+    "--diff", "-d", "show_diff", is_flag=True, help="Show diff for each commit"
+)
 @click.option("--stat", is_flag=True, help="Show file change statistics")
+@click.option("--interactive", "-i", is_flag=True, help="Interactive log browser")
 @require_init
-def log(count: int, diff: bool, stat: bool):
-    """Show commit history with optional diffs.
+def log(
+    file: Path | None, count: int | None, show_diff: bool, stat: bool, interactive: bool
+):
+    """Show commit history.
 
     Examples:
         dot-man log
+        dot-man log .bashrc
         dot-man log -n 20
         dot-man log --diff
-        dot-man log --diff --stat
+        dot-man log --interactive
     """
     try:
-        from ..operations import get_operations
+        import subprocess
 
-        ops = get_operations()
-        commits = list(ops.git.get_commits(count=count))
+        from ..constants import REPO_DIR
 
-        if not commits:
-            warn("No commits found")
+        if interactive:
+            from ..tui_log import LogViewerApp
+
+            app = LogViewerApp()
+            app.run()
             return
 
-        for i, commit in enumerate(commits):
-            sha = commit["sha"]
-            message = commit["message"]
-            author = commit["author"]
-            date = commit["date"]
+        git_args = ["git", "log", "--color=always"]
+        if count:
+            git_args.append(f"-n{count}")
+        if show_diff:
+            git_args.append("-p")
+        if stat:
+            git_args.append("--stat")
 
-            # Format date nicely
-            from datetime import datetime
+        if file:
+            from ..operations import get_operations
 
-            try:
-                dt = datetime.fromisoformat(date)
-                date_str = dt.strftime("%Y-%m-%d %H:%M")
-            except Exception:
-                date_str = date
+            ops = get_operations()
+            target_file = file.expanduser().resolve()
+            found = False
+            for section_name in ops.get_sections():
+                section = ops.get_section(section_name)
+                for tracked_path in section.paths:
+                    if tracked_path.resolve() == target_file:
+                        repo_path = section.get_repo_path(tracked_path, REPO_DIR)
+                        git_args.extend(["--", str(repo_path.relative_to(REPO_DIR))])
+                        found = True
+                        break
+                if found:
+                    break
 
-            # Print commit header
-            ui.console.print()
-            ui.console.print(f"[bold cyan]{sha}[/bold cyan] [dim]{date_str}[/dim]")
-            ui.console.print(f"[bold]{message}[/bold]")
-            ui.console.print(f"[dim]by {author}[/dim]")
+            if not found:
+                error(f"File not tracked: {target_file}")
+                return
 
-            # Show stat if requested
-            if stat:
-                try:
-                    commit_obj = ops.git.repo.commit(sha)
-                    files_changed = len(commit_obj.stats.files)
-                    insertions = commit_obj.stats.total.get("insertions", 0)
-                    deletions = commit_obj.stats.total.get("deletions", 0)
-                    ui.console.print(
-                        f"  [green]+{insertions}[/green] [red]-{deletions}[/red] "
-                        f"({files_changed} file{'s' if files_changed != 1 else ''})"
-                    )
-                except Exception:
-                    pass
-
-            # Show diff if requested
-            if diff:
-                try:
-                    # Get parent commit for diff
-                    commit_obj = ops.git.repo.commit(sha)
-                    parent = commit_obj.parents[0] if commit_obj.parents else None
-
-                    if parent:
-                        diff_text = ops.git.repo.git.diff(
-                            parent.hexsha, commit_obj.hexsha, patch=True
-                        )
-                        if diff_text:
-                            ui.console.print()
-                            # Use a fixed-width font for diff
-                            ui.console.print(
-                                f"[dim]{diff_text[:2000]}[/dim]"
-                                + ("... [truncated]" if len(diff_text) > 2000 else "")
-                            )
-                    else:
-                        # First commit - show all files
-                        diff_text = ops.git.repo.git.show(commit_obj.hexsha, patch=True)
-                        if diff_text:
-                            ui.console.print()
-                            ui.console.print(
-                                f"[dim]{diff_text[:2000]}[/dim]"
-                                + ("... [truncated]" if len(diff_text) > 2000 else "")
-                            )
-                except Exception as e:
-                    ui.console.print(f"[dim]  (diff unavailable: {e})[/dim]")
-
-        ui.console.print()
+        # Let git handle the pager and standard output natively
+        subprocess.run(git_args, cwd=REPO_DIR)
 
     except Exception as e:
         error(str(e))
@@ -123,88 +97,47 @@ def diff(file: Path | None, branch: str | None, staged: bool):
         dot-man diff .bashrc            # Show changes for specific file
     """
     try:
-        from ..operations import get_operations
+        import subprocess
 
-        ops = get_operations()
-        git = ops.git
+        from ..constants import REPO_DIR
+
+        git_args = ["git", "diff", "--color=always"]
 
         if staged:
-            # Show staged changes
-            staged_files = git.repo.index.diff("HEAD")
-            if not staged_files:
-                warn("No staged changes")
-                return
-
-            ui.console.print("[bold]Staged Changes:[/bold]")
-            for f in staged_files:
-                ui.console.print(f"  {f.a_path}")
-            return
+            git_args.append("--staged")
 
         if branch:
-            # Compare current branch with another branch
+            from ..operations import get_operations
+
+            ops = get_operations()
             current = ops.current_branch
-            ui.console.print(
-                f"[bold]Comparing[/bold] [cyan]{current}[/cyan] [bold]vs[/bold] [cyan]{branch}[/cyan]"
-            )
-            ui.console.print()
+            git_args.append(f"{branch}...{current}")
 
-            diff_result = git.repo.git.diff(f"{branch}...{current}")
-            if diff_result:
-                ui.console.print(diff_result[:5000])
-                if len(diff_result) > 5000:
-                    ui.console.print(
-                        f"\n[dim]... {len(diff_result) - 5000} more lines[/dim]"
-                    )
-            else:
-                success("No differences found")
-        elif file:
-            # Show diff for specific file
+        if file:
+            from ..operations import get_operations
+
+            ops = get_operations()
             target_file = file.expanduser().resolve()
-
-            # Find which section this file belongs to
-            from ..constants import REPO_DIR
-
+            found = False
             for section_name in ops.get_sections():
                 section = ops.get_section(section_name)
                 for tracked_path in section.paths:
                     if tracked_path.resolve() == target_file:
                         repo_path = section.get_repo_path(tracked_path, REPO_DIR)
+                        # Use git diff --no-index to compare the file in repo with the local file outside repo
+                        git_args.extend(
+                            ["--no-index", str(repo_path), str(target_file)]
+                        )
+                        found = True
+                        break
+                if found:
+                    break
 
-                        # Compare local vs repo
-                        if target_file.exists():
-                            local_content = target_file.read_text()
-                        else:
-                            local_content = ""
-
-                        if repo_path.exists():
-                            repo_content = repo_path.read_text()
-                        else:
-                            repo_content = ""
-
-                        if local_content == repo_content:
-                            success("File is identical to repository version")
-                        else:
-                            ui.console.print(f"[bold]Changes for:[/bold] {target_file}")
-                            diff_result = git.repo.git.diff(
-                                repo_path, target_file, patch=True
-                            )
-                            ui.console.print(diff_result[:3000])
-                        return
-
-            error(f"File not tracked: {target_file}")
-        else:
-            # Show uncommitted changes (working tree vs staging)
-            if not git.is_dirty():
-                success("No uncommitted changes")
+            if not found:
+                error(f"File not tracked: {target_file}")
                 return
 
-            ui.console.print("[bold]Uncommitted Changes:[/bold]")
-            diff_result = git.repo.git.diff(patch=True)
-            ui.console.print(diff_result[:5000])
-            if len(diff_result) > 5000:
-                ui.console.print(
-                    f"\n[dim]... {len(diff_result) - 5000} more lines[/dim]"
-                )
+        subprocess.run(git_args, cwd=REPO_DIR)
 
     except Exception as e:
         error(str(e))
@@ -261,7 +194,6 @@ def checkout(target: str):
 
 def _checkout_commit(ops, current_branch: str, commit_sha: str):
     """Checkout a specific commit."""
-    from .. import ui
 
     # Check if it's a valid commit
     try:
@@ -291,8 +223,6 @@ def _checkout_commit(ops, current_branch: str, commit_sha: str):
 
 def _checkout_tag(ops, current_branch: str, tag_name: str):
     """Checkout a specific tag."""
-    from .. import ui
-    from .common import success
 
     tag_commit = ops.git.get_tag_commit(tag_name)
     if not tag_commit:

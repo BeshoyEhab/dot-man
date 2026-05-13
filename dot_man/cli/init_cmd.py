@@ -116,9 +116,14 @@ def run_setup_wizard(
 
         # Special handling for Quickshell ambiguity
         if section_name == "quickshell" and path.exists():
-            subdirs = [
-                d for d in path.iterdir() if d.is_dir() and not d.name.startswith(".")
-            ]
+            subdirs = sorted(
+                [
+                    d
+                    for d in path.iterdir()
+                    if d.is_dir() and not d.name.startswith(".")
+                ],
+                key=lambda x: x.name,
+            )
             if len(subdirs) > 1:
                 found_count += 1
                 ui.console.print(
@@ -154,7 +159,7 @@ def run_setup_wizard(
                                 final_path_str = path_str
                             else:
                                 final_section = selected_path.name
-                                final_path_str = str(selected_path)
+                                final_path_str = f"{path_str}/{selected_path.name}"
 
                             if ui.confirm(
                                 f"    Track '{final_section}'?", default=True

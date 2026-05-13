@@ -102,26 +102,24 @@
 ## Test Coverage (Current: ~46%, Target: 80%)
 
 Priority files needing tests:
-- [ ] **`tui.py`** - 0% → 50%+
-- [ ] **`tui_editor.py`** - 0% → 50%+
-- [ ] **`cli/remote_cmd.py`** - 10% → 60%+
-- [ ] **`cli/edit_cmd.py`** - 16% → 60%+
-- [ ] **`cli/init_cmd.py`** - 30% → 60%+
+- [x] **`cli/remote_cmd.py`** - 10% → 60%+
+- [x] **`cli/edit_cmd.py`** - 16% → 60%+
+- [x] **`cli/init_cmd.py`** - 30% → 60%+
 
 ---
 
 ## Feature Roadmap
 
-### v0.12.0 - Diff & History
+### v0.12.0 - Git Wrapper CLI Commands ✅
 
-- [ ] `dot-man diff` - Show changes between branches
-- [ ] `dot-man diff <file>` - Show local vs repo diff
-- [ ] `dot-man log` - Show commit history with files changed
-- [ ] `dot-man log <file>` - Show file-specific history
-- [ ] `dot-man log --interactive` - Interactive log browser
-- [ ] `dot-man restore <file> <commit>` - Restore from history
-- [ ] TUI: Log viewer with commit list, file changes, and diff preview
-- [ ] CLI: `dot-man show <commit>` - View full diff for a specific commit
+- [x] `dot-man diff` - Show uncommitted changes
+- [x] `dot-man diff --branch <name>` - Compare branches
+- [x] `dot-man diff <file>` - Compare specific file
+- [x] `dot-man log` - Show commit history
+- [x] `dot-man log --diff` - Show log with patch
+- [x] `dot-man log --interactive` - TUI Log viewer
+- [x] `dot-man show <commit>` - View full diff for a specific commit
+- [x] `dot-man restore <file> <commit>` - Restore from history
 
 ### v0.13.0 - Template Variables ✅
 

@@ -30,7 +30,9 @@ from .log_cmd import checkout, diff, log
 from .main import main
 from .profile_cmd import profile
 from .remote_cmd import remote, sync
+from .restore_cmd import restore
 from .revert_cmd import revert
+from .show_cmd import show
 from .status_cmd import status
 from .switch_cmd import switch
 from .tag_cmd import tag
@@ -62,10 +64,12 @@ __all__ = [
     "tui",
     "config",
     "revert",
+    "restore",
     "clean",
     "doctor",
     "verify",
     "log",
+    "show",
     "checkout",
     "diff",
     "tag",
