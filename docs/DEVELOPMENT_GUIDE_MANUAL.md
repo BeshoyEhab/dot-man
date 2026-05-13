@@ -8,12 +8,17 @@
 This manual is divided into several modules, each covering a specific layer of the system:
 
 - **[System Overview (This File)](./DEVELOPMENT_GUIDE_MANUAL.md)**: High-level concepts, data flow, secret lifecycle, and architecture diagram.
+- **[Architecture (High Level)](./ARCHITECTURE.md)**: Broad system architecture, layer diagrams, and configuration schemas.
+- **[Roadmap](./docs/ROADMAP.md)**: A roadmap of features to be implemented.
 - **[CLI System Deep Dive](./modules/cli_system.md)**: Command lifecycle, Click registration mechanics, `DotManGroup` typo suggestions, error handling, and a breakdown of all 21 command modules.
 - **[Core System Deep Dive](./modules/core_system.md)**: The `DotManOperations` singleton, mixin patterns, two-phase deployment, vault encryption batching, concurrency models, and caching internals.
 - **[Codebase Review & Improvements](./review/improvements.md)**: Technical debt analysis, known limitations, missing documentation areas, and roadmap proposals.
-- **[Architecture (High Level)](./ARCHITECTURE.md)**: Broad system architecture, layer diagrams, and configuration schemas.
 - **[Command Specifications](./specs/commands.md)**: Specific inputs, outputs, and behaviors for CLI commands.
 - **[Security Specifications](./specs/security.md)**: Secret detection logic and severity levels.
+- **[Change Log](./CHANGELOG.md)**: A log of changes made to the codebase.
+- **[Agents](./AGENTS.md)**: Instructions for AI models working on the dot-man project.
+- **[Contributors](./CONTRIBUTING.md)**: Guidelines for contributing to the project.
+- **[TODO](./TODO.md)**: A list of tasks to be completed.
 
 ---
 
