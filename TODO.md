@@ -3,7 +3,7 @@
 ### main idea v0.0.0
 
 - [ ] make it more simple for user, by UX and toutorial and the starting initialize (init after start then offer make first branch).
-- [ ] after switching it should kill the qs then open it to start
+- [ ] after switching it should kill the qs then open it to start and make hyperctl reload
 
 ## Completed Releases
 
