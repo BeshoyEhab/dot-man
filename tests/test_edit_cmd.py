@@ -94,9 +94,25 @@ class TestEditHelp:
 
 
 class TestEditRequiresInit:
-    def test_edit_without_init_fails(self, runner):
-        result = runner.invoke(cli, ["edit", "--raw"])
-        assert result.exit_code != 0 or "not initialized" in result.output.lower()
+    def test_edit_without_init_fails(self, runner, tmp_path):
+        fake_dot_man = tmp_path / "fake_config" / "dot-man"
+        fake_repo = fake_dot_man / "repo"
+
+        patches = [
+            patch("dot_man.constants.DOT_MAN_DIR", fake_dot_man),
+            patch("dot_man.constants.REPO_DIR", fake_repo),
+            patch("dot_man.cli.common.DOT_MAN_DIR", fake_dot_man),
+            patch("dot_man.cli.common.REPO_DIR", fake_repo),
+            patch("dot_man.cli.edit_cmd.REPO_DIR", fake_repo),
+        ]
+
+        with ExitStack() as stack:
+            for p in patches:
+                stack.enter_context(p)
+            result = runner.invoke(cli, ["edit", "--raw"])
+
+        assert result.exit_code != 0
+        assert "not initialized" in result.output.lower()
 
 
 class TestEditRawMode:
