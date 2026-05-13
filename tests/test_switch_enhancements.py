@@ -32,6 +32,7 @@ class TestSwitchEnhancements:
     def test_switch_without_init(self, runner, tmp_path):
         """Switch should handle uninitialized state."""
         from unittest.mock import patch
+
         with patch("dot_man.cli.common.REPO_DIR", tmp_path / "norepo"):
             result = runner.invoke(cli, ["switch", "main"])
             assert result.exit_code == 1
