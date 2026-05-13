@@ -1,204 +1,142 @@
 # Developer Guide
+> **Phase 4 of the dot-man Development Guide Manual**
 
-Welcome to the `dot-man` development guide! This document provides instructions for setting up your development environment, running tests, and understanding the project structure.
+Welcome to the `dot-man` development guide! This document provides instructions for setting up your development environment, navigating the architecture, running the rigorous test suite, and contributing core features.
 
 ## 📚 Documentation Index
 
-Detailed specifications have been moved to the `docs/` directory:
-
-- **[Command Specifications](docs/specs/commands.md)**: Detailed behavior, options, and error codes for all CLI commands.
+- **[Architecture](docs/ARCHITECTURE.md)**: Full system architecture, layer diagrams, schema, and design tradeoffs.
+- **[Development Guide Manual](docs/DEVELOPMENT_GUIDE_MANUAL.md)**: Deep in-depth system explanation.
+- **[Command Specifications](docs/specs/commands.md)**: Detailed behavior for all CLI commands.
 - **[Security Specification](docs/specs/security.md)**: Secret detection, filtering logic, and auditing.
-- **[Roadmap & Timeline](docs/roadmap.md)**: Development phases, milestones, and success metrics.
+- **[Roadmap & Timeline](docs/roadmap.md)**: Development phases and milestones.
+
+---
 
 ## 🛠️ Development Setup
 
-### Prerequisites
-
+### 1. Prerequisites
 - Python 3.9+
 - Git
-- `pip` or `uv` (recommended)
+- `pip` or `uv` (recommended for faster dependency resolution)
 
-### 1. Clone the Repository
-
+### 2. Clone & Virtual Environment
 ```bash
 git clone https://github.com/BeshoyEhab/dot-man.git
 cd dot-man
-```
-
-### 2. Create a Virtual Environment
-
-```bash
 python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-### 3. Install Dependencies
-
+### 3. Install Dependencies & Hooks
 ```bash
+# Install package in editable mode with development tools
 pip install -e ".[dev]"
+
+# (Optional but recommended) Install pre-commit hooks
+pip install pre-commit
+pre-commit install
 ```
-
-This installs the package in editable mode along with development dependencies (pytest, black, mypy, ruff, etc.).
-
-## 🧪 Running Tests
-
-We use `pytest` for testing.
-
-### Run All Tests
-
-```bash
-pytest
-```
-
-### Run with Coverage
-
-```bash
-pytest --cov=dot_man --cov-report=term-missing
-```
-
-### Run Specific Test File
-
-```bash
-pytest tests/test_core.py
-```
-
-## 📂 Project Structure
-
-```
-dot-man/
-├── dot_man/              # Source code
-│   ├── __init__.py       # Package version
-│   ├── cli/              # CLI commands (modular Click package)
-│   │   ├── __init__.py   # CLI exports
-│   │   ├── main.py       # Entry point
-│   │   ├── interface.py  # Click group definition
-│   │   ├── common.py     # Shared CLI utilities
-│   │   ├── init_cmd.py   # dot-man init
-│   │   ├── add_cmd.py    # dot-man add
-│   │   ├── status_cmd.py # dot-man status
-│   │   ├── switch_cmd.py # dot-man switch
-│   │   ├── deploy_cmd.py # dot-man deploy
-│   │   ├── edit_cmd.py   # dot-man edit
-│   │   ├── audit_cmd.py  # dot-man audit
-│   │   ├── backup_cmd.py # dot-man backup
-│   │   ├── branch_cmd.py # dot-man branch
-│   │   ├── remote_cmd.py # dot-man remote / sync
-│   │   ├── config_cmd.py # dot-man config
-│   │   ├── clean_cmd.py  # dot-man clean
-│   │   ├── revert_cmd.py # dot-man revert
-│   │   └── tui_cmd.py    # dot-man tui
-│   ├── operations.py     # Business logic (single source of truth)
-│   ├── core.py           # Git operations wrapper
-│   ├── config.py         # TOML configuration parsing
-│   ├── constants.py      # Paths, defaults, patterns
-│   ├── files.py          # File operations (atomic copy, move)
-│   ├── secrets.py        # Secret detection logic
-│   ├── vault.py          # Encrypted secret vault
-│   ├── backups.py        # Backup manager
-│   ├── lock.py           # File locking
-│   ├── interactive.py    # Interactive prompts (questionary)
-│   ├── tui.py            # Interactive TUI (textual)
-│   ├── tui_editor.py     # TUI config editor
-│   ├── ui.py             # Rich output helpers
-│   ├── utils.py          # Helper functions
-│   └── exceptions.py     # Custom exception classes
-│
-├── tests/                # Test suite (98 tests)
-│   ├── conftest.py       # Pytest fixtures
-│   ├── test_cli_commands.py
-│   ├── test_cli_revert.py
-│   ├── test_clean.py
-│   ├── test_completion.py
-│   ├── test_core.py
-│   ├── test_files_atomic.py
-│   ├── test_hooks.py
-│   ├── test_interactive.py
-│   ├── test_iter_files_optimization.py
-│   ├── test_lock.py
-│   ├── test_performance_logic.py
-│   ├── test_secrets.py
-│   └── test_vault.py
-│
-├── docs/                 # Documentation
-│   ├── roadmap.md        # Project roadmap
-│   └── specs/            # Detailed specifications
-│       ├── commands.md   # Command specifications
-│       └── security.md   # Security specifications
-│
-├── scripts/              # Helper scripts
-├── integration/          # Integration tests
-├── README.md             # User-facing overview
-├── CONTRIBUTING.md       # Contributor guidelines
-├── DEVELOPMENT.md        # This file
-├── CHANGELOG.md          # Version history
-├── TODO.md               # Development roadmap & tasks
-├── install.sh            # Installation script
-├── uninstall.sh          # Uninstallation script
-└── pyproject.toml        # Project metadata and dependencies
-```
-
-## 🏗️ Architecture
-
-```
-cli/ ────┐
-         ├──> operations.py ─┬─> config.py (TOML)
-tui.py ──┘                   ├─> core.py (Git)
-                             ├─> files.py
-                             ├─> secrets.py
-                             ├─> vault.py
-                             ├─> backups.py
-                             └─> lock.py
-```
-
-`operations.py` is the single source of truth for all business logic. Both the CLI and TUI call into it.
-
-## 🎨 Code Style
-
-We follow **PEP 8** and use **Black** for formatting.
-
-```bash
-# Format code
-black dot_man/ tests/
-
-# Lint code
-ruff check dot_man/ tests/
-
-# Check types
-mypy dot_man/
-```
-
-## 🚀 Release Process
-
-1.  Update version in `pyproject.toml` and `dot_man/__init__.py`.
-2.  Update `CHANGELOG.md`.
-3.  Update `TODO.md` - move completed items, add next milestones.
-4.  Update `docs/roadmap.md` - mark release as complete, update metrics.
-5.  Tag the release: `git tag v0.7.0`.
-6.  Push tags: `git push --tags`.
-7.  Build and publish (CI/CD handles this usually).
+*The pre-commit hook automatically runs `black`, `ruff`, and `mypy` before you commit.*
 
 ---
 
-## 🏃 Current Development Focus
+## 🏗️ Adding a Core Feature (Tutorial)
 
-### v0.8.0 - Performance
-- Batch file operations
-- Parallel secret scanning
-- Lazy loading
-- Content-addressable storage
+Adding a CLI command is simple (see `CONTRIBUTING.md`), but adding a fundamental capability to dot-man requires touching multiple layers. Here is the strict workflow for adding a core feature (e.g., adding a new update strategy).
 
-### v0.9.0 - TUI Core Actions
-- Sync from TUI
-- Switch from TUI
-- Delete branch from TUI
-- Edit config from TUI
+### Step 1: Update Configuration Models
+If your feature requires a configuration toggle, start in `dot_man/section.py` and `dot_man/dotman_config.py`.
+- Add the typed attribute to the `Section` dataclass.
+- Update `DotManConfig._validate_schema()` to accept the new TOML key.
+- Update `DotManConfig.get_section()` to read the key and supply a default.
 
-### v0.12.0 - Diff & History (Highly Requested)
-- `dot-man diff` - Show changes between branches
-- `dot-man log` - Show commit history
-- `dot-man restore <file> <commit>` - Restore from history
+### Step 2: Implement Business Logic in Operations Mixins
+Find the appropriate mixin. 
+- Does it involve saving or deploying? Edit `dot_man/save_deploy_ops.py`.
+- Does it involve reading repository state without mutating it? Edit `dot_man/status_ops.py`.
+- Ensure your method accesses dependencies lazily via `self.global_config` or `self.git`.
 
-### v0.13.0 - Template Variables
-- `dot-man template --set KEY=VALUE`
-- Template substitution (`{{HOSTNAME}}`, `{{EMAIL}}`)
-- System variable auto-population
+### Step 3: Implement Foundation Code
+If your operation needs a new file primitive, write it in `dot_man/files.py`.
+- **Crucial**: Always use `atomic_write_text()` for file mutation. Never use standard `open(..., 'w')` directly unless writing to `tmp` or caches.
+
+### Step 4: Write Real Tests
+dot-man enforces strict testing standards (see `AGENTS.md`). **Tests that only check if a method exists or a class can be instantiated are banned.**
+
+```python
+# GOOD: Testing actual behavior with a real repo
+def test_my_new_feature(tmp_path):
+    from git import Repo
+    from dot_man.operations import DotManOperations
+    
+    # 1. Setup real Git repository
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    Repo.init(repo_dir)
+    
+    # 2. Setup mock dot-man environment
+    # Use conftest fixtures if available, or point ops to tmp_path
+    
+    ops = DotManOperations()
+    # 3. Assert real filesystem side effects
+```
+
+---
+
+## 🧪 Running & Debugging Tests
+
+### Test Execution
+```bash
+# Run all tests (Fast)
+pytest tests/ -v
+
+# Run with coverage (Gatekeeper)
+pytest --cov=dot_man --cov-report=term-missing
+```
+
+### Test Fixtures (`conftest.py`)
+Familiarize yourself with the fixtures in `tests/conftest.py`. The suite provides pre-configured mock environments (`mock_env`, `mock_git_repo`) that isolate tests to `/tmp` directories, preventing your local `~/.config/dot-man/` from being destroyed during a test run.
+
+### Debugging the CLI
+If a command is failing locally, use the built-in debug logger:
+```bash
+dot-man --debug <command>
+```
+This forces all underlying `logging.debug()` calls in `files.py`, `core.py`, and `vault.py` to write to `~/.config/dot-man/dot-man.log`. 
+
+If you want to stream that directly to the terminal without opening the log file:
+```bash
+dot-man -v <command>
+```
+
+---
+
+## 🎨 Code Style
+
+We follow **PEP 8** strictly.
+
+```bash
+# 1. Format code (Max line length 88)
+black dot_man/ tests/
+
+# 2. Lint code (Catches unused imports, f-string errors)
+ruff check dot_man/ tests/ --fix
+
+# 3. Check types (Required: 0 errors)
+mypy dot_man/ --ignore-missing-imports
+```
+
+If `mypy` complains about a library lacking stubs (like `tomlkit` or `GitPython`), suppress it inline using `# type: ignore` but leave a comment explaining why.
+
+---
+
+## 🚀 Release Process
+
+When a milestone is complete:
+1. Bump version strings in `pyproject.toml` and `dot_man/__init__.py`.
+2. Move items from `Unreleased` to a new version header in `CHANGELOG.md`.
+3. Check off completed checkboxes in `TODO.md`.
+4. Update `docs/roadmap.md` to mark the phase as complete.
+5. Run the **Full Pre-Push Quality Checklist** (`AGENTS.md`): `black`, `ruff`, `mypy`, `pytest`, `pytest --cov`.
+6. Commit, tag (`git tag v0.X.0`), and push tags.

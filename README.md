@@ -397,9 +397,11 @@ Run `dot-man audit` to scan your repository.
 
 ## Documentation
 
+- [Development Guide Manual](docs/DEVELOPMENT_GUIDE_MANUAL.md) - In-depth architecture and development guide
 - [Command Specifications](docs/specs/commands.md) - Detailed command behavior
 - [Security Specification](docs/specs/security.md) - Secret detection patterns
 - [Development Roadmap](docs/roadmap.md) - Version milestones
+- [Architecture Overview](docs/ARCHITECTURE.md) - High-level system structure
 
 ---
 

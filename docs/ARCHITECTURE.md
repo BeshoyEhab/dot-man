@@ -15,23 +15,29 @@
 
 **dot-man** is a dotfile manager that uses Git branches to manage different configurations (work, personal, server, etc.). Instead of managing dotfiles directly on your system, you store them in a Git repository and deploy them using branch switching.
 
+### Guiding Principles
+1. **No Symlinks**: Symlinking `~/.bashrc` to a git repo breaks when you switch branches if the branch structure changes. dot-man strictly uses **physical, atomic file copies** during save and deploy phases.
+2. **Secrets Never Enter Git**: Before a file enters the repository, secrets are stripped out and replaced with a cryptographic hash. The actual string is encrypted locally in a vault.
+3. **No Hidden State**: The git repository is a standard bare repository. The configuration file `dot-man.toml` lives inside it, allowing tracking rules to change based on the branch.
+4. **Resiliency**: If a shell hook fails, or a file copy errors out, dot-man collects all errors and continues. File writes use POSIX-atomic `os.replace` to prevent corrupted dotfiles during a system crash.
+
 ### Core Concept
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    Your System                          │
-│  ~/.bashrc, ~/.gitconfig, ~/.config/nvim/             │
+│  ~/.bashrc, ~/.gitconfig, ~/.config/nvim/               │
 └──────────────────────┬──────────────────────────────────┘
                        │
                        ▼
 ┌─────────────────────────────────────────────────────────┐
-│                  dot-man                                 │
-│  ┌─────────┐    ┌─────────┐    ┌─────────┐            │
-│  │  main   │    │  work   │    │ server  │  ...       │
-│  │ branch  │    │ branch  │    │ branch  │            │
-│  └─────────┘    └─────────┘    └─────────┘            │
-│                         │                                │
+│                  dot-man                                │
+│  ┌─────────┐    ┌─────────┐    ┌─────────┐              │
+│  │  main   │    │  work   │    │ server  │  ...         │
+│  │ branch  │    │ branch  │    │ branch  │              │
+│  └─────────┘    └─────────┘    └─────────┘              │
+│                         │                               │
 │              saves changes from your system             │
-│              deploys files from branch to your system  │
+│              deploys files from branch to your system   │
 └─────────────────────────────────────────────────────────┘
 ```
 
@@ -41,27 +47,48 @@
 
 ```
 dot-man/
-├── dot_man/                  # Main package
-│   ├── __init__.py          # Version, exports
-│   ├── cli/                 # CLI commands
-│   │   ├── main.py          # Entry point
-│   │   ├── interface.py     # Click group definition
-│   │   ├── switch_cmd.py    # Switch command
-│   │   ├── log_cmd.py      # Log command
-│   │   ├── tag_cmd.py      # Tag command
-│   │   └── ...             # Other commands
-│   ├── core.py              # Git operations (GitManager)
-│   ├── operations.py        # Main business logic
-│   ├── config.py            # Config file parsing
-│   ├── global_config.py     # Global settings
-│   ├── files.py             # File operations
-│   ├── secrets.py           # Secret detection
-│   ├── vault.py             # Secret storage
-│   ├── backups.py           # Backup management
-│   └── constants.py          # Constants, paths
-├── tests/                   # Test suite
-├── docs/                    # Documentation
-└── pyproject.toml           # Package config
+├── dot_man/              # Main package (20 modules)
+│   ├── __init__.py       # Package version
+│   ├── cli/              # CLI commands (Click-based, 24 files)
+│   │   ├── main.py       # Entry point: calls cli()
+│   │   ├── interface.py  # Click group definition (DotManGroup)
+│   │   ├── common.py     # Shared utilities: require_init, completions,
+│   │   │                 # get_secret_handler, parse_branch_arg
+│   │   ├── __init__.py   # Imports all *_cmd modules (registration trigger)
+│   │   └── *_cmd.py      # 21 individual command modules
+│   ├── operations.py     # DotManOperations singleton + iter_section_paths
+│   ├── save_deploy_ops.py # SaveDeployMixin: save_all, deploy_all (two-phase)
+│   ├── branch_ops.py     # BranchMixin: switch_branch, revert_file
+│   ├── status_ops.py     # StatusMixin: get_status, audit, orphans
+│   ├── core.py           # GitManager (wraps GitPython)
+│   ├── config.py         # Re-export shim only (backward compat)
+│   ├── global_config.py  # GlobalConfig: reads/writes global.toml
+│   ├── dotman_config.py  # DotManConfig: reads/writes dot-man.toml
+│   ├── section.py        # Section dataclass + hook alias resolution
+│   ├── files.py          # File I/O: atomic copy, compare, cache
+│   ├── secrets.py        # Secret detection patterns + filter_secrets()
+│   ├── vault.py          # SecretVault: Fernet encrypt/decrypt
+│   ├── lock.py           # FileLock: fcntl advisory locking (Linux/macOS)
+│   ├── backups.py        # BackupManager: timestamped archives
+│   ├── interactive.py    # Interactive wizards (init, global config)
+│   ├── ui.py             # Rich console wrappers
+│   ├── utils.py          # Misc helpers
+│   ├── constants.py      # All paths, defaults, HOOK_ALIASES
+│   └── exceptions.py     # Custom exception hierarchy + ErrorDiagnostic
+├── tests/                # Test suite
+│   ├── conftest.py       # Pytest fixtures
+│   └── test_*.py         # Test modules
+├── docs/                 # Documentation
+│   ├── ARCHITECTURE.md   # System architecture
+│   ├── DEVELOPMENT_GUIDE_MANUAL.md  # In-depth system explanation
+│   ├── roadmap.md        # Development roadmap
+│   └── specs/            # Detailed specifications
+│       ├── commands.md   # Command specifications
+│       └── security.md   # Security specifications
+├── install.sh            # Installation script
+├── uninstall.sh          # Uninstallation script
+├── pyproject.toml        # Project configuration
+└── README.md             # User documentation
 ```
 
 ---
@@ -239,10 +266,10 @@ dot-man switch work
 ┌───────────────────┐
 │ 3. Deploy Phase   │
 │ - scan sections   │
-│ - compare files  │
-│ - copy from repo │
-│   to ~/.config   │
-│ - run hooks      │
+│ - compare files   │
+│ - copy from repo  │
+│   to ~/.config    │
+│ - run hooks       │
 └───────────────────┘
 ```
 
@@ -255,17 +282,17 @@ dot-man start
 ┌─────────────────┐
 │ Load global.toml│  ~/.config/dot-man/global.toml
 │ - current_branch│
-│ - remote_url   │
-│ - preferences  │
+│ - remote_url    │
+│ - preferences   │
 └─────────────────┘
      │
      ▼
-┌─────────────────┐
+┌──────────────────┐
 │ Load dot-man.toml│  ~/.config/dot-man/repo/dot-man.toml
-│ - sections      │
-│ - paths         │
-│ - hooks         │
-└─────────────────┘
+│ - sections       │
+│ - paths          │
+│ - hooks          │
+└──────────────────┘
 ```
 
 ---
