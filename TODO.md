@@ -210,3 +210,65 @@ tui.py ──┘    (orchestrator)  │    ├─> global_config.py
 ```
 
 `operations.py` is the single source of truth for all business logic.
+
+---
+
+## Current Test Coverage Inventory
+
+Our primary target is **80%+ overall coverage** for the `v1.0.0` release. 
+
+**Overall Progress:** 60% (4231 statements, 1706 missing)
+
+### Modules Below 50% Coverage (High Priority)
+| Module | Current Coverage | Missing Lines |
+|--------|------------------|---------------|
+| `dot_man/tui_log.py` | 0% | 48 |
+| `dot_man/cli/profile_cmd.py` | 17% | 134 |
+| `dot_man/cli/template_cmd.py` | 20% | 105 |
+| `dot_man/cli/audit_cmd.py` | 32% | 55 |
+| `dot_man/cli/log_cmd.py` | 34% | 97 |
+| `dot_man/cli/tag_cmd.py` | 35% | 55 |
+| `dot_man/interactive.py` | 46% | 109 |
+| `dot_man/cli/switch_cmd.py` | 47% | 111 |
+| `dot_man/cli/common.py` | 47% | 94 |
+| `dot_man/cli/branch_cmd.py` | 48% | 37 |
+
+### Modules 50% - 79% Coverage (Medium Priority)
+| Module | Current Coverage | Missing Lines |
+|--------|------------------|---------------|
+| `dot_man/branch_ops.py` | 53% | 58 |
+| `dot_man/dotman_config.py` | 53% | 106 |
+| `dot_man/cli/deploy_cmd.py` | 54% | 46 |
+| `dot_man/core.py` | 58% | 110 |
+| `dot_man/cli/tui_cmd.py` | 60% | 4 |
+| `dot_man/cli/revert_cmd.py` | 61% | 16 |
+| `dot_man/backups.py` | 65% | 37 |
+| `dot_man/status_ops.py` | 65% | 43 |
+| `dot_man/global_config.py` | 67% | 58 |
+| `dot_man/cli/main.py` | 67% | 1 |
+| `dot_man/files.py` | 68% | 62 |
+| `dot_man/operations.py` | 68% | 36 |
+| `dot_man/save_deploy_ops.py`| 68% | 67 |
+| `dot_man/section.py` | 68% | 30 |
+| `dot_man/cli/add_cmd.py` | 69% | 24 |
+| `dot_man/cli/backup_cmd.py` | 69% | 20 |
+| `dot_man/cli/interface.py` | 73% | 8 |
+| `dot_man/cli/status_cmd.py` | 76% | 24 |
+| `dot_man/cli/clean_cmd.py` | 77% | 13 |
+| `dot_man/lock.py` | 79% | 7 |
+
+### Modules 80%+ Coverage (Target Achieved / Low Priority)
+| Module | Current Coverage | Missing Lines |
+|--------|------------------|---------------|
+| `dot_man/ui.py` | 81% | 6 |
+| `dot_man/cli/restore_cmd.py` | 82% | 9 |
+| `dot_man/vault.py` | 85% | 23 |
+| `dot_man/cli/show_cmd.py` | 86% | 2 |
+| `dot_man/utils.py` | 87% | 8 |
+| `dot_man/exceptions.py` | 88% | 9 |
+| `dot_man/secrets.py` | 88% | 20 |
+| `dot_man/cli/init_cmd.py` | 92% | 14 |
+| `dot_man/cli/__init__.py` | 100% | 0 |
+| `dot_man/config.py` | 100% | 0 |
+| `dot_man/constants.py` | 100% | 0 |
+| `dot_man/__init__.py` | 100% | 0 |
