@@ -72,37 +72,30 @@ def test_vault_caching(vault):
     # Create a secret
     vault.stash_secret("f1", 1, "p1", "s1", "main")
 
-    # Modify file behind the scenes
-    vault.vault_file.stat().st_mtime  # noqa: F841 — ensures file is accessible
+    # Verify secret exists
+    assert vault.get_secret("f1", 1, "main") == "s1"
 
     # Wait to ensure mtime changes
     time.sleep(0.01)
 
-    # Manually write new content
+    # Manually write new content (simulate external modification)
     new_data = {"secrets": []}
     vault.vault_file.write_text(json.dumps(new_data))
 
-    # Force mtime update if it was too fast?
-    # actually write_text updates mtime.
-
     # Calling get_secret should reload because mtime changed
-    # But wait, get_secret calls load().
-    # load() checks mtime.
-
-    # If we modify file, mtime increases.
-    # load() compares current mtime vs _last_loaded_mtime.
-    # It sees diff, reloads.
-
-    # Verify we see empty secrets
+    # Verify we see empty secrets (cache was invalidated)
     assert vault.get_secret("f1", 1, "main") is None
 
-    # Now restore
+    # Now restore the secret
     vault.stash_secret("f1", 1, "p1", "s1", "main")
 
-    # Access again - should be cached.
-    # How to verify it didn't read? Mocking?
-    # We can rely on logic correctness or coverage.
-    pass
+    # Access again - should be cached from in-memory data
+    # Verify secret is accessible
+    assert vault.get_secret("f1", 1, "main") == "s1"
+
+    # Verify file on disk now has the secret
+    data = json.loads(vault.vault_file.read_text())
+    assert len(data["secrets"]) == 1
 
 
 def test_vault_concurrency(vault):

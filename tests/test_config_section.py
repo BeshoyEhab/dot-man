@@ -112,10 +112,11 @@ class TestGlobalConfigClass:
 
         config = GlobalConfig()
 
-        # These should return values (may be defaults)
-        _ = config.current_branch
-        _ = config.remote_url
-        _ = config.strict_mode
+        # These should return default values
+        assert config.current_branch is not None
+        assert isinstance(config.current_branch, str)
+        assert config.remote_url == ""
+        assert config.strict_mode is False
 
     def test_global_config_defaults(self):
         """Test GlobalConfig default values."""
