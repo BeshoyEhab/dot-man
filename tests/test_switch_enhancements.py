@@ -29,10 +29,12 @@ class TestSwitchEnhancements:
         assert result.exit_code == 0
         assert "@" in result.output  # branch@tag syntax
 
-    def test_switch_without_init(self, runner):
+    def test_switch_without_init(self, runner, tmp_path):
         """Switch should handle uninitialized state."""
-        result = runner.invoke(cli, ["switch", "main"])
-        assert result.exit_code in [0, 1]
+        from unittest.mock import patch
+        with patch("dot_man.cli.common.REPO_DIR", tmp_path / "norepo"):
+            result = runner.invoke(cli, ["switch", "main"])
+            assert result.exit_code == 1
 
 
 class TestParseBranchArg:

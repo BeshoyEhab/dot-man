@@ -154,8 +154,11 @@ class TestInitCommand:
 
     def test_init_dotman_toml_content(self, clean_env):
         """dot-man.toml created by init should contain valid TOML."""
-        import tomllib
-
+        import sys
+        if sys.version_info >= (3, 11):
+            import tomllib
+        else:
+            import tomli as tomllib
         runner, _, repo_dir, _, _ = clean_env
         runner.invoke(cli, ["init", "--force", "--no-wizard"])
 
