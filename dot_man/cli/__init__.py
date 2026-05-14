@@ -28,6 +28,7 @@ from .init_cmd import init
 from .interface import cli
 from .log_cmd import checkout, diff, log
 from .main import main
+from .onboarding import is_first_run, mark_onboarded, run_onboarding
 from .profile_cmd import profile
 from .remote_cmd import remote, sync
 from .restore_cmd import restore
@@ -50,6 +51,9 @@ __all__ = [
     "DotManGroup",
     "complete_branches",
     "get_secret_handler",
+    "run_onboarding",
+    "is_first_run",
+    "mark_onboarded",
     "init",
     "add",
     "status",

@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.9.0] - 2026-05-10
 
 ### Added
+- **First-time onboarding flow** (`dot_man/cli/onboarding.py`) — automatically
+  launches on the very first `dot-man` invocation:
+  - Welcome banner with ASCII logo
+  - 2-section interactive tutorial (Architecture + Manual / How To Use)
+  - ASCII diagrams for file flow, branch model, components, and typical workflow
+  - Auto-runs `dot-man init` with the interactive setup wizard after the tutorial
+  - Prompts the user to create their first branch and switches to it automatically
+  - Sentinel file (`~/.config/dot-man/.onboarded`) prevents the tutorial from
+    repeating on subsequent launches
+  - Ctrl-C exits cleanly without writing the sentinel (tutorial re-appears next time)
 - **Pre-push quality checklist** in AGENTS.md — mandatory black, ruff, mypy, and pytest before every commit
 - **Pre-commit hooks** via `.pre-commit-config.yaml` — automatic enforcement of formatting, linting, and type checking
 - **Ruff configuration** in `pyproject.toml` — rules E, F, W, I with per-file E402 suppression
