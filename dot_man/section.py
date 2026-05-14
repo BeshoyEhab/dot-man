@@ -27,6 +27,8 @@ class Section:
         exclude: Optional[list[str]] = None,
         pre_deploy: Optional[str] = None,
         post_deploy: Optional[str] = None,
+        on_activate: Optional[str] = None,
+        on_deactivate: Optional[str] = None,
         inherits: Optional[list[str]] = None,
         ignored_directories: Optional[list[str]] = None,
         follow_symlinks: Optional[bool] = None,
@@ -51,6 +53,8 @@ class Section:
         # Resolve hook aliases
         self.pre_deploy = self._resolve_hook(pre_deploy)
         self.post_deploy = self._resolve_hook(post_deploy)
+        self.on_activate = on_activate
+        self.on_deactivate = on_deactivate
 
         self.inherits = inherits or []
 
@@ -166,6 +170,10 @@ class Section:
             result["pre_deploy"] = self.pre_deploy
         if self.post_deploy:
             result["post_deploy"] = self.post_deploy
+        if self.on_activate:
+            result["on_activate"] = self.on_activate
+        if self.on_deactivate:
+            result["on_deactivate"] = self.on_deactivate
         if self.inherits:
             result["inherits"] = self.inherits
 

@@ -251,6 +251,8 @@ def config_tutorial(section: str | None, interactive: bool):
         ("5", "Templates & inheritance", "reusable configs, organization"),
         ("6", "Advanced features", "custom paths, overrides, limits"),
         ("7", "Security & secrets", "automatic filtering, best practices"),
+        ("8", "Branch activation", "on_activate, on_deactivate hooks"),
+        ("9", "Quick presets", "pre-configured for popular dotfiles"),
         ("I", "Interactive tutorial", "step-by-step guided learning"),
         ("C", "Create config", "generate config file with examples"),
         ("Q", "Quit", "exit tutorial"),
@@ -269,7 +271,7 @@ def config_tutorial(section: str | None, interactive: bool):
     # Get user choice
     choice = Prompt.ask(
         "Enter your choice",
-        choices=["1", "2", "3", "4", "5", "6", "7", "I", "C", "Q"],
+        choices=["1", "2", "3", "4", "5", "6", "7", "8", "9", "I", "C", "Q"],
         default="I",
     ).upper()
 
@@ -288,6 +290,10 @@ def config_tutorial(section: str | None, interactive: bool):
         _show_section_examples("advanced")
     elif choice == "7":
         _show_section_examples("secrets")
+    elif choice == "8":
+        _show_section_examples("activate")
+    elif choice == "9":
+        _show_section_examples("presets")
     elif choice == "I":
         _run_interactive_tutorial()
     elif choice == "C":
@@ -480,6 +486,84 @@ secrets_filter = false""",
                     "title": "Check for secrets",
                     "command": "dot-man audit",
                     "explanation": "Scan your repository for secrets. Use --strict for CI/CD.",
+                },
+            ],
+        },
+        "activate": {
+            "title": "Branch Activation Hooks",
+            "description": "Run commands when entering/leaving branches",
+            "examples": [
+                {
+                    "title": "Start app on branch switch",
+                    "config": """[dots]
+paths = [".config/quickshell"]
+on_activate = "qs -c ii"
+on_deactivate = "pkill qs -9" """,
+                    "explanation": "Run 'qs -c ii' when switching TO this branch, "
+                    "and 'pkill qs -9' when leaving. Perfect for launching "
+                    "config-specific applications.",
+                },
+                {
+                    "title": "Reload environment",
+                    "config": """[work]
+paths = [".config/work"]
+on_activate = "source ~/.config/work/env.sh"
+on_deactivate = "echo 'Leaving work config'" """,
+                    "explanation": "Load environment variables or run setup commands "
+                    "when entering a branch.",
+                },
+                {
+                    "title": "Multiple hooks",
+                    "config": """[dev]
+paths = [".config/dev"]
+on_activate = "echo 'Starting dev mode' && alacritty -e tmux"
+on_deactivate = "pkill -f 'alacritty -e tmux'" """,
+                    "explanation": "Chain multiple commands with && for complex activation.",
+                },
+            ],
+        },
+        "presets": {
+            "title": "Quick Setup Presets",
+            "description": "Pre-configured sections for popular dotfiles",
+            "examples": [
+                {
+                    "title": "Quickshell end-4",
+                    "config": """[qs-end4]
+paths = [".config/quickshell/end-4"]
+on_activate = "qs -c end-4"
+on_deactivate = "pkill qs -9" """,
+                    "explanation": "Quickshell with config 'end-4'. Auto-detected if exists.",
+                },
+                {
+                    "title": "Quickshell caelestia",
+                    "config": """[qs-caelestia]
+paths = [".config/quickshell/caelestia"]
+on_activate = "qs -c caelestia"
+on_deactivate = "pkill qs -9" """,
+                    "explanation": "Quickshell with config 'caelestia'. Auto-detected if exists.",
+                },
+                {
+                    "title": "Quickshell custom",
+                    "config": """[qs-my-config]
+paths = [".config/quickshell/my-config"]
+on_activate = "qs -c my-config"
+on_deactivate = "pkill qs -9" """,
+                    "explanation": "Replace 'my-config' with your quickshell config name.",
+                },
+                {
+                    "title": "Full shell setup",
+                    "config": """[shell]
+paths = [".bashrc", ".zshrc", ".config/fish"]
+post_deploy = "shell_reload"
+
+[vim]
+paths = [".config/nvim"]
+
+[tmux]
+paths = [".tmux.conf"]
+post_deploy = "tmux source-file ~/.tmux.conf" """,
+                    "explanation": "Complete shell setup with multiple sections. "
+                    "Run 'dot-man config detect' to auto-detect what's available.",
                 },
             ],
         },

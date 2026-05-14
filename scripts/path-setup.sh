@@ -43,10 +43,11 @@ setup_path() {
             return 1
         }
         
-        read -p "Do you want to automatically add it to your shell config? [y/N] " -n 1 -r
+        read -p "Do you want to automatically add it to your shell config? [Y/n] " -n 1 -r
         echo ""
-        
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
+
+        # Empty input (Enter) or Y/y means yes
+        if [[ -z $REPLY || $REPLY =~ ^[Yy]$ ]]; then
             echo ""
             ADDED=false
             

@@ -15,7 +15,7 @@ function __fish_dot_man_complete
     end
 end
 
-complete -c dot-man -f -a "(__fish_dot_man_complete)"
+complete -c dot-man -f -k -a "(__fish_dot_man_complete)"
 
 # Subcommand completions
 complete -c dot-man -n "__fish_use_subcommand" -a "init" -d "Initialize repository"

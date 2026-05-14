@@ -117,8 +117,11 @@ def next_steps(steps: list[str]) -> None:
 def section(title: str, content: str) -> None:
     """Print a titled section with content."""
     console.print()
-    console.print(f"[bold cyan]┌{'─' * (len(title) + 2)}┐[/bold cyan]")
-    console.print(f"[bold cyan]│[/bold cyan]  {title}  [bold cyan]│[/bold cyan]")
-    console.print(f"[bold cyan]└{'─' * (len(title) + 2)}┘[/bold cyan]")
+    width = max(len(title) + 4, 40)
+    console.print(f"[bold cyan]┌{'─' * width}┐[/bold cyan]")
+    console.print(
+        f"[bold cyan]│[/bold cyan]  {title}{' ' * (width - len(title) - 2)}[bold cyan]│[/bold cyan]"
+    )
+    console.print(f"[bold cyan]└{'─' * width}┘[/bold cyan]")
     if content:
         console.print(f"  {content}")

@@ -113,6 +113,48 @@ def get_changed_sections(ops) -> list[str]:
         return []
 
 
+def run_branch_hooks(ops, hook_type: str) -> None:
+    """Run on_activate or on_deactivate hooks from sections.
+
+    Args:
+        ops: DotManOperations instance
+        hook_type: "on_activate" or "on_deactivate"
+    """
+    commands: list[str] = []
+    for section_name in ops.get_sections():
+        section = ops.get_section(section_name)
+        cmd = getattr(section, hook_type, None)
+        if cmd:
+            commands.append(cmd)
+
+    commands = list(dict.fromkeys(commands))
+
+    if commands:
+        ui.console.print()
+        ui.console.print(f"[bold]Running {hook_type} hooks...[/bold]")
+        hook_failed = False
+        for cmd in commands:
+            ui.console.print(f"  Exec: [cyan]{cmd}[/cyan]")
+            try:
+                shell = os.environ.get("SHELL", "/bin/sh")
+                result = subprocess.run(
+                    [shell, "-c", cmd], capture_output=True, text=True
+                )
+                if result.returncode != 0:
+                    hook_failed = True
+                    ui.console.print(
+                        f"  [yellow]⚠ Hook failed (exit code {result.returncode})[/yellow]"
+                    )
+                    if result.stderr:
+                        for line in result.stderr.splitlines()[:3]:
+                            ui.console.print(f"    [dim]{line}[/dim]")
+            except Exception as e:
+                hook_failed = True
+                warn(f"Failed to run command '{cmd}': {e}")
+        if hook_failed:
+            ui.console.print("[dim]  Some hooks failed - continuing anyway[/dim]")
+
+
 class BranchParamType(click.ParamType):
     """Parameter type that accepts branch, branch@tag, or commit SHA."""
 
@@ -675,6 +717,8 @@ def _handle_branch_navigate(
     ui.console.print()
     ui.console.print(f"[bold]Phase 2:[/bold] Switching to branch '{target_branch}'...")
 
+    run_branch_hooks(ops, "on_deactivate")
+
     run_switch_hooks("pre", ops, current_branch, target_branch)
 
     branch_exists = ops.git.branch_exists(target_branch)
@@ -787,6 +831,8 @@ def _handle_branch_navigate(
     ops.global_config.save()
 
     run_switch_hooks("post", ops, current_branch, target_branch)
+
+    run_branch_hooks(ops, "on_activate")
 
     ui.console.print()
     success(f"Switched to '{target_branch}'")

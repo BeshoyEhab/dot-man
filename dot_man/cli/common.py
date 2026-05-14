@@ -76,8 +76,41 @@ def require_init(func):
 
     @wraps(func)
     def wrapper(*args, **kwargs):
-        if not DOT_MAN_DIR.exists() or not REPO_DIR.exists():
-            error("Not initialized. Run 'dot-man init' first.", exit_code=1)
+        if not DOT_MAN_DIR.exists():
+            ui.console.print()
+            ui.print_banner("🎯 Welcome to dot-man!")
+            ui.console.print()
+            ui.console.print("[bold]The Dotfile Manager for Professionals[/bold]")
+            ui.console.print()
+            ui.console.print("[bold cyan]Get started:[/bold cyan]")
+            ui.console.print(
+                "  [cyan]dot-man init[/cyan]              - Initialize your dotfiles repository"
+            )
+            ui.console.print(
+                "  [cyan]dot-man init --help[/cyan]       - See all init options"
+            )
+            ui.console.print()
+            ui.console.print("[bold cyan]Quick overview:[/bold cyan]")
+            ui.console.print(
+                "  [cyan]dot-man add <path>[/cyan]         - Add files to track"
+            )
+            ui.console.print(
+                "  [cyan]dot-man status[/cyan]            - View tracked files"
+            )
+            ui.console.print(
+                "  [cyan]dot-man navigate <branch>[/cyan]  - Switch between configurations"
+            )
+            ui.console.print(
+                "  [cyan]dot-man --help[/cyan]            - See all commands"
+            )
+            ui.console.print()
+            ui.console.print("[dim]💡 Run 'dot-man init' to get started![/dim]")
+            ui.console.print()
+            raise SystemExit(1)
+
+        if not REPO_DIR.exists() or not (REPO_DIR / ".git").exists():
+            error("Repository not initialized. Run 'dot-man init' first.", exit_code=1)
+
         return func(*args, **kwargs)
 
     return wrapper

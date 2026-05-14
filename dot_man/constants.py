@@ -1,13 +1,15 @@
 """Constants and default values for dot-man."""
 
+import os
 from pathlib import Path
 
 # ============================================================================
 # Paths
 # ============================================================================
 
-# Base directory for dot-man data
-DOT_MAN_DIR = Path.home() / ".config" / "dot-man"
+# Base directory for dot-man data (can override with DOT_MAN_DIR env var)
+_dot_man_dir = os.environ.get("DOT_MAN_DIR") or str(Path.home() / ".config" / "dot-man")
+DOT_MAN_DIR = Path(_dot_man_dir)
 
 # Repository directory (git-backed)
 REPO_DIR = DOT_MAN_DIR / "repo"

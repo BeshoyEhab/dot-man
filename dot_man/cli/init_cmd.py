@@ -19,11 +19,23 @@ from .interface import cli as main
 @main.command()
 @click.option("--force", is_flag=True, help="Reinitialize even if already exists")
 @click.option("--no-wizard", is_flag=True, help="Skip interactive setup wizard")
-def init(force: bool, no_wizard: bool):
+@click.option(
+    "--sandbox",
+    "sandbox_dir",
+    type=click.Path(),
+    default=None,
+    help="Test init in a temporary sandbox directory (for testing wizard)",
+)
+def init(force: bool, no_wizard: bool, sandbox_dir: str | None):
     """Initialize a new dot-man repository.
 
     By default, runs an interactive setup wizard to detect and add
     common dotfiles. Use --no-wizard for manual setup.
+
+    Examples:
+        dot-man init                    # Interactive wizard
+        dot-man init --sandbox /tmp/test # Test wizard in sandbox
+        dot-man init --no-wizard         # Manual setup only
     """
     # Pre-checks
     if not is_git_installed():

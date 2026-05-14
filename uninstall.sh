@@ -30,7 +30,7 @@ echo ""
 # Uninstall package
 print_info "Uninstalling dot-man package..."
 
-# Try pipx first
+# Try pipx first (preferred)
 if command -v pipx &> /dev/null; then
     if pipx uninstall dot-man 2>/dev/null; then
         print_status "Package uninstalled with pipx"
@@ -38,8 +38,21 @@ if command -v pipx &> /dev/null; then
 fi
 
 # Also try pip (in case installed both ways)
-pip3 uninstall -y dot-man 2>/dev/null || true
-print_status "Package uninstalled"
+if command -v pip3 &> /dev/null; then
+    if pip3 uninstall -y dot-man 2>/dev/null; then
+        print_status "Package uninstalled with pip"
+    fi
+elif command -v pip &> /dev/null; then
+    if pip uninstall -y dot-man 2>/dev/null; then
+        print_status "Package uninstalled with pip"
+    fi
+fi
+
+# Remove the binary if it exists in ~/.local/bin
+if [ -f "$HOME/.local/bin/dot-man" ]; then
+    rm -f "$HOME/.local/bin/dot-man"
+    print_status "Removed binary from ~/.local/bin"
+fi
 
 # Remove completions
 print_info "Removing shell completions..."
