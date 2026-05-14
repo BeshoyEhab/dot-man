@@ -1,4 +1,4 @@
-"""Tests for cli/remote_cmd.py — remote command."""
+"""Tests for cli/profile_cmd.py — profile command."""
 
 import os
 from contextlib import ExitStack
@@ -53,26 +53,19 @@ def clean_env(tmp_path):
 
         reset_operations()
 
-        yield CliRunner(), dot_man_dir, repo_dir
+        yield CliRunner(), dot_man_dir, repo_dir, global_toml
 
 
-class TestRemoteHelp:
-    def test_remote_help(self, runner):
-        result = runner.invoke(cli, ["remote", "--help"])
+class TestProfileHelp:
+    def test_profile_help(self, runner):
+        result = runner.invoke(cli, ["profile", "--help"])
         assert result.exit_code == 0
-        assert "remote" in result.output.lower()
-        assert "set" in result.output
 
 
-class TestRemoteGet:
-    def test_remote_get_help(self, runner):
-        """Remote get help."""
-        result = runner.invoke(cli, ["remote", "get", "--help"])
-        assert result.exit_code in [0, 2]
-
-    def test_remote_get_runs(self, clean_env):
-        """Remote get runs."""
-        runner, dot_man_dir, repo_dir = clean_env
+class TestProfileList:
+    def test_profile_list(self, clean_env):
+        """List profiles."""
+        runner, dot_man_dir, repo_dir, global_toml = clean_env
 
         from git import Repo
 
@@ -86,20 +79,29 @@ class TestRemoteGet:
         repo.index.add(["test.txt"])
         repo.index.commit("Initial")
 
-        result = runner.invoke(cli, ["remote", "get"])
+        result = runner.invoke(cli, ["profile", "list"])
 
         assert result.exit_code in [0, 1]
 
 
-class TestRemoteSet:
-    def test_remote_set_help(self, runner):
-        """Remote set help."""
-        result = runner.invoke(cli, ["remote", "set", "--help"])
+class TestProfileSet:
+    def test_profile_set_help(self, runner):
+        """Profile set help."""
+        result = runner.invoke(cli, ["profile", "set", "--help"])
         assert result.exit_code in [0, 2]
 
-    def test_remote_set_runs(self, clean_env):
-        """Remote set runs."""
-        runner, dot_man_dir, repo_dir = clean_env
+
+class TestProfileGet:
+    def test_profile_get_help(self, runner):
+        """Profile get help."""
+        result = runner.invoke(cli, ["profile", "get", "--help"])
+        assert result.exit_code in [0, 2]
+
+
+class TestProfileCreate:
+    def test_profile_create_runs(self, clean_env):
+        """Profile create runs."""
+        runner, dot_man_dir, repo_dir, global_toml = clean_env
 
         from git import Repo
 
@@ -113,35 +115,55 @@ class TestRemoteSet:
         repo.index.add(["test.txt"])
         repo.index.commit("Initial")
 
-        result = runner.invoke(
-            cli, ["remote", "set", "https://github.com/test/dotfiles.git"]
-        )
-
-        assert result.exit_code in [0, 1, 7]
-
-
-class TestSyncBranch:
-    def test_sync_branch_help(self, runner):
-        """Sync-branch help."""
-        result = runner.invoke(cli, ["remote", "sync-branch", "--help"])
-        assert result.exit_code in [0, 2]
-
-    def test_sync_branch_without_remote(self, clean_env):
-        """Sync-branch without remote."""
-        runner, dot_man_dir, repo_dir = clean_env
-
-        from git import Repo
-
-        repo = Repo.init(repo_dir)
-        config_writer = repo.config_writer()
-        config_writer.set_value("user", "name", "Test")
-        config_writer.set_value("user", "email", "test@test.com")
-        config_writer.release()
-
-        (repo_dir / "test.txt").write_text("test")
-        repo.index.add(["test.txt"])
-        repo.index.commit("Initial")
-
-        result = runner.invoke(cli, ["remote", "sync-branch"])
+        result = runner.invoke(cli, ["profile", "create", "work"])
 
         assert result.exit_code in [0, 1]
+
+    def test_profile_create_with_inherits(self, clean_env):
+        """Profile create with inherits."""
+        runner, dot_man_dir, repo_dir, global_toml = clean_env
+
+        from git import Repo
+
+        repo = Repo.init(repo_dir)
+        config_writer = repo.config_writer()
+        config_writer.set_value("user", "name", "Test")
+        config_writer.set_value("user", "email", "test@test.com")
+        config_writer.release()
+
+        (repo_dir / "test.txt").write_text("test")
+        repo.index.add(["test.txt"])
+        repo.index.commit("Initial")
+
+        runner.invoke(cli, ["profile", "create", "base"])
+        result = runner.invoke(cli, ["profile", "create", "work", "--inherits", "base"])
+
+        assert result.exit_code in [0, 1]
+
+
+class TestProfileDelete:
+    def test_profile_delete_help(self, runner):
+        """Profile delete help."""
+        result = runner.invoke(cli, ["profile", "delete", "--help"])
+        assert result.exit_code in [0, 2]
+
+
+class TestProfileSwitch:
+    def test_profile_switch_help(self, runner):
+        """Profile switch help."""
+        result = runner.invoke(cli, ["profile", "switch", "--help"])
+        assert result.exit_code in [0, 2]
+
+
+class TestProfileDetect:
+    def test_profile_detect_help(self, runner):
+        """Profile detect help."""
+        result = runner.invoke(cli, ["profile", "detect", "--help"])
+        assert result.exit_code in [0, 2]
+
+
+class TestProfileSetBranch:
+    def test_profile_set_branch_help(self, runner):
+        """Profile set-branch help."""
+        result = runner.invoke(cli, ["profile", "set-branch", "--help"])
+        assert result.exit_code in [0, 2]

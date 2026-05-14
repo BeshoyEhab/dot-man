@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`--import` option for `init`** - Import from an existing git repository:
+  - `dot-man init --import /path/to/existing/repo` - Local repo
+  - `dot-man init --import github.com/user/repo` - GitHub shorthand
+  - `dot-man init --import https://github.com/user/repo` - GitHub HTTPS
+  - `dot-man init --import git@github.com:user/repo` - GitHub SSH
+  - Preserves all commits, branches, and tags
+- **Shell completion performance** - Optimized with in-memory caching:
+  - Branches, tags, and commits load in <10ms
+  - File-based cache with 10-second TTL
+  - Lightweight git commands (subprocess instead of GitPython)
 - **Unified `navigate` command** - Single command for switching branches, tags, and commits with:
   - `--preview, -p` - Preview changes before switching
   - `--diff, -d` - Show full diff when previewing

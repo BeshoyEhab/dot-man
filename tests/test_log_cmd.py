@@ -1,4 +1,4 @@
-"""Tests for cli/remote_cmd.py — remote command."""
+"""Tests for cli/log_cmd.py — log command."""
 
 import os
 from contextlib import ExitStack
@@ -56,22 +56,21 @@ def clean_env(tmp_path):
         yield CliRunner(), dot_man_dir, repo_dir
 
 
-class TestRemoteHelp:
-    def test_remote_help(self, runner):
-        result = runner.invoke(cli, ["remote", "--help"])
+class TestLogHelp:
+    def test_log_help(self, runner):
+        result = runner.invoke(cli, ["log", "--help"])
         assert result.exit_code == 0
-        assert "remote" in result.output.lower()
-        assert "set" in result.output
+        assert "-n" in result.output
 
 
-class TestRemoteGet:
-    def test_remote_get_help(self, runner):
-        """Remote get help."""
-        result = runner.invoke(cli, ["remote", "get", "--help"])
-        assert result.exit_code in [0, 2]
+class TestLogRun:
+    def test_log_help_works(self, runner):
+        """Log help works without init."""
+        result = runner.invoke(cli, ["log", "--help"])
+        assert result.exit_code == 0
 
-    def test_remote_get_runs(self, clean_env):
-        """Remote get runs."""
+    def test_log_empty_repo(self, clean_env):
+        """Log on empty repo."""
         runner, dot_man_dir, repo_dir = clean_env
 
         from git import Repo
@@ -82,23 +81,12 @@ class TestRemoteGet:
         config_writer.set_value("user", "email", "test@test.com")
         config_writer.release()
 
-        (repo_dir / "test.txt").write_text("test")
-        repo.index.add(["test.txt"])
-        repo.index.commit("Initial")
-
-        result = runner.invoke(cli, ["remote", "get"])
+        result = runner.invoke(cli, ["log"])
 
         assert result.exit_code in [0, 1]
 
-
-class TestRemoteSet:
-    def test_remote_set_help(self, runner):
-        """Remote set help."""
-        result = runner.invoke(cli, ["remote", "set", "--help"])
-        assert result.exit_code in [0, 2]
-
-    def test_remote_set_runs(self, clean_env):
-        """Remote set runs."""
+    def test_log_with_commits(self, clean_env):
+        """Log with commits."""
         runner, dot_man_dir, repo_dir = clean_env
 
         from git import Repo
@@ -111,37 +99,25 @@ class TestRemoteSet:
 
         (repo_dir / "test.txt").write_text("test")
         repo.index.add(["test.txt"])
-        repo.index.commit("Initial")
+        repo.index.commit("First commit")
 
-        result = runner.invoke(
-            cli, ["remote", "set", "https://github.com/test/dotfiles.git"]
-        )
-
-        assert result.exit_code in [0, 1, 7]
-
-
-class TestSyncBranch:
-    def test_sync_branch_help(self, runner):
-        """Sync-branch help."""
-        result = runner.invoke(cli, ["remote", "sync-branch", "--help"])
-        assert result.exit_code in [0, 2]
-
-    def test_sync_branch_without_remote(self, clean_env):
-        """Sync-branch without remote."""
-        runner, dot_man_dir, repo_dir = clean_env
-
-        from git import Repo
-
-        repo = Repo.init(repo_dir)
-        config_writer = repo.config_writer()
-        config_writer.set_value("user", "name", "Test")
-        config_writer.set_value("user", "email", "test@test.com")
-        config_writer.release()
-
-        (repo_dir / "test.txt").write_text("test")
+        (repo_dir / "test.txt").write_text("test2")
         repo.index.add(["test.txt"])
-        repo.index.commit("Initial")
+        repo.index.commit("Second commit")
 
-        result = runner.invoke(cli, ["remote", "sync-branch"])
+        result = runner.invoke(cli, ["log"])
 
-        assert result.exit_code in [0, 1]
+        assert result.exit_code == 0
+
+
+class TestLogLimit:
+    def test_log_limit_help(self, runner):
+        """Log limit shows in help."""
+        result = runner.invoke(cli, ["log", "--help"])
+        assert "--limit" in result.output or "-n" in result.output
+
+
+class TestDiffHelp:
+    def test_diff_help(self, runner):
+        result = runner.invoke(cli, ["diff", "--help"])
+        assert result.exit_code == 0

@@ -1,4 +1,4 @@
-"""Tests for cli/remote_cmd.py — remote command."""
+"""Tests for cli/verify_cmd.py — verify command."""
 
 import os
 from contextlib import ExitStack
@@ -56,49 +56,24 @@ def clean_env(tmp_path):
         yield CliRunner(), dot_man_dir, repo_dir
 
 
-class TestRemoteHelp:
-    def test_remote_help(self, runner):
-        result = runner.invoke(cli, ["remote", "--help"])
+class TestVerifyHelp:
+    def test_verify_help(self, runner):
+        result = runner.invoke(cli, ["verify", "--help"])
         assert result.exit_code == 0
-        assert "remote" in result.output.lower()
-        assert "set" in result.output
+        assert "verify" in result.output.lower()
 
 
-class TestRemoteGet:
-    def test_remote_get_help(self, runner):
-        """Remote get help."""
-        result = runner.invoke(cli, ["remote", "get", "--help"])
-        assert result.exit_code in [0, 2]
-
-    def test_remote_get_runs(self, clean_env):
-        """Remote get runs."""
-        runner, dot_man_dir, repo_dir = clean_env
-
-        from git import Repo
-
-        repo = Repo.init(repo_dir)
-        config_writer = repo.config_writer()
-        config_writer.set_value("user", "name", "Test")
-        config_writer.set_value("user", "email", "test@test.com")
-        config_writer.release()
-
-        (repo_dir / "test.txt").write_text("test")
-        repo.index.add(["test.txt"])
-        repo.index.commit("Initial")
-
-        result = runner.invoke(cli, ["remote", "get"])
-
+class TestVerifyWithoutInit:
+    def test_verify_without_init(self, runner):
+        """Verify without init should fail or show help."""
+        result = runner.invoke(cli, ["verify"])
+        # Either fails or shows help
         assert result.exit_code in [0, 1]
 
 
-class TestRemoteSet:
-    def test_remote_set_help(self, runner):
-        """Remote set help."""
-        result = runner.invoke(cli, ["remote", "set", "--help"])
-        assert result.exit_code in [0, 2]
-
-    def test_remote_set_runs(self, clean_env):
-        """Remote set runs."""
+class TestVerifyRun:
+    def test_verify_clean_repo(self, clean_env):
+        """Verify a clean repo."""
         runner, dot_man_dir, repo_dir = clean_env
 
         from git import Repo
@@ -113,35 +88,6 @@ class TestRemoteSet:
         repo.index.add(["test.txt"])
         repo.index.commit("Initial")
 
-        result = runner.invoke(
-            cli, ["remote", "set", "https://github.com/test/dotfiles.git"]
-        )
-
-        assert result.exit_code in [0, 1, 7]
-
-
-class TestSyncBranch:
-    def test_sync_branch_help(self, runner):
-        """Sync-branch help."""
-        result = runner.invoke(cli, ["remote", "sync-branch", "--help"])
-        assert result.exit_code in [0, 2]
-
-    def test_sync_branch_without_remote(self, clean_env):
-        """Sync-branch without remote."""
-        runner, dot_man_dir, repo_dir = clean_env
-
-        from git import Repo
-
-        repo = Repo.init(repo_dir)
-        config_writer = repo.config_writer()
-        config_writer.set_value("user", "name", "Test")
-        config_writer.set_value("user", "email", "test@test.com")
-        config_writer.release()
-
-        (repo_dir / "test.txt").write_text("test")
-        repo.index.add(["test.txt"])
-        repo.index.commit("Initial")
-
-        result = runner.invoke(cli, ["remote", "sync-branch"])
+        result = runner.invoke(cli, ["verify"])
 
         assert result.exit_code in [0, 1]

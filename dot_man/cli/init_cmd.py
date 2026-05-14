@@ -1,6 +1,7 @@
 """Init command for dot-man CLI."""
 
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -26,7 +27,16 @@ from .interface import cli as main
     default=None,
     help="Test init in a temporary sandbox directory (for testing wizard)",
 )
-def init(force: bool, no_wizard: bool, sandbox_dir: str | None):
+@click.option(
+    "--import",
+    "import_path",
+    type=click.Path(exists=True),
+    default=None,
+    help="Import from an existing git repository",
+)
+def init(
+    force: bool, no_wizard: bool, sandbox_dir: str | None, import_path: str | None
+):
     """Initialize a new dot-man repository.
 
     By default, runs an interactive setup wizard to detect and add
@@ -36,6 +46,7 @@ def init(force: bool, no_wizard: bool, sandbox_dir: str | None):
         dot-man init                    # Interactive wizard
         dot-man init --sandbox /tmp/test # Test wizard in sandbox
         dot-man init --no-wizard         # Manual setup only
+        dot-man init --import ~/dotfiles # Import existing dotfiles repo
     """
     # Pre-checks
     if not is_git_installed():
@@ -57,9 +68,60 @@ def init(force: bool, no_wizard: bool, sandbox_dir: str | None):
         REPO_DIR.mkdir(parents=True, exist_ok=True)
         BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
 
-        # Initialize git repository
-        git = GitManager()
-        git.init()
+        # Handle import from existing repo
+        if import_path:
+            source_path: Path
+
+            # Check if it's a GitHub URL
+            github_url = _parse_github_url(import_path)
+            if github_url:
+                cloned_path = _clone_github_repo(github_url)
+                if cloned_path is None:
+                    error("Failed to clone GitHub repository.", exit_code=1)
+                source_path = cloned_path  # type: ignore[assignment]
+            else:
+                # It's a local path
+                source_path = Path(import_path).expanduser().resolve()
+                if not source_path.exists():
+                    error(f"Path '{source_path}' does not exist.", exit_code=1)
+                if not (source_path / ".git").exists():
+                    error(f"'{source_path}' is not a git repository.", exit_code=1)
+
+            ui.console.print(f"[dim]Importing from {source_path}...[/dim]")
+
+            # Get the current branch from source repo
+            current_branch = "master"
+            try:
+                result = subprocess.run(
+                    ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                    cwd=source_path,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if result.returncode == 0:
+                    current_branch = result.stdout.strip()
+            except Exception:
+                pass
+
+            # Copy entire repo including .git
+            shutil.copytree(source_path, REPO_DIR, dirs_exist_ok=True)
+
+            # Initialize git to get the repo object
+            git = GitManager()
+
+            # Set the active branch to match source
+            try:
+                if current_branch in git.list_branches():
+                    git.checkout(current_branch)
+            except Exception:
+                pass
+
+            ui.success(f"Imported dotfiles from {source_path}")
+        else:
+            # Initialize git repository
+            git = GitManager()
+            git.init()
 
         # Verify git config exists (user.name and user.email)
         try:
@@ -386,3 +448,85 @@ def show_quick_start():
         "[dim]💡 Tip: Config is at ~/.config/dot-man/repo/dot-man.toml[/dim]"
     )
     ui.console.print()
+
+
+def _parse_github_url(url: str) -> str | None:
+    """Parse GitHub URL and return repo URL if valid.
+
+    Supports:
+    - github.com/user/repo
+    - https://github.com/user/repo
+    - git@github.com:user/repo
+    - https://github.com/user/repo.git
+
+    Returns:
+        Clone URL if valid GitHub repo, None otherwise
+    """
+    import re
+
+    url = url.strip()
+
+    # https://github.com/user/repo or https://github.com/user/repo.git
+    match = re.match(r"^https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?$", url)
+    if match:
+        return f"https://github.com/{match.group(1)}/{match.group(2)}.git"
+
+    # git@github.com:user/repo
+    match = re.match(r"^git@github\.com:([^/]+)/([^/]+?)(?:\.git)?$", url)
+    if match:
+        return f"git@github.com:{match.group(1)}/{match.group(2)}.git"
+
+    # github.com/user/repo (shorthand)
+    match = re.match(r"^github\.com/([^/]+)/([^/]+)$", url)
+    if match:
+        return f"https://github.com/{match.group(1)}/{match.group(2)}.git"
+
+    return None
+
+
+def _clone_github_repo(github_url: str) -> Path | None:
+    """Clone a GitHub repo to a temporary directory.
+
+    Args:
+        github_url: GitHub clone URL
+
+    Returns:
+        Path to cloned repo, or None on failure
+    """
+    import tempfile
+
+    ui.console.print(f"[dim]Cloning {github_url}...[/dim]")
+
+    try:
+        temp_dir = tempfile.mkdtemp(prefix="dotman_import_")
+        result = subprocess.run(
+            ["git", "clone", "--mirror", github_url, temp_dir],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if result.returncode != 0:
+            ui.error(f"Failed to clone: {result.stderr}")
+            return None
+
+        # Get the actual repo path (git clone --mirror creates a bare repo)
+        # We need to convert it to a working repo
+        # Clone again to get a working copy
+        work_dir = tempfile.mkdtemp(prefix="dotman_working_")
+        result = subprocess.run(
+            ["git", "clone", temp_dir, work_dir],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        if result.returncode != 0:
+            ui.error(f"Failed to clone working copy: {result.stderr}")
+            return None
+
+        return Path(work_dir)
+    except subprocess.TimeoutExpired:
+        ui.error("Clone timed out")
+        return None
+    except Exception as e:
+        ui.error(f"Clone failed: {e}")
+        return None

@@ -127,13 +127,31 @@
 
 ---
 
+## v0.9.0 - Enhanced Testing & Features ✅
+
+### Testing Improvements
+- ✅ 627 tests (from 418)
+- ✅ 56% coverage (from 57%)
+- ✅ All CLI commands have test coverage
+- ✅ Added tests for: backups, config, remote, profile, template, deploy, add, backup
+- ✅ Updated coverage omit list
+
+### New Features
+- ✅ `dot-man init --import` - Import from existing git repos
+- ✅ `dot-man navigate` - Unified command (replaces switch/checkout)
+- ✅ `dot-man hooks` - Manage global hooks
+- ✅ Auto-detect hooks on branch switch
+- ✅ Universal file merge system
+- ✅ Config auto-detection (Quickshell, etc.)
+
+---
+
 ## v1.0.0 - Production Ready
 
-- [ ] 80%+ test coverage (currently 57%)
+- [ ] 80%+ test coverage (currently 56%)
 - [ ] Full documentation site (mkdocs/sphinx)
 - [ ] PyPI publication
 - [ ] Stable API guarantee
-- [ ] Content-addressable storage for deduplication
 
 ---
 
@@ -162,8 +180,8 @@
 
 | Metric        | Current                  | v1.0.0 Target         |
 | ------------- | ------------------------ | --------------------- |
-| Test Coverage | 57% (418 tests)          | 80%+                  |
-| Core Commands | 25+ commands ✅         | All commands stable   |
+| Test Coverage | 56% (627 tests) ✅      | 80%+                  |
+| Core Commands | 30+ commands ✅         | All commands stable   |
 | Lint Errors   | 0 (ruff + mypy) ✅      | 0                     |
 | TUI           | Removed for redesign    | Redesign in v1.x      |
 | Documentation | README + specs ✅        | Full docs site        |

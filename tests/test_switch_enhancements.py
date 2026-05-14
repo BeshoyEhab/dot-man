@@ -150,28 +150,59 @@ class TestCompletionFunctions:
 
     def test_complete_switch_args_returns_branches(self):
         """complete_switch_args should return matching branches."""
-        from unittest.mock import patch
+        import subprocess
 
-        from dot_man.cli.common import complete_switch_args
+        from dot_man.cli.common import _set_git_runner, complete_switch_args
 
-        with patch("dot_man.cli.common.GitManager") as mock_git:
-            mock_git.return_value.list_branches.return_value = ["main", "work", "dev"]
-            mock_git.return_value.list_tags.return_value = ["v1.0"]
-            mock_git.return_value.current_branch.return_value = "main"
-            mock_git.return_value.get_commits_detailed.return_value = []
-            result = complete_switch_args(None, None, "w")
-            values = [item.value if hasattr(item, "value") else item for item in result]
-            assert "work" in values
+        def make_mock_result(stdout="", returncode=0):
+            result = subprocess.CompletedProcess(
+                args=[], returncode=returncode, stdout=stdout, stderr=""
+            )
+            return result
+
+        def mock_runner(args, cwd=None, timeout=2):
+            if "branch" in args:
+                return make_mock_result("main\nwork\ndev\n")
+            if "rev-parse" in args:
+                return make_mock_result("main")
+            if "tag" in args:
+                return make_mock_result("v1.0\n")
+            if "log" in args:
+                return make_mock_result("")
+            return make_mock_result()
+
+        _set_git_runner(mock_runner)
+        result = complete_switch_args(None, None, "w")
+        values = [item.value if hasattr(item, "value") else item for item in result]
+        assert "work" in values
+        _set_git_runner(None)
 
     def test_complete_tags_returns_matching(self):
         """complete_tags should return matching tag names."""
-        from unittest.mock import patch
+        import subprocess
 
-        from dot_man.cli.common import complete_tags
+        from dot_man.cli.common import (
+            _clear_all_caches,
+            _set_git_runner,
+            complete_tags,
+        )
 
-        with patch("dot_man.cli.common.GitManager") as mock_git:
-            mock_git.return_value.list_tags.return_value = ["v1.0", "v2.0", "latest"]
-            result = complete_tags(None, None, "v")
-            assert "v1.0" in result
-            assert "v2.0" in result
-            assert "latest" not in result
+        _clear_all_caches()
+
+        def make_mock_result(stdout="", returncode=0):
+            result = subprocess.CompletedProcess(
+                args=[], returncode=returncode, stdout=stdout, stderr=""
+            )
+            return result
+
+        def mock_runner(args, cwd=None, timeout=2):
+            if "tag" in args:
+                return make_mock_result("v1.0\nv2.0\nlatest\n")
+            return make_mock_result()
+
+        _set_git_runner(mock_runner)
+        result = complete_tags(None, None, "v")
+        assert "v1.0" in result
+        assert "v2.0" in result
+        assert "latest" not in result
+        _set_git_runner(None)

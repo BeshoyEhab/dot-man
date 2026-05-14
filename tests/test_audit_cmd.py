@@ -1,4 +1,4 @@
-"""Tests for cli/remote_cmd.py — remote command."""
+"""Tests for cli/audit_cmd.py — audit command."""
 
 import os
 from contextlib import ExitStack
@@ -56,22 +56,16 @@ def clean_env(tmp_path):
         yield CliRunner(), dot_man_dir, repo_dir
 
 
-class TestRemoteHelp:
-    def test_remote_help(self, runner):
-        result = runner.invoke(cli, ["remote", "--help"])
+class TestAuditHelp:
+    def test_audit_help(self, runner):
+        result = runner.invoke(cli, ["audit", "--help"])
         assert result.exit_code == 0
-        assert "remote" in result.output.lower()
-        assert "set" in result.output
+        assert "secret" in result.output.lower()
 
 
-class TestRemoteGet:
-    def test_remote_get_help(self, runner):
-        """Remote get help."""
-        result = runner.invoke(cli, ["remote", "get", "--help"])
-        assert result.exit_code in [0, 2]
-
-    def test_remote_get_runs(self, clean_env):
-        """Remote get runs."""
+class TestAuditRun:
+    def test_audit_clean_repo(self, clean_env):
+        """Audit a clean repo with no secrets."""
         runner, dot_man_dir, repo_dir = clean_env
 
         from git import Repo
@@ -82,66 +76,56 @@ class TestRemoteGet:
         config_writer.set_value("user", "email", "test@test.com")
         config_writer.release()
 
-        (repo_dir / "test.txt").write_text("test")
+        (repo_dir / "test.txt").write_text("just some text content")
         repo.index.add(["test.txt"])
         repo.index.commit("Initial")
 
-        result = runner.invoke(cli, ["remote", "get"])
+        result = runner.invoke(cli, ["audit"])
+
+        assert result.exit_code == 0
+
+
+class TestAuditStrict:
+    def test_audit_strict_mode(self, clean_env):
+        """Audit in strict mode."""
+        runner, dot_man_dir, repo_dir = clean_env
+
+        from git import Repo
+
+        repo = Repo.init(repo_dir)
+        config_writer = repo.config_writer()
+        config_writer.set_value("user", "name", "Test")
+        config_writer.set_value("user", "email", "test@test.com")
+        config_writer.release()
+
+        (repo_dir / "test.txt").write_text("test content")
+        repo.index.add(["test.txt"])
+        repo.index.commit("Initial")
+
+        result = runner.invoke(cli, ["audit", "--strict"])
 
         assert result.exit_code in [0, 1]
 
 
-class TestRemoteSet:
-    def test_remote_set_help(self, runner):
-        """Remote set help."""
-        result = runner.invoke(cli, ["remote", "set", "--help"])
+class TestAuditOptions:
+    def test_audit_verbose_help(self, runner):
+        """Audit verbose help."""
+        result = runner.invoke(cli, ["audit", "--verbose", "--help"])
         assert result.exit_code in [0, 2]
 
-    def test_remote_set_runs(self, clean_env):
-        """Remote set runs."""
-        runner, dot_man_dir, repo_dir = clean_env
-
-        from git import Repo
-
-        repo = Repo.init(repo_dir)
-        config_writer = repo.config_writer()
-        config_writer.set_value("user", "name", "Test")
-        config_writer.set_value("user", "email", "test@test.com")
-        config_writer.release()
-
-        (repo_dir / "test.txt").write_text("test")
-        repo.index.add(["test.txt"])
-        repo.index.commit("Initial")
-
-        result = runner.invoke(
-            cli, ["remote", "set", "https://github.com/test/dotfiles.git"]
-        )
-
-        assert result.exit_code in [0, 1, 7]
-
-
-class TestSyncBranch:
-    def test_sync_branch_help(self, runner):
-        """Sync-branch help."""
-        result = runner.invoke(cli, ["remote", "sync-branch", "--help"])
+    def test_audit_path_help(self, runner):
+        """Audit path help."""
+        result = runner.invoke(cli, ["audit", "--path", "--help"])
         assert result.exit_code in [0, 2]
 
-    def test_sync_branch_without_remote(self, clean_env):
-        """Sync-branch without remote."""
-        runner, dot_man_dir, repo_dir = clean_env
+    def test_audit_exclude_help(self, runner):
+        """Audit exclude help."""
+        result = runner.invoke(cli, ["audit", "--exclude", "--help"])
+        assert result.exit_code in [0, 2]
 
-        from git import Repo
 
-        repo = Repo.init(repo_dir)
-        config_writer = repo.config_writer()
-        config_writer.set_value("user", "name", "Test")
-        config_writer.set_value("user", "email", "test@test.com")
-        config_writer.release()
-
-        (repo_dir / "test.txt").write_text("test")
-        repo.index.add(["test.txt"])
-        repo.index.commit("Initial")
-
-        result = runner.invoke(cli, ["remote", "sync-branch"])
-
+class TestAuditWithoutInit:
+    def test_audit_without_init(self, runner):
+        """Audit without init."""
+        result = runner.invoke(cli, ["audit"])
         assert result.exit_code in [0, 1]

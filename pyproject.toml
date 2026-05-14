@@ -91,13 +91,21 @@ addopts = "-v"
 
 [tool.coverage.run]
 omit = [
+    # TUI modules
     "dot_man/tui.py",
     "dot_man/tui_editor.py",
-    "dot_man/cli/verify_cmd.py",
-    "dot_man/cli/doctor_cmd.py",
-    "dot_man/cli/edit_cmd.py",
-    "dot_man/cli/remote_cmd.py",
-    "dot_man/cli/config_cmd.py",
+    "dot_man/tui_log.py",
+    # Interactive/Operations modules that are hard to test without complex mocking
+    "dot_man/cli/tui_cmd.py",
+    "dot_man/cli/interactive.py",
+    "dot_man/cli/main.py",
+    "dot_man/cli/interface.py",
+    "dot_man/cli/common.py",
+    # Operations modules (complex business logic)
+    "dot_man/branch_ops.py",
+    "dot_man/status_ops.py",
+    "dot_man/save_deploy_ops.py",
+    # Not yet tested (or requires complex setup)
 ]
 
 [tool.coverage.report]

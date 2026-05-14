@@ -11,9 +11,18 @@ from .branch_cmd import branch
 from .clean_cmd import clean
 from .common import (
     DotManGroup,
+    _clear_completion_cache,
+    _set_git_runner,
     complete_branches,
+    complete_commits,
+    complete_config_keys,
+    complete_profiles,
+    complete_switch_args,
+    complete_tags,
+    complete_template_keys,
     error,
     get_secret_handler,
+    parse_branch_arg,
     require_init,
     success,
     warn,
@@ -28,8 +37,8 @@ from .init_cmd import init
 from .interface import cli
 from .log_cmd import checkout, diff, log
 from .main import main
-from .onboarding import is_first_run, mark_onboarded, run_onboarding
 from .navigate_cmd import hooks, navigate
+from .onboarding import is_first_run, mark_onboarded, run_onboarding
 from .profile_cmd import profile
 from .remote_cmd import remote, sync
 from .restore_cmd import restore
@@ -51,7 +60,16 @@ __all__ = [
     "require_init",
     "DotManGroup",
     "complete_branches",
+    "complete_tags",
+    "complete_commits",
+    "complete_template_keys",
+    "complete_config_keys",
+    "complete_profiles",
+    "complete_switch_args",
+    "parse_branch_arg",
     "get_secret_handler",
+    "_set_git_runner",
+    "_clear_completion_cache",
     "run_onboarding",
     "is_first_run",
     "mark_onboarded",

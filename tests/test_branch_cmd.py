@@ -1,4 +1,4 @@
-"""Tests for cli/remote_cmd.py — remote command."""
+"""Tests for cli/branch_cmd.py — branch command."""
 
 import os
 from contextlib import ExitStack
@@ -56,22 +56,16 @@ def clean_env(tmp_path):
         yield CliRunner(), dot_man_dir, repo_dir
 
 
-class TestRemoteHelp:
-    def test_remote_help(self, runner):
-        result = runner.invoke(cli, ["remote", "--help"])
+class TestBranchHelp:
+    def test_branch_help(self, runner):
+        result = runner.invoke(cli, ["branch", "--help"])
         assert result.exit_code == 0
-        assert "remote" in result.output.lower()
-        assert "set" in result.output
+        assert "list" in result.output
 
 
-class TestRemoteGet:
-    def test_remote_get_help(self, runner):
-        """Remote get help."""
-        result = runner.invoke(cli, ["remote", "get", "--help"])
-        assert result.exit_code in [0, 2]
-
-    def test_remote_get_runs(self, clean_env):
-        """Remote get runs."""
+class TestBranchList:
+    def test_branch_list_runs(self, clean_env):
+        """List branches command runs."""
         runner, dot_man_dir, repo_dir = clean_env
 
         from git import Repo
@@ -86,48 +80,14 @@ class TestRemoteGet:
         repo.index.add(["test.txt"])
         repo.index.commit("Initial")
 
-        result = runner.invoke(cli, ["remote", "get"])
-
-        assert result.exit_code in [0, 1]
-
-
-class TestRemoteSet:
-    def test_remote_set_help(self, runner):
-        """Remote set help."""
-        result = runner.invoke(cli, ["remote", "set", "--help"])
-        assert result.exit_code in [0, 2]
-
-    def test_remote_set_runs(self, clean_env):
-        """Remote set runs."""
-        runner, dot_man_dir, repo_dir = clean_env
-
-        from git import Repo
-
-        repo = Repo.init(repo_dir)
-        config_writer = repo.config_writer()
-        config_writer.set_value("user", "name", "Test")
-        config_writer.set_value("user", "email", "test@test.com")
-        config_writer.release()
-
-        (repo_dir / "test.txt").write_text("test")
-        repo.index.add(["test.txt"])
-        repo.index.commit("Initial")
-
-        result = runner.invoke(
-            cli, ["remote", "set", "https://github.com/test/dotfiles.git"]
-        )
-
+        result = runner.invoke(cli, ["branch", "list"])
+        # Just verify the command runs without crash
         assert result.exit_code in [0, 1, 7]
 
 
-class TestSyncBranch:
-    def test_sync_branch_help(self, runner):
-        """Sync-branch help."""
-        result = runner.invoke(cli, ["remote", "sync-branch", "--help"])
-        assert result.exit_code in [0, 2]
-
-    def test_sync_branch_without_remote(self, clean_env):
-        """Sync-branch without remote."""
+class TestBranchCreate:
+    def test_branch_create_runs(self, clean_env):
+        """Create branch command runs."""
         runner, dot_man_dir, repo_dir = clean_env
 
         from git import Repo
@@ -142,6 +102,6 @@ class TestSyncBranch:
         repo.index.add(["test.txt"])
         repo.index.commit("Initial")
 
-        result = runner.invoke(cli, ["remote", "sync-branch"])
-
-        assert result.exit_code in [0, 1]
+        result = runner.invoke(cli, ["branch", "create", "feature-branch"])
+        # Just verify the command runs without crash
+        assert result.exit_code in [0, 1, 2]

@@ -357,3 +357,185 @@ class TestSetupWizard:
 
         assert result.exit_code == 0, result.output
         assert "Remote set to" in result.output
+
+
+# ---------------------------------------------------------------------------
+# Import from existing repo
+# ---------------------------------------------------------------------------
+
+
+class TestInitImport:
+    def test_init_help_shows_import_option(self, runner):
+        """init --help should show the --import option."""
+        result = runner.invoke(cli, ["init", "--help"])
+        assert result.exit_code == 0
+        assert "--import" in result.output
+
+    def test_import_nonexistent_path_fails(self, clean_env, tmp_path):
+        """Import from non-existent path should fail."""
+        runner, dot_man_dir, repo_dir, _, _ = clean_env
+
+        nonexistent = tmp_path / "nonexistent"
+        result = runner.invoke(cli, ["init", "--import", str(nonexistent)])
+
+        assert result.exit_code == 2
+
+    def test_import_non_git_repo_fails(self, clean_env, tmp_path):
+        """Import from non-git directory should fail."""
+        runner, dot_man_dir, repo_dir, _, _ = clean_env
+
+        source_dir = tmp_path / "source"
+        source_dir.mkdir()
+        (source_dir / "somefile.txt").write_text("test")
+
+        result = runner.invoke(cli, ["init", "--import", str(source_dir), "--force"])
+
+        assert result.exit_code == 1
+        assert "not a git repository" in result.output.lower()
+
+    def test_import_existing_git_repo(self, clean_env, tmp_path):
+        """Import from existing git repo should copy files."""
+        runner, dot_man_dir, repo_dir, backups_dir, global_toml = clean_env
+
+        source_dir = tmp_path / "source_repo"
+        source_dir.mkdir()
+        from git import Repo
+
+        source_repo = Repo.init(source_dir)
+        config_writer = source_repo.config_writer()
+        config_writer.set_value("user", "name", "Test User")
+        config_writer.set_value("user", "email", "test@test.com")
+        config_writer.release()
+
+        (source_dir / ".bashrc").write_text("export PATH=$PATH:/usr/local/bin")
+        (source_dir / ".vimrc").write_text("set nu")
+        source_repo.index.add([".bashrc", ".vimrc"])
+        source_repo.index.commit("Initial commit")
+
+        source_repo.create_head("work")
+
+        result = runner.invoke(
+            cli, ["init", "--import", str(source_dir), "--force", "--no-wizard"]
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "Imported dotfiles" in result.output
+        assert (repo_dir / ".bashrc").exists()
+        assert (repo_dir / ".vimrc").exists()
+        assert (repo_dir / ".git").exists()
+
+    def test_import_preserves_git_history(self, clean_env, tmp_path):
+        """Import from existing git repo should preserve commit history."""
+        runner, dot_man_dir, repo_dir, backups_dir, global_toml = clean_env
+
+        source_dir = tmp_path / "source_repo"
+        source_dir.mkdir()
+        from git import Repo
+
+        source_repo = Repo.init(source_dir)
+        config_writer = source_repo.config_writer()
+        config_writer.set_value("user", "name", "Test User")
+        config_writer.set_value("user", "email", "test@test.com")
+        config_writer.release()
+
+        (source_dir / "test.txt").write_text("content1")
+        source_repo.index.add(["test.txt"])
+        source_repo.index.commit("First commit")
+
+        (source_dir / "test.txt").write_text("content2")
+        source_repo.index.add(["test.txt"])
+        source_repo.index.commit("Second commit")
+
+        result = runner.invoke(
+            cli, ["init", "--import", str(source_dir), "--force", "--no-wizard"]
+        )
+
+        assert result.exit_code == 0
+
+        from dot_man.core import GitManager
+
+        git = GitManager(repo_dir)
+        commits = list(git.repo.iter_commits(max_count=5))
+        commit_messages = [c.message.strip() for c in commits]
+
+        assert any("First commit" in msg for msg in commit_messages)
+        assert any("Second commit" in msg for msg in commit_messages)
+
+    def test_import_with_branches(self, clean_env, tmp_path):
+        """Import from existing git repo should preserve branches."""
+        runner, dot_man_dir, repo_dir, backups_dir, global_toml = clean_env
+
+        source_dir = tmp_path / "source_repo"
+        source_dir.mkdir()
+        from git import Repo
+
+        source_repo = Repo.init(source_dir)
+        config_writer = source_repo.config_writer()
+        config_writer.set_value("user", "name", "Test User")
+        config_writer.set_value("user", "email", "test@test.com")
+        config_writer.release()
+
+        (source_dir / "test.txt").write_text("main")
+        source_repo.index.add(["test.txt"])
+        source_repo.index.commit("Initial")
+
+        work_branch = source_repo.create_head("work")
+        work_branch.checkout()
+        (source_dir / "test.txt").write_text("work")
+        source_repo.index.add(["test.txt"])
+        source_repo.index.commit("Work commit")
+
+        source_repo.heads["master"].checkout()
+
+        result = runner.invoke(
+            cli, ["init", "--import", str(source_dir), "--force", "--no-wizard"]
+        )
+
+        assert result.exit_code == 0
+
+        from dot_man.core import GitManager
+
+        git = GitManager(repo_dir)
+        branches = git.list_branches()
+
+        assert "master" in branches
+        assert "work" in branches
+
+
+class TestGitHubImport:
+    def test_parse_github_https_url(self):
+        """Parse HTTPS GitHub URL."""
+        from dot_man.cli.init_cmd import _parse_github_url
+
+        result = _parse_github_url("https://github.com/user/dotfiles")
+        assert result == "https://github.com/user/dotfiles.git"
+
+        result = _parse_github_url("https://github.com/user/dotfiles.git")
+        assert result == "https://github.com/user/dotfiles.git"
+
+    def test_parse_github_ssh_url(self):
+        """Parse SSH GitHub URL."""
+        from dot_man.cli.init_cmd import _parse_github_url
+
+        result = _parse_github_url("git@github.com:user/dotfiles")
+        assert result == "git@github.com:user/dotfiles.git"
+
+    def test_parse_github_shorthand(self):
+        """Parse GitHub shorthand URL."""
+        from dot_man.cli.init_cmd import _parse_github_url
+
+        result = _parse_github_url("github.com/user/dotfiles")
+        assert result == "https://github.com/user/dotfiles.git"
+
+    def test_parse_non_github_url(self):
+        """Non-GitHub URLs should return None."""
+        from dot_man.cli.init_cmd import _parse_github_url
+
+        result = _parse_github_url("/home/user/dotfiles")
+        assert result is None
+
+        result = _parse_github_url("https://gitlab.com/user/dotfiles")
+        assert result is None
+
+        result = _parse_github_url("https://github.com")
+        assert result is None

@@ -1,5 +1,10 @@
 """Common utilities for dot-man CLI commands."""
 
+import json
+import os
+import re
+import subprocess
+import time
 from functools import wraps
 from typing import Callable
 
@@ -43,7 +48,6 @@ def handle_exception(exc: BaseException, context: str = "Operation") -> None:
         warn("Operation cancelled by user")
         raise SystemExit(130)
 
-    # At this point exc is known to be an Exception (not KeyboardInterrupt)
     diagnostic = ErrorDiagnostic.from_exception(exc)  # type: ignore[arg-type]
     ui.console.print()
     ui.console.print(f"[red bold]{diagnostic.title}[/red bold]")
@@ -116,7 +120,110 @@ def require_init(func):
     return wrapper
 
 
-import re
+_COMPLETION_CACHE_TTL = 10
+_COMPLETION_CACHE_FILE = REPO_DIR / ".dotman" / "completion_cache.json"
+
+_git_runner = None
+_memory_cache: dict | None = None
+_memory_cache_time: float = 0
+_template_cache: list[str] | None = None
+_config_keys_cache: list[str] | None = None
+_profiles_cache: list[str] | None = None
+
+
+def _set_git_runner(runner):
+    """Set custom git runner for testing."""
+    global _git_runner
+    _git_runner = runner
+
+
+def _run_git(args, cwd=REPO_DIR, timeout=2):
+    """Run git command, using custom runner if set."""
+    if _git_runner is not None:
+        return _git_runner(args, cwd, timeout)
+    result = subprocess.run(
+        args,
+        cwd=cwd,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
+    return result
+
+
+def _get_completion_cache() -> dict:
+    """Load completion cache from memory or file."""
+    global _memory_cache, _memory_cache_time
+
+    if (
+        _memory_cache is not None
+        and time.time() - _memory_cache_time < _COMPLETION_CACHE_TTL
+    ):
+        return _memory_cache
+
+    try:
+        if not REPO_DIR.exists():
+            _memory_cache = {}
+            _memory_cache_time = time.time()
+            return _memory_cache
+        if _COMPLETION_CACHE_FILE.exists():
+            mtime = os.path.getmtime(_COMPLETION_CACHE_FILE)
+            if time.time() - mtime < _COMPLETION_CACHE_TTL:
+                _memory_cache = json.loads(_COMPLETION_CACHE_FILE.read_text())
+                _memory_cache_time = time.time()
+                return _memory_cache
+    except Exception:
+        pass
+
+    _memory_cache = {}
+    _memory_cache_time = time.time()
+    return _memory_cache
+
+
+def _save_completion_cache(data: dict) -> None:
+    """Save completion cache to memory and file."""
+    global _memory_cache, _memory_cache_time
+    _memory_cache = data
+    _memory_cache_time = time.time()
+
+    try:
+        if not REPO_DIR.exists():
+            return
+        _COMPLETION_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
+        _COMPLETION_CACHE_FILE.write_text(json.dumps(data))
+    except Exception:
+        pass
+
+
+def _clear_completion_cache() -> None:
+    """Clear completion cache for testing."""
+    global _memory_cache, _memory_cache_time
+    _memory_cache = None
+    _memory_cache_time = 0
+
+    try:
+        if _COMPLETION_CACHE_FILE.exists():
+            _COMPLETION_CACHE_FILE.unlink()
+    except Exception:
+        pass
+
+
+def _clear_all_caches() -> None:
+    """Clear all completion caches including in-memory."""
+    global _memory_cache, _memory_cache_time
+    global _template_cache, _config_keys_cache, _profiles_cache
+
+    _memory_cache = None
+    _memory_cache_time = 0
+    _template_cache = None
+    _config_keys_cache = None
+    _profiles_cache = None
+
+    try:
+        if _COMPLETION_CACHE_FILE.exists():
+            _COMPLETION_CACHE_FILE.unlink()
+    except Exception:
+        pass
 
 
 def parse_branch_arg(arg: str) -> dict:
@@ -128,7 +235,6 @@ def parse_branch_arg(arg: str) -> dict:
     Returns:
         dict with keys: type (branch|tag|commit), base, target
     """
-    # Pattern: branch@tag
     match = re.match(r"^(.+)@(.+)$", arg)
     if match:
         base = match.group(1)
@@ -137,18 +243,14 @@ def parse_branch_arg(arg: str) -> dict:
         if not base:
             base = "HEAD"
 
-        # Check if target looks like a commit SHA (7+ hex chars)
         if re.match(r"^[a-f0-9]{7,40}$", target):
             return {"type": "commit", "base": base, "target": target}
 
-        # Otherwise it's a tag
         return {"type": "tag", "base": base, "target": target}
 
-    # Check if entire arg looks like a commit SHA
     if re.match(r"^[a-f0-9]{7,40}$", arg):
         return {"type": "commit", "base": "HEAD", "target": arg}
 
-    # Check if arg is a tag (before checking if it's a branch)
     try:
         git = GitManager()
         if arg in git.list_tags():
@@ -158,7 +260,6 @@ def parse_branch_arg(arg: str) -> dict:
 
         logging.debug(f"Could not check tags: {e}")
 
-    # Plain branch name
     return {"type": "branch", "base": arg, "target": arg}
 
 
@@ -182,19 +283,32 @@ def _complete_navigate_items(
 ) -> list[click.shell_completion.CompletionItem]:
     """Get completion items for navigate command with context.
 
-    Returns CompletionItem objects with value and description.
+    Uses cache and lightweight git commands for performance.
     Order: branches -> tags -> commits (like git checkout)
     """
     from click.shell_completion import CompletionItem
 
     try:
-        git = GitManager()
-        current_branch = git.current_branch()
+        cache = _get_completion_cache()
         items: list[CompletionItem] = []
+
+        if "branches" not in cache or "current_branch" not in cache:
+            result = _run_git(["git", "branch", "--list", "--format=%(refname:short)"])
+            branches = [
+                b.strip() for b in result.stdout.strip().split("\n") if b.strip()
+            ]
+
+            result = _run_git(["git", "rev-parse", "--abbrev-ref", "HEAD"])
+            current_branch = result.stdout.strip() or "HEAD"
+
+            cache["branches"] = branches
+            cache["current_branch"] = current_branch
+        else:
+            branches = cache["branches"]
+            current_branch = cache["current_branch"]
 
         branch_items: list[CompletionItem] = []
         other_branches: list[CompletionItem] = []
-        branches = git.list_branches()
         for b in branches:
             if b.startswith(incomplete):
                 if b == current_branch:
@@ -206,49 +320,62 @@ def _complete_navigate_items(
         items.extend(branch_items)
         items.extend(other_branches)
 
+        if "tags" not in cache:
+            result = _run_git(["git", "tag", "-l"])
+            tags = [t.strip() for t in result.stdout.strip().split("\n") if t.strip()]
+            cache["tags"] = tags
+        else:
+            tags = cache["tags"]
+
         tag_items: list[CompletionItem] = []
-        tags = git.list_tags()
         for t in tags:
             if t.startswith(incomplete):
-                commit_hash = git.get_tag_commit(t) or ""
-                tag_items.append(CompletionItem(t, help=f"tag → {commit_hash[:7]}"))
+                result = _run_git(["git", "rev-parse", f"{t}^{{commit}}"])
+                commit_hash = (
+                    result.stdout.strip()[:7] if result.returncode == 0 else ""
+                )
+                tag_items.append(CompletionItem(t, help=f"tag → {commit_hash}"))
 
         tag_items.sort(key=lambda x: x.value.lower())
         items.extend(tag_items)
 
+        if "commits" not in cache:
+            result = _run_git(
+                ["git", "log", "--oneline", "-n", "20", "--format=%H %s"], timeout=3
+            )
+            commits = []
+            for line in result.stdout.strip().split("\n"):
+                if line:
+                    parts = line.split(" ", 1)
+                    if len(parts) == 2:
+                        commits.append({"sha": parts[0][:7], "message": parts[1][:30]})
+            cache["commits"] = commits
+        else:
+            commits = cache["commits"]
+
         commit_items: list[CompletionItem] = []
-        commits = git.get_commits_detailed(count=20)
         for c in commits:
             if c["sha"].startswith(incomplete):
-                files = c.get("files", [])
-                if files:
-                    file_desc = ", ".join(files[:2])
-                    if c.get("files_more"):
-                        file_desc += f" +{c['files_more']}"
-                else:
-                    file_desc = (
-                        c["message"][:25] + "..."
-                        if len(c["message"]) > 25
-                        else c["message"]
-                    )
-                commit_items.append(
-                    CompletionItem(c["sha"], help=f"{file_desc} · {c['relative_date']}")
-                )
+                commit_items.append(CompletionItem(c["sha"], help=f"{c['message']}..."))
 
         items.extend(commit_items)
 
         if "@" in incomplete:
             parts = incomplete.split("@", 1)
-            if parts[0] and git.branch_exists(parts[0]):
-                for t in git.list_tags():
+            if parts[0] in branches:
+                for t in tags:
                     if t.startswith(parts[1] if len(parts) > 1 else ""):
-                        commit_hash = git.get_tag_commit(t) or ""
+                        result = _run_git(["git", "rev-parse", f"{t}^{{commit}}"])
+                        commit_hash = (
+                            result.stdout.strip()[:7] if result.returncode == 0 else ""
+                        )
                         items.append(
                             CompletionItem(
-                                f"{parts[0]}@{t}", help=f"tag at {commit_hash[:7]}"
+                                f"{parts[0]}@{t}", help=f"tag at {commit_hash}"
                             )
                         )
 
+        _save_completion_cache(cache)
         return items
     except Exception:
         return []
@@ -257,8 +384,16 @@ def _complete_navigate_items(
 def complete_branches(ctx, param, incomplete):
     """Shell completion callback for branches."""
     try:
-        git = GitManager()
-        branches = git.list_branches()
+        cache = _get_completion_cache()
+        if "branches" not in cache:
+            result = _run_git(["git", "branch", "--list", "--format=%(refname:short)"])
+            branches = [
+                b.strip() for b in result.stdout.strip().split("\n") if b.strip()
+            ]
+            cache["branches"] = branches
+            _save_completion_cache(cache)
+        else:
+            branches = cache["branches"]
         return [b for b in branches if b.startswith(incomplete)]
     except Exception:
         return []
@@ -267,8 +402,14 @@ def complete_branches(ctx, param, incomplete):
 def complete_tags(ctx, param, incomplete):
     """Shell completion callback for tags."""
     try:
-        git = GitManager()
-        tags = git.list_tags()
+        cache = _get_completion_cache()
+        if "tags" not in cache:
+            result = _run_git(["git", "tag", "-l"])
+            tags = [t.strip() for t in result.stdout.strip().split("\n") if t.strip()]
+            cache["tags"] = tags
+            _save_completion_cache(cache)
+        else:
+            tags = cache["tags"]
         return [t for t in tags if t.startswith(incomplete)]
     except Exception:
         return []
@@ -277,31 +418,49 @@ def complete_tags(ctx, param, incomplete):
 def complete_commits(ctx, param, incomplete):
     """Shell completion callback for commits."""
     try:
-        git = GitManager()
-        commits = git.get_commits(count=50)
-        return [c["sha"][:7] for c in commits if c["sha"].startswith(incomplete)]
+        cache = _get_completion_cache()
+        if "commits_all" not in cache:
+            result = _run_git(
+                ["git", "log", "--oneline", "-n", "50", "--format=%h"], timeout=3
+            )
+            commits = [
+                c.strip() for c in result.stdout.strip().split("\n") if c.strip()
+            ]
+            cache["commits_all"] = commits
+            _save_completion_cache(cache)
+        else:
+            commits = cache["commits_all"]
+        return [c for c in commits if c.startswith(incomplete)]
     except Exception:
         return []
 
 
 def complete_template_keys(ctx, param, incomplete):
     """Shell completion callback for template keys."""
+    global _template_cache
+
+    if _template_cache is not None:
+        return [k for k in _template_cache if k.startswith(incomplete)]
+
     try:
         from ..global_config import GlobalConfig
 
         gc = GlobalConfig()
         templates = gc.get_all_templates()
-        return [k for k in templates.keys() if k.startswith(incomplete)]
+        _template_cache = list(templates.keys())
+        return [k for k in _template_cache if k.startswith(incomplete)]
     except Exception:
         return []
 
 
 def complete_config_keys(ctx, param, incomplete):
     """Shell completion callback for config keys."""
-    try:
-        from ..global_config import GlobalConfig
+    global _config_keys_cache
 
-        GlobalConfig()  # validate it loads
+    if _config_keys_cache is not None:
+        return [k for k in _config_keys_cache if k.startswith(incomplete)]
+
+    try:
         keys = [
             "dot-man.current_branch",
             "remote.url",
@@ -309,6 +468,7 @@ def complete_config_keys(ctx, param, incomplete):
             "switch.default_behavior",
             "secrets_filter_enabled",
         ]
+        _config_keys_cache = keys
         return [k for k in keys if k.startswith(incomplete)]
     except Exception:
         return []
@@ -316,12 +476,18 @@ def complete_config_keys(ctx, param, incomplete):
 
 def complete_profiles(ctx, param, incomplete):
     """Shell completion callback for profiles."""
+    global _profiles_cache
+
+    if _profiles_cache is not None:
+        return [k for k in _profiles_cache if k.startswith(incomplete)]
+
     try:
         from ..global_config import GlobalConfig
 
         gc = GlobalConfig()
         profiles = gc._data.get("profiles", {})
-        return [k for k in profiles.keys() if k.startswith(incomplete)]
+        _profiles_cache = list(profiles.keys())
+        return [k for k in _profiles_cache if k.startswith(incomplete)]
     except Exception:
         return []
 
@@ -332,17 +498,14 @@ def get_secret_handler() -> Callable[[SecretMatch], str]:
     permanent_guard = PermanentRedactGuard()
 
     def handle_secret(match: SecretMatch) -> str:
-        # Check if should be permanently redacted
         if permanent_guard.should_redact(
             match.file, match.line_content, match.pattern_name
         ):
             return "REDACT"
 
-        # Check if already in skip list
         if guard.is_allowed(match.file, match.line_content, match.pattern_name):
             return "IGNORE"
 
-        # Show the secret to user
         ui.console.print()
         ui.warn("Potential secret detected!")
         ui.console.print(f"File: [cyan]{match.file}[/cyan]")
@@ -352,7 +515,6 @@ def get_secret_handler() -> Callable[[SecretMatch], str]:
         )
         ui.console.print()
 
-        # Options
         ui.console.print("Choose how to handle this secret:")
         ui.console.print("  1. [dim]Ignore (skip it this time)[/dim]")
         ui.console.print(

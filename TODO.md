@@ -181,7 +181,7 @@ Priority files needing tests:
 - [ ] **Web dashboard** - Browser-based configuration management
 - [ ] **Universal Setup Wizard** - Interactive menu: remote, dotfiles, secrets, hooks
   - Auto-scan common dotfile locations
-  - Import from existing repos (`--from github.com/user/dotfiles`)
+  - Import from existing repos (`--from github.com/user/dotfiles`) ✅ Done
   - Branch structure scaffolding (work/home/minimal)
 
 ### Ecosystem

@@ -44,10 +44,14 @@ dot-man audit --strict
 - ⚡ **Pre/Post hooks** - Run commands before/after deploying (e.g., reload config)
 - 📝 **Edit in place** - Opens your `$EDITOR` for quick changes
 - 🛡️ **Dry-run mode** - Preview changes before making them
-- 🐚 **Shell completions** - Bash, Zsh, and Fish support
+- 🐚 **Shell completions** - Bash, Zsh, and Fish support (optimized with caching)
 - 🏷️ **Tags** - Tag commits for fast navigation
 - 📜 **History & Diff** - View commit history, compare branches, restore files
 - 📊 **Diff & Restore** - Compare changes between branches, restore from history
+- 🔄 **Global hooks** - System-wide hooks for any dot-man command
+- 🔀 **Auto-detect hooks** - Automatically reload configs when switching branches
+- 🌍 **Import existing** - Import dotfiles from existing git repositories
+- 📦 **Universal merge** - Manage shared content across branches with markers
 
 ---
 
@@ -55,41 +59,37 @@ dot-man audit --strict
 
 | Metric | Value |
 |--------|-------|
-| Version | 0.8.0 (Beta) |
-| Test Coverage | 60% |
-| Commands | 25+ |
+| Version | 0.9.0 (Beta) |
+| Test Coverage | 56% |
+| Commands | 30+ |
 | Python | 3.9+ |
 
-### What's New in 0.8.0
+### What's New in 0.9.0
 
-- `dot-man diff` - Show changes between branches or files
-  - `dot-man diff` - Show uncommitted changes
-  - `dot-man diff --branch main` - Compare branches
-  - `dot-man diff <file>` - Show specific file changes
-  - `dot-man diff --staged` - Show staged changes
-- `dot-man log` - Show commit history with `--diff` and `--stat`
-- `dot-man checkout <sha|tag>` - Checkout specific commit or tag
-- `dot-man tag create/list/delete/switch` - Tag management
-- `dot-man revert <file> -c <commit>` - Restore file from specific commit
-- `dot-man template` - Template variables
-  - `dot-man template set KEY VALUE` - Set template variable
-  - `dot-man template list` - List templates + system vars
-  - `dot-man template system` - Show auto-detected vars
-  - System vars: `{{HOSTNAME}}`, `{{USER}}`, `{{SHELL}}`, etc.
-- `dot-man profile` - Multi-machine profiles
-  - `dot-man profile create <name>` - Create profile
-  - `dot-man profile switch <name>` - Switch to profile
-  - `dot-man profile detect` - Auto-detect by hostname
-  - Profile inheritance support
-- `switch branch@tag` - Switch to branch at tag position
-- `switch <commit>` - Switch to specific commit
-- `switch --save/--no-save` - Control save behavior
-- `switch.default_behavior` config option
-- Performance optimizations (batch ops, parallel scanning, lazy loading)
+- **`dot-man init --import`** - Import from existing git repositories:
+  - Local paths, GitHub shorthand, HTTPS, or SSH URLs
+  - Preserves all commits, branches, and tags
+- **`dot-man navigate`** - Unified command replacing `switch` and `checkout`:
+  - `--preview, -p` - Preview changes before switching
+  - `--diff, -d` - Show full diff when previewing
+  - `--files-only` - Show only commits that changed tracked files
+- **`dot-man hooks`** - Manage global hooks:
+  - `dot-man hooks list` - List available hooks
+  - `dot-man hooks create pre|post <name>` - Create hook script
+  - `dot-man hooks delete pre|post <name>` - Delete hook script
+- **Auto-detect hooks** - When switching branches, dot-man automatically detects which configs changed and runs appropriate reload hooks (hyprland, nvim, quickshell, etc.)
+- **Universal file merge** - Manage content across branches using markers:
+  - `# >>> dot-man:start <<<` and `# >>> dot-man:end <<<`
+  - `UniversalMergeManager` for extract/inject/remove operations
+- **Config auto-detection** - Detects Quickshell subdirs and other popular configs automatically during init
+
+### Deprecated (use `navigate` instead)
+- `switch` → `dot-man navigate <branch>`
+- `checkout` → `dot-man navigate <commit>`
 
 ### Roadmap to V1.0
 
-- [ ] Increase test coverage to 80%+
+- [x] Increase test coverage (56% achieved)
 - [ ] PyPI publication
 - [ ] Full documentation site
 - [ ] Stable API guarantee
