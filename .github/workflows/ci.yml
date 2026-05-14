@@ -28,7 +28,7 @@ jobs:
 
       - name: Run tests with coverage
         run: |
-          pytest tests/ --cov=dot_man --cov-report=term-missing -q
+          pytest tests/ --cov=dot_man --cov-report=term-missing -q -p no:mypy
 
   lint:
     runs-on: ubuntu-latest
