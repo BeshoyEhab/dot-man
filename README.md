@@ -138,48 +138,75 @@ dot-man init
 
 Creates `~/.config/dot-man/` with a git repository.
 
-### 2. Create configuration file
+### 2. Add your dotfiles
 
 ```bash
-dot-man config create
-```
-
-This creates `dot-man.toml` with commented examples. Uncomment and customize sections for your dotfiles:
-
-```toml
-[bashrc]
-paths = ["~/.bashrc"]
-post_deploy = "shell_reload"
-
-[gitconfig]
-paths = ["~/.gitconfig"]
-```
-
-Or edit manually:
-
-```bash
-dot-man edit
+dot-man add ~/.bashrc
+dot-man add ~/.zshrc
+dot-man add ~/.config/nvim
 ```
 
 ### 3. Save your configuration
 
 ```bash
-dot-man switch main
+dot-man navigate main
 ```
 
 This copies your dotfiles to the repository and commits them.
 
-### 4. Create a work configuration
+### 4. Create different configurations
 
+Create a work configuration:
 ```bash
-dot-man switch work
+dot-man navigate work  # Creates 'work' branch with current files
 ```
 
-Creates a new branch with your current setup. Modify files, then switch back:
+Modify files, then switch back:
+```bash
+dot-man navigate main  # Saves work, deploys main
+```
+
+---
+
+## How Navigation Works
+
+### The `navigate` Command
+
+`dot-man navigate` is your main command for switching between configurations.
 
 ```bash
-dot-man switch main  # Saves work, deploys main
+# Switch branches
+dot-man navigate work           # Switch to 'work' branch
+dot-man navigate personal       # Switch to 'personal' branch
+
+# Preview before switching (recommended!)
+dot-man navigate work --preview        # See what changes
+dot-man navigate work --preview --diff # See full diff
+
+# Switch to specific point in history
+dot-man navigate v1.0          # Go to tag
+dot-man navigate abc1234        # Go to commit (detached HEAD)
+
+# Branch at tag
+dot-man navigate work@v1.0      # Switch to work branch at tag v1.0
 ```
+
+### Branch vs Commit: What's the Difference?
+
+| Type | Purpose | Changes Saved? |
+|------|---------|----------------|
+| **Branch** (e.g., `main`, `work`) | Your full configuration | Yes - auto-saved when you switch |
+| **Tag** (e.g., `v1.0`) | Snapshot in time | No - just marks a point |
+| **Commit** (e.g., `abc1234`) | Specific state | No - viewing only (detached HEAD) |
+
+### ⚠️ Deprecated Commands
+
+| Old Command | Use Instead | Why |
+|------------|-------------|-----|
+| `switch` | `navigate` | Unified command with preview |
+| `checkout` | `navigate` | Same functionality |
+
+Run these commands and they'll show deprecation warnings. Use `navigate` instead.
 
 ---
 
@@ -191,7 +218,8 @@ dot-man switch main  # Saves work, deploys main
 | ------------------------------ | --------------------------------------------- |
 | `dot-man init`                 | Initialize repository at `~/.config/dot-man/` |
 | `dot-man status`              | Show tracked files and their status           |
-| `dot-man switch <target>`      | Switch to branch, tag, or commit              |
+| `dot-man navigate <target>`   | Navigate to branch, tag, or commit (unified)  |
+| `dot-man switch <target>`      | Switch to branch, tag, or commit (legacy)     |
 | `dot-man edit`                 | Open `dot-man.toml` in your editor            |
 | `dot-man deploy <branch>`      | One-way deploy (for new machines)             |
 | `dot-man audit`                | Scan repository for secrets                   |
@@ -202,6 +230,7 @@ dot-man switch main  # Saves work, deploys main
 | `dot-man revert <file> -c <sha>` | Restore file from specific commit            |
 | `dot-man template`            | Manage template variables                    |
 | `dot-man profile`            | Manage machine-specific profiles            |
+| `dot-man hooks list|create|delete` | Manage pre/post command hooks              |
 
 ### Switch Enhancements
 
@@ -223,6 +252,51 @@ Set a default behavior preference:
 ```bash
 dot-man config set switch.default_behavior no-save
 ```
+
+### Navigate Command (Unified)
+
+The `navigate` command is the unified way to switch between branches, tags, and commits with preview capabilities:
+
+```bash
+# Basic navigation
+dot-man navigate work              # Switch to branch
+dot-man navigate work@tag         # Switch to branch at tag position
+dot-man navigate abc1234          # Switch to specific commit
+dot-man navigate my-tag           # Switch to tag
+
+# Preview changes before switching
+dot-man navigate work --preview              # Preview diff
+dot-man navigate work --preview --diff       # Show full diff
+dot-man navigate work --preview --files-only  # Only commits with file changes
+
+# Override default save behavior
+dot-man navigate work --save                  # Force save current changes
+dot-man navigate work --no-save               # Force discard current changes
+```
+
+### Hooks
+
+Hooks allow you to run custom scripts before or after commands:
+
+```bash
+# List available hooks
+dot-man hooks list
+
+# Create a hook (creates ~/.config/dot-man/hooks/pre_switch)
+dot-man hooks create pre switch
+
+# Create a post-deploy hook
+dot-man hooks create post deploy
+
+# Delete a hook
+dot-man hooks delete pre checkout
+```
+
+Hook scripts have environment variables available:
+- `DOTMAN_HOOK_COMMAND` - The command being run (switch, checkout, deploy, etc.)
+- `DOTMAN_HOOK_PHASE` - "pre" or "post"
+- `DOTMAN_SOURCE` - Source branch/commit (for switch)
+- `DOTMAN_TARGET` - Target branch/commit
 
 ### Remote & Sync
 
@@ -376,6 +450,74 @@ dot-man config set switch.default_behavior no-save
 | `update_strategy` | replace/rename_old/ignore | How to deploy files                           |
 | `pre_deploy`      | command string            | Shell command to run _before_ file is changed |
 | `post_deploy`     | command string            | Shell command to run _after_ file is changed  |
+
+---
+
+## Troubleshooting
+
+### Common Issues
+
+**Q: I'm on a detached HEAD state. How do I get back?**
+```bash
+# List your branches
+dot-man branch list
+
+# Return to a branch
+dot-man navigate main
+```
+
+**Q: How do I undo the last switch?**
+```bash
+# Your previous work is saved as a commit
+dot-man log
+
+# Switch back to it
+dot-man navigate <previous-branch>
+```
+
+**Q: My changes aren't being saved when I switch**
+```bash
+# Make sure you're using the save mode (default)
+dot-man navigate work --save
+
+# Or check if secrets are being redacted
+dot-man status
+```
+
+**Q: How do I see what changed in a branch?**
+```bash
+# Preview changes before switching
+dot-man navigate work --preview
+
+# See full diff
+dot-man navigate work --preview --diff
+```
+
+**Q: What are the differences between branches?**
+```bash
+# Compare two branches
+dot-man diff --branch main
+
+# Show only commits that changed tracked files
+dot-man navigate main --preview --files-only
+```
+
+### Getting Help
+
+```bash
+# See all commands
+dot-man --help
+
+# See specific command help
+dot-man navigate --help
+dot-man add --help
+
+# Diagnose issues
+dot-man doctor
+
+# Check repository integrity
+dot-man verify
+```
 
 ---
 

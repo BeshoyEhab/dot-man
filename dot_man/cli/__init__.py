@@ -29,6 +29,7 @@ from .interface import cli
 from .log_cmd import checkout, diff, log
 from .main import main
 from .onboarding import is_first_run, mark_onboarded, run_onboarding
+from .navigate_cmd import hooks, navigate
 from .profile_cmd import profile
 from .remote_cmd import remote, sync
 from .restore_cmd import restore
@@ -79,4 +80,6 @@ __all__ = [
     "tag",
     "template",
     "profile",
+    "navigate",
+    "hooks",
 ]

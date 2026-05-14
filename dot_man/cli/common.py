@@ -130,48 +130,94 @@ def parse_branch_arg(arg: str) -> dict:
 
 
 def complete_switch_args(ctx, param, incomplete):
-    """Shell completion callback for switch (branches, tags, commits)."""
+    """Shell completion callback for switch (branches, tags, commits).
+
+    Returns tuples (value, description) for shell completion.
+    Order: branches first, then tags, then commits (git checkout style).
+    """
     try:
-        git = GitManager()
-        results = []
-
-        # Add branches
-        branches = git.list_branches()
-        for b in branches:
-            if b.startswith(incomplete):
-                results.append(b)
-            # Also add branch@tag suggestions for tags
-            if "@" in incomplete:
-                prefix = incomplete.split("@")[0]
-                if b.startswith(prefix) and b != prefix:
-                    for tag in git.list_tags():
-                        if tag.startswith(
-                            incomplete.split("@")[1]
-                            if len(incomplete.split("@")) > 1
-                            else ""
-                        ):
-                            results.append(f"{b}@{tag}")
-
-        # Add tags
-        tags = git.list_tags()
-        for t in tags:
-            if t.startswith(incomplete):
-                results.append(t)
-            if "@" in incomplete:
-                prefix = incomplete.split("@")[0]
-                if prefix and t.startswith(incomplete.split("@")[1]):
-                    results.append(f"{prefix}@{t}")
-
-        # Add recent commits (first 7 chars)
-        for commit in git.get_commits(count=10):
-            if commit["sha"].startswith(incomplete):
-                results.append(commit["sha"])
-
-        return list(set(results))
+        return _complete_navigate_items(incomplete)
     except Exception as e:
         import logging
 
         logging.debug(f"Completion error: {e}")
+        return []
+
+
+def _complete_navigate_items(
+    incomplete: str,
+) -> list[click.shell_completion.CompletionItem]:
+    """Get completion items for navigate command with context.
+
+    Returns CompletionItem objects with value and description.
+    Order: branches -> tags -> commits (like git checkout)
+    """
+    from click.shell_completion import CompletionItem
+
+    try:
+        git = GitManager()
+        current_branch = git.current_branch()
+        items: list[CompletionItem] = []
+
+        branch_items: list[CompletionItem] = []
+        other_branches: list[CompletionItem] = []
+        branches = git.list_branches()
+        for b in branches:
+            if b.startswith(incomplete):
+                if b == current_branch:
+                    branch_items.append(CompletionItem(b, help="current branch"))
+                else:
+                    other_branches.append(CompletionItem(b, help="branch"))
+
+        other_branches.sort(key=lambda x: x.value.lower())
+        items.extend(branch_items)
+        items.extend(other_branches)
+
+        tag_items: list[CompletionItem] = []
+        tags = git.list_tags()
+        for t in tags:
+            if t.startswith(incomplete):
+                commit_hash = git.get_tag_commit(t) or ""
+                tag_items.append(CompletionItem(t, help=f"tag → {commit_hash[:7]}"))
+
+        tag_items.sort(key=lambda x: x.value.lower())
+        items.extend(tag_items)
+
+        commit_items: list[CompletionItem] = []
+        commits = git.get_commits_detailed(count=20)
+        for c in commits:
+            if c["sha"].startswith(incomplete):
+                files = c.get("files", [])
+                if files:
+                    file_desc = ", ".join(files[:2])
+                    if c.get("files_more"):
+                        file_desc += f" +{c['files_more']}"
+                else:
+                    file_desc = (
+                        c["message"][:25] + "..."
+                        if len(c["message"]) > 25
+                        else c["message"]
+                    )
+                commit_items.append(
+                    CompletionItem(c["sha"], help=f"{file_desc} · {c['relative_date']}")
+                )
+
+        items.extend(commit_items)
+
+        if "@" in incomplete:
+            parts = incomplete.split("@", 1)
+            if parts[0] and git.branch_exists(parts[0]):
+                for t in git.list_tags():
+                    if t.startswith(parts[1] if len(parts) > 1 else ""):
+                        commit_hash = git.get_tag_commit(t) or ""
+                        items.append(
+                            CompletionItem(
+                                f"{parts[0]}@{t}", help=f"tag at {commit_hash[:7]}"
+                            )
+                        )
+
+        return items
+    except Exception:
         return []
 
 

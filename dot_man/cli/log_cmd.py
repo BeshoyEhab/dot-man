@@ -143,7 +143,7 @@ def diff(file: Path | None, branch: str | None, staged: bool):
         error(str(e))
 
 
-@main.command()
+@main.command(deprecated=True, help="⚠️ DEPRECATED: Use 'dot-man navigate' instead")
 @click.argument("target", shell_complete=complete_tags)
 @require_init
 def checkout(target: str):
@@ -152,13 +152,20 @@ def checkout(target: str):
     This allows you to view the state of your dotfiles at a specific
     commit or tag without switching branches.
 
+    ⚠️ DEPRECATED: Use 'dot-man navigate' instead.
+
     To return to a branch, use:
-        dot-man switch <branch-name>
+        dot-man navigate <branch-name>
 
     Examples:
         dot-man checkout abc1234
         dot-man checkout my-tag
     """
+    ui.console.print(
+        "[yellow bold]⚠️ WARNING:[/yellow bold] [yellow]'checkout' is deprecated.[/yellow]\n"
+        "  Use [cyan]dot-man navigate[/cyan] instead.\n"
+        "  Run [cyan]dot-man navigate --help[/cyan] to see the new command.\n"
+    )
     try:
         from ..operations import get_operations
 

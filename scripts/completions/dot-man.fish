@@ -20,7 +20,8 @@ complete -c dot-man -f -a "(__fish_dot_man_complete)"
 # Subcommand completions
 complete -c dot-man -n "__fish_use_subcommand" -a "init" -d "Initialize repository"
 complete -c dot-man -n "__fish_use_subcommand" -a "status" -d "Show status"
-complete -c dot-man -n "__fish_use_subcommand" -a "switch" -d "Switch branch"
+complete -c dot-man -n "__fish_use_subcommand" -a "navigate" -d "Switch branch/tag/commit (recommended)"
+complete -c dot-man -n "__fish_use_subcommand" -a "switch" -d "Switch branch (deprecated)"
 complete -c dot-man -n "__fish_use_subcommand" -a "edit" -d "Edit config"
 complete -c dot-man -n "__fish_use_subcommand" -a "deploy" -d "Deploy branch"
 complete -c dot-man -n "__fish_use_subcommand" -a "audit" -d "Audit secrets"
@@ -33,6 +34,11 @@ complete -c dot-man -n "__fish_use_subcommand" -a "tui" -d "Open TUI"
 # Branch subcommands
 complete -c dot-man -n "__fish_seen_subcommand_from branch" -a "list" -d "List branches"
 complete -c dot-man -n "__fish_seen_subcommand_from branch" -a "delete" -d "Delete branch"
+
+# Navigate subcommands
+complete -c dot-man -n "__fish_seen_subcommand_from navigate" -l preview -d "Preview changes"
+complete -c dot-man -n "__fish_seen_subcommand_from navigate" -l diff -d "Show full diff"
+complete -c dot-man -n "__fish_seen_subcommand_from navigate" -l files-only -d "Show only changed files"
 
 # Remote subcommands
 complete -c dot-man -n "__fish_seen_subcommand_from remote" -a "get" -d "Get remote URL"

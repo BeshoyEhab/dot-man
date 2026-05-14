@@ -8,6 +8,7 @@ import click
 
 from .. import ui
 from ..config import DotManConfig, GlobalConfig
+from ..config_detector import ConfigDetector, get_auto_hooks_for_config
 from ..constants import BACKUPS_DIR, DOT_MAN_DIR, FILE_PERMISSIONS, REPO_DIR
 from ..core import GitManager
 from ..utils import is_git_installed
@@ -47,6 +48,25 @@ def init(force: bool, no_wizard: bool):
         # Initialize git repository
         git = GitManager()
         git.init()
+
+        # Verify git config exists (user.name and user.email)
+        try:
+            git.repo.config_reader().get_value("user", "name")
+            git.repo.config_reader().get_value("user", "email")
+        except Exception:
+            ui.console.print()
+            ui.warn("Git user configuration not found. Setting defaults...")
+            with git.repo.config_writer() as config:
+                config.set_value("user", "name", "dot-man-user")
+                config.set_value("user", "email", "dot-man@localhost")
+            ui.console.print("[dim]  Configured default git user.[/dim]")
+            ui.console.print(
+                "[dim]  Run 'git config --global user.name \"Your Name\"' to customize[/dim]"
+            )
+            ui.console.print(
+                "[dim]  Run 'git config --global user.email \"you@example.com\"' to customize[/dim]"
+            )
+            ui.console.print()
 
         # Create global configuration
         global_config = GlobalConfig()
@@ -91,6 +111,10 @@ def run_setup_wizard(
     ui.console.print("[bold]Detecting dotfiles...[/bold]")
     ui.console.print()
 
+    # Detect quickshell configs using ConfigDetector
+    qs_configs = ConfigDetector.detect_quickshell_configs()
+
+    # Build common_files with quickshell detection
     common_files = [
         ("~/.bashrc", "Bash shell", "bashrc"),
         ("~/.zshrc", "Zsh shell", "zshrc"),
@@ -102,11 +126,19 @@ def run_setup_wizard(
         ("~/.config/alacritty", "Alacritty terminal", "alacritty"),
         ("~/.config/hypr", "Hyprland WM", "hypr"),
         ("~/.config/i3", "i3 WM", "i3"),
-        ("~/.config/quickshell", "Quickshell bar", "quickshell"),
-        ("~/.config/illogical-impulse", "Illogical Impulse", "illogical-impulse"),
         ("~/.tmux.conf", "tmux", "tmux"),
         ("~/.ssh/config", "SSH config", "ssh-config"),
     ]
+
+    # Add quickshell configs as separate entries
+    for qs_config in qs_configs:
+        common_files.append(
+            (
+                qs_config["paths"][0],
+                qs_config["display_name"],
+                qs_config["section_name"],
+            )
+        )
 
     files_to_add = []
     found_count = 0
@@ -114,7 +146,18 @@ def run_setup_wizard(
     for path_str, desc, section_name in common_files:
         path = Path(path_str).expanduser()
 
-        # Special handling for Quickshell ambiguity
+        # Skip quickshell subdirs (detected separately by ConfigDetector)
+        if section_name.startswith("qs-"):
+            if path.exists():
+                found_count += 1
+                ui.console.print(
+                    f"  [green]✓[/green] Found: [cyan]{path_str}[/cyan] ({desc})"
+                )
+                if ui.confirm("    Track this?", default=True):
+                    files_to_add.append((path_str, section_name))
+            continue
+
+        # Special handling for Quickshell root ambiguity
         if section_name == "quickshell" and path.exists():
             subdirs = sorted(
                 [
@@ -227,6 +270,22 @@ def run_setup_wizard(
                     name=section_name,
                     paths=[path_str],
                 )
+                # Auto-detect and suggest hooks for popular configs
+                auto_hooks = get_auto_hooks_for_config(section_name, [path_str])
+                if auto_hooks:
+                    for hook_type, hook_cmd in auto_hooks.items():
+                        # Map to actual config keys
+                        if hook_type == "post_deploy":
+                            dotman_config.update_section(
+                                section_name, post_deploy=hook_cmd
+                            )
+                        elif hook_type == "pre_deploy":
+                            dotman_config.update_section(
+                                section_name, pre_deploy=hook_cmd
+                            )
+                        ui.console.print(
+                            f"  [dim]Auto-detected {hook_type} hook for {section_name}[/dim]"
+                        )
                 ui.console.print(f"  [green]✓[/green] [{section_name}]: {path_str}")
             except Exception as e:
                 warn(f"Could not add {path_str}: {e}")
@@ -266,17 +325,23 @@ def run_setup_wizard(
     if files_to_add:
         ui.console.print("[bold]Next steps:[/bold]")
         ui.console.print(
-            "  1. [cyan]dot-man status[/cyan]       - View your tracked files"
+            "  1. [cyan]dot-man status[/cyan]            - View your tracked files"
         )
         ui.console.print(
-            "  2. [cyan]dot-man switch work[/cyan]  - Create a work configuration branch"
+            "  2. [cyan]dot-man navigate work[/cyan]     - Create a work configuration branch"
         )
-        ui.console.print("  3. [cyan]dot-man add <path>[/cyan]   - Track more files")
+        ui.console.print(
+            "  3. [cyan]dot-man add <path>[/cyan]       - Track more files"
+        )
     else:
         ui.console.print("[bold]Get started:[/bold]")
-        ui.console.print("  [cyan]dot-man add ~/.bashrc[/cyan]   - Add files to track")
-        ui.console.print("  [cyan]dot-man edit[/cyan]            - Edit config file")
-        ui.console.print("  [cyan]dot-man status[/cyan]          - View status")
+        ui.console.print(
+            "  [cyan]dot-man add ~/.bashrc[/cyan]        - Add files to track"
+        )
+        ui.console.print(
+            "  [cyan]dot-man edit[/cyan]                 - Edit config file"
+        )
+        ui.console.print("  [cyan]dot-man status[/cyan]               - View status")
 
     ui.console.print()
     ui.console.print("[dim]💡 Run 'dot-man --help' to see all commands[/dim]")
@@ -299,10 +364,10 @@ def show_quick_start():
         "  dot-man status                     [dim]# View tracked files[/dim]"
     )
     ui.console.print(
-        "  dot-man switch main                [dim]# Save current state[/dim]"
+        "  dot-man navigate main              [dim]# Save & switch to main[/dim]"
     )
     ui.console.print(
-        "  dot-man switch work                [dim]# Create work branch[/dim]"
+        "  dot-man navigate work --preview    [dim]# Preview work branch[/dim]"
     )
     ui.console.print()
     ui.console.print(

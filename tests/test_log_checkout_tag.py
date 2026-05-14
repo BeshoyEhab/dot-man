@@ -29,9 +29,11 @@ class TestCheckoutCommand:
     """Tests for dot-man checkout command."""
 
     def test_checkout_help(self, runner):
+        """Checkout help should show deprecation notice."""
         result = runner.invoke(cli, ["checkout", "--help"])
         assert result.exit_code == 0
-        assert "Checkout a specific commit" in result.output
+        assert "DEPRECATED" in result.output
+        assert "navigate" in result.output.lower()
 
     def test_checkout_without_init(self, runner):
         """Checkout should handle uninitialized state."""

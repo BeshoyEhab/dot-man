@@ -8,6 +8,7 @@ from .constants import REPO_DIR
 from .exceptions import DotManError
 from .files import atomic_write_text, clear_comparison_cache, copy_file
 from .lock import FileLock
+from .merge import get_hook_for_config
 from .secrets import SecretMatch
 from .ui import warn
 
@@ -15,6 +16,35 @@ if TYPE_CHECKING:
     pass
 
 LOCK_FILE = REPO_DIR.parent / ".lock"
+
+FILE_TO_HOOK_MAP = {
+    ".bashrc": "bash_reload",
+    ".zshrc": "zsh_reload",
+    ".bash_profile": "bash_reload",
+    ".zprofile": "zsh_reload",
+    ".config/fish": "fish_reload",
+    ".tmux.conf": "tmux_reload",
+    ".config/nvim": "nvim_sync",
+    ".config/kitty": "kitty_reload",
+    ".config/alacritty": "alacritty_reload",
+    ".config/wezterm": "wezterm_reload",
+    ".config/hypr": "hyprland_reload",
+    ".config/hyprland": "hyprland_reload",
+    ".config/sway": "sway_reload",
+    ".config/i3": "i3_reload",
+    ".config/awesome": "awesome_reload",
+    ".config/polybar": "polybar_reload",
+    ".config/waybar": "waybar_reload",
+    ".config/dunst": "dunst_reload",
+    ".config/picom": "picom_reload",
+    ".Xresources": "xreload",
+    ".config/starship": "starship_reload",
+    ".fzf.bash": "fzf_reload",
+    ".fzf.zsh": "fzf_reload",
+    ".emacs.d": "emacs_reload",
+    ".vimrc": "vim_reload",
+    ".gitconfig": "git_reload",
+}
 
 
 class BranchMixin:
@@ -149,6 +179,16 @@ class BranchMixin:
                     result["deployed_count"] = deploy_result["deployed"]
                     result["errors"].extend(deploy_result["errors"])
 
+                    # Auto-detect hooks based on changed files
+                    changed_files = self.get_changed_files_between_branches(
+                        current_branch, target_branch
+                    )
+                    if changed_files:
+                        auto_hooks = self.detect_hooks_for_changed_files(changed_files)
+                        for hook in auto_hooks:
+                            if hook and hook not in result["post_hooks"]:
+                                result["post_hooks"].append(hook)
+
                 except Exception as e:
                     result["errors"].append(
                         f"Critical error during switch deployment: {e}"
@@ -222,3 +262,88 @@ class BranchMixin:
 
         except Exception as e:
             raise DotManError(f"Failed to revert {path}: {e}")
+
+    def get_changed_files_between_branches(
+        self, source_branch: str, target_branch: str
+    ) -> list[str]:
+        """Get list of files that differ between two branches.
+
+        Args:
+            source_branch: The source branch name
+            target_branch: The target branch name
+
+        Returns:
+            List of file paths that changed
+        """
+        try:
+            diff_output = self.git.repo.git.diff(
+                f"{source_branch}...{target_branch}", "--name-only"
+            )
+            if diff_output.strip():
+                return [f.strip() for f in diff_output.strip().split("\n") if f.strip()]
+        except Exception:
+            pass
+        return []
+
+    def detect_hooks_for_changed_files(self, changed_files: list[str]) -> list[str]:
+        """Determine which hooks to run based on changed files.
+
+        Args:
+            changed_files: List of file paths that changed
+
+        Returns:
+            List of hook commands to execute (deduplicated)
+        """
+        hooks_to_run = set()
+
+        for file_path in changed_files:
+            file_str = str(file_path)
+
+            for pattern, hook_name in FILE_TO_HOOK_MAP.items():
+                if pattern in file_str or file_str.endswith(pattern):
+                    hook_cmd = get_hook_for_config(pattern)
+                    if hook_cmd:
+                        hooks_to_run.add(hook_cmd)
+                    break
+
+            section_name = self._find_section_for_file(file_path)
+            if section_name:
+                section = self.get_section(section_name)
+                if section.pre_deploy:
+                    hooks_to_run.add(section.pre_deploy)
+                if section.post_deploy:
+                    hooks_to_run.add(section.post_deploy)
+
+        return list(hooks_to_run)
+
+    def _find_section_for_file(self, file_path: str) -> str | None:
+        """Find which section tracks a given file path.
+
+        Args:
+            file_path: Path to search for
+
+        Returns:
+            Section name or None
+        """
+        path = (
+            Path(file_path).expanduser()
+            if file_path.startswith("~")
+            else Path(file_path)
+        )
+
+        for section_name in self.get_sections():
+            section = self.get_section(section_name)
+            for section_path in section.paths:
+                if path == section_path or (
+                    section_path.is_dir() and self._is_subpath(path, section_path)
+                ):
+                    return section_name
+        return None
+
+    def _is_subpath(self, path: Path, parent: Path) -> bool:
+        """Check if path is under parent directory."""
+        try:
+            path.resolve().relative_to(parent.resolve())
+            return True
+        except ValueError:
+            return False
