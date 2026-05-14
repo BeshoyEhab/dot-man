@@ -280,7 +280,7 @@ def complete_switch_args(ctx, param, incomplete):
 
 def _complete_navigate_items(
     incomplete: str,
-) -> list[click.shell_completion.CompletionItem]:
+) -> "list[click.shell_completion.CompletionItem]":
     """Get completion items for navigate command with context.
 
     Uses cache and lightweight git commands for performance.
