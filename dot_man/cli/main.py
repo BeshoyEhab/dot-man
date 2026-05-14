@@ -9,8 +9,18 @@ from .interface import cli
 # Import all subcommands to register them with the CLI group
 
 
-def main():
-    """Main entry point for the CLI."""
+def main() -> None:
+    """Main entry point for the CLI.
+
+    On the very first launch (no ~/.config/dot-man/ or sentinel missing),
+    the onboarding tutorial runs automatically before anything else.
+    """
+    from .onboarding import is_first_run, run_onboarding
+
+    if is_first_run():
+        run_onboarding()
+        return
+
     cli()
 
 
