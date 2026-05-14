@@ -195,8 +195,8 @@ COMPONENTS = """\
   ├────────────────┼──────────────────────────────────────────┤
   │  GitManager    │  git branches, commits, checkout         │
   │  DotManConfig  │  which files go in which section         │
-  │  GlobalConfig  │  current branch, remote URL, settings   │
-  │  Operations    │  save files  →  repo, deploy  →  system │
+  │  GlobalConfig  │  current branch, remote URL, settings    │
+  │  Operations    │  save files  →  repo, deploy  →  system  │
   │  SecretGuard   │  redact passwords/keys before committing │
   └────────────────┴──────────────────────────────────────────┘"""
 
