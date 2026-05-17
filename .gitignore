@@ -48,5 +48,10 @@ tmp/
 temp/
 *.tmp
 
+# Generated exports (test artifacts)
+*.tar.gz
+*.zip
+manifest.json
+
 *cache*
 .benchmarks/
