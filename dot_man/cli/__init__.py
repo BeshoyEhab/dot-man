@@ -27,6 +27,7 @@ from .common import (
     success,
     warn,
 )
+from .completions_cmd import completions
 from .config_cmd import config
 from .deploy_cmd import deploy
 from .discover_cmd import discover_cmd
@@ -108,4 +109,5 @@ __all__ = [
     "export_cmd",
     "encrypt_cmd",
     "discover_cmd",
+    "completions",
 ]

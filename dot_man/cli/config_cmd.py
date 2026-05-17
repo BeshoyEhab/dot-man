@@ -90,20 +90,6 @@ def config_defaults():
     ui.console.print("  dot-man config set remote.auto_sync true")
     ui.console.print("  dot-man config set defaults.update_strategy rename_old")
     ui.console.print()
-    ui.console.print("[bold]To change a setting:[/bold]")
-    ui.console.print("  [cyan]dot-man config set <key> <value>[/cyan]")
-    ui.console.print()
-    ui.console.print(
-        "[dim]Example: dot-man config set switch.default_behavior no-save[/dim]"
-    )
-    ui.console.print()
-    ui.console.print("[bold]To change a setting:[/bold]")
-    ui.console.print("  [cyan]dot-man config set <key> <value>[/cyan]")
-    ui.console.print()
-    ui.console.print(
-        "[dim]Example: dot-man config set switch.default_behavior no-save[/dim]"
-    )
-    ui.console.print()
 
 
 @config.command("list")

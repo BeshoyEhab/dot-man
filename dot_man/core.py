@@ -609,8 +609,6 @@ class GitManager:
             from typing import cast
 
             return cast(str | None, self.repo.git.show(f"{branch}:{file_path}"))
-        except GitCommandError:
-            # File doesn't exist in that branch
-            return None
         except (GitCommandError, ValueError, OSError):
+            # File doesn't exist in that branch
             return None

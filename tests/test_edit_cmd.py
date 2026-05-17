@@ -1,6 +1,5 @@
 """Tests for cli/edit_cmd.py — edit command."""
 
-import pytest
 from click.testing import CliRunner
 
 from dot_man.cli.interface import cli
@@ -17,11 +16,18 @@ class TestEditHelp:
 
 
 class TestEditWithoutInit:
-    def test_edit_requires_init(self):
+    def test_edit_requires_init(self, tmp_path):
         """Test edit requires initialization."""
+        from unittest.mock import patch
+
+        fake_dir = tmp_path / "nonexistent"
         runner = CliRunner()
-        result = runner.invoke(cli, ["edit"])
-        assert result.exit_code == 1
+        with (
+            patch("dot_man.cli.common.DOT_MAN_DIR", fake_dir),
+            patch("dot_man.cli.common.REPO_DIR", fake_dir / "repo"),
+        ):
+            result = runner.invoke(cli, ["edit"])
+            assert result.exit_code == 1
 
 
 class TestEditOptions:

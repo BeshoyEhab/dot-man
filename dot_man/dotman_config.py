@@ -74,7 +74,7 @@ class DotManConfig:
 
         if self._path.suffix in (".yaml", ".yml"):
             try:
-                import yaml
+                import yaml  # type: ignore[import-untyped]
             except ImportError:
                 raise ConfigurationError(
                     "YAML support requires pyyaml. Install with: pip install pyyaml"

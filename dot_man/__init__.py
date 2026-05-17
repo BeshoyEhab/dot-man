@@ -1,4 +1,4 @@
 """dot-man: Dotfile manager with git-powered branching."""
 
-__version__ = "0.10.0"
+__version__ = "1.0.0"
 __author__ = "Bishoy Ehab"

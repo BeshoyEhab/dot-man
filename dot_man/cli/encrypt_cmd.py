@@ -131,9 +131,9 @@ def _encrypt_section(
 
     for path_str in section.paths:
         local_path = Path(path_str).expanduser()
-        repo_dir = ops.git.repo.working_dir
-        assert repo_dir is not None
-        repo_path = section.get_repo_path(local_path, repo_dir)
+        repo_dir_str = ops.git.repo.working_dir
+        assert repo_dir_str is not None
+        repo_path = section.get_repo_path(local_path, Path(repo_dir_str))
 
         if not local_path.exists():
             warn(f"File not found: {local_path}")
@@ -182,9 +182,9 @@ def _decrypt_section(
 
     for path_str in section.paths:
         local_path = Path(path_str).expanduser()
-        repo_dir = ops.git.repo.working_dir
-        assert repo_dir is not None
-        repo_path = section.get_repo_path(local_path, repo_dir)
+        repo_dir_str = ops.git.repo.working_dir
+        assert repo_dir_str is not None
+        repo_path = section.get_repo_path(local_path, Path(repo_dir_str))
 
         encrypted_path = repo_path.with_suffix(repo_path.suffix + ".gpg")
 

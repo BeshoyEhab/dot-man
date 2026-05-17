@@ -1,6 +1,6 @@
 [project]
-name = "dot-man"
-version = "0.10.0"
+name = "dotman-git"
+version = "1.0.0"
 description = "Dotfile manager with git-powered branching"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -8,12 +8,15 @@ license = { text = "MIT" }
 authors = [
     { name = "Bishoy Ehab", email = "beshoyehabhhmm@gmail.com" }
 ]
-keywords = ["dotfiles", "git", "configuration", "cli", "dotfile-manager"]
+keywords = ["dotfiles", "git", "configuration", "cli", "dotfile-manager", "branching"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Developers",
+    "Intended Audience :: System Administrators",
     "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
@@ -21,13 +24,14 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: System :: Systems Administration",
+    "Topic :: Utilities",
+    "Typing :: Typed",
 ]
 dependencies = [
     "click>=8.0",
     "cryptography>=41.0.0",
     "gitpython>=3.1",
     "rich>=13.0",
-    "textual>=0.73.0",
     "tomli>=2.0; python_version < '3.11'",
     "tomlkit>=0.12.0",
     "questionary>=2.0.0",
@@ -38,24 +42,28 @@ yaml = [
     "pyyaml>=6.0",
 ]
 tui = [
-    "textual>=0.40",
+    "textual>=0.73.0",
 ]
 dev = [
     "pytest>=8.3.5",
     "pytest-cov>=5.0.0",
     "black>=24.8.0",
     "mypy>=1.14.1",
-    "textual>=0.40",
+    "textual>=0.73.0",
     "ruff>=0.4.0",
     "pre-commit>=3.0.0",
 ]
 
 [project.scripts]
 dot-man = "dot_man.cli:main"
+dotman-install-completions = "dot_man.cli.completions_cmd:run_install"
 
 [project.urls]
 Homepage = "https://github.com/BeshoyEhab/dot-man"
 Repository = "https://github.com/BeshoyEhab/dot-man"
+Documentation = "https://github.com/BeshoyEhab/dot-man#readme"
+"Bug Tracker" = "https://github.com/BeshoyEhab/dot-man/issues"
+Changelog = "https://github.com/BeshoyEhab/dot-man/blob/main/CHANGELOG.md"
 
 [build-system]
 requires = ["setuptools>=61"]
@@ -64,6 +72,9 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["dot_man*"]
+
+[tool.setuptools.package-data]
+dot_man = ["py.typed", "completions/*"]
 
 [tool.black]
 line-length = 88
@@ -94,21 +105,17 @@ addopts = "-v"
 
 [tool.coverage.run]
 omit = [
-    # TUI modules
+    # TUI modules (optional dependency)
     "dot_man/tui.py",
     "dot_man/tui_editor.py",
     "dot_man/tui_log.py",
-    # Interactive/Operations modules that are hard to test without complex mocking
-    "dot_man/cli/tui_cmd.py",
-    "dot_man/cli/interactive.py",
+    # Entry points
     "dot_man/cli/main.py",
     "dot_man/cli/interface.py",
-    "dot_man/cli/common.py",
-    # Operations modules (complex business logic)
-    "dot_man/branch_ops.py",
-    "dot_man/status_ops.py",
-    "dot_man/save_deploy_ops.py",
-    # Not yet tested (or requires complex setup)
+    # Interactive wizards (require user input)
+    "dot_man/cli/interactive.py",
+    # TUI command
+    "dot_man/cli/tui_cmd.py",
 ]
 
 [tool.coverage.report]

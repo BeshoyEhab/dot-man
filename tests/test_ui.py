@@ -1,7 +1,6 @@
 """Tests for ui module."""
 
 
-
 class TestUIConsole:
     """Test ui.console functionality."""
 

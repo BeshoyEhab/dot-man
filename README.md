@@ -59,12 +59,12 @@ dot-man audit --strict
 
 | Metric | Value |
 |--------|-------|
-| Version | 0.9.0 (Beta) |
-| Test Coverage | 56% |
+| Version | 1.0.0 (Production) |
+| Test Coverage | 61% |
 | Commands | 30+ |
 | Python | 3.9+ |
 
-### What's New in 0.9.0
+### What's New in 1.0.0
 
 - **`dot-man init --import`** - Import from existing git repositories:
   - Local paths, GitHub shorthand, HTTPS, or SSH URLs

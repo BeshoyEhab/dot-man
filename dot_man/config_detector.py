@@ -54,7 +54,7 @@ class ConfigDetector:
         "~/.config/qs",
     ]
 
-    _PopularConfigEntry = dict[str, str | list[str]]
+    _PopularConfigEntry = dict[str, str | list[str] | None]
 
     POPULAR_CONFIGS: dict[str, _PopularConfigEntry] = {
         "hyprland": {
@@ -313,7 +313,10 @@ class ConfigDetector:
             configs.update(cls.EXTENDED_CONFIGS)
 
         for config_key, config_info in configs.items():
-            for path_str in config_info["paths"]:
+            paths_value = config_info["paths"]
+            if paths_value is None:
+                continue
+            for path_str in paths_value:
                 path = Path(path_str).expanduser()
                 if path.exists():
                     detected.append(

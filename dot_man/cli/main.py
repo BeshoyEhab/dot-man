@@ -21,6 +21,14 @@ def main() -> None:
         run_onboarding()
         return
 
+    # Try to install completions if not already installed
+    try:
+        from .completions_cmd import run_install
+
+        run_install()
+    except Exception:
+        pass
+
     cli()
 
 

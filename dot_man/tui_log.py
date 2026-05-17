@@ -4,7 +4,7 @@ from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Footer, Header, Label, ListItem, ListView, Markdown
 
-from ..operations import get_operations
+from .operations import get_operations
 
 
 class CommitItem(ListItem):
@@ -73,7 +73,8 @@ class LogViewerApp(App):
                 f"**Author:** {commit_obj.author.name} <{commit_obj.author.email}>\n\n"
             )
             md_content += f"**Date:** {commit_obj.authored_datetime.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-            md_content += f"**Message:**\n\n```\n{commit_obj.message}\n```\n\n"
+            message_text = str(commit_obj.message)
+            md_content += f"**Message:**\n\n```\n{message_text}\n```\n\n"
 
             diff_text = ops.git.repo.git.show(sha, patch=True, color="never")
             md_content += f"## Diff\n\n```diff\n{diff_text}\n```"
