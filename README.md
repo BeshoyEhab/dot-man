@@ -37,21 +37,26 @@ dot-man audit --strict
 
 ## Features
 
+- 📦 **PyPI ready** - Install with `pip install dotman-git`
 - 🌿 **Git-powered branching** - Each config is a branch, easy to sync
 - 🔐 **Secret detection** - Automatically redacts API keys, passwords, tokens
+- 🔒 **Encryption** - Encrypt/decrypt sensitive files with GPG or AGE
 - 🔄 **Save & deploy** - One command to save current state and switch configs
 - ☁️ **Remote sync** - Push/pull dotfiles across machines with `dot-man sync`
 - ⚡ **Pre/Post hooks** - Run commands before/after deploying (e.g., reload config)
 - 📝 **Edit in place** - Opens your `$EDITOR` for quick changes
 - 🛡️ **Dry-run mode** - Preview changes before making them
-- 🐚 **Shell completions** - Bash, Zsh, and Fish support (optimized with caching)
+- 🐚 **Shell completions** - Auto-installed for Bash, Zsh, and Fish
 - 🏷️ **Tags** - Tag commits for fast navigation
 - 📜 **History & Diff** - View commit history, compare branches, restore files
-- 📊 **Diff & Restore** - Compare changes between branches, restore from history
+- 🎨 **Rich diff** - Syntax-highlighted colored diffs
 - 🔄 **Global hooks** - System-wide hooks for any dot-man command
 - 🔀 **Auto-detect hooks** - Automatically reload configs when switching branches
-- 🌍 **Import existing** - Import dotfiles from existing git repositories
+- 🌍 **Import** - Import from git repos, chezmoi, yadm, or GNU Stow
+- 📤 **Export** - Export to tar, zip, or JSON
+- 🔍 **Discover** - Auto-detect existing dotfiles (30+ locations)
 - 📦 **Universal merge** - Manage shared content across branches with markers
+- 🌐 **YAML support** - Config files in TOML or YAML format
 
 ---
 
@@ -66,42 +71,46 @@ dot-man audit --strict
 
 ### What's New in 1.0.0
 
-- **`dot-man init --import`** - Import from existing git repositories:
-  - Local paths, GitHub shorthand, HTTPS, or SSH URLs
-  - Preserves all commits, branches, and tags
-- **`dot-man navigate`** - Unified command replacing `switch` and `checkout`:
-  - `--preview, -p` - Preview changes before switching
-  - `--diff, -d` - Show full diff when previewing
-  - `--files-only` - Show only commits that changed tracked files
-- **`dot-man hooks`** - Manage global hooks:
-  - `dot-man hooks list` - List available hooks
-  - `dot-man hooks create pre|post <name>` - Create hook script
-  - `dot-man hooks delete pre|post <name>` - Delete hook script
-- **Auto-detect hooks** - When switching branches, dot-man automatically detects which configs changed and runs appropriate reload hooks (hyprland, nvim, quickshell, etc.)
-- **Universal file merge** - Manage content across branches using markers:
-  - `# >>> dot-man:start <<<` and `# >>> dot-man:end <<<`
-  - `UniversalMergeManager` for extract/inject/remove operations
-- **Config auto-detection** - Detects Quickshell subdirs and other popular configs automatically during init
+- **PyPI Ready** - Install with `pip install dotman-git`
+- **Auto shell completions** - Automatically installed on first run
+- **`dot-man init --import`** - Import from existing git repositories
+- **`dot-man navigate`** - Unified command replacing `switch` and `checkout`
+- **`dot-man import`** - Import from other dotfile managers:
+  - `dot-man import chezmoi` / `dot-man import yadm` / `dot-man import stow`
+  - `dot-man import all` - Auto-detect and import
+- **`dot-man export`** - Export to portable formats:
+  - `dot-man export tar backup.tar.gz`
+  - `dot-man export zip dots.zip`
+  - `dot-man export json manifest.json`
+- **`dot-man discover`** - Auto-detect existing dotfiles (30+ locations)
+- **`dot-man encrypt`** - Encrypt/decrypt sensitive files (GPG/AGE)
+- **`dot-man diff --rich`** - Syntax-highlighted diffs with colors
 
 ### Deprecated (use `navigate` instead)
 - `switch` → `dot-man navigate <branch>`
 - `checkout` → `dot-man navigate <commit>`
 
-### Roadmap to V1.0
-
-- [x] Increase test coverage (56% achieved)
-- [ ] PyPI publication
-- [ ] Full documentation site
-- [ ] Stable API guarantee
+### v1.0.0 Release ✅
+- Test Coverage: 61%
+- PyPI: Published as `dotman-git`
+- Shell completions: Auto-installed for Bash, Zsh, Fish
 
 ---
 
 ## Installation
 
-### With pipx (Recommended)
+### From PyPI (Recommended)
 
 ```bash
-pipx install git+https://github.com/BeshoyEhab/dot-man.git
+pip install dotman-git
+```
+
+This automatically installs shell completions for Bash, Zsh, and Fish.
+
+### With pipx
+
+```bash
+pipx install dotman-git
 ```
 
 ### From Source
@@ -109,21 +118,13 @@ pipx install git+https://github.com/BeshoyEhab/dot-man.git
 ```bash
 git clone https://github.com/BeshoyEhab/dot-man.git
 cd dot-man
-./install.sh
-```
-
-### With pip
-
-```bash
-pip install git+https://github.com/BeshoyEhab/dot-man.git
+pip install .
 ```
 
 ### Uninstall
 
 ```bash
-pipx uninstall dot-man
-# or
-./uninstall.sh
+pip uninstall dotman-git
 ```
 
 ---
