@@ -47,12 +47,16 @@ class TestEncryptActions:
         result = runner.invoke(cli, ["encrypt", "invalid"])
         assert result.exit_code == 2
 
-    @pytest.mark.skip(reason="Python version compatibility issue with mock patching")
-    def test_encrypt_status_no_tools(self):
+    @patch("dot_man.cli.encrypt_cmd.detect_available_encryption", return_value=[])
+    def test_encrypt_status_no_tools(self, mock_detect):
         """Test encrypt status with no encryption tools."""
+        import sys
+        if sys.version_info < (3, 11):
+            pytest.skip("Python 3.10 has mock patching compatibility issues")
         runner = CliRunner()
         result = runner.invoke(cli, ["encrypt", "status"])
-        assert result.exit_code in (0, 1)
+        assert result.exit_code == 1
+        assert "GPG" in result.output or "AGE" in result.output
 
 
 class TestEncryptionMethods:
