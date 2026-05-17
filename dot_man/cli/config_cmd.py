@@ -18,6 +18,94 @@ def config():
     pass
 
 
+@config.command("defaults")
+def config_defaults():
+    """Show all configurable defaults with descriptions.
+
+    This displays all the settings that users can customize,
+    along with their current default values.
+
+    Example: dot-man config defaults
+    """
+    from rich.table import Table
+
+    table = Table(title="Configurable Defaults", show_header=True)
+    table.add_column("Setting", style="cyan", no_wrap=True)
+    table.add_column("Default Value", style="green")
+    table.add_column("Description")
+
+    defaults = [
+        # Switch/Navigate settings
+        (
+            "switch.default_behavior",
+            "save",
+            "What to do with unsaved changes when switching (save/no-save)",
+        ),
+        (
+            "remote.auto_sync",
+            "false",
+            "Auto push/pull when switching branches (true/false)",
+        ),
+        ("remote.url", "", "Remote repository URL for sync"),
+        # Default section settings
+        ("defaults.secrets_filter", "true", "Redact secrets when saving (true/false)"),
+        (
+            "defaults.update_strategy",
+            "replace",
+            "How to deploy: replace/rename_old/ignore",
+        ),
+        (
+            "defaults.follow_symlinks",
+            "false",
+            "Follow symlinks when deploying (true/false)",
+        ),
+        # Security
+        (
+            "security.strict_mode",
+            "false",
+            "Exit with error if secrets detected (true/false)",
+        ),
+        ("security.audit_on_commit", "true", "Run audit before commits (true/false)"),
+        # Other
+        ("backup.max_count", "5", "Maximum number of backups to keep"),
+    ]
+
+    for key, default_val, desc in defaults:
+        table.add_row(key, str(default_val), desc)
+
+    ui.console.print(table)
+    ui.console.print()
+    ui.console.print("[bold]Section-level settings (in dot-man.toml):[/bold]")
+    ui.console.print("  [cyan]paths[/cyan]           - List of files/dirs to track")
+    ui.console.print("  [cyan]secrets_filter[/cyan]  - Enable secret detection")
+    ui.console.print("  [cyan]update_strategy[/cyan] - How to handle existing files")
+    ui.console.print("  [cyan]pre_deploy[/cyan]      - Command to run before deploying")
+    ui.console.print("  [cyan]post_deploy[/cyan]     - Command to run after deploying")
+    ui.console.print()
+    ui.console.print("[bold]To change a setting:[/bold]")
+    ui.console.print("  [cyan]dot-man config set <key> <value>[/cyan]")
+    ui.console.print()
+    ui.console.print("[dim]Examples:[/dim]")
+    ui.console.print("  dot-man config set switch.default_behavior no-save")
+    ui.console.print("  dot-man config set remote.auto_sync true")
+    ui.console.print("  dot-man config set defaults.update_strategy rename_old")
+    ui.console.print()
+    ui.console.print("[bold]To change a setting:[/bold]")
+    ui.console.print("  [cyan]dot-man config set <key> <value>[/cyan]")
+    ui.console.print()
+    ui.console.print(
+        "[dim]Example: dot-man config set switch.default_behavior no-save[/dim]"
+    )
+    ui.console.print()
+    ui.console.print("[bold]To change a setting:[/bold]")
+    ui.console.print("  [cyan]dot-man config set <key> <value>[/cyan]")
+    ui.console.print()
+    ui.console.print(
+        "[dim]Example: dot-man config set switch.default_behavior no-save[/dim]"
+    )
+    ui.console.print()
+
+
 @config.command("list")
 def config_list():
     """List all global configuration values."""

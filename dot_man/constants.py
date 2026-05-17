@@ -20,14 +20,13 @@ BACKUPS_DIR = DOT_MAN_DIR / "backups"
 # Global configuration file
 GLOBAL_TOML = DOT_MAN_DIR / "global.toml"
 
-# Legacy config file (for migration)
-GLOBAL_CONF = DOT_MAN_DIR / "global.conf"
-
 # Branch-specific configuration file (inside repo)
 DOT_MAN_TOML = "dot-man.toml"
+DOT_MAN_YAML = "dot-man.yaml"
+DOT_MAN_YML = "dot-man.yml"
 
-# Legacy config file (for migration)
-DOT_MAN_INI = "dot-man.ini"
+# Priority order for config files (first match wins)
+CONFIG_FILE_PRIORITY = [DOT_MAN_TOML, DOT_MAN_YAML, DOT_MAN_YML]
 
 # Template variables storage
 TEMPLATE_VARS_FILE = DOT_MAN_DIR / "template_vars.json"
@@ -105,3 +104,6 @@ DOTMAN_REDACTION_TEXT = "***REDACTED_BY_DOTMAN***"
 
 MAX_BACKUPS = 5
 FILE_PERMISSIONS = 0o700  # Secure directory permissions
+
+# Lock file to prevent concurrent operations
+LOCK_FILE = DOT_MAN_DIR / ".lock"

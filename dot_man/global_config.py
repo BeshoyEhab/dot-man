@@ -113,71 +113,27 @@ class GlobalConfig:
     def load(self) -> None:
         """Load the global configuration file.
 
-        If global.toml doesn't exist but global.conf does, automatically
-        migrates the old INI format to TOML.
+        Supports TOML (.toml) and YAML (.yaml/.yml) formats.
         """
-        # Check for migration
         if not self._path.exists():
-            from .constants import GLOBAL_CONF
-
-            if GLOBAL_CONF.exists():
-                self._migrate_from_ini(GLOBAL_CONF)
-                return
             raise ConfigurationError(f"Global config not found: {self._path}")
 
         content = self._path.read_text()
-        self._data = tomllib.loads(content)
-        # Also parse with tomlkit to preserve comments
-        self._doc = tomlkit.parse(content)
+
+        if self._path.suffix in (".yaml", ".yml"):
+            try:
+                import yaml
+            except ImportError:
+                raise ConfigurationError(
+                    "YAML support requires pyyaml. Install with: pip install pyyaml"
+                )
+            self._data = yaml.safe_load(content) or {}
+            self._doc = None
+        else:
+            self._data = tomllib.loads(content)
+            self._doc = tomlkit.parse(content)
+
         self._dirty = False
-
-    def _migrate_from_ini(self, old_path: Path) -> None:
-        """Migrate from old INI format to TOML."""
-        import configparser
-        import shutil
-
-        logging.info("Migrating %s to TOML format...", old_path.name)
-
-        config = configparser.ConfigParser()
-        config.read(old_path)
-
-        # Convert INI to TOML structure
-        self._data = {}
-        for section in config.sections():
-            self._data[section] = {}
-            for key, value in config[section].items():
-                # Convert string booleans
-                if value.lower() in ("true", "false"):
-                    self._data[section][key] = value.lower() == "true"
-                else:
-                    self._data[section][key] = value
-
-        # Add defaults section if not present
-        if "defaults" not in self._data:
-            self._data["defaults"] = {
-                "secrets_filter": True,
-                "update_strategy": "replace",
-                "ignored_directories": DEFAULT_IGNORED_DIRECTORIES,
-                "follow_symlinks": False,
-            }
-
-        # Add empty templates section
-        if "templates" not in self._data:
-            self._data["templates"] = {}
-
-        # Backup old file
-        backup_path = old_path.with_suffix(".conf.bak")
-        shutil.copy(old_path, backup_path)
-        logging.info("  Backed up old config to %s", backup_path.name)
-
-        # Save new TOML
-        self._dirty = True
-        self.save()
-        logging.info("  Created %s", self._path.name)
-
-        # Remove old file
-        old_path.unlink()
-        logging.info("  Removed old %s", old_path.name)
 
     def save(self, force: bool = False) -> None:
         """Save the global configuration file.

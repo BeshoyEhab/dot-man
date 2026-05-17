@@ -47,7 +47,7 @@ def navigate_integration(tmp_path):
         patch("dot_man.cli.switch_cmd.REPO_DIR", repo_dir),
         patch("dot_man.cli.navigate_cmd.REPO_DIR", repo_dir),
         patch("dot_man.backups.BACKUPS_DIR", backups_dir),
-        patch("dot_man.backups.DOT_MAN_DIR", dot_man_dir),
+        patch("dot_man.constants.DOT_MAN_DIR", dot_man_dir),
         patch("dot_man.cli.common.DOT_MAN_DIR", dot_man_dir),
         patch("dot_man.cli.common.REPO_DIR", repo_dir),
         patch("dot_man.hooks.DOT_MAN_DIR", dot_man_dir),

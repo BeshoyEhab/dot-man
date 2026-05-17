@@ -29,8 +29,12 @@ from .common import (
 )
 from .config_cmd import config
 from .deploy_cmd import deploy
+from .discover_cmd import discover_cmd
 from .doctor_cmd import doctor
 from .edit_cmd import edit
+from .encrypt_cmd import encrypt_cmd
+from .export_cmd import export_cmd
+from .import_cmd import import_cmd
 
 # Import commands for easier access and backward compatibility
 from .init_cmd import init
@@ -100,4 +104,8 @@ __all__ = [
     "profile",
     "navigate",
     "hooks",
+    "import_cmd",
+    "export_cmd",
+    "encrypt_cmd",
+    "discover_cmd",
 ]

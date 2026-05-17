@@ -1,6 +1,6 @@
-"""DotMan configuration file parser (dot-man.toml)."""
+"""DotMan configuration file parser (TOML/YAML)."""
 
-__all__ = ["DotManConfig", "LegacyConfigLoader"]
+__all__ = ["DotManConfig"]
 
 import logging
 import sys
@@ -19,6 +19,7 @@ else:
 import tomlkit
 
 from .constants import (
+    CONFIG_FILE_PRIORITY,
     DOT_MAN_TOML,
     REPO_DIR,
     VALID_UPDATE_STRATEGIES,
@@ -29,14 +30,29 @@ from .section import Section
 
 
 class DotManConfig:
-    """Parser for the dot-man.toml configuration file."""
+    """Parser for the dot-man configuration file (TOML/YAML)."""
 
     def __init__(
         self, repo_path: Path | None = None, global_config: GlobalConfig | None = None
     ):
         self._data: dict = {}
         self._repo_path = repo_path or REPO_DIR
-        self._path = self._repo_path / DOT_MAN_TOML
+
+        # Find first existing config file in priority order
+        config_files = [self._repo_path / f for f in CONFIG_FILE_PRIORITY]
+        existing = [f for f in config_files if f.exists()]
+
+        if len(existing) > 1:
+            logging.warning(
+                f"Multiple config files found: {[f.name for f in existing]}. "
+                f"Using {existing[0].name} (TOML > YAML priority)"
+            )
+
+        self._path = existing[0] if existing else self._repo_path / DOT_MAN_TOML
+
+        # Track config format for save operations
+        self._config_format = self._path.suffix.replace(".", "")
+
         self._global_config = global_config
         self._doc: tomlkit.TOMLDocument | None = None  # For preserving comments
         self._dirty: bool = False
@@ -47,32 +63,34 @@ class DotManConfig:
         return self._repo_path
 
     def load(self) -> None:
-        """Load the dot-man.toml configuration file.
+        """Load the dot-man configuration file.
 
-        If dot-man.toml doesn't exist but dot-man.ini does, automatically
-        migrates the old INI format to TOML.
+        Supports TOML (.toml) and YAML (.yaml/.yml) formats.
         """
-        # Check for migration
         if not self._path.exists():
-            from .constants import DOT_MAN_INI
-
-            old_path = self._repo_path / DOT_MAN_INI
-            if old_path.exists():
-                self._migrate_from_ini(old_path)
-                return
             raise ConfigurationError(f"Config not found: {self._path}")
 
         content = self._path.read_text()
-        self._data = tomllib.loads(content)
-        # Also parse with tomlkit to preserve comments
-        self._doc = tomlkit.parse(content)
+
+        if self._path.suffix in (".yaml", ".yml"):
+            try:
+                import yaml
+            except ImportError:
+                raise ConfigurationError(
+                    "YAML support requires pyyaml. Install with: pip install pyyaml"
+                )
+            self._data = yaml.safe_load(content) or {}
+            self._doc = None
+        else:
+            self._data = tomllib.loads(content)
+            self._doc = tomlkit.parse(content)
+
         self._dirty = False
 
-        # Validate schema on load
         warnings = self._validate_schema()
         if warnings:
             for w in warnings:
-                logging.warning("Config warning: %s", w)
+                logging.warning("Config warning: {w}")
 
     def _validate_schema(self) -> list[str]:
         """Validate config structure on load."""
@@ -102,77 +120,6 @@ class DotManConfig:
                     if key not in valid_section_keys:
                         warnings.append(f"[{name}]: Unknown key '{key}'")
         return warnings
-
-    def _migrate_from_ini(self, old_path: Path) -> None:
-        """Migrate from old INI format to TOML."""
-        import configparser
-        import shutil
-
-        logging.info("Migrating %s to TOML format...", old_path.name)
-
-        config = configparser.ConfigParser()
-        config.read(old_path)
-
-        # Convert INI to TOML structure
-        self._data = {"templates": {}}
-
-        for section_name in config.sections():
-            if section_name == "DEFAULT":
-                continue
-
-            section_data = dict(config[section_name])
-
-            # Convert old format to new format
-            new_section: dict[str, Any] = {}
-
-            # Handle local_path -> paths
-            if "local_path" in section_data:
-                new_section["paths"] = [section_data["local_path"]]
-
-            # Handle repo_path -> repo_base
-            if "repo_path" in section_data:
-                new_section["repo_base"] = section_data["repo_path"]
-
-            # Copy other fields
-            for key in ["pre_deploy", "post_deploy", "update_strategy"]:
-                if key in section_data:
-                    new_section[key] = section_data[key]
-
-            # Convert secrets_filter boolean
-            if "secrets_filter" in section_data:
-                value = section_data["secrets_filter"].lower()
-                if value in ("true", "false"):
-                    new_section["secrets_filter"] = value == "true"
-
-            # More robust name generation to avoid collisions
-            clean_name = section_name
-            for prefix in ["~/.", "~/.config/", "~/", "/"]:
-                if clean_name.startswith(prefix):
-                    clean_name = clean_name[len(prefix) :]
-            clean_name = clean_name.replace("/", "-").replace(".", "-")
-
-            # Ensure uniqueness
-            base_name = clean_name
-            counter = 1
-            while clean_name in self._data:
-                clean_name = f"{base_name}_{counter}"
-                counter += 1
-
-            self._data[clean_name] = new_section
-
-        # Backup old file
-        backup_path = old_path.with_suffix(".ini.bak")
-        shutil.copy(old_path, backup_path)
-        logging.info("  Backed up old config to %s", backup_path.name)
-
-        # Save new TOML
-        self._dirty = True
-        self.save(force=True)
-        logging.info("  Created %s", self._path.name)
-
-        # Remove old file
-        old_path.unlink()
-        logging.info("  Removed old %s", old_path.name)
 
     def save(self, force: bool = False) -> None:
         """Save the dot-man.toml configuration file.
@@ -363,11 +310,13 @@ class DotManConfig:
         # Apply section-specific settings
         settings = self._merge_settings(settings, raw)
 
-        # Parse paths
+        # Parse paths with environment variable expansion
+        import os
+
         paths_raw = settings.get("paths", [])
         if isinstance(paths_raw, str):
             paths_raw = [paths_raw]
-        paths = [Path(p).expanduser() for p in paths_raw]
+        paths = [Path(os.path.expandvars(os.path.expanduser(p))) for p in paths_raw]
 
         if not paths:
             raise ConfigValidationError(f"Section [{name}] must have at least one path")
@@ -565,30 +514,3 @@ class DotManConfig:
                 warnings.append(f"[{name}]: {e}")
 
         return warnings
-
-
-# Backwards compatibility - legacy config support
-class LegacyConfigLoader:
-    """Helper to migrate from INI to TOML format."""
-
-    @staticmethod
-    def migrate_global_conf(old_path: Path, new_path: Path) -> bool:
-        """Migrate global.conf to global.toml."""
-        import configparser
-
-        if not old_path.exists():
-            return False
-
-        config = configparser.ConfigParser()
-        config.read(old_path)
-
-        data: dict[str, dict[str, Any]] = {}
-        for section in config.sections():
-            data[section] = dict(config[section])
-            # Convert string booleans
-            for key, value in data[section].items():
-                if value.lower() in ("true", "false"):
-                    data[section][key] = value.lower() == "true"
-
-        _write_toml(new_path, data)
-        return True

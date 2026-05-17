@@ -5,262 +5,53 @@ All notable changes to dot-man will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.10.0] - 2026-05-17
 
 ### Added
-- **`--import` option for `init`** - Import from an existing git repository:
-  - `dot-man init --import /path/to/existing/repo` - Local repo
-  - `dot-man init --import github.com/user/repo` - GitHub shorthand
-  - `dot-man init --import https://github.com/user/repo` - GitHub HTTPS
-  - `dot-man init --import git@github.com:user/repo` - GitHub SSH
-  - Preserves all commits, branches, and tags
-- **Shell completion performance** - Optimized with in-memory caching:
-  - Branches, tags, and commits load in <10ms
-  - File-based cache with 10-second TTL
-  - Lightweight git commands (subprocess instead of GitPython)
-- **Unified `navigate` command** - Single command for switching branches, tags, and commits with:
-  - `--preview, -p` - Preview changes before switching
-  - `--diff, -d` - Show full diff when previewing
-  - `--files-only` - Show only commits that changed tracked files
-- **Global hooks system** - Hooks directory (`~/.config/dot-man/hooks/`) with:
-  - `pre_switch`, `post_switch` hooks
-  - `pre_checkout`, `post_checkout` hooks
-  - Environment variables: `DOTMAN_HOOK_COMMAND`, `DOTMAN_HOOK_PHASE`, `DOTMAN_SOURCE`, `DOTMAN_TARGET`
-- **`dot-man hooks` command** - Manage hooks:
-  - `dot-man hooks list` - List available hooks
-  - `dot-man hooks create pre|post <name>` - Create hook script
-  - `dot-man hooks delete pre|post <name>` - Delete hook script
-- **Branch diff preview** - See changed files between branches when using `--preview`
-- **Commit diff display** - Show files changed in each commit with `--files-only`
-- **Enhanced commit display** - `get_commits_detailed()` shows:
-  - Tags, merge status, insertions/deletions
-  - Relative dates ("2 days ago")
-  - File changes per commit
-- **Improved shell completions** - Context-aware with dates and messages
-- **`ui.next_steps()`** - New function for "what to do next" hints
-- **`ui.hint()`** - New function for helpful hints
-- **`ui.section()`** - New function for titled sections
-- **Auto-detection for Quickshell configs** - `config_detector.py` with:
-  - `ConfigDetector.detect_quickshell_configs()` - Detects all quickshell subdirs
-  - `get_auto_hooks_for_config()` - Suggests hooks for popular configs (hyprland, nvim, kitty, etc.)
-  - Auto-detects config names like `caelestea`, `end-4`, `illogical-impulse`
-- **Auto-suggest hooks during init** - Quickshell and other popular configs get automatic `post_deploy` hooks
-- **Universal file merge system** (`merge.py`) - Manage content across all branches with markers:
-  - `UniversalMergeManager` - Extract, inject, and remove managed regions
-  - Markers: `# >>> dot-man:start <<<` and `# >>> dot-man:end <<<`
-- **Comprehensive hook library** - 25+ reload commands for:
-  - Shells: bash, zsh, fish
-  - Window managers: hyprland, sway, i3, awesome
-  - Terminals: kitty, alacritty, wezterm
-  - Bars: polybar, waybar
-  - Editors: nvim, vim, emacs
-  - Tools: tmux, starship, fzf
-  - `get_hook_for_config()` - Auto-detect appropriate hook
-  - `list_all_hooks()` - List hooks by category
-  - `reload_all_dots()` - Generate commands to reload all configs
-- **Auto-detect hooks on branch switch** - When switching branches, dot-man now:
-  - Detects which files changed between branches
-  - Identifies corresponding configs (nvim, hyprland, quickshell, etc.)
-  - Automatically adds relevant reload hooks to post_hooks
-  - `get_changed_files_between_branches()` - Get diff between branches
-  - `detect_hooks_for_changed_files()` - Map files to appropriate hooks
+- **YAML configuration support** - Config files now support `.yaml` and `.yml` formats alongside TOML:
+  - Automatic format detection
+  - Warning when multiple config files exist (TOML takes priority)
+  - Environment variable expansion in paths (`$HOME`, `$USER`, `$WORK_DIR`, etc.)
+- **`dot-man import`** - Import dotfiles from other dotfile managers:
+  - `dot-man import chezmoi` - Import from chezmoi
+  - `dot-man import yadm` - Import from yadm
+  - `dot-man import stow` - Import from GNU Stow packages
+  - `dot-man import all` - Auto-detect and import from any source
+  - `--dry-run` to preview what would be imported
+- **`dot-man export`** - Export dotfiles to portable formats:
+  - `dot-man export tar backup.tar.gz` - Tar archive
+  - `dot-man export zip dots.zip` - Zip archive
+  - `dot-man export json manifest.json` - JSON manifest
+  - `--branch` to export specific branch
+- **`dot-man discover`** - Auto-detect existing dotfiles:
+  - Scans 30+ common dotfile locations (shells, WMs, terminals, editors)
+  - `--add` to automatically add to dot-man.toml
+  - `--include-extended/--no-extended` for VS Code, Sublime, etc.
+- **`dot-man encrypt`** - Encrypt/decrypt sensitive files:
+  - GPG and AGE encryption support
+  - `encrypt status` - Show encryption status
+  - `encrypt encrypt <section>` - Encrypt section files
+  - `encrypt decrypt <section>` - Decrypt section files
+- **`dot-man diff --rich`** - Syntax-highlighted diffs using rich library:
+  - Monokai theme with line numbers
+  - `--no-rich` to use plain git diff (default: enabled)
 
 ### Changed
+- **Removed legacy code**:
+  - Removed INI migration (TOML/YAML only)
+  - Removed unused `LegacyConfigLoader` class
+  - Consolidated `LOCK_FILE` to constants.py
+  - Removed `GLOBAL_CONF` and `DOT_MAN_INI` constants
+- **Config file priority**: TOML (.toml) > YAML (.yaml/.yml)
 - **`switch` command** - Marked as DEPRECATED, shows warning and points to `navigate`
 - **`checkout` command** - Marked as DEPRECATED, shows warning and points to `navigate`
-- **`tui` command** - Updated help text with quick navigation commands
-- **Commit display** - Now uses box format and shows detailed info (tags, stats, files)
-- **Branch diff preview** - Now uses box format with emoji indicators (🔀, 📁, 📌)
 
 ### Deprecated
 - `switch` → Use `navigate` instead
 - `checkout` → Use `navigate` instead
 - `tag switch` → Use `navigate` instead
 
-## [0.9.0] - 2026-05-10
+## [Unreleased]
 
 ### Added
-- **First-time onboarding flow** (`dot_man/cli/onboarding.py`) — automatically
-  launches on the very first `dot-man` invocation:
-  - Welcome banner with ASCII logo
-  - 2-section interactive tutorial (Architecture + Manual / How To Use)
-  - ASCII diagrams for file flow, branch model, components, and typical workflow
-  - Auto-runs `dot-man init` with the interactive setup wizard after the tutorial
-  - Prompts the user to create their first branch and switches to it automatically
-  - Sentinel file (`~/.config/dot-man/.onboarded`) prevents the tutorial from
-    repeating on subsequent launches
-  - Ctrl-C exits cleanly without writing the sentinel (tutorial re-appears next time)
-- **Pre-push quality checklist** in AGENTS.md — mandatory black, ruff, mypy, and pytest before every commit
-- **Pre-commit hooks** via `.pre-commit-config.yaml` — automatic enforcement of formatting, linting, and type checking
-- **Ruff configuration** in `pyproject.toml` — rules E, F, W, I with per-file E402 suppression
-- **Missing test fixtures** — `git_repo`, `git_repo_with_branches`, `git_repo_with_tags`, `git_repo_with_commits`
-
-### Changed
-- **CI workflow** — Black now runs with `--check` (was silently reformatting), added ruff lint step
-- **Test quality audit** — replaced 15+ weak tests (callable/hasattr/import checks) with functional tests:
-  - Secret scanning tests now exercise real file scanning
-  - Completion function tests use mocked GitManager with real invocations
-  - Operations singleton test verifies identity, not just callability
-- Black target-version updated from py38 to py39
-
-### Fixed
-- **6 mypy errors** resolved across 4 files:
-  - `global_config.py` — `no-any-return` on `current_profile` property
-  - `core.py` — `delete_tag` now uses `repo.git.tag("-d", name)` instead of `Repo.delete_tag(str)`
-  - `cli/log_cmd.py` — removed invalid `.path` attribute access on Diff objects
-  - `cli/profile_cmd.py` — fixed `getattr` misuse and `no-any-return` in `_detect_profile`
-- **137 ruff lint errors** fixed (unused imports, unused variables, bool comparison style, trailing whitespace)
-- Removed unused `socket` import in profile_cmd.py
-- Fixed 26 pre-existing test fixture errors (missing `git_repo`/`git_repo_with_tags` fixtures)
-- **SHA-keyed deduplication** - Consolidated three duplicate `hashlib.sha256` implementations (`files.get_content_hash`, `BaseSecretGuard._compute_hash`, `SecretVault._perform_stash`) into a single `utils.sha256_hex` helper
-
-## [0.8.0] - 2026-05-10
-
-### Removed
-- **TUI** - Temporarily removed for redesign. CLI provides full functionality.
-
-### Added
-- `dot-man diff` - Show changes between branches or files
-  - `dot-man diff` - Show uncommitted changes
-  - `dot-man diff --branch main` - Compare branches
-  - `dot-man diff <file>` - Show specific file changes
-  - `dot-man diff --staged` - Show staged changes
-- `dot-man revert` - Enhanced with `--commit` to restore from specific commit
-- `dot-man template` - Template variable management
-  - `dot-man template set <key> <value>` - Set template variable
-  - `dot-man template get <key>` - Get template value
-  - `dot-man template list` - List all templates
-  - `dot-man template system` - Show auto-detected system variables
-  - System variables: {{HOSTNAME}}, {{USER}}, {{SHELL}}, {{OS}}, etc.
-- `dot-man profile` - Multi-machine profiles
-  - `dot-man profile create <name>` - Create profile
-  - `dot-man profile list` - List profiles
-  - `dot-man profile switch <name>` - Switch to profile
-  - `dot-man profile detect` - Auto-detect by hostname
-  - Profile inheritance support
-- **Performance optimizations:**
-  - Batch file operations for faster branch switching
-  - Parallel secret scanning using `concurrent.futures`
-  - Lazy loading for `SecretGuard` - only loaded when secrets detected
-  - Content hash function for future deduplication
-  - Thread-safe vault operations with batch mode
-- `dot-man log` - Show commit history with optional diffs and stats
-  - `-n, --count` - Number of commits to show
-  - `--diff, -d` - Show diff for each commit
-  - `--stat` - Show file change statistics
-- `dot-man checkout <sha|tag>` - Checkout specific commit or tag (creates detached HEAD)
-- `dot-man tag` - Tag management
-  - `tag create <name> [commit]` - Create tag at current or specific commit
-  - `tag list` - List all tags
-  - `tag delete <name>` - Delete a tag
-  - `tag switch <name>` - Switch to tag
-- Enhanced `dot-man switch` command:
-  - `branch@tag` syntax - Switch to branch at tag position
-  - `commit` syntax - Switch to specific commit (e.g., `switch abc1234`)
-  - `--save` - Force save current changes
-  - `--no-save` - Discard current changes
-  - Flexible argument order (branch can be before or after flags)
-- `switch.default_behavior` config option - Set default save/no-save preference
-- Shell completions for tags and commits in switch command
-
-### Changed
-- Updated documentation with new commands
-- Updated roadmap to reflect completed features
-- Version bumped to 0.8.0 (Beta)
-
-### Fixed
-- Tag detection in branch parsing
-- Proper checkout for tags
-
-## [0.7.0] - 2026-02-28
-
-### Added
-- `dot-man verify` - Validate repository integrity
-- `dot-man clean` - Remove stale backups and orphaned files
-- `dot-man doctor` - Diagnostics and health checks
-- `--verbose` / `-v` global flag
-- GitHub Actions CI with Black and mypy
-
-### Fixed
-- Various stability improvements
-
-## [0.6.0] - 2024
-
-### Added
-- Atomic file operations
-- File locking mechanism
-- Complete type hints
-- Consolidated secret checking
-
-## [0.5.0] - 2024
-
-### Added
-- `dot-man backup create/list/restore`
-- Auto-backup before destructive operations
-- Backup rotation (max 5)
-- `dot-man stash` / `dot-man stash pop`
-- `dot-man switch --stash` and `--save-to`
-
-## [0.4.0] - 2024
-
-### Added
-- TOML config format with sections and templates
-- Template inheritance (`inherits = ["template1"]`)
-- Include/exclude patterns for files
-- Modular `operations.py` for business logic
-- `dot-man add` command
-- Auto-migration from INI to TOML
-
-## [0.3.0] - 2024
-
-### Added
-- `dot-man sync` - Push/pull with remote
-- `dot-man remote get/set` - Remote configuration
-- `dot-man setup` - Guided GitHub remote setup
-- Interactive TUI (`dot-man tui`)
-- TUI Command Palette
-- Shell completions (bash, zsh, fish)
-
-## [0.2.0] - 2024
-
-### Added
-- Pre/post deploy hooks
-- Smart deployment (skip identical files)
-- Interactive branch deletion
-- Shell completions for branch names
-
-## [0.1.0] - 2023
-
-### Added
-- Core functionality
-- `dot-man init` - Initialize repository
-- `dot-man status` - Display current state
-- `dot-man switch <branch>` - Save/deploy configurations
-- `dot-man edit` - Open config in editor
-- `dot-man audit` - Scan for secrets
-- `dot-man deploy <branch>` - One-way deploy for new machines
-
----
-
-## Roadmap to V1.0
-
-| Feature | Status |
-|---------|--------|
-| Core commands | ✅ Complete |
-| Remote sync | ✅ Complete |
-| TUI | ✅ Complete |
-| Tags & History (0.8.0) | ✅ Complete |
-| Test Coverage (80%+) | 🔄 In Progress |
-| PyPI Publication | ⏳ Pending |
-| Full Documentation | ⏳ Pending |
-| Stable API | ⏳ Pending |
-
-## Future Ideas (Post V1.0)
-
-- Encrypted files support (GPG/age)
-- Symlink mode
-- Web dashboard for configuration management
-- Dotfile sharing/marketplace
-- CI/CD integration for dotfile testing
-- Cloud sync backends (S3, Dropbox, etc.)
-- Plugin system
+- (No new changes in unreleased)

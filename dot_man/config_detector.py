@@ -63,11 +63,41 @@ class ConfigDetector:
             "paths": ["~/.config/hypr"],
             "default_hook": "hyprland_reload",
         },
+        "sway": {
+            "display_name": "Sway WM",
+            "section_name": "sway",
+            "paths": ["~/.config/sway"],
+            "default_hook": "sway_reload",
+        },
+        "i3": {
+            "display_name": "i3 Window Manager",
+            "section_name": "i3",
+            "paths": ["~/.config/i3"],
+            "default_hook": "i3_reload",
+        },
+        "awesome": {
+            "display_name": "Awesome WM",
+            "section_name": "awesome",
+            "paths": ["~/.config/awesome"],
+            "default_hook": "awesome_restart",
+        },
         "kitty": {
             "display_name": "Kitty terminal",
             "section_name": "kitty",
             "paths": ["~/.config/kitty"],
             "default_hook": "kitty_reload",
+        },
+        "alacritty": {
+            "display_name": "Alacritty terminal",
+            "section_name": "alacritty",
+            "paths": ["~/.config/alacritty"],
+            "default_hook": "alacritty_reload",
+        },
+        "wezterm": {
+            "display_name": "WezTerm terminal",
+            "section_name": "wezterm",
+            "paths": ["~/.config/wezterm"],
+            "default_hook": "wezterm_reload",
         },
         "fish": {
             "display_name": "Fish shell",
@@ -81,6 +111,18 @@ class ConfigDetector:
             "paths": ["~/.config/nvim"],
             "default_hook": "nvim_sync",
         },
+        "vim": {
+            "display_name": "Vim",
+            "section_name": "vim",
+            "paths": ["~/.vimrc", "~/.vim"],
+            "default_hook": "vim_reload",
+        },
+        "emacs": {
+            "display_name": "Emacs",
+            "section_name": "emacs",
+            "paths": ["~/.emacs.d"],
+            "default_hook": "emacs_reload",
+        },
         "tmux": {
             "display_name": "tmux",
             "section_name": "tmux",
@@ -90,14 +132,131 @@ class ConfigDetector:
         "zsh": {
             "display_name": "Zsh shell",
             "section_name": "zsh",
-            "paths": ["~/.zshrc"],
+            "paths": ["~/.zshrc", "~/.zshrc"],
             "default_hook": "shell_reload",
         },
         "bash": {
             "display_name": "Bash shell",
             "section_name": "bashrc",
-            "paths": ["~/.bashrc"],
+            "paths": ["~/.bashrc", "~/.bashrc"],
             "default_hook": "shell_reload",
+        },
+        "polybar": {
+            "display_name": "Polybar",
+            "section_name": "polybar",
+            "paths": ["~/.config/polybar"],
+            "default_hook": "polybar_reload",
+        },
+        "waybar": {
+            "display_name": "Waybar",
+            "section_name": "waybar",
+            "paths": ["~/.config/waybar"],
+            "default_hook": "waybar_reload",
+        },
+        "dunst": {
+            "display_name": "Dunst notification daemon",
+            "section_name": "dunst",
+            "paths": ["~/.config/dunst"],
+            "default_hook": "dunst_reload",
+        },
+        "picom": {
+            "display_name": "Picom compositor",
+            "section_name": "picom",
+            "paths": ["~/.config/picom"],
+            "default_hook": "picom_reload",
+        },
+        "rofi": {
+            "display_name": "Rofi launcher",
+            "section_name": "rofi",
+            "paths": ["~/.config/rofi"],
+            "default_hook": "rofi_reload",
+        },
+        "ssh": {
+            "display_name": "SSH config",
+            "section_name": "ssh",
+            "paths": ["~/.ssh/config"],
+            "default_hook": None,
+        },
+        "git": {
+            "display_name": "Git config",
+            "section_name": "git",
+            "paths": ["~/.gitconfig"],
+            "default_hook": None,
+        },
+        "starship": {
+            "display_name": "Starship prompt",
+            "section_name": "starship",
+            "paths": ["~/.config/starship.toml"],
+            "default_hook": "shell_reload",
+        },
+        "fzf": {
+            "display_name": "FZF",
+            "section_name": "fzf",
+            "paths": ["~/.fzf"],
+            "default_hook": "fzf_reload",
+        },
+    }
+
+    EXTENDED_CONFIGS: dict[str, _PopularConfigEntry] = {
+        "code": {
+            "display_name": "VS Code",
+            "section_name": "vscode",
+            "paths": ["~/.config/Code/User"],
+            "default_hook": None,
+        },
+        "sublime": {
+            "display_name": "Sublime Text",
+            "section_name": "sublime",
+            "paths": ["~/.config/sublime-text"],
+            "default_hook": None,
+        },
+        "flatpak": {
+            "display_name": "Flatpak",
+            "section_name": "flatpak",
+            "paths": ["~/.config/flatpak"],
+            "default_hook": None,
+        },
+        "gtk": {
+            "display_name": "GTK settings",
+            "section_name": "gtk",
+            "paths": ["~/.config/gtk-3.0"],
+            "default_hook": None,
+        },
+        "qt": {
+            "display_name": "Qt settings",
+            "section_name": "qt",
+            "paths": ["~/.config/qt5ct", "~/.config/qt6ct"],
+            "default_hook": None,
+        },
+        "ranger": {
+            "display_name": "Ranger file manager",
+            "section_name": "ranger",
+            "paths": ["~/.config/ranger"],
+            "default_hook": None,
+        },
+        "lf": {
+            "display_name": "LF file manager",
+            "section_name": "lf",
+            "paths": ["~/.config/lf"],
+            "default_hook": None,
+        },
+        "aria2": {
+            "display_name": "Aria2 download manager",
+            "section_name": "aria2",
+            "paths": ["~/.aria2"],
+            "default_hook": None,
+        },
+        "doom": {
+            "display_name": "Doom Emacs",
+            "section_name": "doom",
+            "paths": ["~/.doom.d"],
+            "default_hook": "emacs_reload",
+        },
+        "alacritty-extra": {
+            "display_name": "Alacritty extra themes",
+            "section_name": "alacritty-themes",
+            "paths": ["~/.config/alacritty-themes"],
+            "default_hook": "alacritty_reload",
         },
     }
 
@@ -138,15 +297,22 @@ class ConfigDetector:
         return detected
 
     @classmethod
-    def detect_popular_configs(cls) -> list[ConfigInfo]:
+    def detect_popular_configs(cls, include_extended: bool = True) -> list[ConfigInfo]:
         """Detect all popular configurations on the system.
+
+        Args:
+            include_extended: Include less common configs like VS Code, Sublime, etc.
 
         Returns:
             List of ConfigInfo dicts for detected configs
         """
         detected: list[ConfigInfo] = []
 
-        for config_key, config_info in cls.POPULAR_CONFIGS.items():
+        configs = dict(cls.POPULAR_CONFIGS)
+        if include_extended:
+            configs.update(cls.EXTENDED_CONFIGS)
+
+        for config_key, config_info in configs.items():
             for path_str in config_info["paths"]:
                 path = Path(path_str).expanduser()
                 if path.exists():
@@ -157,7 +323,11 @@ class ConfigDetector:
                                 "display_name": str(config_info["display_name"]),
                                 "section_name": str(config_info["section_name"]),
                                 "paths": [path_str],
-                                "default_hook": str(config_info["default_hook"]),
+                                "default_hook": (
+                                    str(config_info["default_hook"])
+                                    if config_info["default_hook"]
+                                    else None
+                                ),
                                 "reload_cmd": None,
                             }
                         )

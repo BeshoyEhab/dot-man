@@ -231,6 +231,10 @@ Run these commands and they'll show deprecation warnings. Use `navigate` instead
 | `dot-man template`            | Manage template variables                    |
 | `dot-man profile`            | Manage machine-specific profiles            |
 | `dot-man hooks list|create|delete` | Manage pre/post command hooks              |
+| `dot-man discover`            | Auto-detect existing dotfiles                 |
+| `dot-man import <source>`      | Import from chezmoi, yadm, or stow            |
+| `dot-man export <format>`     | Export to tar, zip, or json                   |
+| `dot-man encrypt`             | Encrypt/decrypt sensitive files               |
 
 ### Switch Enhancements
 
@@ -395,13 +399,25 @@ dot-man sync --pull-only        # Only pull, don't push
 dot-man audit --strict          # Exit with error if secrets found
 dot-man audit --fix             # Auto-redact detected secrets
 dot-man status --secrets        # Highlight files with secrets
+dot-man diff --rich/--no-rich    # Enable/disable rich diff colors (default: on)
+dot-man discover --add          # Auto-add detected configs to dot-man.toml
+dot-man import chezmoi --dry-run # Preview what would be imported
+dot-man export tar backup.tar.gz # Export to tar archive
+dot-man encrypt status           # Show encryption status
 ```
 
 ---
 
 ## Configuration
 
-### dot-man.toml
+### Supported Formats
+
+dot-man supports both **TOML** and **YAML** configuration formats:
+
+- TOML: `dot-man.toml` (default)
+- YAML: `dot-man.yaml` or `dot-man.yml`
+
+### Example: TOML format
 
 Located at `~/.config/dot-man/repo/dot-man.toml`:
 
@@ -424,6 +440,30 @@ paths = ["~/.ssh/config"]
 secrets_filter = true
 ```
 
+### Example: YAML format
+
+Located at `~/.config/dot-man/repo/dot-man.yaml`:
+
+```yaml
+defaults:
+  secrets_filter: true
+  update_strategy: replace
+
+bashrc:
+  paths:
+    - ~/.bashrc
+
+nvim:
+  paths:
+    - ~/.config/nvim
+  update_strategy: rename_old
+
+ssh-config:
+  paths:
+    - ~/.ssh/config
+  secrets_filter: true
+```
+
 ### Global Configuration
 
 Global settings are stored in `~/.config/dot-man/global.toml`. Use `dot-man config` to manage them:
@@ -444,12 +484,29 @@ dot-man config set switch.default_behavior no-save
 
 | Option            | Values                    | Description                                   |
 | ----------------- | ------------------------- | --------------------------------------------- |
+| `paths`           | list of paths             | Paths to track (supports $HOME, $USER, etc.)  |
 | `local_path`      | path                      | Path on your filesystem                       |
 | `repo_path`       | path                      | Path in the repository                        |
 | `secrets_filter`  | true/false                | Redact secrets when saving                    |
 | `update_strategy` | replace/rename_old/ignore | How to deploy files                           |
 | `pre_deploy`      | command string            | Shell command to run _before_ file is changed |
-| `post_deploy`     | command string            | Shell command to run _after_ file is changed  |
+| `post_deploy`     | command string            | Shell command to run _after_ file is changed |
+
+### Environment Variables in Paths
+
+Paths support environment variable expansion:
+
+```toml
+[work-files]
+paths = ["$WORK_DIR/config", "~/$USER/.config/app"]
+```
+
+```yaml
+work-files:
+  paths:
+    - $WORK_DIR/config
+    - ~/$USER/.config/app
+```
 
 ---
 

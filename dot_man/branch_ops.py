@@ -4,7 +4,7 @@ from abc import abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
-from .constants import REPO_DIR
+from .constants import LOCK_FILE, REPO_DIR
 from .exceptions import DotManError
 from .files import atomic_write_text, clear_comparison_cache, copy_file
 from .lock import FileLock
@@ -14,8 +14,6 @@ from .ui import warn
 
 if TYPE_CHECKING:
     pass
-
-LOCK_FILE = REPO_DIR.parent / ".lock"
 
 FILE_TO_HOOK_MAP = {
     ".bashrc": "bash_reload",

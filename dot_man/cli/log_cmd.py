@@ -87,57 +87,65 @@ def log(
     shell_complete=complete_branches,
 )
 @click.option("--staged", is_flag=True, help="Show staged changes")
+@click.option(
+    "--rich/--no-rich",
+    default=True,
+    help="Use rich for syntax-highlighted diff (default: enabled)",
+)
 @require_init
-def diff(file: Path | None, branch: str | None, staged: bool):
+def diff(file: Path | None, branch: str | None, staged: bool, rich: bool):
     """Show changes between branches or files.
 
     Examples:
         dot-man diff                    # Show uncommitted changes
         dot-man diff --branch main      # Compare current branch with main
         dot-man diff .bashrc            # Show changes for specific file
+        dot-man diff --no-rich          # Use plain git diff
     """
     try:
         import subprocess
 
         from ..constants import REPO_DIR
 
-        git_args = ["git", "diff", "--color=always"]
+        if rich:
+            _show_rich_diff(file, branch, staged)
+        else:
+            git_args = ["git", "diff", "--color=always"]
 
-        if staged:
-            git_args.append("--staged")
+            if staged:
+                git_args.append("--staged")
 
-        if branch:
-            from ..operations import get_operations
+            if branch:
+                from ..operations import get_operations
 
-            ops = get_operations()
-            current = ops.current_branch
-            git_args.append(f"{branch}...{current}")
+                ops = get_operations()
+                current = ops.current_branch
+                git_args.append(f"{branch}...{current}")
 
-        if file:
-            from ..operations import get_operations
+            if file:
+                from ..operations import get_operations
 
-            ops = get_operations()
-            target_file = file.expanduser().resolve()
-            found = False
-            for section_name in ops.get_sections():
-                section = ops.get_section(section_name)
-                for tracked_path in section.paths:
-                    if tracked_path.resolve() == target_file:
-                        repo_path = section.get_repo_path(tracked_path, REPO_DIR)
-                        # Use git diff --no-index to compare the file in repo with the local file outside repo
-                        git_args.extend(
-                            ["--no-index", str(repo_path), str(target_file)]
-                        )
-                        found = True
+                ops = get_operations()
+                target_file = file.expanduser().resolve()
+                found = False
+                for section_name in ops.get_sections():
+                    section = ops.get_section(section_name)
+                    for tracked_path in section.paths:
+                        if tracked_path.resolve() == target_file:
+                            repo_path = section.get_repo_path(tracked_path, REPO_DIR)
+                            git_args.extend(
+                                ["--no-index", str(repo_path), str(target_file)]
+                            )
+                            found = True
+                            break
+                    if found:
                         break
-                if found:
-                    break
 
-            if not found:
-                error(f"File not tracked: {target_file}")
-                return
+                if not found:
+                    error(f"File not tracked: {target_file}")
+                    return
 
-        subprocess.run(git_args, cwd=REPO_DIR)
+            subprocess.run(git_args, cwd=REPO_DIR)
 
     except Exception as e:
         error(str(e))
@@ -254,3 +262,78 @@ def _checkout_tag(ops, current_branch: str, tag_name: str):
     ui.console.print()
     ui.console.print("To return to a branch, run:")
     ui.console.print("  [cyan]dot-man switch <branch-name>[/cyan]")
+
+
+def _show_rich_diff(file: Path | None, branch: str | None, staged: bool):
+    """Show syntax-highlighted diff using rich."""
+    try:
+        import subprocess
+
+        from rich.console import Console
+        from rich.syntax import Syntax
+
+        from ..constants import REPO_DIR
+
+        console = Console()
+
+        git_args = ["git", "diff", "--no-color"]
+
+        if staged:
+            git_args.append("--staged")
+
+        if branch:
+            from ..operations import get_operations
+
+            ops = get_operations()
+            current = ops.current_branch
+            git_args.append(f"{branch}...{current}")
+
+        if file:
+            from ..operations import get_operations
+
+            ops = get_operations()
+            target_file = file.expanduser().resolve()
+            found = False
+            for section_name in ops.get_sections():
+                section = ops.get_section(section_name)
+                for tracked_path in section.paths:
+                    if tracked_path.resolve() == target_file:
+                        repo_path = section.get_repo_path(tracked_path, REPO_DIR)
+                        git_args.extend(
+                            ["--no-index", str(repo_path), str(target_file)]
+                        )
+                        found = True
+                        break
+                if found:
+                    break
+
+            if not found:
+                error(f"File not tracked: {target_file}")
+                return
+
+        result = subprocess.run(git_args, cwd=REPO_DIR, capture_output=True, text=True)
+
+        if result.stdout:
+            syntax = Syntax(result.stdout, "diff", theme="monokai", line_numbers=True)
+            console.print(syntax)
+        else:
+            ui.console.print("[dim]No changes found[/dim]")
+
+        if result.returncode == 1:
+            pass
+        elif result.returncode > 1:
+            error(f"Git diff failed: {result.stderr}")
+
+    except ImportError:
+        ui.console.print(
+            "[yellow]Rich not installed, falling back to git diff[/yellow]"
+        )
+        git_args = ["git", "diff", "--color=always"]
+        if staged:
+            git_args.append("--staged")
+        if branch:
+            from ..operations import get_operations
+
+            ops = get_operations()
+            git_args.append(f"{branch}...{ops.current_branch}")
+        subprocess.run(git_args, cwd=REPO_DIR)

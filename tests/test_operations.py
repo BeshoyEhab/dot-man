@@ -68,7 +68,7 @@ paths = ["{tracked_file}"]
         patch("dot_man.branch_ops.REPO_DIR", repo_dir),
         patch("dot_man.status_ops.REPO_DIR", repo_dir),
         patch("dot_man.backups.BACKUPS_DIR", backups_dir),
-        patch("dot_man.backups.DOT_MAN_DIR", dot_man_dir),
+        patch("dot_man.constants.DOT_MAN_DIR", dot_man_dir),
     ]
 
     for p in patches:

@@ -167,22 +167,54 @@ Priority files needing tests:
 
 ---
 
+## Implemented in Recent Releases
+
+### v0.10.0 - Config System Improvements
+
+- [x] YAML configuration support (.yaml, .yml alongside .toml)
+- [x] Environment variable expansion in paths ($HOME, $USER, etc.)
+- [x] Config file conflict detection (warns when both .toml and .yaml exist)
+- [x] Removed legacy INI migration code
+- [x] Removed unused LegacyConfigLoader class
+- [x] Consolidated LOCK_FILE to constants.py
+- [x] Import from chezmoi/yadm/stow
+- [x] Export to tar/zip/json
+- [x] Encrypt/decrypt sensitive files (GPG/AGE)
+- [x] Auto-discover dotfiles
+- [x] Rich diff output
+
+---
+
 ## Future Ideas (v2.0+)
 
 ### Storage & Sync
 
 - [ ] **Symlink mode** - Option to symlink files instead of copying (instant sync, saves space)
-- [ ] **Encrypted files** - GPG/age support for sensitive configs
+- [ ] **Encrypted files** - GPG/age support for sensitive configs (basic done, needs more)
 - [ ] **Cloud sync backends** - S3, Dropbox, Google Drive
 - [ ] **Per-branch config inheritance** - `inherits_branch = "main"` in dot-man.toml
+- [ ] **Configurable backup rotation** - Make MAX_BACKUPS configurable via global.toml
+- [ ] **Deploy rollback** - Transaction-style deploy with automatic rollback on failure
+- [ ] **Configurable thread pool** - `max_workers` setting in global.toml
 
 ### User Experience
 
 - [ ] **Web dashboard** - Browser-based configuration management
+- [ ] **JSON output** - `--json` option for scripting (status, log, show, audit)
 - [ ] **Universal Setup Wizard** - Interactive menu: remote, dotfiles, secrets, hooks
-  - Auto-scan common dotfile locations
-  - Import from existing repos (`--from github.com/user/dotfiles`) ✅ Done
-  - Branch structure scaffolding (work/home/minimal)
+- [ ] **File watcher** - `dot-man watch` for auto-sync on file changes
+
+### CLI Improvements
+
+- [ ] **YAML save support** - Preserve YAML format when saving
+- [ ] **Section priority/ordering** - Control deploy order with `priority` key
+- [ ] **Enhanced shell completions** - Add for all commands
+
+### Architecture
+
+- [ ] **Profile system expansion** - Profile-specific configs and switching
+- [ ] **Template multiple inheritance** - True inheritance chain with override priority
+- [ ] **Abstract method enforcement** - Use protocol-based typing for mixins
 
 ### Ecosystem
 
@@ -195,7 +227,7 @@ Priority files needing tests:
 
 - Shell completions may show stale branch names (restart shell to refresh)
 - TUI cannot fully preview files for other branches without git checkout
-- Old INI configs are auto-migrated on first run
+- YAML config files are saved as TOML (format is converted on save)
 
 ---
 

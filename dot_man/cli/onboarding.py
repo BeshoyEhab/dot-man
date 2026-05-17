@@ -522,6 +522,7 @@ def run_onboarding() -> None:
                 "  [cyan]dot-man status[/cyan]          — see tracked files\n"
                 "  [cyan]dot-man add <path>[/cyan]      — track a new file\n"
                 "  [cyan]dot-man switch <name>[/cyan]   — switch branch\n"
+                "  [cyan]dot-man config defaults[/cyan] — view/change default settings\n"
                 "  [cyan]dot-man --help[/cyan]          — full command list",
                 border_style="green",
                 padding=(1, 4),

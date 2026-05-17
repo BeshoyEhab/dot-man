@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
-from .constants import REPO_DIR
+from .constants import LOCK_FILE, REPO_DIR
 from .files import (
     atomic_write_text,
     backup_file,
@@ -21,8 +21,6 @@ from .secrets import SecretMatch
 
 if TYPE_CHECKING:
     from .config import Section
-
-LOCK_FILE = REPO_DIR.parent / ".lock"
 
 # Binary file extensions that can't contain text secrets
 _BINARY_EXTENSIONS = {

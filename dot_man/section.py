@@ -2,6 +2,7 @@
 
 __all__ = ["Section"]
 
+import os
 from pathlib import Path
 from typing import Any, Optional
 
@@ -10,6 +11,12 @@ from .constants import (
     DEFAULT_IGNORED_DIRECTORIES,
     HOOK_ALIASES,
 )
+
+
+def _expand_path(path_str: str) -> Path:
+    """Expand environment variables and ~ in a path string."""
+    expanded = os.path.expandvars(os.path.expanduser(path_str))
+    return Path(expanded)
 
 
 class Section:
@@ -32,9 +39,13 @@ class Section:
         inherits: Optional[list[str]] = None,
         ignored_directories: Optional[list[str]] = None,
         follow_symlinks: Optional[bool] = None,
+        encrypted: Optional[bool] = None,
+        encryption_method: Optional[str] = None,
+        encryption_recipient: Optional[str] = None,
     ):
         self.name = name
-        self.paths = paths
+        # Expand environment variables in paths
+        self.paths = [_expand_path(str(p)) if isinstance(p, str) else p for p in paths]
         self.repo_path = repo_path
 
         # Smart repo_base generation if not provided
@@ -64,6 +75,11 @@ class Section:
             else DEFAULT_IGNORED_DIRECTORIES
         )
         self.follow_symlinks = follow_symlinks if follow_symlinks is not None else False
+
+        # Encryption options
+        self.encrypted = encrypted if encrypted is not None else False
+        self.encryption_method = encryption_method or "gpg"
+        self.encryption_recipient = encryption_recipient
 
     def _generate_repo_base(self) -> str:
         """Auto-generate repo_base from first path.
@@ -181,5 +197,11 @@ class Section:
             result["ignored_directories"] = self.ignored_directories
         if self.follow_symlinks is not False:
             result["follow_symlinks"] = self.follow_symlinks
+        if self.encrypted:
+            result["encrypted"] = self.encrypted
+        if self.encryption_method != "gpg":
+            result["encryption_method"] = self.encryption_method
+        if self.encryption_recipient:
+            result["encryption_recipient"] = self.encryption_recipient
 
         return result

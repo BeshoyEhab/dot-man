@@ -160,19 +160,37 @@
 - [ ] Custom secret detection patterns via config
 - [ ] User-defined hook scripts directory
 - [ ] Plugin API for extensions
-- [ ] Import from chezmoi, yadm, GNU Stow
-- [ ] Export to portable format
+- [ ] Built-in plugin: pro-mgr integration
 
 ---
 
 ## v2.0+ - Future Ideas
 
-- [ ] Encrypted files support (GPG/age)
-- [ ] Symlink mode
-- [ ] Web dashboard for configuration management
-- [ ] Dotfile sharing/marketplace
-- [ ] CI/CD integration for dotfile testing
-- [ ] Cloud sync backends (S3, Dropbox, etc.)
+### Implemented in v0.10.0
+- ✅ Import from chezmoi, yadm, GNU Stow (`dot-man import`)
+- ✅ Export to portable formats (`dot-man export tar/zip/json`)
+- ✅ Encrypt/decrypt sensitive files (`dot-man encrypt`)
+- ✅ Auto-discover dotfiles (`dot-man discover`)
+- ✅ YAML configuration support
+- ✅ Environment variable expansion in paths
+- ✅ Rich diff output (`dot-man diff --rich`)
+
+### Storage & Sync (Future)
+- [ ] Symlink mode - Option to symlink files instead of copying
+- [ ] Encrypted files - More advanced GPG/age support
+- [ ] Cloud sync backends - S3, Dropbox, Google Drive
+- [ ] Per-branch config inheritance - `inherits_branch = "main"` in config
+
+### User Experience (Future)
+- [ ] Web dashboard - Browser-based configuration management
+- [ ] JSON output - `--json` option for scripting
+- [ ] File watcher - `dot-man watch` for auto-sync
+- [ ] Deploy rollback - Transaction-style with automatic undo
+- [ ] Configurable backup rotation - `max_backups` in global.toml
+
+### Ecosystem (Future)
+- [ ] Dotfile sharing/marketplace - Share configs with community
+- [ ] CI/CD integration - Test dotfiles before deployment
 
 ---
 
