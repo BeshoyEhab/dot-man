@@ -26,8 +26,8 @@
 
 ```bash
 # Switch between configurations instantly
-dot-man switch work      # Deploy work setup
-dot-man switch personal  # Deploy personal setup
+dot-man navigate work      # Deploy work setup
+dot-man navigate personal  # Deploy personal setup
 
 # Audit for secrets before pushing
 dot-man audit --strict
@@ -237,25 +237,25 @@ Run these commands and they'll show deprecation warnings. Use `navigate` instead
 | `dot-man export <format>`     | Export to tar, zip, or json                   |
 | `dot-man encrypt`             | Encrypt/decrypt sensitive files               |
 
-### Switch Enhancements
+### Navigate Command
 
-The `switch` command now supports multiple target types:
+The `navigate` command supports multiple target types:
 
 ```bash
-dot-man switch work              # Switch to branch
-dot-man switch work@tag          # Switch to branch at tag position
-dot-man switch abc1234          # Switch to specific commit
-dot-man switch my-tag           # Switch to tag
+dot-man navigate work              # Navigate to branch
+dot-man navigate work@tag          # Navigate to branch at tag position
+dot-man navigate abc1234          # Navigate to specific commit
+dot-man navigate my-tag           # Navigate to tag
 
 # Override default save behavior
-dot-man switch work --save       # Force save current changes
-dot-man switch work --no-save    # Force discard current changes
-dot-man switch --save work       # Flexible argument order
+dot-man navigate work --save       # Force save current changes
+dot-man navigate work --no-save    # Force discard current changes
+dot-man navigate --save work       # Flexible argument order
 ```
 
 Set a default behavior preference:
 ```bash
-dot-man config set switch.default_behavior no-save
+dot-man config set navigate.default_behavior no-save
 ```
 
 ### Navigate Command (Unified)
@@ -391,10 +391,10 @@ dot-man profile switch work-laptop
 ### Options
 
 ```bash
-dot-man switch work --dry-run   # Preview without changes
-dot-man switch work --force     # Skip confirmation
-dot-man switch work --save      # Save current changes before switching
-dot-man switch work --no-save   # Discard current changes
+dot-man navigate work --dry-run   # Preview without changes
+dot-man navigate work --force     # Skip confirmation
+dot-man navigate work --save      # Save current changes before switching
+dot-man navigate work --no-save   # Discard current changes
 dot-man sync --push-only        # Only push, don't pull
 dot-man sync --pull-only        # Only pull, don't push
 dot-man audit --strict          # Exit with error if secrets found
