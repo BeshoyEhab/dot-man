@@ -1,8 +1,8 @@
 """Tests for encrypt command."""
 
-import pytest
 from unittest.mock import patch
 
+import pytest
 from click.testing import CliRunner
 
 from dot_man.cli.interface import cli
@@ -51,6 +51,7 @@ class TestEncryptActions:
     def test_encrypt_status_no_tools(self, mock_detect):
         """Test encrypt status with no encryption tools."""
         import sys
+
         if sys.version_info < (3, 11):
             pytest.skip("Python 3.10 has mock patching compatibility issues")
         runner = CliRunner()
