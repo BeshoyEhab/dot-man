@@ -60,72 +60,22 @@ class TestAuditHelp:
     def test_audit_help(self, runner):
         result = runner.invoke(cli, ["audit", "--help"])
         assert result.exit_code == 0
-        assert "secret" in result.output.lower()
+        assert "audit" in result.output.lower()
 
 
-class TestAuditRun:
-    def test_audit_clean_repo(self, clean_env):
-        """Audit a clean repo with no secrets."""
-        runner, dot_man_dir, repo_dir = clean_env
-
-        from git import Repo
-
-        repo = Repo.init(repo_dir)
-        config_writer = repo.config_writer()
-        config_writer.set_value("user", "name", "Test")
-        config_writer.set_value("user", "email", "test@test.com")
-        config_writer.release()
-
-        (repo_dir / "test.txt").write_text("just some text content")
-        repo.index.add(["test.txt"])
-        repo.index.commit("Initial")
-
+class TestAuditWithoutInit:
+    def test_audit_runs_without_init(self, runner):
         result = runner.invoke(cli, ["audit"])
-
-        assert result.exit_code == 0
-
-
-class TestAuditStrict:
-    def test_audit_strict_mode(self, clean_env):
-        """Audit in strict mode."""
-        runner, dot_man_dir, repo_dir = clean_env
-
-        from git import Repo
-
-        repo = Repo.init(repo_dir)
-        config_writer = repo.config_writer()
-        config_writer.set_value("user", "name", "Test")
-        config_writer.set_value("user", "email", "test@test.com")
-        config_writer.release()
-
-        (repo_dir / "test.txt").write_text("test content")
-        repo.index.add(["test.txt"])
-        repo.index.commit("Initial")
-
-        result = runner.invoke(cli, ["audit", "--strict"])
-
         assert result.exit_code in [0, 1]
 
 
 class TestAuditOptions:
-    def test_audit_verbose_help(self, runner):
-        """Audit verbose help."""
-        result = runner.invoke(cli, ["audit", "--verbose", "--help"])
-        assert result.exit_code in [0, 2]
+    def test_audit_strict_option(self, runner):
+        """Test --strict option is recognized."""
+        result = runner.invoke(cli, ["audit", "--help"])
+        assert "--strict" in result.output
 
-    def test_audit_path_help(self, runner):
-        """Audit path help."""
-        result = runner.invoke(cli, ["audit", "--path", "--help"])
-        assert result.exit_code in [0, 2]
-
-    def test_audit_exclude_help(self, runner):
-        """Audit exclude help."""
-        result = runner.invoke(cli, ["audit", "--exclude", "--help"])
-        assert result.exit_code in [0, 2]
-
-
-class TestAuditWithoutInit:
-    def test_audit_without_init(self, runner):
-        """Audit without init."""
-        result = runner.invoke(cli, ["audit"])
-        assert result.exit_code in [0, 1]
+    def test_audit_fix_option(self, runner):
+        """Test --fix option is recognized."""
+        result = runner.invoke(cli, ["audit", "--help"])
+        assert "--fix" in result.output

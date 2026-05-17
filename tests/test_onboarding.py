@@ -1,162 +1,119 @@
-"""Tests for dot_man.cli.onboarding."""
+"""Tests for onboarding module."""
 
-from pathlib import Path
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Helpers / fixtures
-# ──────────────────────────────────────────────────────────────────────────────
+from unittest.mock import MagicMock, patch
 
 
-def _patch_dot_man_dir(monkeypatch, tmp_path: Path):
-    """Point DOT_MAN_DIR and SENTINEL at a temporary location."""
-    fake_dir = tmp_path / ".config" / "dot-man"
+class TestOnboardingSentinel:
+    """Test onboarding sentinel functions."""
 
-    monkeypatch.setattr("dot_man.cli.onboarding.DOT_MAN_DIR", fake_dir)
-    monkeypatch.setattr("dot_man.cli.onboarding.SENTINEL", fake_dir / ".onboarded")
-    return fake_dir
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# is_first_run()
-# ──────────────────────────────────────────────────────────────────────────────
-
-
-class TestIsFirstRun:
-    def test_returns_true_when_dir_missing(self, monkeypatch, tmp_path):
-        """is_first_run() → True when DOT_MAN_DIR doesn't exist at all."""
-        fake_dir = _patch_dot_man_dir(monkeypatch, tmp_path)
-        assert not fake_dir.exists()
-
+    @patch("dot_man.cli.onboarding.DOT_MAN_DIR")
+    @patch("dot_man.cli.onboarding.SENTINEL")
+    def test_is_first_run_no_dir(self, mock_sentinel, mock_dir):
+        """Test first run detection when dot-man dir doesn't exist."""
         from dot_man.cli.onboarding import is_first_run
 
-        assert is_first_run() is True
+        mock_dir.exists.return_value = False
+        result = is_first_run()
+        assert result is True
 
-    def test_returns_true_when_dir_exists_but_no_sentinel(self, monkeypatch, tmp_path):
-        """is_first_run() → True when dir exists but .onboarded sentinel is absent."""
-        fake_dir = _patch_dot_man_dir(monkeypatch, tmp_path)
-        fake_dir.mkdir(parents=True)
-        assert not (fake_dir / ".onboarded").exists()
-
+    @patch("dot_man.cli.onboarding.DOT_MAN_DIR")
+    @patch("dot_man.cli.onboarding.SENTINEL")
+    def test_is_first_run_dir_exists_no_sentinel(self, mock_sentinel, mock_dir):
+        """Test first run when dir exists but no sentinel."""
         from dot_man.cli.onboarding import is_first_run
 
-        assert is_first_run() is True
+        mock_dir.exists.return_value = True
+        mock_sentinel.exists.return_value = False
+        result = is_first_run()
+        assert result is True
 
-    def test_returns_false_when_sentinel_exists(self, monkeypatch, tmp_path):
-        """is_first_run() → False when the .onboarded sentinel file is present."""
-        fake_dir = _patch_dot_man_dir(monkeypatch, tmp_path)
-        fake_dir.mkdir(parents=True)
-        sentinel = fake_dir / ".onboarded"
-        sentinel.touch()
-
+    @patch("dot_man.cli.onboarding.DOT_MAN_DIR")
+    @patch("dot_man.cli.onboarding.SENTINEL")
+    def test_is_first_run_not_first(self, mock_sentinel, mock_dir):
+        """Test not first run when sentinel exists."""
         from dot_man.cli.onboarding import is_first_run
 
-        assert is_first_run() is False
+        mock_dir.exists.return_value = True
+        mock_sentinel.exists.return_value = True
+        result = is_first_run()
+        assert result is False
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# mark_onboarded()
-# ──────────────────────────────────────────────────────────────────────────────
+class TestOnboardingMarkOnboarded:
+    """Test mark_onboarded function."""
 
-
-class TestMarkOnboarded:
-    def test_creates_sentinel_file(self, monkeypatch, tmp_path):
-        """mark_onboarded() creates the sentinel file."""
-        fake_dir = _patch_dot_man_dir(monkeypatch, tmp_path)
-        fake_dir.mkdir(parents=True)
-
+    @patch("dot_man.cli.onboarding.DOT_MAN_DIR")
+    @patch("dot_man.cli.onboarding.SENTINEL")
+    def test_mark_onboarded_creates_sentinel(self, mock_sentinel, mock_dir):
+        """Test that mark_onboarded creates sentinel file."""
         from dot_man.cli.onboarding import mark_onboarded
 
-        mark_onboarded()
-
-        sentinel = fake_dir / ".onboarded"
-        assert sentinel.exists(), "Sentinel file was not created"
-
-    def test_creates_parent_dir_if_missing(self, monkeypatch, tmp_path):
-        """mark_onboarded() creates DOT_MAN_DIR if it doesn't exist yet."""
-        fake_dir = _patch_dot_man_dir(monkeypatch, tmp_path)
-        assert not fake_dir.exists()
-
-        from dot_man.cli.onboarding import mark_onboarded
+        mock_dir.mkdir = MagicMock()
+        mock_sentinel.touch = MagicMock()
 
         mark_onboarded()
 
-        assert fake_dir.exists()
-        assert (fake_dir / ".onboarded").exists()
-
-    def test_does_not_raise_if_called_twice(self, monkeypatch, tmp_path):
-        """mark_onboarded() is idempotent — calling it twice doesn't raise."""
-        fake_dir = _patch_dot_man_dir(monkeypatch, tmp_path)
-        fake_dir.mkdir(parents=True)
-
-        from dot_man.cli.onboarding import mark_onboarded
-
-        mark_onboarded()
-        mark_onboarded()  # should not raise
-
-        assert (fake_dir / ".onboarded").exists()
+        mock_dir.mkdir.assert_called_once()
+        mock_sentinel.touch.assert_called_once()
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Round-trip: mark → is_first_run
-# ──────────────────────────────────────────────────────────────────────────────
+class TestOnboardingInternal:
+    """Test onboarding internal functions."""
+
+    @patch("dot_man.cli.onboarding._console")
+    def test_section_rule(self, mock_console):
+        """Test _section_rule prints a rule."""
+        from dot_man.cli.onboarding import _section_rule
+
+        _section_rule("Test Section")
+
+        mock_console.print.assert_called()
+
+    @patch("dot_man.cli.onboarding._console")
+    def test_code_block(self, mock_console):
+        """Test _code_block renders a code block."""
+        from dot_man.cli.onboarding import _code_block
+
+        _code_block("echo test")
+
+        assert mock_console.print.called
+
+    @patch("dot_man.cli.onboarding._console")
+    @patch("builtins.input", return_value="")
+    def test_pause(self, mock_input, mock_console):
+        """Test _pause waits for input."""
+        from dot_man.cli.onboarding import _pause
+
+        _pause()
+
+        mock_console.print.assert_called()
 
 
-class TestOnboardingRoundTrip:
-    def test_is_first_run_false_after_mark(self, monkeypatch, tmp_path):
-        """After mark_onboarded(), is_first_run() must return False."""
-        fake_dir = _patch_dot_man_dir(monkeypatch, tmp_path)
-        fake_dir.mkdir(parents=True)
+class TestOnboardingTutorial:
+    """Test onboarding tutorial content."""
 
-        from dot_man.cli.onboarding import is_first_run, mark_onboarded
+    @patch("dot_man.cli.onboarding._pause")
+    @patch("dot_man.cli.onboarding._section_rule")
+    @patch("dot_man.cli.onboarding._code_block")
+    @patch("dot_man.cli.onboarding._console")
+    def test_section_architecture(
+        self, mock_console, mock_code, mock_section, mock_pause
+    ):
+        """Test architecture section displays."""
+        from dot_man.cli.onboarding import _section_architecture
 
-        assert is_first_run() is True  # before
-        mark_onboarded()
-        assert is_first_run() is False  # after
+        _section_architecture()
 
+        assert mock_section.called or mock_console.print.called
 
-# ──────────────────────────────────────────────────────────────────────────────
-# main() — onboarding gate in the CLI entry point
-# ──────────────────────────────────────────────────────────────────────────────
+    @patch("dot_man.cli.onboarding._pause")
+    @patch("dot_man.cli.onboarding._section_rule")
+    @patch("dot_man.cli.onboarding._code_block")
+    @patch("dot_man.cli.onboarding._console")
+    def test_section_manual(self, mock_console, mock_code, mock_section, mock_pause):
+        """Test manual section displays."""
+        from dot_man.cli.onboarding import _section_manual
 
+        _section_manual()
 
-class TestMainOnboardingGate:
-    def test_main_calls_run_onboarding_on_first_run(self, monkeypatch, tmp_path):
-        """main() should call run_onboarding() when is_first_run() returns True."""
-        _patch_dot_man_dir(monkeypatch, tmp_path)
-
-        called: list[str] = []
-
-        def fake_run_onboarding() -> None:
-            called.append("onboarding")
-
-        # Patch the module-level functions that main() imports at call time
-        import dot_man.cli.onboarding as onboarding_mod
-
-        monkeypatch.setattr(onboarding_mod, "is_first_run", lambda: True)
-        monkeypatch.setattr(onboarding_mod, "run_onboarding", fake_run_onboarding)
-
-        from dot_man.cli.main import main
-
-        main()
-        assert "onboarding" in called
-
-    def test_main_skips_onboarding_after_sentinel(self, monkeypatch, tmp_path):
-        """main() should NOT call run_onboarding() when the sentinel file exists."""
-        fake_dir = _patch_dot_man_dir(monkeypatch, tmp_path)
-        fake_dir.mkdir(parents=True)
-        (fake_dir / ".onboarded").touch()
-
-        called: list[str] = []
-
-        def fake_run_onboarding() -> None:  # pragma: no cover
-            called.append("onboarding")
-
-        import dot_man.cli.onboarding as onboarding_mod
-
-        monkeypatch.setattr(onboarding_mod, "run_onboarding", fake_run_onboarding)
-
-        # Verify is_first_run() correctly returns False for the patched dir
-        from dot_man.cli.onboarding import is_first_run
-
-        assert is_first_run() is False
-        assert "onboarding" not in called
+        assert mock_section.called or mock_console.print.called

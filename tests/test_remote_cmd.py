@@ -145,3 +145,17 @@ class TestSyncBranch:
         result = runner.invoke(cli, ["remote", "sync-branch"])
 
         assert result.exit_code in [0, 1]
+
+
+class TestRemoteDelete:
+    def test_remote_delete_help(self, runner):
+        """Remote delete help."""
+        result = runner.invoke(cli, ["remote", "delete", "--help"])
+        assert result.exit_code in [0, 2]
+
+
+class TestRemoteInvalidAction:
+    def test_invalid_action(self, runner):
+        """Test invalid remote action."""
+        result = runner.invoke(cli, ["remote", "invalid"])
+        assert result.exit_code == 2
