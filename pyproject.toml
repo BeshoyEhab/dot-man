@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [
-    { name = "Bishoy Ehab", email = "beshoy@example.com" }
+    { name = "Bishoy Ehab", email = "beshoyehabhhmm@gmail.com" }
 ]
 keywords = ["dotfiles", "git", "configuration", "cli", "dotfile-manager"]
 classifiers = [
