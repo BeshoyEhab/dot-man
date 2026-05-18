@@ -4,11 +4,11 @@ import click
 
 from .. import ui
 from ..config_detector import ConfigDetector
-from .common import require_init
+from .common import AliasedCommand, require_init
 from .interface import cli as main
 
 
-@main.command("discover")
+@main.command("discover", cls=AliasedCommand, aliases=["dis"])
 @click.option(
     "--include-extended/--no-extended",
     default=True,

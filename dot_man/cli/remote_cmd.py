@@ -6,11 +6,11 @@ from .. import ui
 from ..config import GlobalConfig
 from ..core import GitManager
 from ..exceptions import DotManError
-from .common import error, require_init, success, warn
+from .common import AliasedCommand, error, require_init, success, warn
 from .interface import cli as main
 
 
-@main.group()
+@main.group("remote")
 def remote():
     """Manage remote repository connection."""
     pass
@@ -141,7 +141,7 @@ def sync_branch():
         error(f"Sync branch failed: {e}")
 
 
-@main.command()
+@main.command("sync", cls=AliasedCommand, aliases=["syn"])
 @click.option("--push-only", is_flag=True, help="Only push, don't pull")
 @click.option("--pull-only", is_flag=True, help="Only pull, don't push")
 @require_init

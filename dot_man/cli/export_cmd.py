@@ -10,11 +10,11 @@ import click
 
 from .. import ui
 from ..constants import REPO_DIR
-from .common import error, require_init, success
+from .common import AliasedCommand, error, require_init, success
 from .interface import cli as main
 
 
-@main.command("export")
+@main.command("export", cls=AliasedCommand, aliases=["exp"])
 @click.argument("format", type=click.Choice(["tar", "zip", "json"]))
 @click.argument("output", type=click.Path())
 @click.option(

@@ -7,7 +7,7 @@ from .common import complete_tags, error, require_init, success, warn
 from .interface import cli as main
 
 
-@main.group()
+@main.group("tag")
 @require_init
 def tag():
     """Manage tags for fast navigation.

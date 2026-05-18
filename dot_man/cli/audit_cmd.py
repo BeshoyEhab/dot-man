@@ -7,11 +7,11 @@ from ..constants import REPO_DIR
 from ..core import GitManager
 from ..exceptions import DotManError
 from ..secrets import PermanentRedactGuard, SecretGuard, SecretMatch, SecretScanner
-from .common import error, handle_exception, require_init, success
+from .common import AliasedCommand, error, handle_exception, require_init, success
 from .interface import cli as main
 
 
-@main.command()
+@main.command("audit", cls=AliasedCommand, aliases=["aud"])
 @click.option(
     "--strict", is_flag=True, help="Exit with error if secrets found (for CI/CD)"
 )

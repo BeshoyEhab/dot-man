@@ -12,6 +12,7 @@ from ..core import GitManager
 from ..files import compare_files
 from ..hooks import run_checkout_hooks, run_switch_hooks
 from .common import (
+    AliasedCommand,
     complete_switch_args,
     error,
     get_secret_handler,
@@ -170,7 +171,7 @@ class BranchParamType(click.ParamType):
 BRANCH = BranchParamType()
 
 
-@main.command()
+@main.command("navigate", cls=AliasedCommand, aliases=["nav"])
 @click.option(
     "--dry-run",
     "-n",
@@ -848,7 +849,7 @@ def _handle_branch_navigate(
     )
 
 
-@main.command()
+@main.command("hooks", cls=AliasedCommand, aliases=["hks"])
 @click.argument("command", type=click.Choice(["list", "create", "delete"]))
 @click.argument("phase", type=click.Choice(["pre", "post"]), required=False)
 @click.argument("name", type=str, required=False)

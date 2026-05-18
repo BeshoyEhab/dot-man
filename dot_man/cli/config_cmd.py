@@ -12,7 +12,7 @@ from .common import complete_config_keys, error, require_init, success
 from .interface import cli as main
 
 
-@main.group()
+@main.group("config")
 def config():
     """Manage global configuration."""
     pass

@@ -6,11 +6,11 @@ import click
 
 from .. import ui
 from ..exceptions import DotManError
-from .common import complete_commits, error, require_init, success
+from .common import AliasedCommand, complete_commits, error, require_init, success
 from .interface import cli as main
 
 
-@main.command("revert")
+@main.command("revert", cls=AliasedCommand, aliases=["rev"])
 @click.argument("path", type=click.Path(path_type=Path))
 @click.option("--force", is_flag=True, help="Skip confirmation prompt")
 @click.option(

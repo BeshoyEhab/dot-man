@@ -9,11 +9,11 @@ from .. import ui
 from ..config import GlobalConfig
 from ..constants import DOT_MAN_TOML, GLOBAL_TOML, REPO_DIR
 from ..exceptions import DotManError
-from .common import error, require_init, success, warn
+from .common import AliasedCommand, error, require_init, success, warn
 from .interface import cli as main
 
 
-@main.command()
+@main.command("edit", cls=AliasedCommand, aliases=["edt"])
 @click.option("--editor", help="Editor to use (default: config or $VISUAL or $EDITOR)")
 @click.option("--global", "edit_global", is_flag=True, help="Edit global configuration")
 @click.option(

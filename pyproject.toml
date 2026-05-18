@@ -1,6 +1,6 @@
 [project]
 name = "dotman-git"
-version = "1.1.0"
+version = "1.1.1"
 description = "Dotfile manager with git-powered branching"
 readme = "README.md"
 requires-python = ">=3.9"

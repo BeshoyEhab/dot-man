@@ -11,11 +11,11 @@ from ..encryption import (
     EncryptionManager,
     detect_available_encryption,
 )
-from .common import error, require_init, success, warn
+from .common import AliasedCommand, error, require_init, success, warn
 from .interface import cli as main
 
 
-@main.command("encrypt")
+@main.command("encrypt", cls=AliasedCommand, aliases=["enc"])
 @click.argument("action", type=click.Choice(["encrypt", "decrypt", "status"]))
 @click.argument("section", required=False)
 @click.option(

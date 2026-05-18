@@ -11,7 +11,7 @@ from .common import complete_branches, error, handle_exception, require_init, su
 from .interface import cli as main
 
 
-@main.group()
+@main.group("branch")
 def branch():
     """Manage configuration branches."""
     pass

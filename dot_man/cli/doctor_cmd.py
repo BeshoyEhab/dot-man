@@ -5,11 +5,11 @@ import shutil
 
 from .. import ui
 from ..constants import DOT_MAN_DIR, DOT_MAN_TOML, GLOBAL_TOML, REPO_DIR
-from .common import error, require_init, success
+from .common import AliasedCommand, error, require_init, success
 from .interface import cli as main
 
 
-@main.command("doctor")
+@main.command("doctor", cls=AliasedCommand, aliases=["doc"])
 @require_init
 def doctor():
     """Run diagnostics and health checks.

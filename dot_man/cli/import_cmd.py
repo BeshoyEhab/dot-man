@@ -7,11 +7,11 @@ import click
 
 from .. import ui
 from ..core import GitManager
-from .common import error, require_init, warn
+from .common import AliasedCommand, error, require_init, warn
 from .interface import cli as main
 
 
-@main.command("import")
+@main.command("import", cls=AliasedCommand, aliases=["imp"])
 @click.argument("source", type=click.Choice(["chezmoi", "yadm", "stow", "all"]))
 @click.option(
     "--path",

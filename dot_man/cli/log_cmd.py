@@ -5,11 +5,18 @@ from pathlib import Path
 import click
 
 from .. import ui
-from .common import complete_branches, complete_tags, error, require_init, success
+from .common import (
+    AliasedCommand,
+    complete_branches,
+    complete_tags,
+    error,
+    require_init,
+    success,
+)
 from .interface import cli as main
 
 
-@main.command()
+@main.command("log", cls=AliasedCommand, aliases=["log"])
 @click.argument("file", required=False, type=click.Path(path_type=Path))
 @click.option("-n", "--count", type=int, help="Number of commits to show")
 @click.option(
@@ -78,7 +85,7 @@ def log(
         error(str(e))
 
 
-@main.command("diff")
+@main.command("diff", cls=AliasedCommand, aliases=["dif"])
 @click.argument("file", required=False, type=click.Path(path_type=Path))
 @click.option(
     "--branch",

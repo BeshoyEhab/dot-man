@@ -5,10 +5,11 @@ from pathlib import Path
 
 import click
 
+from .common import AliasedCommand
 from .interface import cli as main
 
 
-@main.command("completions")
+@main.command("completions", cls=AliasedCommand, aliases=["cpl"])
 @click.option(
     "--shell",
     type=click.Choice(["bash", "zsh", "fish", "all"]),

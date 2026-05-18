@@ -7,7 +7,7 @@ from .common import complete_profiles, error, require_init, success, warn
 from .interface import cli as main
 
 
-@main.group()
+@main.group("profile")
 def profile():
     """Manage machine-specific profiles.
 

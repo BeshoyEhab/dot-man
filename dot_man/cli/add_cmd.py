@@ -9,11 +9,18 @@ from ..config import DotManConfig, GlobalConfig
 from ..constants import REPO_DIR
 from ..exceptions import DotManError
 from ..files import copy_directory, copy_file
-from .common import error, get_secret_handler, require_init, success, warn
+from .common import (
+    AliasedCommand,
+    error,
+    get_secret_handler,
+    require_init,
+    success,
+    warn,
+)
 from .interface import cli as main
 
 
-@main.command()
+@main.command("add", cls=AliasedCommand, aliases=["add"])
 @click.argument("path", type=click.Path(exists=True))
 @click.option(
     "--section", "-s", help="Section name (default: auto-generated from path)"

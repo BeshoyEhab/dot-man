@@ -4,11 +4,11 @@ import click
 
 from .. import ui
 from ..constants import REPO_DIR
-from .common import error, require_init, success
+from .common import AliasedCommand, error, require_init, success
 from .interface import cli as main
 
 
-@main.command("clean")
+@main.command("clean", cls=AliasedCommand, aliases=["cln"])
 @click.option("--backups", is_flag=True, help="Clean old backups")
 @click.option("--orphans", is_flag=True, help="Clean orphaned files from repo")
 @click.option("--all", "clean_all", is_flag=True, help="Clean both backups and orphans")

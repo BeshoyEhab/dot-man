@@ -13,11 +13,11 @@ from ..config_detector import ConfigDetector, get_auto_hooks_for_config
 from ..constants import BACKUPS_DIR, DOT_MAN_DIR, FILE_PERMISSIONS, REPO_DIR
 from ..core import GitManager
 from ..utils import is_git_installed
-from .common import error, handle_exception, success, warn
+from .common import AliasedCommand, error, handle_exception, success, warn
 from .interface import cli as main
 
 
-@main.command()
+@main.command("init", cls=AliasedCommand, aliases=["ini"])
 @click.option("--force", is_flag=True, help="Reinitialize even if already exists")
 @click.option("--no-wizard", is_flag=True, help="Skip interactive setup wizard")
 @click.option(

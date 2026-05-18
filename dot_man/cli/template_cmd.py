@@ -26,7 +26,7 @@ SYSTEM_VARS = {
 }
 
 
-@main.group()
+@main.group("template")
 def template():
     """Manage template variables for dynamic configuration.
 

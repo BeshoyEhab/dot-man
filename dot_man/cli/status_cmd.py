@@ -10,11 +10,11 @@ from .. import ui
 from ..constants import REPO_DIR
 from ..exceptions import DotManError
 from ..secrets import SecretScanner
-from .common import error, handle_exception, require_init
+from .common import AliasedCommand, error, handle_exception, require_init
 from .interface import cli as main
 
 
-@main.command()
+@main.command("status", cls=AliasedCommand, aliases=["sta"])
 @click.option("-v", "--verbose", is_flag=True, help="Show detailed information")
 @click.option("--secrets", is_flag=True, help="Highlight files with detected secrets")
 @require_init

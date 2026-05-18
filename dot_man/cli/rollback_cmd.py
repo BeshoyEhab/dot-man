@@ -8,11 +8,11 @@ from rich.table import Table
 
 from .. import ui
 from ..exceptions import DotManError
-from .common import error, require_init, success, warn
+from .common import AliasedCommand, error, require_init, success, warn
 from .interface import cli as main
 
 
-@main.command("rollback")
+@main.command("rollback", cls=AliasedCommand, aliases=["rol"])
 @click.argument("target", required=False)
 @click.option(
     "--list",

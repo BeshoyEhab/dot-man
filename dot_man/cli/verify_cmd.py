@@ -6,11 +6,11 @@ import click
 
 from .. import ui
 from ..constants import DOT_MAN_TOML, REPO_DIR
-from .common import require_init, success
+from .common import AliasedCommand, require_init, success
 from .interface import cli as main
 
 
-@main.command("verify")
+@main.command("verify", cls=AliasedCommand, aliases=["ver"])
 @click.option("--fix", is_flag=True, help="Attempt to fix issues automatically")
 @require_init
 def verify(fix: bool):

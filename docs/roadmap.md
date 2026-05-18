@@ -146,6 +146,22 @@
 
 ---
 
+## v1.1.1 - Command Aliases ✅
+
+- ✅ Short command aliases (3 letters where possible):
+  - ✅ `nav` = navigate, `doc` = doctor, `dep` = deploy
+  - ✅ `enc` = encrypt, `exp` = export, `imp` = import
+  - ✅ `dis` = discover, `aud` = audit, `cln` = clean
+  - ✅ `ver` = verify, `rev` = revert, `rol` = rollback
+  - ✅ `wat` = watch, `cpl` = completions, `rst` = restore
+  - ✅ `edt` = edit, `sta` = status, `ini` = init
+  - ✅ `syn` = sync, `log` = log, `dif` = diff
+  - ✅ `hks` = hooks
+- ✅ Updated license with additional copyright holder (ZVAXEROWS)
+- ✅ Updated copyright years to 2025, 2026
+
+---
+
 ## v1.0.0 - Production Ready
 
 - [ ] 80%+ test coverage (currently 56%)

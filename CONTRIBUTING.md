@@ -27,7 +27,7 @@ pytest tests/ -v
 dot-man/
 ├── dot_man/              # Main package (20 modules)
 │   ├── __init__.py       # Package version
-│   ├── cli/              # CLI commands (Click-based, 24 files)
+│   ├── cli/              # CLI commands (Click-based, 28 files)
 │   │   ├── main.py       # Entry point: calls cli()
 │   │   ├── interface.py  # Click group definition (DotManGroup)
 │   │   ├── common.py     # Shared utilities: require_init, completions,

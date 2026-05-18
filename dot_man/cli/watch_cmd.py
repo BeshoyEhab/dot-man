@@ -9,7 +9,7 @@ import click
 
 from .. import ui
 from ..exceptions import DotManError
-from .common import error, require_init, warn
+from .common import AliasedCommand, error, require_init, warn
 from .interface import cli as main
 
 # Try to import watchdog; fall back to polling if unavailable
@@ -145,7 +145,7 @@ if _WATCHDOG_AVAILABLE:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-@main.command("watch")
+@main.command("watch", cls=AliasedCommand, aliases=["wat"])
 @click.option(
     "--interval",
     "-i",

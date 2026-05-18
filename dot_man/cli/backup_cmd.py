@@ -8,7 +8,7 @@ from .common import error, require_init, success
 from .interface import cli as main
 
 
-@main.group()
+@main.group("backup")
 def backup():
     """Manage local safety backups."""
     pass

@@ -57,8 +57,49 @@ def handle_exception(exc: BaseException, context: str = "Operation") -> None:
     raise SystemExit(1)
 
 
+class AliasedCommand(click.Command):
+    """Custom Command class that supports aliases."""
+
+    def __init__(self, *args, aliases=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._aliases = aliases or []
+
+    @property
+    def aliases(self):
+        return self._aliases
+
+
+def command(name=None, cls=None, aliases=None, **kwargs):
+    """Decorator to create a command with optional aliases.
+
+    Args:
+        name: Command name (default: function name)
+        cls: Command class (default: AliasedCommand)
+        aliases: List of alias names for the command
+
+    Example:
+        @command("navigate", aliases=["nav", "go"])
+        def navigate():
+            ...
+    """
+    if cls is None:
+        cls = AliasedCommand
+
+    def decorator(f):
+        return click.command(name=name, cls=cls, aliases=aliases, **kwargs)(f)
+
+    return decorator
+
+
 class DotManGroup(click.Group):
     """Custom Click Group to provide suggestions for typos."""
+
+    def add_command(self, command, name=None):
+        name = name or command.name
+        super().add_command(command, name)
+        if hasattr(command, "aliases") and command.aliases:
+            for alias in command.aliases:
+                super().add_command(command, alias)
 
     def get_command(self, ctx, cmd_name):
         rv = click.Group.get_command(self, ctx, cmd_name)
