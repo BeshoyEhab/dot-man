@@ -451,4 +451,4 @@ All contributions must pass the pre-push quality checklist: `black`, `ruff`, `my
 
 ## License
 
-[MIT](LICENSE) © [Bishoy Ehab](https://github.com/BeshoyEhab)
+[MIT](LICENSE) © [Bishoy Ehab](https://github.com/BeshoyEhab) & [ZVAXEROWS](https://github.com/ZVAXEROWS)
