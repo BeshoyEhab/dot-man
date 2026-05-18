@@ -34,7 +34,7 @@ Your Machine                  dot-man Repo               Any Machine
 ──────────────                ────────────               ───────────
 ~/.bashrc      ──── save ──►  branch: main  ── deploy ──►  ~/.bashrc
 ~/.config/nvim ──── save ──►  branch: work  ── deploy ──►  ~/.config/nvim
-~/.gitconfig   ──── save ──►  branch: server             ~/.gitconfig
+~/.gitconfig   ──── save ──►  branch: server               ~/.gitconfig
 ```
 
 **Secrets are never committed.** API keys, tokens and passwords are automatically detected, encrypted locally in a vault, and replaced with hashes in the repository before any commit.
