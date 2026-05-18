@@ -175,6 +175,10 @@
 - ✅ Environment variable expansion in paths
 - ✅ Rich diff output (`dot-man diff --rich`)
 
+### Implemented in v1.0.1
+- ✅ `dot-man watch` - Auto-save tracked dotfiles on change (watchdog/polling)
+- ✅ `dot-man rollback` - Transaction-style rollback to previous commits/tags
+
 ### Storage & Sync (Future)
 - [ ] Symlink mode - Option to symlink files instead of copying
 - [ ] Encrypted files - More advanced GPG/age support
@@ -184,8 +188,8 @@
 ### User Experience (Future)
 - [ ] Web dashboard - Browser-based configuration management
 - [ ] JSON output - `--json` option for scripting
-- [ ] File watcher - `dot-man watch` for auto-sync
-- [ ] Deploy rollback - Transaction-style with automatic undo
+- [x] File watcher - `dot-man watch` for auto-sync
+- [x] Deploy rollback - Transaction-style with automatic undo
 - [ ] Configurable backup rotation - `max_backups` in global.toml
 
 ### Ecosystem (Future)

@@ -113,4 +113,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- (No new changes in unreleased)
+- **`dot-man watch`** — auto-save tracked dotfiles on change (watchdog or polling backend, debounced commits, `--no-commit` / `--dry-run` flags)
+- **`dot-man rollback`** — transaction-style rollback to any previous commit, tag, or `HEAD~N`; shows coloured diff, auto-backs up before rolling back
+
+### Changed
+- README completely overhauled: badges, shields, architecture diagram, full command reference tables, TOML/YAML config examples

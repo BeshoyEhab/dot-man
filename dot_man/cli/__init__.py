@@ -48,6 +48,7 @@ from .profile_cmd import profile
 from .remote_cmd import remote, sync
 from .restore_cmd import restore
 from .revert_cmd import revert
+from .rollback_cmd import rollback
 from .show_cmd import show
 from .status_cmd import status
 from .switch_cmd import switch
@@ -55,6 +56,7 @@ from .tag_cmd import tag
 from .template_cmd import template
 from .tui_cmd import tui
 from .verify_cmd import verify
+from .watch_cmd import watch
 
 __all__ = [
     "main",
@@ -110,4 +112,6 @@ __all__ = [
     "encrypt_cmd",
     "discover_cmd",
     "completions",
+    "watch",
+    "rollback",
 ]

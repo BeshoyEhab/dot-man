@@ -1,119 +1,102 @@
-<p align="center"><h1>dot-man</h1></p>
+<div align="center">
 
-<p align="center">
-  <strong>Dotfile manager with git-powered branching</strong>
-</p>
+# dot-man
 
-<p align="center">
-  <a href="https://github.com/BeshoyEhab/dot-man/actions/workflows/ci.yml">
-    <img src="https://github.com/BeshoyEhab/dot-man/actions/workflows/ci.yml/badge.svg" alt="CI">
-  </a>
-</p>
+**Dotfile manager with git-powered branching**
 
-<p align="center">
-  <a href="#features">Features</a> •
-  <a href="#installation">Installation</a> •
-  <a href="#quick-start">Quick Start</a> •
-  <a href="#commands">Commands</a> •
-  <a href="#configuration">Configuration</a>
-</p>
+[![CI](https://github.com/BeshoyEhab/dot-man/actions/workflows/ci.yml/badge.svg)](https://github.com/BeshoyEhab/dot-man/actions/workflows/ci.yml)
+[![PyPI version](https://img.shields.io/pypi/v/dotman-git?color=blue&logo=pypi&logoColor=white)](https://pypi.org/project/dotman-git/)
+[![PyPI downloads](https://img.shields.io/pypi/dm/dotman-git?color=blue&logo=pypi&logoColor=white)](https://pypi.org/project/dotman-git/)
+[![Python](https://img.shields.io/pypi/pyversions/dotman-git?logo=python&logoColor=white)](https://pypi.org/project/dotman-git/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
+[![Coverage](https://img.shields.io/badge/coverage-61%25-yellow)](https://github.com/BeshoyEhab/dot-man)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/BeshoyEhab/dot-man/pulls)
 
 ---
 
-## Overview
+*Switch your entire development environment in one command.*
 
-**dot-man** manages your dotfiles across multiple machines using git branches. Each branch represents a different configuration (work, personal, minimal, server).
+[**Install**](#installation) · [**Quick Start**](#quick-start) · [**Commands**](#commands) · [**Config**](#configuration) · [**Docs**](docs/)
 
-```bash
-# Switch between configurations instantly
-dot-man navigate work      # Deploy work setup
-dot-man navigate personal  # Deploy personal setup
+</div>
 
-# Audit for secrets before pushing
-dot-man audit --strict
+---
+
+## What is dot-man?
+
+dot-man stores your dotfiles in a **git repository** and uses **branches as configuration profiles**. Each branch is a complete, deployable snapshot of your environment.
+
 ```
+Your Machine                  dot-man Repo               Any Machine
+──────────────                ────────────               ───────────
+~/.bashrc      ──── save ──►  branch: main  ── deploy ──►  ~/.bashrc
+~/.config/nvim ──── save ──►  branch: work  ── deploy ──►  ~/.config/nvim
+~/.gitconfig   ──── save ──►  branch: server             ~/.gitconfig
+```
+
+**Secrets are never committed.** API keys, tokens and passwords are automatically detected, encrypted locally in a vault, and replaced with hashes in the repository before any commit.
 
 ---
 
 ## Features
 
-- 📦 **PyPI ready** - Install with `pip install dotman-git`
-- 🌿 **Git-powered branching** - Each config is a branch, easy to sync
-- 🔐 **Secret detection** - Automatically redacts API keys, passwords, tokens
-- 🔒 **Encryption** - Encrypt/decrypt sensitive files with GPG or AGE
-- 🔄 **Save & deploy** - One command to save current state and switch configs
-- ☁️ **Remote sync** - Push/pull dotfiles across machines with `dot-man sync`
-- ⚡ **Pre/Post hooks** - Run commands before/after deploying (e.g., reload config)
-- 📝 **Edit in place** - Opens your `$EDITOR` for quick changes
-- 🛡️ **Dry-run mode** - Preview changes before making them
-- 🐚 **Shell completions** - Auto-installed for Bash, Zsh, and Fish
-- 🏷️ **Tags** - Tag commits for fast navigation
-- 📜 **History & Diff** - View commit history, compare branches, restore files
-- 🎨 **Rich diff** - Syntax-highlighted colored diffs
-- 🔄 **Global hooks** - System-wide hooks for any dot-man command
-- 🔀 **Auto-detect hooks** - Automatically reload configs when switching branches
-- 🌍 **Import** - Import from git repos, chezmoi, yadm, or GNU Stow
-- 📤 **Export** - Export to tar, zip, or JSON
-- 🔍 **Discover** - Auto-detect existing dotfiles (30+ locations)
-- 📦 **Universal merge** - Manage shared content across branches with markers
-- 🌐 **YAML support** - Config files in TOML or YAML format
+<table>
+<tr>
+<td>
 
----
+**Core**
+- 🌿 Git-powered branch profiles
+- 🔐 Automatic secret detection & vault
+- 🔄 Save → switch → deploy in one command
+- ⚡ Pre/post deploy hooks with aliases
+- 🏷️ Tag snapshots for fast rollback
 
-## Current Status
+</td>
+<td>
 
-| Metric | Value |
-|--------|-------|
-| Version | 1.0.0 (Production) |
-| Test Coverage | 61% |
-| Commands | 30+ |
-| Python | 3.9+ |
+**Advanced**
+- 🔒 GPG / AGE file encryption
+- 🌍 Import from chezmoi, yadm, stow
+- 📤 Export to tar, zip, JSON
+- 🔍 Auto-discover 30+ dotfile locations
+- 🌐 YAML + TOML config support
 
-### What's New in 1.0.0
+</td>
+<td>
 
-- **PyPI Ready** - Install with `pip install dotman-git`
-- **Auto shell completions** - Automatically installed on first run
-- **`dot-man init --import`** - Import from existing git repositories
-- **`dot-man navigate`** - Unified command replacing `switch` and `checkout`
-- **`dot-man import`** - Import from other dotfile managers:
-  - `dot-man import chezmoi` / `dot-man import yadm` / `dot-man import stow`
-  - `dot-man import all` - Auto-detect and import
-- **`dot-man export`** - Export to portable formats:
-  - `dot-man export tar backup.tar.gz`
-  - `dot-man export zip dots.zip`
-  - `dot-man export json manifest.json`
-- **`dot-man discover`** - Auto-detect existing dotfiles (30+ locations)
-- **`dot-man encrypt`** - Encrypt/decrypt sensitive files (GPG/AGE)
-- **`dot-man diff --rich`** - Syntax-highlighted diffs with colors
+**Developer**
+- 🐚 Shell completions (bash/zsh/fish)
+- 🎨 Syntax-highlighted rich diffs
+- 🩺 `doctor` and `verify` diagnostics
+- 📦 PyPI — `pip install dotman-git`
+- 🔁 Remote sync via `dot-man sync`
 
-### Deprecated (use `navigate` instead)
-- `switch` → `dot-man navigate <branch>`
-- `checkout` → `dot-man navigate <commit>`
-
-### v1.0.0 Release ✅
-- Test Coverage: 61%
-- PyPI: Published as `dotman-git`
-- Shell completions: Auto-installed for Bash, Zsh, Fish
+</td>
+</tr>
+</table>
 
 ---
 
 ## Installation
 
-### From PyPI (Recommended)
+### From PyPI (recommended)
 
 ```bash
 pip install dotman-git
 ```
 
-This automatically installs shell completions for Bash, Zsh, and Fish.
+Shell completions are installed automatically on first run.
 
-### With pipx
+### With pipx (isolated)
 
 ```bash
 pipx install dotman-git
 ```
 
-### From Source
+### From source
 
 ```bash
 git clone https://github.com/BeshoyEhab/dot-man.git
@@ -121,506 +104,350 @@ cd dot-man
 pip install .
 ```
 
-### Uninstall
+### Verify
 
 ```bash
-pip uninstall dotman-git
+dot-man --version
 ```
 
 ---
 
 ## Quick Start
 
-### 1. Initialize
-
 ```bash
+# 1. Initialize — runs an interactive wizard that auto-detects your dotfiles
 dot-man init
-```
 
-Creates `~/.config/dot-man/` with a git repository.
-
-### 2. Add your dotfiles
-
-```bash
+# 2. Add files manually if needed
 dot-man add ~/.bashrc
-dot-man add ~/.zshrc
 dot-man add ~/.config/nvim
-```
 
-### 3. Save your configuration
+# 3. Create a "work" profile (branch)
+dot-man navigate work
 
-```bash
+# 4. Edit your work-specific configs, then switch back — changes are saved automatically
 dot-man navigate main
-```
 
-This copies your dotfiles to the repository and commits them.
-
-### 4. Create different configurations
-
-Create a work configuration:
-```bash
-dot-man navigate work  # Creates 'work' branch with current files
-```
-
-Modify files, then switch back:
-```bash
-dot-man navigate main  # Saves work, deploys main
+# 5. See what's changed
+dot-man status
+dot-man diff
 ```
 
 ---
 
-## How Navigation Works
+## How Branching Works
 
-### The `navigate` Command
+Each branch is an independent configuration. Switching branches runs three phases automatically:
 
-`dot-man navigate` is your main command for switching between configurations.
-
-```bash
-# Switch branches
-dot-man navigate work           # Switch to 'work' branch
-dot-man navigate personal       # Switch to 'personal' branch
-
-# Preview before switching (recommended!)
-dot-man navigate work --preview        # See what changes
-dot-man navigate work --preview --diff # See full diff
-
-# Switch to specific point in history
-dot-man navigate v1.0          # Go to tag
-dot-man navigate abc1234        # Go to commit (detached HEAD)
-
-# Branch at tag
-dot-man navigate work@v1.0      # Switch to work branch at tag v1.0
+```
+dot-man navigate work
+        │
+        ├─► Phase 1: Save   — copies your files into the repo and commits
+        ├─► Phase 2: Switch — git checkout work
+        └─► Phase 3: Deploy — copies repo files back to your home directory
 ```
 
-### Branch vs Commit: What's the Difference?
-
-| Type | Purpose | Changes Saved? |
-|------|---------|----------------|
-| **Branch** (e.g., `main`, `work`) | Your full configuration | Yes - auto-saved when you switch |
-| **Tag** (e.g., `v1.0`) | Snapshot in time | No - just marks a point |
-| **Commit** (e.g., `abc1234`) | Specific state | No - viewing only (detached HEAD) |
-
-### ⚠️ Deprecated Commands
-
-| Old Command | Use Instead | Why |
-|------------|-------------|-----|
-| `switch` | `navigate` | Unified command with preview |
-| `checkout` | `navigate` | Same functionality |
-
-Run these commands and they'll show deprecation warnings. Use `navigate` instead.
+| Branch   | Purpose                              |
+|----------|--------------------------------------|
+| `main`   | Personal daily driver                |
+| `work`   | Office: proxy, work aliases          |
+| `server` | Minimal: headless, no GUI tools      |
+| `laptop` | Mobile: battery saving, HiDPI        |
 
 ---
 
 ## Commands
 
-### Core Commands
+### Navigation
 
-| Command                        | Description                                   |
-| ------------------------------ | --------------------------------------------- |
-| `dot-man init`                 | Initialize repository at `~/.config/dot-man/` |
-| `dot-man status`              | Show tracked files and their status           |
-| `dot-man navigate <target>`   | Navigate to branch, tag, or commit (unified)  |
-| `dot-man switch <target>`      | Switch to branch, tag, or commit (legacy)     |
-| `dot-man edit`                 | Open `dot-man.toml` in your editor            |
-| `dot-man deploy <branch>`      | One-way deploy (for new machines)             |
-| `dot-man audit`                | Scan repository for secrets                   |
-| `dot-man log`                  | Show commit history with optional diffs      |
-| `dot-man checkout <target>`   | Checkout a specific commit or tag (detached)  |
-| `dot-man diff`                 | Show changes between branches or files       |
-| `dot-man revert <file>`        | Revert file to repository version            |
-| `dot-man revert <file> -c <sha>` | Restore file from specific commit            |
-| `dot-man template`            | Manage template variables                    |
-| `dot-man profile`            | Manage machine-specific profiles            |
-| `dot-man hooks list|create|delete` | Manage pre/post command hooks              |
-| `dot-man discover`            | Auto-detect existing dotfiles                 |
-| `dot-man import <source>`      | Import from chezmoi, yadm, or stow            |
-| `dot-man export <format>`     | Export to tar, zip, or json                   |
-| `dot-man encrypt`             | Encrypt/decrypt sensitive files               |
+| Command | Description |
+|---------|-------------|
+| `dot-man navigate <target>` | Switch to branch, tag, or commit |
+| `dot-man navigate work --preview` | Preview what will change |
+| `dot-man navigate work --preview --diff` | Full diff before switching |
+| `dot-man navigate work --no-save` | Discard local changes and switch |
+| `dot-man navigate v1.0` | Jump to a tag |
+| `dot-man navigate abc1234` | Checkout a specific commit |
 
-### Navigate Command
+### Files & Tracking
 
-The `navigate` command supports multiple target types:
+| Command | Description |
+|---------|-------------|
+| `dot-man init` | Initialize repository with setup wizard |
+| `dot-man add <path>` | Track a file or directory |
+| `dot-man status` | Show tracked files and their state |
+| `dot-man status --secrets` | Highlight files containing secrets |
+| `dot-man diff` | Show uncommitted changes |
+| `dot-man diff --branch main` | Compare current branch to main |
+| `dot-man diff --rich` | Syntax-highlighted diff |
+| `dot-man revert <file>` | Restore file from repo |
+| `dot-man revert <file> -c abc123` | Restore from specific commit |
+| `dot-man watch` | Auto-save tracked files on change |
+| `dot-man watch --no-commit` | Watch and save without committing |
 
-```bash
-dot-man navigate work              # Navigate to branch
-dot-man navigate work@tag          # Navigate to branch at tag position
-dot-man navigate abc1234          # Navigate to specific commit
-dot-man navigate my-tag           # Navigate to tag
+### History & Tags
 
-# Override default save behavior
-dot-man navigate work --save       # Force save current changes
-dot-man navigate work --no-save    # Force discard current changes
-dot-man navigate --save work       # Flexible argument order
-```
+| Command | Description |
+|---------|-------------|
+| `dot-man log` | Show commit history |
+| `dot-man log --diff` | History with diffs |
+| `dot-man log --interactive` | TUI log browser |
+| `dot-man show <commit>` | Full diff for a commit |
+| `dot-man tag create v1.0` | Create a tag |
+| `dot-man tag list` | List all tags |
+| `dot-man tag switch v1.0` | Checkout a tag |
+| `dot-man rollback` | Roll back to previous commit |
+| `dot-man rollback -n 3` | Roll back 3 commits |
+| `dot-man rollback --list` | Show available rollback points |
 
-Set a default behavior preference:
-```bash
-dot-man config set navigate.default_behavior no-save
-```
+### Security
 
-### Navigate Command (Unified)
+| Command | Description |
+|---------|-------------|
+| `dot-man audit` | Scan repo for secrets |
+| `dot-man audit --strict` | Exit non-zero if any secrets found |
+| `dot-man audit --fix` | Auto-redact detected secrets |
+| `dot-man encrypt encrypt <section>` | Encrypt a section with GPG/AGE |
+| `dot-man encrypt status` | Show encryption status |
 
-The `navigate` command is the unified way to switch between branches, tags, and commits with preview capabilities:
+### Import / Export / Discovery
 
-```bash
-# Basic navigation
-dot-man navigate work              # Switch to branch
-dot-man navigate work@tag         # Switch to branch at tag position
-dot-man navigate abc1234          # Switch to specific commit
-dot-man navigate my-tag           # Switch to tag
+| Command | Description |
+|---------|-------------|
+| `dot-man discover` | Auto-detect existing dotfiles |
+| `dot-man discover --add` | Add detected configs automatically |
+| `dot-man import chezmoi` | Import from chezmoi |
+| `dot-man import yadm` | Import from yadm |
+| `dot-man import stow` | Import from GNU Stow |
+| `dot-man export tar backup.tar.gz` | Export to tar archive |
+| `dot-man export zip dots.zip` | Export to zip |
+| `dot-man export json manifest.json` | Export to JSON manifest |
 
-# Preview changes before switching
-dot-man navigate work --preview              # Preview diff
-dot-man navigate work --preview --diff       # Show full diff
-dot-man navigate work --preview --files-only  # Only commits with file changes
+### Sync & Remote
 
-# Override default save behavior
-dot-man navigate work --save                  # Force save current changes
-dot-man navigate work --no-save               # Force discard current changes
-```
+| Command | Description |
+|---------|-------------|
+| `dot-man sync` | Push + pull with remote |
+| `dot-man sync --push-only` | Only push |
+| `dot-man sync --pull-only` | Only pull |
+| `dot-man remote set <url>` | Set remote URL |
+| `dot-man setup` | Guided GitHub remote setup |
 
-### Hooks
+### Diagnostics
 
-Hooks allow you to run custom scripts before or after commands:
-
-```bash
-# List available hooks
-dot-man hooks list
-
-# Create a hook (creates ~/.config/dot-man/hooks/pre_switch)
-dot-man hooks create pre switch
-
-# Create a post-deploy hook
-dot-man hooks create post deploy
-
-# Delete a hook
-dot-man hooks delete pre checkout
-```
-
-Hook scripts have environment variables available:
-- `DOTMAN_HOOK_COMMAND` - The command being run (switch, checkout, deploy, etc.)
-- `DOTMAN_HOOK_PHASE` - "pre" or "post"
-- `DOTMAN_SOURCE` - Source branch/commit (for switch)
-- `DOTMAN_TARGET` - Target branch/commit
-
-### Remote & Sync
-
-| Command                      | Description                                     |
-| ---------------------------- | ----------------------------------------------- |
-| `dot-man sync`               | Push/pull dotfiles with remote repository       |
-| `dot-man remote set <url>`   | Set remote repository URL                       |
-| `dot-man remote get`         | Show current remote URL                         |
-| `dot-man remote sync-branch` | Sync local/remote branch names (main vs master) |
-| `dot-man setup`              | Guided setup for GitHub remote (supports `gh`)  |
-
-### Branch Management
-
-| Command                        | Description                           |
-| ------------------------------ | ------------------------------------- |
-| `dot-man branch list`          | List all configuration branches       |
-| `dot-man branch delete <name>` | Delete a branch (prompts if unmerged) |
-
-### Tags
-
-Tags allow you to mark specific commits for fast navigation:
-
-| Command                        | Description                           |
-| ------------------------------ | ------------------------------------- |
-| `dot-man tag list`             | List all tags                         |
-| `dot-man tag create <name>`    | Create tag at current commit          |
-| `dot-man tag create <name> <sha>` | Create tag at specific commit     |
-| `dot-man tag delete <name>`    | Delete a tag                          |
-| `dot-man tag switch <name>`    | Switch to tag (checkout tag)          |
-
-### Diff & History
-
-Compare changes and restore from history:
-
-```bash
-# Show uncommitted changes
-dot-man diff
-
-# Compare current branch with main
-dot-man diff --branch main
-
-# Show changes for a specific file
-dot-man diff ~/.bashrc
-
-# Show staged changes
-dot-man diff --staged
-
-# Show last 20 commits with diffs
-dot-man log --diff -n 20
-
-# Restore file from specific commit
-dot-man revert ~/.bashrc -c abc1234
-
-# View commit history for a file
-dot-man log -- path/to/file
-```
-
-### Profile Variables
-
-Profiles allow different machine-specific configurations:
-
-```bash
-# Create a profile
-dot-man profile create work-laptop -h laptop -h work-laptop -i minimal
-
-# Set the branch for a profile
-dot-man profile set-branch work-laptop work-main
-
-# Auto-detect profile by hostname
-dot-man profile detect
-
-# Switch to a profile
-dot-man profile switch work-laptop
-```
-
-**Profile inheritance**: Profiles can inherit from another profile.
-
-### Utilities
-
-| Command         | Description                                  |
-| --------------- | -------------------------------------------- |
-| `dot-man repo`  | Print repository path for direct access      |
-| `dot-man shell` | Open a shell in the repository directory     |
-| `dot-man verify` | Validate repository integrity                |
-| `dot-man doctor` | Run diagnostics and health checks            |
-
-### Options
-
-```bash
-dot-man navigate work --dry-run   # Preview without changes
-dot-man navigate work --force     # Skip confirmation
-dot-man navigate work --save      # Save current changes before switching
-dot-man navigate work --no-save   # Discard current changes
-dot-man sync --push-only        # Only push, don't pull
-dot-man sync --pull-only        # Only pull, don't push
-dot-man audit --strict          # Exit with error if secrets found
-dot-man audit --fix             # Auto-redact detected secrets
-dot-man status --secrets        # Highlight files with secrets
-dot-man diff --rich/--no-rich    # Enable/disable rich diff colors (default: on)
-dot-man discover --add          # Auto-add detected configs to dot-man.toml
-dot-man import chezmoi --dry-run # Preview what would be imported
-dot-man export tar backup.tar.gz # Export to tar archive
-dot-man encrypt status           # Show encryption status
-```
+| Command | Description |
+|---------|-------------|
+| `dot-man doctor` | Run health checks |
+| `dot-man verify` | Validate repo integrity |
+| `dot-man backup create` | Create a manual backup |
+| `dot-man backup restore <id>` | Restore from backup |
 
 ---
 
 ## Configuration
 
-### Supported Formats
+Configuration lives in `~/.config/dot-man/repo/dot-man.toml` and is tracked **per branch** — different branches can track different files.
 
-dot-man supports both **TOML** and **YAML** configuration formats:
-
-- TOML: `dot-man.toml` (default)
-- YAML: `dot-man.yaml` or `dot-man.yml`
-
-### Example: TOML format
-
-Located at `~/.config/dot-man/repo/dot-man.toml`:
+### TOML (default)
 
 ```toml
-# Global defaults (applied to all sections)
-[defaults]
-secrets_filter = true
-update_strategy = "replace"
-
-# Individual file sections
+# Simple file tracking
 [bashrc]
 paths = ["~/.bashrc"]
+post_deploy = "shell_reload"
 
+# Directory with exclusions
 [nvim]
 paths = ["~/.config/nvim"]
-update_strategy = "rename_old"
+exclude = ["*.log", "plugin/packer_compiled.lua"]
+post_deploy = "nvim_sync"
 
+# SSH config with secret filtering
 [ssh-config]
 paths = ["~/.ssh/config"]
 secrets_filter = true
+update_strategy = "rename_old"
+
+# Hyprland with notification on deploy
+[hyprland]
+paths = ["~/.config/hypr"]
+post_deploy = "hyprland_reload"
 ```
 
-### Example: YAML format
-
-Located at `~/.config/dot-man/repo/dot-man.yaml`:
+### YAML (also supported)
 
 ```yaml
-defaults:
-  secrets_filter: true
-  update_strategy: replace
-
 bashrc:
   paths:
     - ~/.bashrc
+  post_deploy: shell_reload
 
 nvim:
   paths:
     - ~/.config/nvim
-  update_strategy: rename_old
-
-ssh-config:
-  paths:
-    - ~/.ssh/config
-  secrets_filter: true
+  exclude:
+    - "*.log"
+  post_deploy: nvim_sync
 ```
 
-### Global Configuration
+### Hook Aliases
 
-Global settings are stored in `~/.config/dot-man/global.toml`. Use `dot-man config` to manage them:
+Instead of writing full shell commands, use built-in aliases:
 
-```bash
-# View current settings
-dot-man config list
+| Alias | Runs |
+|-------|------|
+| `shell_reload` | `source ~/.bashrc \|\| source ~/.zshrc` |
+| `nvim_sync` | `nvim --headless +PackerSync +qa` |
+| `hyprland_reload` | `hyprctl reload` |
+| `fish_reload` | `source ~/.config/fish/config.fish` |
+| `tmux_reload` | `tmux source-file ~/.tmux.conf` |
+| `kitty_reload` | `killall -SIGUSR1 kitty` |
 
-# Set switch default behavior (save or no-save)
-dot-man config set switch.default_behavior no-save
+### Update Strategies
+
+| Strategy | Behaviour |
+|----------|-----------|
+| `replace` | Overwrite existing files *(default)* |
+| `rename_old` | Back up existing file before overwriting |
+| `ignore` | Skip if file already exists |
+
+### Templates & Inheritance
+
+```toml
+# Define reusable templates
+[templates.linux-desktop]
+post_deploy = "notify-send 'Config updated'"
+update_strategy = "rename_old"
+
+# Inherit in sections
+[hyprland]
+paths = ["~/.config/hypr"]
+inherits = ["linux-desktop"]
+
+[waybar]
+paths = ["~/.config/waybar"]
+inherits = ["linux-desktop"]
 ```
 
-| Setting                     | Values         | Description                           |
-| --------------------------- | -------------- | ------------------------------------- |
-| `switch.default_behavior`  | save / no-save | Default for switch command            |
-
-### Options
-
-| Option            | Values                    | Description                                   |
-| ----------------- | ------------------------- | --------------------------------------------- |
-| `paths`           | list of paths             | Paths to track (supports $HOME, $USER, etc.)  |
-| `local_path`      | path                      | Path on your filesystem                       |
-| `repo_path`       | path                      | Path in the repository                        |
-| `secrets_filter`  | true/false                | Redact secrets when saving                    |
-| `update_strategy` | replace/rename_old/ignore | How to deploy files                           |
-| `pre_deploy`      | command string            | Shell command to run _before_ file is changed |
-| `post_deploy`     | command string            | Shell command to run _after_ file is changed |
-
-### Environment Variables in Paths
-
-Paths support environment variable expansion:
+### Environment Variable Expansion
 
 ```toml
 [work-files]
 paths = ["$WORK_DIR/config", "~/$USER/.config/app"]
 ```
 
-```yaml
-work-files:
-  paths:
-    - $WORK_DIR/config
-    - ~/$USER/.config/app
-```
-
----
-
-## Troubleshooting
-
-### Common Issues
-
-**Q: I'm on a detached HEAD state. How do I get back?**
-```bash
-# List your branches
-dot-man branch list
-
-# Return to a branch
-dot-man navigate main
-```
-
-**Q: How do I undo the last switch?**
-```bash
-# Your previous work is saved as a commit
-dot-man log
-
-# Switch back to it
-dot-man navigate <previous-branch>
-```
-
-**Q: My changes aren't being saved when I switch**
-```bash
-# Make sure you're using the save mode (default)
-dot-man navigate work --save
-
-# Or check if secrets are being redacted
-dot-man status
-```
-
-**Q: How do I see what changed in a branch?**
-```bash
-# Preview changes before switching
-dot-man navigate work --preview
-
-# See full diff
-dot-man navigate work --preview --diff
-```
-
-**Q: What are the differences between branches?**
-```bash
-# Compare two branches
-dot-man diff --branch main
-
-# Show only commits that changed tracked files
-dot-man navigate main --preview --files-only
-```
-
-### Getting Help
-
-```bash
-# See all commands
-dot-man --help
-
-# See specific command help
-dot-man navigate --help
-dot-man add --help
-
-# Diagnose issues
-dot-man doctor
-
-# Check repository integrity
-dot-man verify
-```
-
 ---
 
 ## Secret Detection
 
-dot-man detects and redacts common secrets:
+Before any file enters the repository, dot-man scans it for secrets. Detected values are **encrypted locally** and replaced with a hash placeholder in the repo.
 
-| Pattern       | Severity | Example                           |
-| ------------- | -------- | --------------------------------- |
-| Private Keys  | CRITICAL | `-----BEGIN RSA PRIVATE KEY-----` |
-| AWS Keys      | CRITICAL | `AKIAIOSFODNN7EXAMPLE`            |
-| GitHub Tokens | HIGH     | `ghp_xxxxxxxxxxxx`                |
-| API Keys      | HIGH     | `api_key=sk_live_xxxxx`           |
-| Passwords     | HIGH     | `password=mysecret`               |
+| Pattern | Severity | Example |
+|---------|----------|---------|
+| Private keys | 🔴 CRITICAL | `-----BEGIN RSA PRIVATE KEY-----` |
+| AWS credentials | 🔴 CRITICAL | `AKIA...` |
+| GitHub tokens | 🟠 HIGH | `ghp_xxxx` |
+| API keys | 🟠 HIGH | `api_key = "sk-..."` |
+| Passwords | 🟠 HIGH | `password = "hunter2"` |
+| JWT tokens | 🟡 MEDIUM | `eyJ...` |
 
-Run `dot-man audit` to scan your repository.
+```
+repo file:   api_key = "***REDACTED:e3b0c44298...***"
+vault:       { encrypted: "gAAAAABk..." }   ← Fernet AES-128
+system file: api_key = "sk-abc123..."       ← restored on deploy
+```
+
+Run `dot-man audit` to scan at any time. Use `dot-man audit --strict` in CI/CD pipelines.
 
 ---
 
-## Documentation
+## Multi-Machine Profiles
 
-- [Development Guide Manual](docs/DEVELOPMENT_GUIDE_MANUAL.md) - In-depth architecture and development guide
-- [Command Specifications](docs/specs/commands.md) - Detailed command behavior
-- [Security Specification](docs/specs/security.md) - Secret detection patterns
-- [Development Roadmap](docs/roadmap.md) - Version milestones
-- [Architecture Overview](docs/ARCHITECTURE.md) - High-level system structure
+Profiles let you auto-select the right branch based on hostname:
+
+```bash
+dot-man profile create work-laptop -h work-laptop -h thinkpad
+dot-man profile set-branch work-laptop work
+dot-man profile detect   # auto-switches to the right profile
+```
+
+---
+
+## Template Variables
+
+Use `{{VARIABLE}}` placeholders in your dotfiles that get substituted on deploy:
+
+```bash
+dot-man template set EMAIL john@work.com
+dot-man template set HOSTNAME work-laptop
+```
+
+Then in your `~/.gitconfig`:
+```
+[user]
+    email = {{EMAIL}}
+    name  = John Doe
+```
+
+System variables (`{{HOSTNAME}}`, `{{USER}}`, `{{SHELL}}`, etc.) are auto-populated.
+
+---
+
+## Project Status
+
+| Metric | Value |
+|--------|-------|
+| Version | `1.0.1` |
+| Python | `3.9+` |
+| Platforms | Linux, macOS |
+| Test Coverage | 61% |
+| Commands | 30+ |
+| PyPI | [`dotman-git`](https://pypi.org/project/dotman-git/) |
+
+---
+
+## Development
+
+```bash
+git clone https://github.com/BeshoyEhab/dot-man.git
+cd dot-man
+pip install -e ".[dev]"
+
+# Run tests
+pytest tests/ -v
+
+# Run full quality gate
+black dot_man/ tests/
+ruff check dot_man/ tests/
+mypy dot_man/ --ignore-missing-imports
+pytest tests/ --cov=dot_man --cov-report=term-missing
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) and [DEVELOPMENT.md](DEVELOPMENT.md) for full guides.
+
+---
+
+## Roadmap
+
+- [ ] 80%+ test coverage
+- [ ] Full documentation site (mkdocs)
+- [ ] Symlink mode
+- [x] `dot-man watch` — auto-sync on file change
+- [x] Deploy rollback (transaction-style)
+- [ ] Plugin system
+
+See [docs/roadmap.md](docs/roadmap.md) for the full roadmap.
 
 ---
 
 ## Contributing
 
-See [DEVELOPMENT.md](DEVELOPMENT.md) for setup and contribution guidelines.
+Pull requests are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) first.
 
-```bash
-# Setup development environment
-python -m venv venv
-source venv/bin/activate
-pip install -e ".[dev]"
-
-# Run tests
-pytest tests/ -v
-```
+All contributions must pass the pre-push quality checklist: `black`, `ruff`, `mypy`, and all tests.
 
 ---
 
 ## License
 
-MIT License - see [LICENSE](LICENSE)
+[MIT](LICENSE) © [Bishoy Ehab](https://github.com/BeshoyEhab)

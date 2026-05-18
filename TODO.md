@@ -142,12 +142,12 @@ Priority files needing tests:
 - [x] Automatic profile detection based on hostname
 - [x] Profile inheritance (e.g., `server` extends `minimal`)
 
-### v0.15.0 - Import/Migration
+### v0.15.0 - Import/Migration ✅
 
-- [ ] `dot-man import chezmoi` - Import from chezmoi
-- [ ] `dot-man import yadm` - Import from yadm
-- [ ] `dot-man import stow` - Import from GNU Stow
-- [ ] `dot-man export` - Export to portable format
+- [x] `dot-man import chezmoi` - Import from chezmoi
+- [x] `dot-man import yadm` - Import from yadm
+- [x] `dot-man import stow` - Import from GNU Stow
+- [x] `dot-man export` - Export to portable format
 
 ---
 
@@ -194,7 +194,7 @@ Priority files needing tests:
 - [ ] **Cloud sync backends** - S3, Dropbox, Google Drive
 - [ ] **Per-branch config inheritance** - `inherits_branch = "main"` in dot-man.toml
 - [ ] **Configurable backup rotation** - Make MAX_BACKUPS configurable via global.toml
-- [ ] **Deploy rollback** - Transaction-style deploy with automatic rollback on failure
+- [x] **Deploy rollback** - Transaction-style deploy with automatic rollback on failure
 - [ ] **Configurable thread pool** - `max_workers` setting in global.toml
 
 ### User Experience
@@ -202,7 +202,7 @@ Priority files needing tests:
 - [ ] **Web dashboard** - Browser-based configuration management
 - [ ] **JSON output** - `--json` option for scripting (status, log, show, audit)
 - [ ] **Universal Setup Wizard** - Interactive menu: remote, dotfiles, secrets, hooks
-- [ ] **File watcher** - `dot-man watch` for auto-sync on file changes
+- [x] **File watcher** - `dot-man watch` for auto-sync on file changes
 
 ### CLI Improvements
 
