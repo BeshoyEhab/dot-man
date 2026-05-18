@@ -124,6 +124,7 @@ dot-man add ~/.config/nvim
 
 # 3. Create a "work" profile (branch)
 dot-man navigate work
+# btw it was "switch" instead of "navigate" untill Bishoy decided to change it to "navigate" for some silly reasons and push that changes so as community help us to make it "switch" again.
 
 # 4. Edit your work-specific configs, then switch back — changes are saved automatically
 dot-man navigate main
