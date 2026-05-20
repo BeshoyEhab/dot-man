@@ -8,6 +8,8 @@ __all__ = [
     "PermanentRedactGuard",
     "Severity",
     "filter_secrets",
+    "get_custom_scanner",
+    "load_custom_patterns",
 ]
 
 import json
@@ -452,7 +454,7 @@ def filter_secrets(
         Tuple of (filtered_content, list_of_redacted_secrets)
         Note: Only secrets that were actually redacted are returned, not ignored ones.
     """
-    scanner = SecretScanner()
+    scanner = get_custom_scanner()
 
     # Track which secrets were actually redacted
     redacted_secrets: list[SecretMatch] = []
@@ -471,3 +473,98 @@ def filter_secrets(
 
     filtered_content, _ = scanner.redact_content(content, tracking_callback, file_path)
     return filtered_content, redacted_secrets
+
+
+def load_custom_patterns(config_data: dict, key_path: list[str]) -> list[SecretPattern]:
+    """Load custom secret patterns from a configuration dictionary.
+
+    Expects the config dictionary to have a list of pattern dicts at key_path:
+    e.g., ['security', 'patterns'] or ['secrets', 'patterns']
+
+    Each pattern entry should look like:
+    { "name": "...", "pattern": "...", "severity": "...", "description": "..." }
+    """
+    data = config_data
+    for key in key_path:
+        if isinstance(data, dict):
+            data = data.get(key, {})
+        else:
+            return []
+
+    if not isinstance(data, list):
+        return []
+
+    patterns = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        name = item.get("name")
+        pattern_str = item.get("pattern")
+        if not name or not pattern_str:
+            continue
+
+        severity_str = str(item.get("severity", "HIGH")).upper()
+        try:
+            severity = Severity[severity_str]
+        except KeyError:
+            severity = Severity.HIGH
+
+        description = str(item.get("description", f"Custom pattern {name}"))
+        try:
+            compiled = re.compile(pattern_str)
+            patterns.append(
+                SecretPattern(
+                    name=name,
+                    pattern=compiled,
+                    severity=severity,
+                    description=description,
+                )
+            )
+        except re.error as e:
+            logging.warning(
+                f"Failed to compile custom regex pattern '{pattern_str}': {e}"
+            )
+
+    return patterns
+
+
+def get_custom_scanner() -> SecretScanner:
+    """Instantiate a SecretScanner populated with default and custom patterns."""
+    try:
+        from .operations import get_operations
+
+        ops = get_operations()
+
+        # Check if default patterns should be used
+        use_default = True
+        if ops.global_config and ops.global_config._data:
+            use_default = ops.global_config._data.get("security", {}).get(
+                "use_default_patterns", True
+            )
+        if ops.dotman_config and ops.dotman_config._data:
+            use_default = ops.dotman_config._data.get("secrets", {}).get(
+                "use_default_patterns", use_default
+            )
+
+        # Load global custom patterns
+        global_patterns = []
+        if ops.global_config and ops.global_config._data:
+            global_patterns = load_custom_patterns(
+                ops.global_config._data, ["security", "patterns"]
+            )
+
+        # Load repo custom patterns
+        repo_patterns = []
+        if ops.dotman_config and ops.dotman_config._data:
+            repo_patterns = load_custom_patterns(
+                ops.dotman_config._data, ["secrets", "patterns"]
+            )
+
+        base_patterns = DEFAULT_PATTERNS if use_default else []
+        all_patterns = base_patterns + global_patterns + repo_patterns
+        return SecretScanner(patterns=all_patterns)
+    except Exception as e:
+        # Fallback to default patterns if operations can't be loaded/fail
+        logging.debug(f"Failed to load custom secret patterns: {e}")
+
+    return SecretScanner()

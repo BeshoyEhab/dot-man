@@ -6,7 +6,7 @@ from .. import ui
 from ..constants import REPO_DIR
 from ..core import GitManager
 from ..exceptions import DotManError
-from ..secrets import PermanentRedactGuard, SecretGuard, SecretMatch, SecretScanner
+from ..secrets import PermanentRedactGuard, SecretGuard, SecretMatch, get_custom_scanner
 from .common import AliasedCommand, error, handle_exception, require_init, success
 from .interface import cli as main
 
@@ -26,7 +26,7 @@ def audit(strict: bool, fix: bool):
     Use --strict in CI/CD pipelines to fail builds if secrets are found.
     """
     try:
-        scanner = SecretScanner()
+        scanner = get_custom_scanner()
         guard = SecretGuard()
         permanent_guard = PermanentRedactGuard()
 

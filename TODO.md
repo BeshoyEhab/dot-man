@@ -160,7 +160,7 @@ Priority files needing tests:
 
 ## v1.1.0 - Plugin System
 
-- [ ] Custom secret detection patterns via config
+- [x] Custom secret detection patterns via config ✅
 - [ ] User-defined hook scripts directory
 - [ ] Plugin API for extensions
 - [ ] Built-in plugin: pro-mgr integration

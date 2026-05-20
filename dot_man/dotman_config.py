@@ -116,7 +116,7 @@ class DotManConfig:
         }
 
         for name, section in self._data.items():
-            if name == "templates":
+            if name in ("templates", "secrets"):
                 continue
             if isinstance(section, dict):
                 for key in section:

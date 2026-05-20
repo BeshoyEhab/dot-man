@@ -12,7 +12,7 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
-[![Coverage](https://img.shields.io/badge/coverage-59%25-yellow)](https://github.com/BeshoyEhab/dot-man)
+[![Coverage](https://img.shields.io/badge/coverage-60%25-green)](https://github.com/BeshoyEhab/dot-man)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/BeshoyEhab/dot-man/pulls)
 
 ---
@@ -359,6 +359,31 @@ system file: api_key = "sk-abc123..."       ← restored on deploy
 ```
 
 Run `dot-man audit` to scan at any time. Use `dot-man audit --strict` in CI/CD pipelines.
+
+### Custom Secret Patterns
+
+You can define custom regular expressions to match sensitive patterns, either globally in `~/.config/dot-man/global.toml` or for a specific repository in `dot-man.toml`.
+
+#### Global custom secrets (`global.toml`)
+```toml
+[security]
+use_default_patterns = true # Set to false to disable built-in patterns
+
+[[security.patterns]]
+name = "My Custom API Token"
+pattern = 'my_api_key_[a-zA-Z0-9]{32}'
+severity = "HIGH"
+description = "Internal service API key"
+```
+
+#### Repository custom secrets (`dot-man.toml`)
+```toml
+[secrets]
+use_default_patterns = true # Set to false to disable built-in patterns
+patterns = [
+  { name = "Special Repo Key", pattern = 'special_[0-9]+', severity = "CRITICAL" }
+]
+```
 
 ---
 

@@ -9,7 +9,7 @@ from rich.table import Table
 from .. import ui
 from ..constants import REPO_DIR
 from ..exceptions import DotManError
-from ..secrets import SecretScanner
+from ..secrets import get_custom_scanner
 from .common import AliasedCommand, error, handle_exception, require_init
 from .interface import cli as main
 
@@ -85,7 +85,7 @@ def status(verbose: bool, secrets: bool):
             "IDENTICAL": "green",
         }
 
-        scanner = SecretScanner() if secrets else None
+        scanner = get_custom_scanner() if secrets else None
         secrets_found = []
 
         from itertools import groupby

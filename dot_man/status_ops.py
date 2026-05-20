@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Iterator
 
 from .constants import REPO_DIR
-from .secrets import SecretMatch, SecretScanner
+from .secrets import SecretMatch, get_custom_scanner
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ class StatusMixin:
         Returns:
             List of (section_name, matches) tuples
         """
-        scanner = SecretScanner()
+        scanner = get_custom_scanner()
         results: list[tuple[str, list[SecretMatch]]] = []
 
         for section_name in self.get_sections():

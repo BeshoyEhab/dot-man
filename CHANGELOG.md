@@ -112,6 +112,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Custom Secret Patterns** - Support defining custom regex patterns for secret detection globally in `global.toml` or per-repository in `dot-man.toml`.
+- **Secret Scanner Customization** - Added option to disable default built-in secret pattern matching using `use_default_patterns = false`.
+
 ## [1.1.1] - 2026-05-20
 
 ### Added

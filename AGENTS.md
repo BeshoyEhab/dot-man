@@ -404,7 +404,7 @@ AI models should focus on the following core needs of the project:
 
 ### 2. Extensibility (v1.2.0 - Plugin System)
 
-- **Custom Secret Patterns**: Allow users to define custom regex patterns for secret detection in their config.
+- **Custom Secret Patterns**: Allow users to define custom regex patterns for secret detection in their config. ✅
 - **Hook Scripts Directory**: Support executing custom hook scripts located in a specific folder.
 - **Plugin API**: Create an extension mechanism for third-party tools (e.g., integrating `pro-mgr`).
 
