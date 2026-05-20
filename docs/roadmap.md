@@ -130,6 +130,7 @@
 ## v0.9.0 - Enhanced Testing & Features ✅
 
 ### Testing Improvements
+
 - ✅ 627 tests (from 418)
 - ✅ 56% coverage (from 57%)
 - ✅ All CLI commands have test coverage
@@ -137,6 +138,7 @@
 - ✅ Updated coverage omit list
 
 ### New Features
+
 - ✅ `dot-man init --import` - Import from existing git repos
 - ✅ `dot-man navigate` - Unified command (replaces switch/checkout)
 - ✅ `dot-man hooks` - Manage global hooks
@@ -183,6 +185,7 @@
 ## v2.0+ - Future Ideas
 
 ### Implemented in v0.10.0
+
 - ✅ Import from chezmoi, yadm, GNU Stow (`dot-man import`)
 - ✅ Export to portable formats (`dot-man export tar/zip/json`)
 - ✅ Encrypt/decrypt sensitive files (`dot-man encrypt`)
@@ -192,16 +195,19 @@
 - ✅ Rich diff output (`dot-man diff --rich`)
 
 ### Implemented in v1.0.1
+
 - ✅ `dot-man watch` - Auto-save tracked dotfiles on change (watchdog/polling)
 - ✅ `dot-man rollback` - Transaction-style rollback to previous commits/tags
 
 ### Storage & Sync (Future)
+
 - [ ] Symlink mode - Option to symlink files instead of copying
 - [ ] Encrypted files - More advanced GPG/age support
 - [ ] Cloud sync backends - S3, Dropbox, Google Drive
 - [ ] Per-branch config inheritance - `inherits_branch = "main"` in config
 
 ### User Experience (Future)
+
 - [ ] Web dashboard - Browser-based configuration management
 - [ ] JSON output - `--json` option for scripting
 - [x] File watcher - `dot-man watch` for auto-sync
@@ -209,6 +215,7 @@
 - [ ] Configurable backup rotation - `max_backups` in global.toml
 
 ### Ecosystem (Future)
+
 - [ ] Dotfile sharing/marketplace - Share configs with community
 - [ ] CI/CD integration - Test dotfiles before deployment
 
@@ -216,12 +223,12 @@
 
 ## Success Metrics
 
-| Metric        | Current                  | v1.0.0 Target         |
-| ------------- | ------------------------ | --------------------- |
-| Test Coverage | 59% (869 tests) ✅      | 80%+                  |
-| Core Commands | 30+ commands ✅         | All commands stable   |
-| Lint Errors   | 0 (ruff + mypy) ✅      | 0                     |
-| TUI           | Removed for redesign    | Redesign in v1.x      |
-| Documentation | README + specs ✅        | Full docs site        |
-| Performance   | Batch ops + parallel ✅ | 500+ files in <5s     |
-| Distribution  | Published to PyPI ✅    | PyPI published        |
+| Metric        | Current                 | v1.0.0 Target       |
+| ------------- | ----------------------- | ------------------- |
+| Test Coverage | 59% (872 tests) ✅      | 80%+                |
+| Core Commands | 30+ commands ✅         | All commands stable |
+| Lint Errors   | 0 (ruff + mypy) ✅      | 0                   |
+| TUI           | Removed for redesign    | Redesign in v1.x    |
+| Documentation | README + specs ✅       | Full docs site      |
+| Performance   | Batch ops + parallel ✅ | 500+ files in <5s   |
+| Distribution  | Published to PyPI ✅    | PyPI published      |

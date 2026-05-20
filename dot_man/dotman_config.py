@@ -25,7 +25,7 @@ from .constants import (
     VALID_UPDATE_STRATEGIES,
 )
 from .exceptions import ConfigurationError, ConfigValidationError
-from .global_config import GlobalConfig, _write_toml
+from .global_config import GlobalConfig, write_config_file
 from .section import Section
 
 
@@ -54,7 +54,7 @@ class DotManConfig:
         self._config_format = self._path.suffix.replace(".", "")
 
         self._global_config = global_config
-        self._doc: tomlkit.TOMLDocument | None = None  # For preserving comments
+        self._doc: Any = None  # For preserving comments
         self._dirty: bool = False
 
     @property
@@ -74,13 +74,16 @@ class DotManConfig:
 
         if self._path.suffix in (".yaml", ".yml"):
             try:
-                import yaml  # type: ignore[import-untyped]
+                from ruamel.yaml import YAML
             except ImportError:
                 raise ConfigurationError(
-                    "YAML support requires pyyaml. Install with: pip install pyyaml"
+                    "YAML support requires ruamel.yaml. Install with: pip install dotman-git[yaml]"
                 )
-            self._data = yaml.safe_load(content) or {}
-            self._doc = None
+            yaml = YAML()
+            self._doc = yaml.load(content)
+            import yaml as pyyaml  # type: ignore[import-untyped]
+
+            self._data = pyyaml.safe_load(content) or {}
         else:
             self._data = tomllib.loads(content)
             self._doc = tomlkit.parse(content)
@@ -129,7 +132,7 @@ class DotManConfig:
         """
         if not self._dirty and not force:
             return
-        _write_toml(self._path, self._data, self._doc)
+        write_config_file(self._path, self._data, self._doc)
         self._dirty = False
 
     def create_default(self) -> None:

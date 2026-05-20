@@ -206,7 +206,7 @@ Priority files needing tests:
 
 ### CLI Improvements
 
-- [ ] **YAML save support** - Preserve YAML format when saving
+- [x] YAML save support - Preserve YAML format when saving ✅
 - [ ] **Section priority/ordering** - Control deploy order with `priority` key
 - [ ] **Enhanced shell completions** - Add for all commands
 
@@ -227,7 +227,6 @@ Priority files needing tests:
 
 - Shell completions may show stale branch names (restart shell to refresh)
 - TUI cannot fully preview files for other branches without git checkout
-- YAML config files are saved as TOML (format is converted on save)
 
 ---
 
@@ -259,23 +258,23 @@ Our primary target is **80%+ overall coverage** for the `v1.0.0` release.
 
 ### Modules Below 50% Coverage (High Priority)
 
-| Module                        | Current Coverage | Missing Lines |
-| ----------------------------- | ---------------- | ------------- |
-| `dot_man/tui_log.py`          | 0%               | 48            |
-| `dot_man/cli/audit_cmd.py`    | 32%              | 55            |
-| `dot_man/cli/log_cmd.py`      | 34%              | 97            |
-| `dot_man/cli/tag_cmd.py`      | 35%              | 55            |
-| `dot_man/interactive.py`      | 46%              | 109           |
-| `dot_man/cli/switch_cmd.py`   | 47%              | 111           |
-| `dot_man/cli/common.py`       | 47%              | 94            |
-| `dot_man/cli/branch_cmd.py`   | 48%              | 37            |
+| Module                      | Current Coverage | Missing Lines |
+| --------------------------- | ---------------- | ------------- |
+| `dot_man/tui_log.py`        | 0%               | 48            |
+| `dot_man/cli/audit_cmd.py`  | 32%              | 55            |
+| `dot_man/cli/log_cmd.py`    | 34%              | 97            |
+| `dot_man/cli/tag_cmd.py`    | 35%              | 55            |
+| `dot_man/interactive.py`    | 46%              | 109           |
+| `dot_man/cli/switch_cmd.py` | 47%              | 111           |
+| `dot_man/cli/common.py`     | 47%              | 94            |
+| `dot_man/cli/branch_cmd.py` | 48%              | 37            |
 
 ### Modules 50% - 79% Coverage (Medium Priority)
 
 | Module                       | Current Coverage | Missing Lines |
 | ---------------------------- | ---------------- | ------------- |
 | `dot_man/branch_ops.py`      | 53%              | 58            |
-| `dot_man/dotman_config.py`   | 53%              | 106           |
+| `dot_man/dotman_config.py`   | 78%              | 39            |
 | `dot_man/cli/deploy_cmd.py`  | 54%              | 46            |
 | `dot_man/core.py`            | 58%              | 110           |
 | `dot_man/cli/tui_cmd.py`     | 60%              | 4             |
@@ -296,20 +295,20 @@ Our primary target is **80%+ overall coverage** for the `v1.0.0` release.
 
 ### Modules 80%+ Coverage (Target Achieved / Low Priority)
 
-| Module                       | Current Coverage | Missing Lines |
-| ---------------------------- | ---------------- | ------------- |
-| `dot_man/ui.py`              | 81%              | 6             |
-| `dot_man/cli/restore_cmd.py` | 82%              | 9             |
-| `dot_man/vault.py`           | 85%              | 23            |
-| `dot_man/global_config.py`   | 86%              | 21            |
-| `dot_man/cli/show_cmd.py`    | 86%              | 2             |
-| `dot_man/utils.py`           | 87%              | 8             |
-| `dot_man/exceptions.py`      | 88%              | 9             |
-| `dot_man/secrets.py`         | 88%              | 20            |
-| `dot_man/cli/template_cmd.py` | 90%             | 13            |
-| `dot_man/cli/init_cmd.py`    | 92%              | 14            |
+| Module                        | Current Coverage | Missing Lines |
+| ----------------------------- | ---------------- | ------------- |
+| `dot_man/ui.py`               | 81%              | 6             |
+| `dot_man/cli/restore_cmd.py`  | 82%              | 9             |
+| `dot_man/vault.py`            | 85%              | 23            |
+| `dot_man/global_config.py`    | 89%              | 20            |
+| `dot_man/cli/show_cmd.py`     | 86%              | 2             |
+| `dot_man/utils.py`            | 87%              | 8             |
+| `dot_man/exceptions.py`       | 88%              | 9             |
+| `dot_man/secrets.py`          | 88%              | 20            |
+| `dot_man/cli/template_cmd.py` | 90%              | 13            |
+| `dot_man/cli/init_cmd.py`     | 92%              | 14            |
 | `dot_man/cli/profile_cmd.py`  | 94%              | 11            |
-| `dot_man/cli/__init__.py`    | 100%             | 0             |
-| `dot_man/config.py`          | 100%             | 0             |
-| `dot_man/constants.py`       | 100%             | 0             |
-| `dot_man/__init__.py`        | 100%             | 0             |
+| `dot_man/cli/__init__.py`     | 100%             | 0             |
+| `dot_man/config.py`           | 100%             | 0             |
+| `dot_man/constants.py`        | 100%             | 0             |
+| `dot_man/__init__.py`         | 100%             | 0             |

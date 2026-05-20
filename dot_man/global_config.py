@@ -1,6 +1,6 @@
 """Global configuration management for dot-man."""
 
-__all__ = ["GlobalConfig", "_write_toml", "substitute_templates"]
+__all__ = ["GlobalConfig", "write_config_file", "_write_toml", "substitute_templates"]
 
 import logging
 import os
@@ -71,7 +71,6 @@ else:
         raise ImportError("Please install tomli: pip install tomli")
 
 import tomlkit
-from tomlkit import TOMLDocument
 
 from .constants import (
     DEFAULT_BRANCH,
@@ -81,24 +80,60 @@ from .constants import (
 from .exceptions import ConfigurationError
 
 
-def _write_toml(
-    path: Path, data: dict, preserve_doc: TOMLDocument | None = None
-) -> None:
-    """Write TOML data to file, preserving comments when possible.
+def update_config_doc(doc: Any, data: dict) -> None:
+    """Recursively update a tomlkit/ruamel.yaml config document (doc) with dict data,
+    preserving comments and deleting stale keys.
+    """
+    # Remove keys in doc that are not in data
+    keys_to_remove = [k for k in doc if k not in data]
+    for k in keys_to_remove:
+        del doc[k]
+
+    # Update or add keys from data
+    for k, v in data.items():
+        if k in doc:
+            if isinstance(v, dict) and isinstance(doc[k], dict):
+                update_config_doc(doc[k], v)
+            elif doc[k] == v:
+                # Avoid re-assignment to preserve comments/formatting
+                pass
+            else:
+                doc[k] = v
+        else:
+            doc[k] = v
+
+
+def write_config_file(path: Path, data: dict, preserve_doc: Any = None) -> None:
+    """Write TOML/YAML configuration data to file, preserving comments when possible.
 
     Args:
         path: File path to write to
         data: Dictionary of data to write
-        preserve_doc: Optional existing TOMLDocument to update (preserves comments)
+        preserve_doc: Optional existing TOML/YAML document to update (preserves comments)
     """
-    if preserve_doc is not None:
-        # Update existing document in-place to preserve comments
-        for key, value in data.items():
-            preserve_doc[key] = value
-        path.write_text(tomlkit.dumps(preserve_doc))
+    if path.suffix in (".yaml", ".yml"):
+        from ruamel.yaml import YAML
+
+        yaml = YAML()
+        if preserve_doc is not None:
+            update_config_doc(preserve_doc, data)
+            with open(path, "w") as f:
+                yaml.dump(preserve_doc, f)
+        else:
+            with open(path, "w") as f:
+                yaml.dump(data, f)
     else:
-        # Create new document from dict
-        path.write_text(tomlkit.dumps(data))
+        # TOML
+        if preserve_doc is not None:
+            update_config_doc(preserve_doc, data)
+            path.write_text(tomlkit.dumps(preserve_doc))
+        else:
+            path.write_text(tomlkit.dumps(data))
+
+
+def _write_toml(path: Path, data: dict, preserve_doc: Any = None) -> None:
+    """Compatibility wrapper for write_config_file."""
+    write_config_file(path, data, preserve_doc)
 
 
 class GlobalConfig:
@@ -107,7 +142,7 @@ class GlobalConfig:
     def __init__(self):
         self._data: dict = {}
         self._path = GLOBAL_TOML
-        self._doc: TOMLDocument | None = None  # For preserving comments
+        self._doc: Any = None  # For preserving comments
         self._dirty: bool = False
 
     def load(self) -> None:
@@ -122,13 +157,16 @@ class GlobalConfig:
 
         if self._path.suffix in (".yaml", ".yml"):
             try:
-                import yaml  # type: ignore[import-untyped]
+                from ruamel.yaml import YAML
             except ImportError:
                 raise ConfigurationError(
-                    "YAML support requires pyyaml. Install with: pip install pyyaml"
+                    "YAML support requires ruamel.yaml. Install with: pip install dotman-git[yaml]"
                 )
-            self._data = yaml.safe_load(content) or {}
-            self._doc = None
+            yaml = YAML()
+            self._doc = yaml.load(content)
+            import yaml as pyyaml  # type: ignore[import-untyped]
+
+            self._data = pyyaml.safe_load(content) or {}
         else:
             self._data = tomllib.loads(content)
             self._doc = tomlkit.parse(content)
@@ -144,7 +182,7 @@ class GlobalConfig:
         if not self._dirty and not force:
             return
         self._path.parent.mkdir(parents=True, exist_ok=True)
-        _write_toml(self._path, self._data, self._doc)
+        write_config_file(self._path, self._data, self._doc)
         self._dirty = False
 
     def create_default(self) -> None:

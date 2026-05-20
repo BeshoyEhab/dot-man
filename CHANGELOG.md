@@ -125,6 +125,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `hks` (hooks)
 - **`dot-man watch`** — Auto-save tracked dotfiles on change (supporting both watchdog and polling backends, debounced commits, and `--no-commit`/`--dry-run` flags).
 - **`dot-man rollback`** — Transaction-style rollback to any previous commit, tag, or `HEAD~N`, with colored diffs and automatic pre-rollback backups.
+- **YAML Comment Preservation** - Added round-trip YAML configuration comment and layout preservation using `ruamel.yaml`.
 
 ### Changed
 - **README Overhaul** - Redesigned README with project badges, architecture diagrams, config examples (TOML/YAML), and command reference tables.
@@ -134,4 +135,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Profile Switch & Serialization** - Resolved a traceback in `profile switch` by properly parsing branch parameters for `ctx.invoke`.
 - **Global Config Save** - Defaulted `GlobalConfig.save()` to write to disk (`force=True`) to prevent silent save failures across CLI commands.
 - **TOML Serialization of None** - Prevented `tomlkit` ConvertError by omitting the `inherits` key if its value is `None` during profile creation.
+- **YAML Configuration Overwrites** - Resolved a bug where editing configuration fields would silently convert YAML files back to TOML on save.
+- **TOML/YAML Comment Preservation & Key Deletions** - Fixed a bug in document updates where deleted configuration keys were not removed from the saved file, and added value equality checks to prevent losing comments on sequence fields.
 - **Integration Tests** - Added robust test cases covering the complete `profile switch` flow, validating branch switching, warnings, inheritance, and error handling.
