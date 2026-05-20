@@ -1,5 +1,7 @@
 """Profile command for dot-man CLI - Multi-machine configuration profiles."""
 
+from typing import Any
+
 import click
 
 from .. import ui
@@ -98,10 +100,12 @@ def profile_create(name: str, inherits: str | None, hostname: tuple):
             error(f"Profile '{inherits}' does not exist", exit_code=1)
 
         # Create new profile
-        profiles[name] = {
-            "inherits": inherits,
+        profile_data: dict[str, Any] = {
             "hostnames": list(hostname) if hostname else [],
         }
+        if inherits:
+            profile_data["inherits"] = inherits
+        profiles[name] = profile_data
 
         # Save
         if "profiles" not in global_config._data:
@@ -200,10 +204,12 @@ def profile_switch(name: str):
 
         # Try to switch to branch (if it exists)
         if branch in ops.git.list_branches():
+            from .common import parse_branch_arg
             from .switch_cmd import switch
 
+            parsed_branch = parse_branch_arg(branch)
             ctx = click.Context(switch)
-            ctx.invoke(switch, branch=branch, dry_run=False, force=True)
+            ctx.invoke(switch, branch=parsed_branch, dry_run=False, force=True)
         else:
             ui.console.print(
                 f"[yellow]Branch '{branch}' does not exist - profile saved but no branch switched[/yellow]"

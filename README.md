@@ -12,7 +12,7 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
-[![Coverage](https://img.shields.io/badge/coverage-61%25-yellow)](https://github.com/BeshoyEhab/dot-man)
+[![Coverage](https://img.shields.io/badge/coverage-59%25-yellow)](https://github.com/BeshoyEhab/dot-man)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/BeshoyEhab/dot-man/pulls)
 
 ---
@@ -398,10 +398,10 @@ System variables (`{{HOSTNAME}}`, `{{USER}}`, `{{SHELL}}`, etc.) are auto-popula
 
 | Metric | Value |
 |--------|-------|
-| Version | `1.1.0` |
+| Version | `1.1.1` |
 | Python | `3.9+` |
 | Platforms | Linux, macOS |
-| Test Coverage | 61% |
+| Test Coverage | 59% (869 tests) |
 | Commands | 30+ |
 | PyPI | [`dotman-git`](https://pypi.org/project/dotman-git/) |
 

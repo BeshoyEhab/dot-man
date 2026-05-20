@@ -140,3 +140,85 @@ class TestProfileDetect:
         integration_runner.invoke(cli, ["profile", "create", "partial", "-h", partial])
         result = integration_runner.invoke(cli, ["profile", "detect"])
         assert result.exit_code == 0
+
+
+class TestProfileSwitch:
+    def test_switch_to_profile_success(self, integration_runner):
+        result = integration_runner.invoke(cli, ["profile", "create", "work"])
+        assert result.exit_code == 0
+
+        from dot_man.operations import get_operations
+
+        ops = get_operations()
+        if not ops.git.repo.heads:
+            from pathlib import Path
+
+            dummy = Path(ops.git.repo_path) / "dummy.txt"
+            dummy.write_text("hello")
+            ops.git.repo.index.add(["dummy.txt"])
+            ops.git.repo.index.commit("Initial")
+
+        ops.git.create_branch("work")
+
+        result = integration_runner.invoke(cli, ["profile", "switch", "work"])
+        assert result.exit_code == 0
+        assert "Switched to profile 'work'" in result.output
+
+        assert ops.global_config.current_profile == "work"
+        assert ops.git.repo.active_branch.name == "work"
+
+    def test_switch_to_profile_missing_branch(self, integration_runner):
+        result = integration_runner.invoke(
+            cli, ["profile", "create", "missing-branch-profile"]
+        )
+        assert result.exit_code == 0
+
+        result = integration_runner.invoke(
+            cli, ["profile", "switch", "missing-branch-profile"]
+        )
+        assert result.exit_code == 0
+        assert "does not exist" in result.output
+        assert "profile saved but no branch" in result.output
+
+        from dot_man.operations import get_operations
+
+        ops = get_operations()
+        assert ops.global_config.current_profile == "missing-branch-profile"
+
+    def test_switch_to_profile_inheritance(self, integration_runner):
+        result = integration_runner.invoke(cli, ["profile", "create", "base"])
+        assert result.exit_code == 0
+        result = integration_runner.invoke(
+            cli, ["profile", "set-branch", "base", "main-branch"]
+        )
+        assert result.exit_code == 0
+
+        result = integration_runner.invoke(
+            cli, ["profile", "create", "child", "--inherits", "base"]
+        )
+        assert result.exit_code == 0
+
+        from dot_man.operations import get_operations
+
+        ops = get_operations()
+        if not ops.git.repo.heads:
+            from pathlib import Path
+
+            dummy = Path(ops.git.repo_path) / "dummy.txt"
+            dummy.write_text("hello")
+            ops.git.repo.index.add(["dummy.txt"])
+            ops.git.repo.index.commit("Initial")
+
+        ops.git.create_branch("main-branch")
+
+        result = integration_runner.invoke(cli, ["profile", "switch", "child"])
+        assert result.exit_code == 0
+        assert "Switched to profile 'child'" in result.output
+
+        assert ops.global_config.current_profile == "child"
+        assert ops.git.repo.active_branch.name == "main-branch"
+
+    def test_switch_to_nonexistent_profile(self, integration_runner):
+        result = integration_runner.invoke(cli, ["profile", "switch", "nonexistent"])
+        assert result.exit_code != 0
+        assert "does not exist" in result.output

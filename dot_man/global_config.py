@@ -135,7 +135,7 @@ class GlobalConfig:
 
         self._dirty = False
 
-    def save(self, force: bool = False) -> None:
+    def save(self, force: bool = True) -> None:
         """Save the global configuration file.
 
         Args:

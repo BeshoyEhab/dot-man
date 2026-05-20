@@ -112,9 +112,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-05-20
+
 ### Added
-- **`dot-man watch`** — auto-save tracked dotfiles on change (watchdog or polling backend, debounced commits, `--no-commit` / `--dry-run` flags)
-- **`dot-man rollback`** — transaction-style rollback to any previous commit, tag, or `HEAD~N`; shows coloured diff, auto-backs up before rolling back
+- **PyPI Publication** - Official release published to PyPI as `dotman-git`.
+- **Command Aliases** - Short 3-letter command aliases added for all major operations:
+  - `nav` (navigate), `doc` (doctor), `dep` (deploy), `enc` (encrypt)
+  - `exp` (export), `imp` (import), `dis` (discover), `aud` (audit)
+  - `cln` (clean), `ver` (verify), `rev` (revert), `rol` (rollback)
+  - `wat` (watch), `cpl` (completions), `rst` (restore), `edt` (edit)
+  - `sta` (status), `ini` (init), `syn` (sync), `log` (log), `dif` (diff)
+  - `hks` (hooks)
+- **`dot-man watch`** — Auto-save tracked dotfiles on change (supporting both watchdog and polling backends, debounced commits, and `--no-commit`/`--dry-run` flags).
+- **`dot-man rollback`** — Transaction-style rollback to any previous commit, tag, or `HEAD~N`, with colored diffs and automatic pre-rollback backups.
 
 ### Changed
-- README completely overhauled: badges, shields, architecture diagram, full command reference tables, TOML/YAML config examples
+- **README Overhaul** - Redesigned README with project badges, architecture diagrams, config examples (TOML/YAML), and command reference tables.
+- **License & Copyright** - Updated license with additional copyright holder (ZVAXEROWS) and copyright years to 2025, 2026.
+
+### Fixed
+- **Profile Switch & Serialization** - Resolved a traceback in `profile switch` by properly parsing branch parameters for `ctx.invoke`.
+- **Global Config Save** - Defaulted `GlobalConfig.save()` to write to disk (`force=True`) to prevent silent save failures across CLI commands.
+- **TOML Serialization of None** - Prevented `tomlkit` ConvertError by omitting the `inherits` key if its value is `None` during profile creation.
+- **Integration Tests** - Added robust test cases covering the complete `profile switch` flow, validating branch switching, warnings, inheritance, and error handling.

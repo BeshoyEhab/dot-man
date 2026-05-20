@@ -11,7 +11,7 @@ This file contains instructions for AI models working on the dot-man project.
 - **Language**: Python 3.9+
 - **CLI Framework**: Click
 - **Testing**: pytest
-- **Current Version**: 0.9.0 (Beta)
+- **Current Version**: 1.1.1 (Stable)
 
 ---
 
@@ -19,14 +19,14 @@ This file contains instructions for AI models working on the dot-man project.
 
 When making changes, always update these files as needed:
 
-| File | When to Update |
-|------|----------------|
-| `CHANGELOG.md` | Add new features, bug fixes, changes under current version |
-| `TODO.md` | Mark completed items with ✅, add new items |
-| `README.md` | Update command tables, add examples, update features |
-| `docs/roadmap.md` | Update version status, add completed items |
-| `pyproject.toml` | Bump version for releases |
-| `AGENTS.md` | Add new guidelines as project evolves |
+| File              | When to Update                                             |
+| ----------------- | ---------------------------------------------------------- |
+| `CHANGELOG.md`    | Add new features, bug fixes, changes under current version |
+| `TODO.md`         | Mark completed items with ✅, add new items                |
+| `README.md`       | Update command tables, add examples, features, version, test coverage, and technologies used |
+| `docs/roadmap.md` | Update version status, add completed items                 |
+| `pyproject.toml`  | Bump version for releases                                  |
+| `AGENTS.md`       | Add new guidelines as project evolves                      |
 
 ---
 
@@ -79,6 +79,7 @@ This runs Black, ruff, and mypy automatically on every `git commit`.
 ```
 
 **Types:**
+
 - `feat` - New feature
 - `fix` - Bug fix
 - `perf` - Performance improvement
@@ -88,6 +89,7 @@ This runs Black, ruff, and mypy automatically on every `git commit`.
 - `chore` - Maintenance
 
 **Examples:**
+
 ```
 feat(diff): add dot-man diff command
 
@@ -105,17 +107,20 @@ Closes #123
 When adding new CLI commands, **ALWAYS add shell completions**:
 
 1. Import completion functions from `dot_man.cli.common`:
+
 ```python
 from .common import complete_branches, complete_tags, complete_commits, complete_profiles, complete_template_keys
 ```
 
 2. Add `shell_complete` to click arguments:
+
 ```python
 @click.argument("branch", shell_complete=complete_branches)
 @click.option("--commit", "-c", shell_complete=complete_commits)
 ```
 
 3. Add new completion functions if needed in `common.py`:
+
 ```python
 def complete_new_thing(ctx, param, incomplete):
     """Shell completion callback for new thing."""
@@ -147,26 +152,26 @@ def test_git_manager_create_branch(self, tmp_path):
     """Test creating a branch - REAL test."""
     from dot_man.core import GitManager
     from git import Repo
-    
+
     # Create real git repo
     repo_dir = tmp_path / "repo"
     repo_dir.mkdir()
     repo = Repo.init(repo_dir)
-    
+
     # Configure git
     with repo.config_writer() as config:
         config.set_value("user", "name", "Test")
         config.set_value("user", "email", "test@test.com")
-    
+
     # Create initial commit
     (repo_dir / "test.txt").write_text("test")
     repo.index.add(["test.txt"])
     repo.index.commit("Initial")
-    
+
     # Test GitManager
     gm = GitManager(repo_dir)
     gm.create_branch("new-branch")
-    
+
     assert "new-branch" in gm.list_branches()  # REAL assertion
 ```
 
@@ -239,9 +244,10 @@ pytest tests/test_core.py -v
 pytest -vv
 ```
 
-### Important: Tests directory requires __init__.py
+### Important: Tests directory requires **init**.py
 
 The `tests/` directory must contain a `__init__.py` file to be a proper package:
+
 ```
 tests/
 ├── __init__.py      # REQUIRED - makes tests a package
@@ -323,7 +329,7 @@ When releasing a new version:
 2. ✅ Update `dot_man/__init__.py` version
 3. ✅ Update `CHANGELOG.md` - move "Unreleased" to version date
 4. ✅ Update `TODO.md` - mark completed items with ✅
-5. ✅ Update `README.md` - update "What's New" section
+5. ✅ Update `README.md` - update "What's New" section, version metrics, technologies, and test coverage
 6. ✅ Update `docs/roadmap.md` - update version status
 7. ✅ Run full quality gate:
    - `black --check dot_man/ tests/`
@@ -360,29 +366,53 @@ dot-man/
 
 ## Key Commands
 
-| Command | Description |
-|---------|-------------|
-| `dot-man init` | Initialize repository |
-| `dot-man switch` | Switch branches |
-| `dot-man status` | Show status |
-| `dot-man audit` | Scan for secrets |
-| `dot-man diff` | Show changes |
-| `dot-man log` | Show commit history |
-| `dot-man template` | Template variables |
-| `dot-man profile` | Machine profiles |
+| Command            | Description           |
+| ------------------ | --------------------- |
+| `dot-man init`     | Initialize repository |
+| `dot-man navigate` | Switch branches       |
+| `dot-man status`   | Show status           |
+| `dot-man audit`    | Scan for secrets      |
+| `dot-man diff`     | Show changes          |
+| `dot-man log`      | Show commit history   |
+| `dot-man template` | Template variables    |
+| `dot-man profile`  | Machine profiles      |
 
 ---
 
-## Updating This File
+## Updating This File & AI Autonomy
 
-When updating AGENTS.md, consider:
+AI models working on this project have the authority to self-update this `AGENTS.md` file whenever:
 
-1. **New patterns** - Add examples of good code patterns
-2. **New scenarios** - Document how to handle new situations
-3. **Test examples** - Add more test examples if patterns emerge
-4. **File updates** - Update the file checklist if project structure changes
+1. The project version bumps or release milestones are completed.
+2. New coding patterns, guidelines, or shell completion callbacks are established.
+3. Project requirements, checklists, or active development priorities change.
 
-Add new guidelines at the appropriate section. Use clear headers and examples.
+When updating `AGENTS.md`, ensure the checklist, key commands, and priorities are kept in sync with `TODO.md` and `docs/roadmap.md`.
+
+---
+
+## Active Project Priorities
+
+AI models should focus on the following core needs of the project:
+
+### 1. Hardening & Release Verification (v1.x Stable)
+
+- **Improve Test Coverage to 80%+**: Add unit and integration tests to low-coverage modules:
+  - `audit_cmd.py`, `log_cmd.py`, `tag_cmd.py`, `switch_cmd.py`.
+- **Docs Generation**: Set up and host a complete documentation site (e.g., using `mkdocs` or `sphinx`).
+- **Release Verification**: Test PyPI package builds and installation.
+
+### 2. Extensibility (v1.2.0 - Plugin System)
+
+- **Custom Secret Patterns**: Allow users to define custom regex patterns for secret detection in their config.
+- **Hook Scripts Directory**: Support executing custom hook scripts located in a specific folder.
+- **Plugin API**: Create an extension mechanism for third-party tools (e.g., integrating `pro-mgr`).
+
+### 3. Future Enhancements (v2.0+)
+
+- **Symlink Mode**: Option to symlink files instead of copying them.
+- **Cloud sync backends**: Native support for S3, Google Drive, and Dropbox.
+- **YAML Config Auto-Preservation**: Ensure changes to YAML configs are saved back as YAML, not converted to TOML.
 
 ---
 

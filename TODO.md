@@ -155,7 +155,7 @@ Priority files needing tests:
 
 - [ ] 80%+ test coverage
 - [ ] Full documentation site (mkdocs/sphinx)
-- [ ] PyPI publication
+- [x] PyPI publication ✅
 - [ ] Stable API guarantee
 
 ## v1.1.0 - Plugin System
@@ -262,8 +262,6 @@ Our primary target is **80%+ overall coverage** for the `v1.0.0` release.
 | Module                        | Current Coverage | Missing Lines |
 | ----------------------------- | ---------------- | ------------- |
 | `dot_man/tui_log.py`          | 0%               | 48            |
-| `dot_man/cli/profile_cmd.py`  | 17%              | 134           |
-| `dot_man/cli/template_cmd.py` | 20%              | 105           |
 | `dot_man/cli/audit_cmd.py`    | 32%              | 55            |
 | `dot_man/cli/log_cmd.py`      | 34%              | 97            |
 | `dot_man/cli/tag_cmd.py`      | 35%              | 55            |
@@ -284,7 +282,6 @@ Our primary target is **80%+ overall coverage** for the `v1.0.0` release.
 | `dot_man/cli/revert_cmd.py`  | 61%              | 16            |
 | `dot_man/backups.py`         | 65%              | 37            |
 | `dot_man/status_ops.py`      | 65%              | 43            |
-| `dot_man/global_config.py`   | 67%              | 58            |
 | `dot_man/cli/main.py`        | 67%              | 1             |
 | `dot_man/files.py`           | 68%              | 62            |
 | `dot_man/operations.py`      | 68%              | 36            |
@@ -304,11 +301,14 @@ Our primary target is **80%+ overall coverage** for the `v1.0.0` release.
 | `dot_man/ui.py`              | 81%              | 6             |
 | `dot_man/cli/restore_cmd.py` | 82%              | 9             |
 | `dot_man/vault.py`           | 85%              | 23            |
+| `dot_man/global_config.py`   | 86%              | 21            |
 | `dot_man/cli/show_cmd.py`    | 86%              | 2             |
 | `dot_man/utils.py`           | 87%              | 8             |
 | `dot_man/exceptions.py`      | 88%              | 9             |
 | `dot_man/secrets.py`         | 88%              | 20            |
+| `dot_man/cli/template_cmd.py` | 90%             | 13            |
 | `dot_man/cli/init_cmd.py`    | 92%              | 14            |
+| `dot_man/cli/profile_cmd.py`  | 94%              | 11            |
 | `dot_man/cli/__init__.py`    | 100%             | 0             |
 | `dot_man/config.py`          | 100%             | 0             |
 | `dot_man/constants.py`       | 100%             | 0             |

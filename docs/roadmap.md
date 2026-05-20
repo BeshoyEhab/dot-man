@@ -166,7 +166,7 @@
 
 - [ ] 80%+ test coverage (currently 56%)
 - [ ] Full documentation site (mkdocs/sphinx)
-- [ ] PyPI publication
+- [x] PyPI publication ✅
 - [ ] Stable API guarantee
 
 ---
@@ -218,10 +218,10 @@
 
 | Metric        | Current                  | v1.0.0 Target         |
 | ------------- | ------------------------ | --------------------- |
-| Test Coverage | 56% (627 tests) ✅      | 80%+                  |
+| Test Coverage | 59% (869 tests) ✅      | 80%+                  |
 | Core Commands | 30+ commands ✅         | All commands stable   |
 | Lint Errors   | 0 (ruff + mypy) ✅      | 0                     |
 | TUI           | Removed for redesign    | Redesign in v1.x      |
 | Documentation | README + specs ✅        | Full docs site        |
 | Performance   | Batch ops + parallel ✅ | 500+ files in <5s     |
-| Distribution  | GitHub only              | PyPI published        |
+| Distribution  | Published to PyPI ✅    | PyPI published        |
