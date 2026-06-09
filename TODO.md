@@ -1,314 +1,174 @@
 # TODO
 
-### main idea v0.0.0
+---
 
-- [x] make it more simple for user, by UX and tutorial and the starting initialize (init after start then offer make first branch). ✅
-- [] after switching it should kill the qs then open it to start and make hyperctl reload
+## ✅ Completed (v1.2.0)
 
-## Completed Releases
+### Bugs
+- [x] Missing f-string prefix in `dotman_config.py:96` — fixed
+- [x] Stale `"dot-man.ini"` reference in `status_ops.py:158` — removed
+- [x] `assert` in production code — all replaced with proper `if/error()` checks across `navigate_cmd.py`, `encrypt_cmd.py`, `import_cmd.py`
 
-### v0.1.0 ✅ - Core Foundation
+### Refactoring & Code Quality
 
-- [x] Core CLI with Click
-- [x] Git operations with GitPython
-- [x] Secret detection (10 patterns)
-- [x] Commands: init, status, switch, edit, deploy, audit
-- [x] Branch management (list, delete)
-- [x] Install script with shell completions
-- [x] Unit tests
+- [x] **Consolidate `switch_cmd.py` → `navigate_cmd.py`** — `switch_cmd` is now a 17-line thin wrapper delegating to `_navigate_impl()`
+- [x] **Remove duplicate `BranchParamType`** — moved from `switch_cmd.py`/`navigate_cmd.py` to `common.py`
+- [x] **Deduplicate schema keys** — `VALID_SECTION_KEYS` defined once in `dotman_config.py`
+- [x] **Unify `HOOK_ALIASES` and `UNIVERSAL_HOOKS`** — `constants.py` is canonical; `merge.py` imports it
+- [x] **Silent `except: pass` cleanup** — added `logging.debug()`/`logging.warning()` to 11+ bare exceptions across `common.py`, `navigate_cmd.py`, `rollback_cmd.py`, `core.py`, `files.py`, `init_cmd.py`
+- [x] **Generalized placeholder system** — `{qs_config}` → `{config_name}`, `{config_root}`, `{section_name}`, `{paths}`, `{branch}` in `Section._resolve_hook()`
 
-### v0.2.0 ✅ - Hooks & Smart Deploy
+### Features
+- [x] **Symlink deploy mode** — `deploy_method = "symlink"` per section
+- [x] **Symlink warning on save** — warns user when saving to symlinked paths
+- [x] **Quickshell hook aliases** — `quickshell_reload`, `quickshell_restart`, `quickshell_validate` with `{qs_config}` → `{config_name}` placeholder
+- [x] **Migration onboarding** — init wizard shows import hints for chezmoi/yadm/stow
+- [x] **Removed hard-coded quickshell kill/restart** — lifecycle now handled via user-defined hooks
+- [x] **Shell completions** — `complete_sections` for `encrypt`, `complete_branches` for `export --branch`, `complete_commits` for `rollback`
 
-- [x] Hooks: `pre_deploy` and `post_deploy`
-- [x] Smart deployment (skip identical files)
-- [x] Directory recursion fix
-- [x] Interactive branch deletion
-- [x] Shell completions for branches
+### Test Coverage Improvements
 
-### v0.3.0 ✅ - Remote Sync & TUI
+| Module | Before | After | Gain |
+|--------|--------|-------|------|
+| `files.py` | 73% | **94%** | +21pp |
+| `branch_ops.py` | 40% | **97%** | +57pp |
+| `encryption.py` | 33% | **100%** | +67pp |
+| `completions_cmd.py` | 12% | **94%** | +82pp |
+| `section.py` | 70% | **95%** | +25pp |
+| `save_deploy_ops.py` | 52% | **75%** | +23pp |
+| `status_ops.py` | 59% | **89%** | +30pp |
+| `core.py` | 58% | **66%** | +8pp |
 
-- [x] `dot-man sync` - Push/pull with remote
-- [x] `dot-man remote get/set` - Configure remote URL
-- [x] `dot-man setup` - Guided GitHub remote setup
-- [x] Interactive TUI (`dot-man tui`)
-- [x] TUI Command Palette (access all commands)
-- [x] `dot-man repo` and `dot-man shell` utilities
-
-### v0.4.0 ✅ - Config Refactor & Modular Architecture
-
-- [x] TOML config format with sections and templates
-- [x] Template inheritance (`inherits = ["template1"]`)
-- [x] Include/exclude patterns for files
-- [x] Modular `operations.py` for business logic
-- [x] `dot-man add` command
-- [x] Auto-migration from INI to TOML
-- [x] Branch-specific file preview in TUI
-- [x] Refactored all commands to use new Section API
-
-### v0.5.0 ✅ - Backup & Stash System
-
-- [x] `dot-man backup create` - Manual backups
-- [x] `dot-man backup list` - Show available backups
-- [x] `dot-man backup restore` - Restore from backup
-- [x] Auto-backup before destructive operations
-- [x] Backup rotation (max 5)
-- [x] `dot-man stash` - Temporarily stash current changes
-- [x] `dot-man stash pop` - Restore stashed changes
-- [x] `dot-man switch --stash` - Stash changes instead of committing
-- [x] `dot-man switch --save-to <branch>` - Save to new branch before switching
-
-### v0.5.1 ✅ - Bug Fixes & Stability
-
-- [x] Fix file comparison false positives after git checkout
-- [x] Fix secret ignore list path matching (canonicalize paths)
-- [x] Add error categorization with user-friendly suggestions
-- [x] Add `dot-man remote sync-branch` for main/master mismatch
-- [x] Add quickshell hook aliases
-- [x] Graceful KeyboardInterrupt handling
+New test files added: `test_files_comprehensive.py` (55), `test_branch_ops.py` (39), `test_encryption.py` (32), `test_completions_cmd.py` (10), `test_shell_completions.py` (7), `test_section.py` (39), `test_save_deploy_ops.py` (26), `test_status_ops.py` (17), `test_core_extended.py` (46)
 
 ---
 
-### v0.6.0 ✅ - Code Quality & Robustness
+## 🔥 Refactoring & Code Quality (Remaining)
 
-- [x] **Atomic file operations** - Write to temp file, then rename (prevents corruption)
-- [x] **Consistent file I/O** - Use `newline=""` everywhere for line ending preservation
-- [x] **Consolidate secret checking** - Reduce duplicate code in `has_unhandled_secrets()` and `check_file_save_status()`
-- [x] **Complete type hints** - Add missing type annotations throughout codebase
-- [x] **File locking** - Prevent concurrent `dot-man` operations from conflicting
+### Eliminate Duplication
 
----
+- [ ] **Deduplicate deploy logic** — `deploy_section()` and `deploy_item()` in `save_deploy_ops.py` duplicate symlink/copy/secret-restore code. Extract shared helpers.
+- [ ] **Unify config loading** — `dotman_config.py` and `global_config.py` have nearly identical YAML/TOML loading patterns. Extract base class or utility.
 
-## Currently In Progress
+### Clean Up Silent `except: pass`
 
-### v0.8.0 - Performance ✅
+- [ ] **Cache ops** — `common.py:230-280` silently swallows all cache save/load errors
+- [ ] **Git operations** — `core.py:330,441,456` silently swallows errors in diff/stash operations
+- [ ] **Remote operations** — `init_cmd.py:104,117,130` silently swallows clone/fetch errors
 
-- [x] **Batch file operations** - Group reads/writes for faster switching
-- [x] **Parallel secret scanning** - Use `concurrent.futures` for large directories
-- [x] **Lazy loading** - Only load `SecretGuard` when secrets detected
-- [x] **Content-addressable storage** - SHA-keyed deduplication (consolidated `sha256_hex` into `utils.py`)
+### Break Up Long Functions
 
-### v0.9.0 - TUI Core Actions (DEPRECATED)
+- [ ] **`config_cmd.py`** — `_run_interactive_tutorial` (301 lines), `_show_section_examples` (290 lines)
+- [ ] **`init_cmd.py`** — `run_setup_wizard` (250 lines)
+- [ ] **`remote_cmd.py`** — `setup` (253 lines)
+- [ ] **`navigate_cmd.py`** — `_handle_branch_navigate` (211 lines)
+- [ ] **`save_deploy_ops.py`** — `execute_deployment_plan` (130 lines), `deploy_section` (92 lines)
+- [ ] **`files.py`** — `copy_directory` (92 lines), `smart_save_file` (88 lines)
 
-- [x] TUI temporarily removed for redesign (v1.x)
-- [x] CLI provides full functionality for all operations
+### Deep Nesting
 
----
-
-### v0.12.0 - Diff & History ✅
-
-- [x] `dot-man diff` - Show changes between branches
-- [x] `dot-man diff <file>` - Show local vs repo diff
-- [x] `dot-man log` - Show commit history with files changed (existing)
-- [x] `dot-man checkout` - Checkout specific commit/tag (existing)
-- [x] `dot-man revert --commit` - Restore from history
+- [ ] **`config_cmd.py`** — `config_tutorial` has 12 levels of nesting
+- [ ] **`remote_cmd.py`** — `setup` has 11 levels
+- [ ] **`edit_cmd.py`** — `edit` has 9 levels
+- [ ] **`save_deploy_ops.py`** — `deploy_section` and `deploy_item` have 7 levels each
 
 ---
 
-## Test Coverage (Current: ~46%, Target: 80%)
+## 🧪 Test Coverage (Current ~66%, Target 80%+)
 
-Priority files needing tests:
+### Lowest coverage modules (below 50%)
 
-- [x] **`cli/remote_cmd.py`** - 10% → 60%+
-- [x] **`cli/edit_cmd.py`** - 16% → 60%+
-- [x] **`cli/init_cmd.py`** - 30% → 60%+
-
----
-
-## Feature Roadmap
-
-### v0.12.0 - Git Wrapper CLI Commands ✅
-
-- [x] `dot-man diff` - Show uncommitted changes
-- [x] `dot-man diff --branch <name>` - Compare branches
-- [x] `dot-man diff <file>` - Compare specific file
-- [x] `dot-man log` - Show commit history
-- [x] `dot-man log --diff` - Show log with patch
-- [x] `dot-man log --interactive` - TUI Log viewer
-- [x] `dot-man show <commit>` - View full diff for a specific commit
-- [x] `dot-man restore <file> <commit>` - Restore from history
-
-### v0.13.0 - Template Variables ✅
-
-- [x] `dot-man template set KEY=VALUE`
-- [x] `dot-man template list`
-- [x] Template substitution (`{{HOSTNAME}}`, `{{EMAIL}}`)
-- [x] System variable auto-population
-
-### v0.14.0 - Multi-Machine Profiles ✅
-
-- [x] `dot-man profile create <name>` - Create machine-specific profiles
-- [x] `dot-man profile list` - List available profiles
-- [x] `dot-man profile switch <name>` - Switch between profiles
-- [x] Automatic profile detection based on hostname
-- [x] Profile inheritance (e.g., `server` extends `minimal`)
-
-### v0.15.0 - Import/Migration ✅
-
-- [x] `dot-man import chezmoi` - Import from chezmoi
-- [x] `dot-man import yadm` - Import from yadm
-- [x] `dot-man import stow` - Import from GNU Stow
-- [x] `dot-man export` - Export to portable format
+| Module | Coverage |
+|--------|----------|
+| `watch_cmd.py` | 19% |
+| `edit_cmd.py` | 16% |
+| `rollback_cmd.py` | 14% |
+| `discover_cmd.py` | 33% |
+| `doctor_cmd.py` | 36% |
+| `remote_cmd.py` | 30% |
+| `import_cmd.py` | 31% |
+| `config_cmd.py` | 49% |
+| `encrypt_cmd.py` | 49% |
+| `log_cmd.py` | 48% |
+| `interactive.py` | 47% |
+| `onboarding.py` | 47% |
+| `branch_cmd.py` | 51% |
 
 ---
 
-## v1.0.0 - Production Ready
+## 🚀 Features
 
-- [ ] 80%+ test coverage
-- [ ] Full documentation site (mkdocs/sphinx)
-- [x] PyPI publication ✅
-- [ ] Stable API guarantee
+### Shell Completions
 
-## v1.1.0 - Plugin System
+- [ ] **`add` command** — complete local file paths
+- [ ] **`import` command** — complete source tools (chezmoi, yadm, stow)
 
-- [x] Custom secret detection patterns via config ✅
-- [ ] User-defined hook scripts directory
-- [ ] Plugin API for extensions
-- [ ] Built-in plugin: pro-mgr integration
+### Init Wizard Hook Suggestions
 
----
-
-## Implemented in Recent Releases
-
-### v0.10.0 - Config System Improvements
-
-- [x] YAML configuration support (.yaml, .yml alongside .toml)
-- [x] Environment variable expansion in paths ($HOME, $USER, etc.)
-- [x] Config file conflict detection (warns when both .toml and .yaml exist)
-- [x] Removed legacy INI migration code
-- [x] Removed unused LegacyConfigLoader class
-- [x] Consolidated LOCK_FILE to constants.py
-- [x] Import from chezmoi/yadm/stow
-- [x] Export to tar/zip/json
-- [x] Encrypt/decrypt sensitive files (GPG/AGE)
-- [x] Auto-discover dotfiles
-- [x] Rich diff output
-
----
-
-## Future Ideas (v2.0+)
-
-### Storage & Sync
-
-- [ ] **Symlink mode** - Option to symlink files instead of copying (instant sync, saves space)
-- [ ] **Encrypted files** - GPG/age support for sensitive configs (basic done, needs more)
-- [ ] **Cloud sync backends** - S3, Dropbox, Google Drive
-- [ ] **Per-branch config inheritance** - `inherits_branch = "main"` in dot-man.toml
-- [ ] **Configurable backup rotation** - Make MAX_BACKUPS configurable via global.toml
-- [x] **Deploy rollback** - Transaction-style deploy with automatic rollback on failure
-- [ ] **Configurable thread pool** - `max_workers` setting in global.toml
+- [ ] When init wizard detects popular tools, suggest appropriate `post_deploy` hooks
+- [ ] For shell configs — suggest `on_activate`/`on_deactivate` hooks
+- [ ] Show example of how hooks work when adding the first section
 
 ### User Experience
 
-- [ ] **Web dashboard** - Browser-based configuration management
-- [ ] **JSON output** - `--json` option for scripting (status, log, show, audit)
-- [ ] **Universal Setup Wizard** - Interactive menu: remote, dotfiles, secrets, hooks
-- [x] **File watcher** - `dot-man watch` for auto-sync on file changes
+- [ ] **`--json` output** — for `status`, `log`, `show`, `audit`
+- [ ] **Centered error handling** — all commands use `handle_exception()` from `common.py`
+- [ ] **Consistent exit codes** — replace `sys.exit(1)` / `raise SystemExit(1)` mix
 
-### CLI Improvements
+### Extensibility (v1.2.0+)
 
-- [x] YAML save support - Preserve YAML format when saving ✅
-- [ ] **Section priority/ordering** - Control deploy order with `priority` key
-- [ ] **Enhanced shell completions** - Add for all commands
-
-### Architecture
-
-- [ ] **Profile system expansion** - Profile-specific configs and switching
-- [ ] **Template multiple inheritance** - True inheritance chain with override priority
-- [ ] **Abstract method enforcement** - Use protocol-based typing for mixins
-
-### Ecosystem
-
-- [ ] **Dotfile sharing/marketplace** - Share configs with community
-- [ ] **CI/CD integration** - Test dotfiles before deployment
+- [ ] **Hook scripts directory** — support executing custom hook scripts from a folder
+- [ ] **Plugin API** — extension mechanism for third-party tools
+- [ ] **Make placeholders available in template variables** — `{{config_name}}` in config values
 
 ---
 
-## Known Issues
+## 📚 Documentation
 
-- Shell completions may show stale branch names (restart shell to refresh)
-- TUI cannot fully preview files for other branches without git checkout
-
----
-
-## Architecture
-
-```
-cli/ ────┐
-         ├──> operations.py ─┬─> config.py (re-exports)
-tui.py ──┘    (orchestrator)  │    ├─> global_config.py
-              ├ SaveDeployMixin│    ├─> section.py
-              ├ BranchMixin   │    └─> dotman_config.py
-              └ StatusMixin   ├─> core.py (Git)
-                              ├─> files.py
-                              ├─> secrets.py
-                              ├─> vault.py
-                              ├─> backups.py
-                              └─> lock.py
-```
-
-`operations.py` is the single source of truth for all business logic.
+- [ ] **Full docs site** — mkdocs/sphinx hosted on GitHub Pages
+- [ ] **Hook system docs** — document all hook aliases, placeholders, and examples
+- [ ] **Migration guides** — detailed chezmoi/yadm/stow import walkthroughs
+- [ ] **Architecture docs** — how mixins work, how config loading works
 
 ---
 
-## Current Test Coverage Inventory
+## 🏗️ Architecture
 
-Our primary target is **80%+ overall coverage** for the `v1.0.0` release.
+- [ ] **Remove old `log_cmd` checkout** (already deprecated)
+- [ ] **Reduce `type: ignore` count** — currently some mask real typing issues
 
-**Overall Progress:** 60% (4231 statements, 1706 missing)
+---
 
-### Modules Below 50% Coverage (High Priority)
+## Coverage Inventory (as of last run, 66% overall)
 
-| Module                      | Current Coverage | Missing Lines |
-| --------------------------- | ---------------- | ------------- |
-| `dot_man/tui_log.py`        | 0%               | 48            |
-| `dot_man/cli/audit_cmd.py`  | 32%              | 55            |
-| `dot_man/cli/log_cmd.py`    | 34%              | 97            |
-| `dot_man/cli/tag_cmd.py`    | 35%              | 55            |
-| `dot_man/interactive.py`    | 46%              | 109           |
-| `dot_man/cli/switch_cmd.py` | 47%              | 111           |
-| `dot_man/cli/common.py`     | 47%              | 94            |
-| `dot_man/cli/branch_cmd.py` | 48%              | 37            |
-
-### Modules 50% - 79% Coverage (Medium Priority)
-
-| Module                       | Current Coverage | Missing Lines |
-| ---------------------------- | ---------------- | ------------- |
-| `dot_man/branch_ops.py`      | 53%              | 58            |
-| `dot_man/dotman_config.py`   | 78%              | 39            |
-| `dot_man/cli/deploy_cmd.py`  | 54%              | 46            |
-| `dot_man/core.py`            | 58%              | 110           |
-| `dot_man/cli/tui_cmd.py`     | 60%              | 4             |
-| `dot_man/cli/revert_cmd.py`  | 61%              | 16            |
-| `dot_man/backups.py`         | 65%              | 37            |
-| `dot_man/status_ops.py`      | 65%              | 43            |
-| `dot_man/cli/main.py`        | 67%              | 1             |
-| `dot_man/files.py`           | 68%              | 62            |
-| `dot_man/operations.py`      | 68%              | 36            |
-| `dot_man/save_deploy_ops.py` | 68%              | 67            |
-| `dot_man/section.py`         | 68%              | 30            |
-| `dot_man/cli/add_cmd.py`     | 69%              | 24            |
-| `dot_man/cli/backup_cmd.py`  | 69%              | 20            |
-| `dot_man/cli/interface.py`   | 73%              | 8             |
-| `dot_man/cli/status_cmd.py`  | 76%              | 24            |
-| `dot_man/cli/clean_cmd.py`   | 77%              | 13            |
-| `dot_man/lock.py`            | 79%              | 7             |
-
-### Modules 80%+ Coverage (Target Achieved / Low Priority)
-
-| Module                        | Current Coverage | Missing Lines |
-| ----------------------------- | ---------------- | ------------- |
-| `dot_man/ui.py`               | 81%              | 6             |
-| `dot_man/cli/restore_cmd.py`  | 82%              | 9             |
-| `dot_man/vault.py`            | 85%              | 23            |
-| `dot_man/global_config.py`    | 89%              | 20            |
-| `dot_man/cli/show_cmd.py`     | 86%              | 2             |
-| `dot_man/utils.py`            | 87%              | 8             |
-| `dot_man/exceptions.py`       | 88%              | 9             |
-| `dot_man/secrets.py`          | 88%              | 20            |
-| `dot_man/cli/template_cmd.py` | 90%              | 13            |
-| `dot_man/cli/init_cmd.py`     | 92%              | 14            |
-| `dot_man/cli/profile_cmd.py`  | 94%              | 11            |
-| `dot_man/cli/__init__.py`     | 100%             | 0             |
-| `dot_man/config.py`           | 100%             | 0             |
-| `dot_man/constants.py`        | 100%             | 0             |
-| `dot_man/__init__.py`         | 100%             | 0             |
+| Module | Coverage | Module | Coverage |
+|--------|----------|--------|----------|
+| `__init__.py` | 100% | `backups.py` | 71% |
+| `branch_ops.py` | **97%** | `cli/__init__.py` | 100% |
+| `cli/add_cmd.py` | 82% | `cli/audit_cmd.py` | 70% |
+| `cli/backup_cmd.py` | 72% | `cli/branch_cmd.py` | 51% |
+| `cli/clean_cmd.py` | 81% | `cli/common.py` | 66% |
+| `cli/completions_cmd.py` | **94%** | `cli/config_cmd.py` | 49% |
+| `cli/deploy_cmd.py` | 59% | `cli/discover_cmd.py` | 33% |
+| `cli/doctor_cmd.py` | 36% | `cli/edit_cmd.py` | 16% |
+| `cli/encrypt_cmd.py` | 49% | `cli/export_cmd.py` | 82% |
+| `cli/import_cmd.py` | 31% | `cli/init_cmd.py` | 70% |
+| `cli/log_cmd.py` | 48% | `cli/navigate_cmd.py` | 59% |
+| `cli/onboarding.py` | 47% | `cli/profile_cmd.py` | 94% |
+| `cli/remote_cmd.py` | 30% | `cli/restore_cmd.py` | 82% |
+| `cli/revert_cmd.py` | 68% | `cli/rollback_cmd.py` | 14% |
+| `cli/show_cmd.py` | 86% | `cli/status_cmd.py` | 76% |
+| `cli/switch_cmd.py` | 94% | `cli/tag_cmd.py` | 68% |
+| `cli/template_cmd.py` | 90% | `cli/verify_cmd.py` | 70% |
+| `cli/watch_cmd.py` | 19% | `config.py` | 100% |
+| `config_detector.py` | 87% | `constants.py` | 100% |
+| `core.py` | 66% | `dotman_config.py` | 78% |
+| `encryption.py` | **100%** | `exceptions.py` | 89% |
+| `files.py` | **94%** | `global_config.py` | 89% |
+| `hooks.py` | 80% | `interactive.py` | 47% |
+| `lock.py` | 79% | `merge.py` | 80% |
+| `operations.py` | 82% | `save_deploy_ops.py` | 75% |
+| `secrets.py` | 86% | `section.py` | **95%** |
+| `status_ops.py` | **89%** | `ui.py` | 78% |
+| `utils.py` | 81% | `vault.py` | 85% |
+| **TOTAL** | **66%** | **(7383 lines)** | |

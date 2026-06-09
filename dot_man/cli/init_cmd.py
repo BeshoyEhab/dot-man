@@ -1,5 +1,6 @@
 """Init command for dot-man CLI."""
 
+import logging
 import shutil
 import subprocess
 import sys
@@ -102,7 +103,7 @@ def init(
                 if result.returncode == 0:
                     current_branch = result.stdout.strip()
             except Exception:
-                pass
+                logging.debug("Failed to get current branch from source repo")
 
             # Copy entire repo including .git
             shutil.copytree(source_path, REPO_DIR, dirs_exist_ok=True)
@@ -115,7 +116,7 @@ def init(
                 if current_branch in git.list_branches():
                     git.checkout(current_branch)
             except Exception:
-                pass
+                logging.debug("Failed to checkout branch after import")
 
             ui.success(f"Imported dotfiles from {source_path}")
         else:
@@ -128,6 +129,7 @@ def init(
             git.repo.config_reader().get_value("user", "name")
             git.repo.config_reader().get_value("user", "email")
         except Exception:
+            logging.debug("Git user config not found, will set defaults")
             ui.console.print()
             ui.warn("Git user configuration not found. Setting defaults...")
             with git.repo.config_writer() as config:

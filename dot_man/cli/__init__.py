@@ -10,6 +10,7 @@ from .backup_cmd import backup
 from .branch_cmd import branch
 from .clean_cmd import clean
 from .common import (
+    BRANCH,
     DotManGroup,
     _clear_completion_cache,
     _set_git_runner,
@@ -17,6 +18,7 @@ from .common import (
     complete_commits,
     complete_config_keys,
     complete_profiles,
+    complete_sections,
     complete_switch_args,
     complete_tags,
     complete_template_keys,
@@ -72,7 +74,9 @@ __all__ = [
     "complete_template_keys",
     "complete_config_keys",
     "complete_profiles",
+    "complete_sections",
     "complete_switch_args",
+    "BRANCH",
     "parse_branch_arg",
     "get_secret_handler",
     "_set_git_runner",

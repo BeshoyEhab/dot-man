@@ -1,6 +1,6 @@
 """DotMan configuration file parser (TOML/YAML)."""
 
-__all__ = ["DotManConfig"]
+__all__ = ["DotManConfig", "VALID_SECTION_KEYS"]
 
 import logging
 import sys
@@ -27,6 +27,28 @@ from .constants import (
 from .exceptions import ConfigurationError, ConfigValidationError
 from .global_config import GlobalConfig, write_config_file
 from .section import Section
+
+VALID_SECTION_KEYS = {
+    "paths",
+    "repo_base",
+    "repo_path",
+    "secrets_filter",
+    "update_strategy",
+    "include",
+    "exclude",
+    "pre_deploy",
+    "post_deploy",
+    "on_activate",
+    "on_deactivate",
+    "inherits",
+    "ignored_directories",
+    "follow_symlinks",
+    "deploy_method",
+    "encrypted",
+    "encryption_method",
+    "encryption_recipient",
+}
+"""Canonical set of valid keys for section config."""
 
 
 class DotManConfig:
@@ -93,34 +115,18 @@ class DotManConfig:
         warnings = self._validate_schema()
         if warnings:
             for w in warnings:
-                logging.warning("Config warning: {w}")
+                logging.warning(f"Config warning: {w}")
 
     def _validate_schema(self) -> list[str]:
         """Validate config structure on load."""
         warnings: list[str] = []
-        valid_section_keys = {
-            "paths",
-            "repo_base",
-            "repo_path",
-            "secrets_filter",
-            "update_strategy",
-            "include",
-            "exclude",
-            "pre_deploy",
-            "post_deploy",
-            "on_activate",
-            "on_deactivate",
-            "inherits",
-            "ignored_directories",
-            "follow_symlinks",
-        }
 
         for name, section in self._data.items():
             if name in ("templates", "secrets"):
                 continue
             if isinstance(section, dict):
                 for key in section:
-                    if key not in valid_section_keys:
+                    if key not in VALID_SECTION_KEYS:
                         warnings.append(f"[{name}]: Unknown key '{key}'")
         return warnings
 
@@ -332,6 +338,15 @@ class DotManConfig:
                 f"Valid options: {VALID_UPDATE_STRATEGIES}"
             )
 
+        # Validate deploy_method
+        deploy_method = settings.get("deploy_method", "copy")
+        valid_methods = ["copy", "symlink"]
+        if deploy_method not in valid_methods:
+            raise ConfigValidationError(
+                f"Invalid deploy_method '{deploy_method}' in [{name}]. "
+                f"Valid options: {valid_methods}"
+            )
+
         # Build Section object
         return Section(
             name=name,
@@ -349,6 +364,7 @@ class DotManConfig:
             inherits=inherits,
             ignored_directories=settings.get("ignored_directories"),
             follow_symlinks=settings.get("follow_symlinks"),
+            deploy_method=settings.get("deploy_method", "copy"),
         )
 
     def add_section(
@@ -389,20 +405,7 @@ class DotManConfig:
         }
 
         # Add optional fields
-        for key in [
-            "secrets_filter",
-            "update_strategy",
-            "include",
-            "exclude",
-            "pre_deploy",
-            "post_deploy",
-            "on_activate",
-            "on_deactivate",
-            "inherits",
-            "repo_path",
-            "ignored_directories",
-            "follow_symlinks",
-        ]:
+        for key in VALID_SECTION_KEYS - {"paths", "repo_base"}:
             if key in kwargs and kwargs[key]:
                 section_data[key] = kwargs[key]
 
@@ -422,25 +425,8 @@ class DotManConfig:
         if name not in self._data or name == "templates":
             raise ConfigurationError(f"Section not found: {name}")
 
-        valid_keys = {
-            "paths",
-            "repo_base",
-            "repo_path",
-            "secrets_filter",
-            "update_strategy",
-            "include",
-            "exclude",
-            "pre_deploy",
-            "post_deploy",
-            "on_activate",
-            "on_deactivate",
-            "inherits",
-            "ignored_directories",
-            "follow_symlinks",
-        }
-
         for key, value in kwargs.items():
-            if key not in valid_keys:
+            if key not in VALID_SECTION_KEYS:
                 raise ConfigurationError(f"Unknown key: {key}")
             if value is None:
                 # Remove the key if set to None
@@ -493,24 +479,8 @@ class DotManConfig:
                         warnings.append(f"[{name}]: Template not found: {template}")
 
                 # Check for invalid keys
-                valid_keys = {
-                    "paths",
-                    "repo_base",
-                    "repo_path",
-                    "secrets_filter",
-                    "update_strategy",
-                    "include",
-                    "exclude",
-                    "pre_deploy",
-                    "post_deploy",
-                    "on_activate",
-                    "on_deactivate",
-                    "inherits",
-                    "ignored_directories",
-                    "follow_symlinks",
-                }
                 for key in self._data[name]:
-                    if key not in valid_keys:
+                    if key not in VALID_SECTION_KEYS:
                         warnings.append(f"[{name}]: Unknown key '{key}'")
 
             except Exception as e:

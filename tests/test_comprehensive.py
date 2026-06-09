@@ -158,7 +158,7 @@ class TestBranchParamType:
 
     def test_convert_branch(self):
         """Test converting branch name."""
-        from dot_man.cli.switch_cmd import BranchParamType
+        from dot_man.cli.common import BranchParamType
 
         param = BranchParamType()
         result = param.convert("main", None, None)
@@ -166,7 +166,7 @@ class TestBranchParamType:
 
     def test_convert_commit(self):
         """Test converting commit SHA."""
-        from dot_man.cli.switch_cmd import BranchParamType
+        from dot_man.cli.common import BranchParamType
 
         param = BranchParamType()
         result = param.convert("abc1234", None, None)

@@ -131,6 +131,13 @@ class BranchMixin:
                 result["saved_count"] = save_result["saved"]
                 result["secrets_redacted"] = len(save_result["secrets"])
                 result["errors"].extend(save_result["errors"])
+                # Warn about symlinked paths
+                symlinks: list[Path] = save_result.get("symlinks", [])
+                for sym_path in symlinks:
+                    result["errors"].append(
+                        f"⚠ {sym_path} is a symlink → {sym_path.resolve()}. "
+                        f"Edits affect the symlink target, not the config folder."
+                    )
 
                 commit_msg = f"Auto-save from '{current_branch}' before switch to '{target_branch}'"
                 self.git.commit(commit_msg)
@@ -195,7 +202,7 @@ class BranchMixin:
                 self.global_config.current_branch = target_branch
                 self.global_config.save()
 
-            # Clear file comparison cache since files have likely changed
+                # Clear file comparison cache since files have likely changed
             clear_comparison_cache()
 
         return result
@@ -299,9 +306,17 @@ class BranchMixin:
 
             for pattern, hook_name in FILE_TO_HOOK_MAP.items():
                 if pattern in file_str or file_str.endswith(pattern):
-                    hook_cmd = get_hook_for_config(pattern)
-                    if hook_cmd:
-                        hooks_to_run.add(hook_cmd)
+                    # Try to resolve the hook alias first
+                    from .constants import HOOK_ALIASES
+
+                    if hook_name in HOOK_ALIASES:
+                        resolved_cmd: str = HOOK_ALIASES[hook_name]
+                        hooks_to_run.add(resolved_cmd)
+                    else:
+                        # Fallback to get_hook_for_config
+                        fallback_cmd = get_hook_for_config(pattern)
+                        if fallback_cmd:
+                            hooks_to_run.add(fallback_cmd)
                     break
 
             section_name = self._find_section_for_file(file_path)

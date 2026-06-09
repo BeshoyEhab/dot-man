@@ -15,6 +15,8 @@ from .files import (
     compare_files,
     copy_directory,
     copy_file,
+    deploy_directory_with_symlinks,
+    deploy_file_or_symlink,
 )
 from .lock import FileLock
 from .secrets import SecretMatch
@@ -118,16 +120,17 @@ class SaveDeployMixin:
         self,
         section: Section,
         secret_handler: Optional[Callable[[SecretMatch], str]] = None,
-    ) -> tuple[int, list[SecretMatch], list[str]]:
+    ) -> tuple[int, list[SecretMatch], list[str], list[Path]]:
         """
         Save a section from local to repo.
 
         Returns:
-            (files_saved, secrets_detected, errors)
+            (files_saved, secrets_detected, errors, symlink_paths)
         """
         saved = 0
         all_secrets: list[SecretMatch] = []
         errors: list[str] = []
+        symlink_paths: list[Path] = []
 
         # Enhanced secret handler that also stashes to vault
         def wrapped_handler(match: SecretMatch) -> str:
@@ -163,6 +166,10 @@ class SaveDeployMixin:
             if not local_path.exists():
                 continue
 
+            # Warn if path is a symlink (real content lives elsewhere)
+            if local_path.is_symlink():
+                symlink_paths.append(local_path)
+
             repo_path = section.get_repo_path(local_path, REPO_DIR)
 
             try:
@@ -195,7 +202,7 @@ class SaveDeployMixin:
             except (OSError, IOError) as e:
                 errors.append(f"Error processing {local_path}: {e}")
 
-        return saved, all_secrets, errors
+        return saved, all_secrets, errors, symlink_paths
 
     def deploy_section(self, section: Section) -> tuple[int, bool, list[str]]:
         """
@@ -237,28 +244,44 @@ class SaveDeployMixin:
 
             try:
                 if repo_path.is_file():
-                    success, _ = copy_file(
-                        repo_path, local_path, filter_secrets_enabled=False
-                    )
-                    if success:
-                        if section.secrets_filter:
-                            restore_file_secrets(local_path)
-                        deployed += 1
+                    if section.deploy_method == "symlink":
+                        symlinked, _ = deploy_file_or_symlink(
+                            repo_path, local_path, deploy_method="symlink"
+                        )
+                        if symlinked:
+                            deployed += 1
+                    else:
+                        success, _ = copy_file(
+                            repo_path, local_path, filter_secrets_enabled=False
+                        )
+                        if success:
+                            if section.secrets_filter:
+                                restore_file_secrets(local_path)
+                            deployed += 1
                 else:
-                    files_copied, files_failed, _ = copy_directory(
-                        repo_path,
-                        local_path,
-                        filter_secrets_enabled=False,
-                        include_patterns=section.include,
-                        exclude_patterns=final_excludes,
-                        follow_symlinks=section.follow_symlinks,
-                    )
-                    if section.secrets_filter:
-                        for deployed_file in local_path.rglob("*"):
-                            if deployed_file.is_file():
-                                restore_file_secrets(deployed_file)
+                    if section.deploy_method == "symlink":
+                        files_symlinked, files_failed = deploy_directory_with_symlinks(
+                            repo_path,
+                            local_path,
+                            include_patterns=section.include,
+                            exclude_patterns=final_excludes,
+                        )
+                        deployed += files_symlinked
+                    else:
+                        files_copied, files_failed, _ = copy_directory(
+                            repo_path,
+                            local_path,
+                            filter_secrets_enabled=False,
+                            include_patterns=section.include,
+                            exclude_patterns=final_excludes,
+                            follow_symlinks=section.follow_symlinks,
+                        )
+                        if section.secrets_filter:
+                            for deployed_file in local_path.rglob("*"):
+                                if deployed_file.is_file():
+                                    restore_file_secrets(deployed_file)
 
-                    deployed += files_copied
+                        deployed += files_copied
                     if files_failed > 0:
                         errors.append(
                             f"Failed to deploy {files_failed} files in {local_path}"
@@ -355,32 +378,59 @@ class SaveDeployMixin:
 
                     try:
                         if repo_path.is_file():
-                            success, _ = copy_file(
-                                repo_path, local_path, filter_secrets_enabled=False
-                            )
-                            if success:
-                                if section.secrets_filter:
-                                    restore_file_secrets(local_path)
-                                deployed_count += 1
-                            else:
-                                item_errors.append(
-                                    f"Failed to copy {repo_path} to {local_path}"
+                            if section.deploy_method == "symlink":
+                                symlinked, _ = deploy_file_or_symlink(
+                                    repo_path,
+                                    local_path,
+                                    deploy_method="symlink",
                                 )
+                                if symlinked:
+                                    deployed_count += 1
+                                else:
+                                    item_errors.append(
+                                        f"Failed to symlink {repo_path} to {local_path}"
+                                    )
+                            else:
+                                success, _ = copy_file(
+                                    repo_path,
+                                    local_path,
+                                    filter_secrets_enabled=False,
+                                )
+                                if success:
+                                    if section.secrets_filter:
+                                        restore_file_secrets(local_path)
+                                    deployed_count += 1
+                                else:
+                                    item_errors.append(
+                                        f"Failed to copy {repo_path} to {local_path}"
+                                    )
                         elif repo_path.is_dir():
-                            files_copied, files_failed, _ = copy_directory(
-                                repo_path,
-                                local_path,
-                                filter_secrets_enabled=False,
-                                include_patterns=section.include,
-                                exclude_patterns=final_excludes,
-                                follow_symlinks=section.follow_symlinks,
-                            )
-                            if section.secrets_filter:
-                                for deployed_file in local_path.rglob("*"):
-                                    if deployed_file.is_file():
-                                        restore_file_secrets(deployed_file)
+                            if section.deploy_method == "symlink":
+                                (
+                                    files_symlinked,
+                                    files_failed,
+                                ) = deploy_directory_with_symlinks(
+                                    repo_path,
+                                    local_path,
+                                    include_patterns=section.include,
+                                    exclude_patterns=final_excludes,
+                                )
+                                deployed_count += files_symlinked
+                            else:
+                                files_copied, files_failed, _ = copy_directory(
+                                    repo_path,
+                                    local_path,
+                                    filter_secrets_enabled=False,
+                                    include_patterns=section.include,
+                                    exclude_patterns=final_excludes,
+                                    follow_symlinks=section.follow_symlinks,
+                                )
+                                if section.secrets_filter:
+                                    for deployed_file in local_path.rglob("*"):
+                                        if deployed_file.is_file():
+                                            restore_file_secrets(deployed_file)
 
-                            deployed_count += files_copied
+                                deployed_count += files_copied
                             if files_failed > 0:
                                 item_errors.append(
                                     f"Failed to deploy {files_failed} files in {local_path}"
@@ -428,12 +478,13 @@ class SaveDeployMixin:
     ) -> dict:
         """
         Save all sections from local to repo.
-        Returns dict with keys: 'saved', 'secrets', 'errors'
+        Returns dict with keys: 'saved', 'secrets', 'errors', 'symlinks'
         """
         with FileLock(LOCK_FILE):
             total_saved = 0
             all_secrets: list[SecretMatch] = []
             all_errors: list[str] = []
+            all_symlinks: list[Path] = []
 
             sections = [self.get_section(name) for name in self.get_sections()]
 
@@ -445,14 +496,20 @@ class SaveDeployMixin:
 
                 for future in as_completed(future_to_section):
                     try:
-                        saved, secrets, errors = future.result()
+                        saved, secrets, errors, symlinks = future.result()
                         total_saved += saved
                         all_secrets.extend(secrets)
                         all_errors.extend(errors)
+                        all_symlinks.extend(symlinks)
                     except Exception as e:
                         all_errors.append(f"Critical error saving section: {e}")
 
-            return {"saved": total_saved, "secrets": all_secrets, "errors": all_errors}
+            return {
+                "saved": total_saved,
+                "secrets": all_secrets,
+                "errors": all_errors,
+                "symlinks": all_symlinks,
+            }
 
     def deploy_all(self) -> dict:
         """

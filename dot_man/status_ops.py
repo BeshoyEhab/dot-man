@@ -155,7 +155,7 @@ class StatusMixin:
             List of absolute paths to orphaned files.
         """
         repo_files: set[Path] = set()
-        internal_files = {".gitignore", "dot-man.toml", "dot-man.ini"}
+        internal_files = {".gitignore", "dot-man.toml"}
 
         for root, dirs, files in os.walk(REPO_DIR):
             root_path = Path(root)

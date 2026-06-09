@@ -1,5 +1,7 @@
 """Git operations wrapper for dot-man."""
 
+import logging
+
 __all__ = ["GitManager"]
 
 from pathlib import Path
@@ -328,7 +330,7 @@ class GitManager:
                 if tag.commit.hexsha.startswith(sha[:7]):
                     tags.append(tag.name)
         except Exception:
-            pass
+            logging.debug("Failed to get tags for commit %s", sha)
         return tags
 
     def delete_branch(self, name: str, force: bool = False) -> None:
@@ -439,7 +441,7 @@ class GitManager:
                 try:
                     self.repo.git.stash("pop")
                 except Exception:
-                    pass  # Best effort
+                    logging.debug("Failed to restore stash after pull conflict error")
 
             if "CONFLICT" in str(e.stdout) or "conflict" in str(e.stderr):
                 raise GitOperationError(
@@ -454,7 +456,7 @@ class GitManager:
                 try:
                     self.repo.git.stash("pop")
                 except Exception:
-                    pass  # Best effort
+                    logging.debug("Failed to restore stash after pull OSError")
             raise GitOperationError(f"Failed to pull: {e}")
 
     def push(self, set_upstream: bool = True) -> str:

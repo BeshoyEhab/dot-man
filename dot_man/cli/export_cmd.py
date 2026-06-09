@@ -10,7 +10,13 @@ import click
 
 from .. import ui
 from ..constants import REPO_DIR
-from .common import AliasedCommand, error, require_init, success
+from .common import (
+    AliasedCommand,
+    complete_branches,
+    error,
+    require_init,
+    success,
+)
 from .interface import cli as main
 
 
@@ -21,6 +27,7 @@ from .interface import cli as main
     "--branch",
     "-b",
     default=None,
+    shell_complete=complete_branches,
     help="Export specific branch (default: current branch)",
 )
 @click.option(

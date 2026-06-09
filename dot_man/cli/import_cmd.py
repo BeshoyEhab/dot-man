@@ -157,8 +157,10 @@ def _import_chezmoi(source_path: str | None, dry_run: bool, git: GitManager):
                 "chezmoi source not found. Install chezmoi first or use --path.",
                 exit_code=1,
             )
-    assert source_path is not None
-
+            return
+    if source_path is None:
+        error("Source path is required", exit_code=1)
+        return
     source = Path(source_path).expanduser().resolve()
 
     if not source.exists():
@@ -210,8 +212,10 @@ def _import_yadm(source_path: str | None, dry_run: bool, git: GitManager):
             error(
                 "yadm source not found. Install yadm first or use --path.", exit_code=1
             )
-    assert source_path is not None
-
+            return
+    if source_path is None:
+        error("Source path is required", exit_code=1)
+        return
     source = Path(source_path).expanduser().resolve()
 
     if not source.exists():
@@ -255,8 +259,10 @@ def _import_stow(source_path: str | None, dry_run: bool, git: GitManager):
         source_path = _detect_stow()
         if source_path is None:
             error("Stow packages not found. Use --path to specify.", exit_code=1)
-    assert source_path is not None
-
+            return
+    if source_path is None:
+        error("Source path is required", exit_code=1)
+        return
     source = Path(source_path).expanduser().resolve()
 
     if not source.exists():

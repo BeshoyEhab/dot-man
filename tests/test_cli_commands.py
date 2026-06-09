@@ -382,7 +382,7 @@ class TestQuickshellHooks:
 
         cmd = HOOK_ALIASES["quickshell_reload"]
         assert "qs" in cmd
-        assert "{qs_config}" in cmd  # Has placeholder for config dir
+        assert "{config_name}" in cmd  # General placeholder for config directory
 
     def test_quickshell_restart_command(self):
         """Verify quickshell_restart has correct command."""

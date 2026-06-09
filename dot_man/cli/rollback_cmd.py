@@ -1,5 +1,6 @@
 """Rollback command for dot-man — revert to a previous deployment state."""
 
+import logging
 from pathlib import Path
 from typing import cast
 
@@ -8,12 +9,19 @@ from rich.table import Table
 
 from .. import ui
 from ..exceptions import DotManError
-from .common import AliasedCommand, error, require_init, success, warn
+from .common import (
+    AliasedCommand,
+    complete_commits,
+    error,
+    require_init,
+    success,
+    warn,
+)
 from .interface import cli as main
 
 
 @main.command("rollback", cls=AliasedCommand, aliases=["rol"])
-@click.argument("target", required=False)
+@click.argument("target", required=False, shell_complete=complete_commits)
 @click.option(
     "--list",
     "list_only",
@@ -97,8 +105,11 @@ def rollback(
                 )
             display_target = f"HEAD~{steps}"
 
-        assert resolved_sha is not None
+        if resolved_sha is None:
+            error("Could not resolve commit SHA for rollback target", exit_code=1)
+            return
 
+        resolved_sha = cast(str, resolved_sha)
         # ── Show what we're rolling back to ───────────────────────────────────
         commit_obj = git.repo.commit(resolved_sha)
         msg_first_line = str(commit_obj.message).strip().split("\n")[0]
@@ -140,7 +151,7 @@ def rollback(
             else:
                 ui.console.print("[dim]No file differences detected.[/dim]")
         except Exception:
-            pass
+            logging.debug("Failed to compute diff for rollback preview")
 
         ui.console.print()
 

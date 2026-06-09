@@ -19,7 +19,16 @@ from .common import DotManGroup
 @click.option("--debug", is_flag=True, help="Enable debug logging to file")
 @click.pass_context
 def cli(ctx, verbose: bool, debug: bool):
-    """dot-man: The Dotfile Manager for Professionals."""
+    """dot-man: The Dotfile Manager for Professionals.
+
+    Git-powered branching for your dotfiles. Switch between configurations
+    (work, personal, minimal, server) on the fly — each branch is a
+    complete dotfile environment.
+
+    Supports deploy_method = "symlink" for edit-in-place workflows,
+    auto-detected post-deploy hooks, and import from chezmoi, yadm,
+    and GNU Stow.
+    """
     # Ensure config dir exists for logs
     if not DOT_MAN_DIR.exists():
         try:

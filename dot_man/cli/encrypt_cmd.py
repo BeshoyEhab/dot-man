@@ -11,13 +11,20 @@ from ..encryption import (
     EncryptionManager,
     detect_available_encryption,
 )
-from .common import AliasedCommand, error, require_init, success, warn
+from .common import (
+    AliasedCommand,
+    complete_sections,
+    error,
+    require_init,
+    success,
+    warn,
+)
 from .interface import cli as main
 
 
 @main.command("encrypt", cls=AliasedCommand, aliases=["enc"])
 @click.argument("action", type=click.Choice(["encrypt", "decrypt", "status"]))
-@click.argument("section", required=False)
+@click.argument("section", required=False, shell_complete=complete_sections)
 @click.option(
     "--method",
     "-m",
@@ -111,10 +118,13 @@ def _encrypt_section(
     ops = get_operations()
     config = DotManConfig()
 
-    assert section_name is not None
+    if section_name is None:
+        error("Section name is required", exit_code=1)
+        return
     section = ops.get_section(section_name)
     if not section:
         error(f"Section not found: {section_name}", exit_code=1)
+        return
 
     if recipient is None:
         if section.encryption_recipient:
@@ -124,6 +134,7 @@ def _encrypt_section(
                 "No recipient specified. Use --recipient or set encryption_recipient in config",
                 exit_code=1,
             )
+            return
 
     ui.console.print(f"[dim]Encrypting section: {section_name}[/dim]")
 
@@ -132,7 +143,9 @@ def _encrypt_section(
     for path_str in section.paths:
         local_path = Path(path_str).expanduser()
         repo_dir_str = ops.git.repo.working_dir
-        assert repo_dir_str is not None
+        if repo_dir_str is None:
+            error("Failed to determine repo working directory", exit_code=1)
+            return
         repo_path = section.get_repo_path(local_path, Path(repo_dir_str))
 
         if not local_path.exists():
@@ -171,10 +184,13 @@ def _decrypt_section(
     ops = get_operations()
     config = DotManConfig()
 
-    assert section_name is not None
+    if section_name is None:
+        error("Section name is required", exit_code=1)
+        return
     section = ops.get_section(section_name)
     if not section:
         error(f"Section not found: {section_name}", exit_code=1)
+        return
 
     ui.console.print(f"[dim]Decrypting section: {section_name}[/dim]")
 
@@ -183,7 +199,9 @@ def _decrypt_section(
     for path_str in section.paths:
         local_path = Path(path_str).expanduser()
         repo_dir_str = ops.git.repo.working_dir
-        assert repo_dir_str is not None
+        if repo_dir_str is None:
+            error("Failed to determine repo working directory", exit_code=1)
+            return
         repo_path = section.get_repo_path(local_path, Path(repo_dir_str))
 
         encrypted_path = repo_path.with_suffix(repo_path.suffix + ".gpg")
@@ -198,7 +216,9 @@ def _decrypt_section(
         except EncryptionError as e:
             warn(f"Failed to decrypt {local_path.name}: {e}")
 
-    assert section_name is not None
+    if section_name is None:
+        error("Section name is required", exit_code=1)
+        return
     config.update_section(section_name, encrypted=False)
     config.save()
 

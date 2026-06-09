@@ -1,6 +1,7 @@
 """Common utilities for dot-man CLI commands."""
 
 import json
+import logging
 import os
 import re
 import subprocess
@@ -127,6 +128,20 @@ def require_init(func):
             ui.console.print()
             ui.console.print("[bold]The Dotfile Manager for Professionals[/bold]")
             ui.console.print()
+            ui.console.print("[bold cyan]Coming from another tool?[/bold cyan]")
+            ui.console.print(
+                "  [cyan]dot-man import chezmoi[/cyan]    - Import from chezmoi"
+            )
+            ui.console.print(
+                "  [cyan]dot-man import yadm[/cyan]       - Import from yadm"
+            )
+            ui.console.print(
+                "  [cyan]dot-man import stow[/cyan]       - Import from GNU Stow"
+            )
+            ui.console.print(
+                "  [cyan]dot-man import all[/cyan]        - Auto-detect and import"
+            )
+            ui.console.print()
             ui.console.print("[bold cyan]Get started:[/bold cyan]")
             ui.console.print(
                 "  [cyan]dot-man init[/cyan]              - Initialize your dotfiles repository"
@@ -214,6 +229,7 @@ def _get_completion_cache() -> dict:
                 _memory_cache_time = time.time()
                 return _memory_cache
     except Exception:
+        logging.debug("Failed to load completion cache from file")
         pass
 
     _memory_cache = {}
@@ -233,6 +249,7 @@ def _save_completion_cache(data: dict) -> None:
         _COMPLETION_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
         _COMPLETION_CACHE_FILE.write_text(json.dumps(data))
     except Exception:
+        logging.debug("Failed to save completion cache to file")
         pass
 
 
@@ -246,6 +263,9 @@ def _clear_completion_cache() -> None:
         if _COMPLETION_CACHE_FILE.exists():
             _COMPLETION_CACHE_FILE.unlink()
     except Exception:
+        logging.debug(
+            "Failed to unlink completion cache file in _clear_completion_cache"
+        )
         pass
 
 
@@ -264,6 +284,7 @@ def _clear_all_caches() -> None:
         if _COMPLETION_CACHE_FILE.exists():
             _COMPLETION_CACHE_FILE.unlink()
     except Exception:
+        logging.debug("Failed to unlink completion cache file in _clear_all_caches")
         pass
 
 
@@ -302,6 +323,20 @@ def parse_branch_arg(arg: str) -> dict:
         logging.debug(f"Could not check tags: {e}")
 
     return {"type": "branch", "base": arg, "target": arg}
+
+
+class BranchParamType(click.ParamType):
+    """Parameter type that accepts branch, branch@tag, or commit SHA."""
+
+    name = "branch"
+
+    def convert(self, value, param, ctx):
+        if not value:
+            return None
+        return parse_branch_arg(value)
+
+
+BRANCH = BranchParamType()
 
 
 def complete_switch_args(ctx, param, incomplete):
@@ -419,6 +454,7 @@ def _complete_navigate_items(
         _save_completion_cache(cache)
         return items
     except Exception:
+        logging.debug("Failed to complete navigate items")
         return []
 
 
@@ -437,6 +473,7 @@ def complete_branches(ctx, param, incomplete):
             branches = cache["branches"]
         return [b for b in branches if b.startswith(incomplete)]
     except Exception:
+        logging.debug("Failed to complete branches")
         return []
 
 
@@ -453,6 +490,7 @@ def complete_tags(ctx, param, incomplete):
             tags = cache["tags"]
         return [t for t in tags if t.startswith(incomplete)]
     except Exception:
+        logging.debug("Failed to complete tags")
         return []
 
 
@@ -473,6 +511,7 @@ def complete_commits(ctx, param, incomplete):
             commits = cache["commits_all"]
         return [c for c in commits if c.startswith(incomplete)]
     except Exception:
+        logging.debug("Failed to complete commits")
         return []
 
 
@@ -491,6 +530,7 @@ def complete_template_keys(ctx, param, incomplete):
         _template_cache = list(templates.keys())
         return [k for k in _template_cache if k.startswith(incomplete)]
     except Exception:
+        logging.debug("Failed to complete template keys")
         return []
 
 
@@ -512,6 +552,7 @@ def complete_config_keys(ctx, param, incomplete):
         _config_keys_cache = keys
         return [k for k in keys if k.startswith(incomplete)]
     except Exception:
+        logging.debug("Failed to complete config keys")
         return []
 
 
@@ -530,6 +571,22 @@ def complete_profiles(ctx, param, incomplete):
         _profiles_cache = list(profiles.keys())
         return [k for k in _profiles_cache if k.startswith(incomplete)]
     except Exception:
+        logging.debug("Failed to complete profiles")
+        return []
+
+
+def complete_sections(ctx, param, incomplete):
+    """Shell completion callback for section names."""
+    try:
+        from ..dotman_config import DotManConfig
+
+        config = DotManConfig()
+        config.load()
+        return [
+            name for name in config.get_section_names() if name.startswith(incomplete)
+        ]
+    except Exception:
+        logging.debug("Failed to complete sections")
         return []
 
 

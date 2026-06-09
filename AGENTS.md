@@ -11,7 +11,7 @@ This file contains instructions for AI models working on the dot-man project.
 - **Language**: Python 3.9+
 - **CLI Framework**: Click
 - **Testing**: pytest
-- **Current Version**: 1.1.1 (Stable)
+- **Current Version**: 1.2.0 (Stable)
 
 ---
 
@@ -341,6 +341,48 @@ When releasing a new version:
 
 ---
 
+## Section Config Fields
+
+When working with Section config, here are the available fields:
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `paths` | `list[str]` | required | File/directory paths to track |
+| `repo_base` | `str` | auto | Base directory name in repo |
+| `repo_path` | `str` | None | Explicit repo path for single files |
+| `secrets_filter` | `bool` | `true` | Enable secret detection |
+| `update_strategy` | `str` | `"replace"` | `"replace"`, `"rename_old"`, `"ignore"` |
+| `deploy_method` | `str` | `"copy"` | `"copy"` or `"symlink"` |
+| `include` | `list[str]` | `[]` | Glob patterns to include |
+| `exclude` | `list[str]` | `[]` | Glob patterns to exclude |
+| `pre_deploy` | `str` | None | Command to run before deploy |
+| `post_deploy` | `str` | None | Command to run after deploy |
+| `on_activate` | `str` | None | Command when branch is activated |
+| `on_deactivate` | `str` | None | Command when branch is deactivated |
+| `inherits` | `list[str]` | `[]` | Template names to inherit |
+| `follow_symlinks` | `bool` | `false` | Follow symlinks during traversal |
+
+### Quickshell Config Example
+
+Quickshell is managed through the default hooks system — users define
+`on_activate` and `on_deactivate` in their section config:
+
+```toml
+[quickshell-ii]
+paths = ["~/.config/quickshell/ii"]
+deploy_method = "copy"
+post_deploy = "quickshell_reload"
+on_deactivate = "killall qs 2>/dev/null || true"
+on_activate = "qs -c ii &"
+```
+
+The `quickshell_reload`, `quickshell_restart`, and `quickshell_validate`
+hook aliases are available in `HOOK_ALIASES` and can be referenced by name.
+The `{qs_config}` placeholder is resolved automatically from the section's
+paths when using these aliases via `Section._resolve_hook()`.
+
+---
+
 ## Project Structure
 
 ```
@@ -408,9 +450,13 @@ AI models should focus on the following core needs of the project:
 - **Hook Scripts Directory**: Support executing custom hook scripts located in a specific folder.
 - **Plugin API**: Create an extension mechanism for third-party tools (e.g., integrating `pro-mgr`).
 
-### 3. Future Enhancements (v2.0+)
+### 3. v1.2.0 - Completed
 
-- **Symlink Mode**: Option to symlink files instead of copying them.
+- **Symlink Mode**: Option to symlink files instead of copying them (`deploy_method = "symlink"`). ✅
+- **Quickshell Hook Aliases**: Built-in `quickshell_reload`, `quickshell_restart`, and `quickshell_validate` hook aliases with `{qs_config}` placeholder resolution. ✅
+
+### 4. Future Enhancements (v2.0+)
+
 - **Cloud sync backends**: Native support for S3, Google Drive, and Dropbox.
 - **YAML Config Auto-Preservation**: Ensure changes to YAML configs are saved back as YAML, not converted to TOML.
 

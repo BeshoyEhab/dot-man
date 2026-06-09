@@ -242,6 +242,7 @@ def watch(interval: float, commit: bool, message: str, dry_run: bool):
                 saved = result["saved"]
                 secrets = len(result["secrets"])
                 errors = result["errors"]
+                symlinks = result.get("symlinks", [])
 
                 if saved == 0:
                     return  # Nothing actually changed on disk
@@ -256,6 +257,9 @@ def watch(interval: float, commit: bool, message: str, dry_run: bool):
                 if errors:
                     for e in errors:
                         warn(f"    {e}")
+
+                for sym_path in symlinks:
+                    ui.console.print(f"    [yellow]⚠ {sym_path} is a symlink[/yellow]")
 
                 if commit:
                     if message == "auto":

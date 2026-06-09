@@ -1,96 +1,338 @@
-"""Tests for encryption module."""
+"""Tests for dot_man.encryption — EncryptionManager."""
+
+from __future__ import annotations
+
+import os
+import subprocess
+from unittest.mock import MagicMock, patch
+
+import pytest
+
+from dot_man.encryption import (
+    EncryptionError,
+    EncryptionManager,
+    detect_available_encryption,
+    is_age_available,
+    is_gpg_available,
+)
 
 
 class TestEncryptionManager:
-    """Test EncryptionManager class."""
+    def test_encrypt_gpg(self, tmp_path):
+        mgr = EncryptionManager(method="gpg")
+        inp = tmp_path / "plain.txt"
+        out = tmp_path / "encrypted.asc"
+        inp.write_text("secret data")
 
-    def test_encryption_manager_init_gpg(self):
-        """Test EncryptionManager with GPG."""
-        from dot_man.encryption import EncryptionManager
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            mgr.encrypt_file(inp, out, recipient="test@example.com")
 
-        enc = EncryptionManager("gpg")
-        assert enc.method == "gpg"
+        mock_run.assert_called_once()
+        args = mock_run.call_args[0][0]
+        assert "gpg" in args
+        assert "--encrypt" in args
+        assert "--recipient" in args
+        assert "test@example.com" in args
 
-    def test_encryption_manager_init_age(self):
-        """Test EncryptionManager with AGE."""
-        from dot_man.encryption import EncryptionManager
+    def test_encrypt_gpg_symmetric(self, tmp_path):
+        mgr = EncryptionManager(method="gpg")
+        inp = tmp_path / "plain.txt"
+        out = tmp_path / "encrypted.asc"
+        inp.write_text("secret data")
 
-        enc = EncryptionManager("age")
-        assert enc.method == "age"
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            mgr.encrypt_file(inp, out)
 
-    def test_is_gpg_available(self):
-        """Test GPG availability check."""
-        from dot_man.encryption import is_gpg_available
+        args = mock_run.call_args[0][0]
+        assert "--symmetric" in args
+        assert "--recipient" not in args
 
-        result = is_gpg_available()
-        assert isinstance(result, bool)
+    def test_encrypt_gpg_error(self, tmp_path):
+        mgr = EncryptionManager(method="gpg")
+        inp = tmp_path / "plain.txt"
+        out = tmp_path / "encrypted.asc"
+        inp.write_text("data")
 
-    def test_is_age_available(self):
-        """Test AGE availability check."""
-        from dot_man.encryption import is_age_available
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=1, stderr="bad key")
+            with pytest.raises(EncryptionError, match="GPG encryption failed"):
+                mgr.encrypt_file(inp, out)
 
-        result = is_age_available()
-        assert isinstance(result, bool)
+    def test_encrypt_gpg_not_found(self, tmp_path):
+        mgr = EncryptionManager(method="gpg")
+        inp = tmp_path / "plain.txt"
+        out = tmp_path / "encrypted.asc"
+        inp.write_text("data")
 
-    def test_detect_available_encryption(self):
-        """Test encryption method detection."""
-        from dot_man.encryption import detect_available_encryption
+        with patch("subprocess.run", side_effect=FileNotFoundError):
+            with pytest.raises(EncryptionError, match="GPG not installed"):
+                mgr.encrypt_file(inp, out)
 
-        result = detect_available_encryption()
-        assert isinstance(result, list)
+    def test_encrypt_gpg_timeout(self, tmp_path):
+        mgr = EncryptionManager(method="gpg")
+        inp = tmp_path / "plain.txt"
+        out = tmp_path / "encrypted.asc"
+        inp.write_text("data")
+
+        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired("gpg", 30)):
+            with pytest.raises(EncryptionError, match="timed out"):
+                mgr.encrypt_file(inp, out)
+
+    def test_encrypt_age(self, tmp_path):
+        mgr = EncryptionManager(method="age")
+        inp = tmp_path / "plain.txt"
+        out = tmp_path / "encrypted.age"
+        inp.write_text("secret")
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            mgr.encrypt_file(inp, out, recipient="age1test")
+
+        args = mock_run.call_args[0][0]
+        assert "age" in args
+        assert "--encrypt" in args
+        assert "-r" in args
+        assert "age1test" in args
+
+    def test_encrypt_age_no_recipient(self, tmp_path):
+        mgr = EncryptionManager(method="age")
+        inp = tmp_path / "plain.txt"
+        out = tmp_path / "encrypted.age"
+        with pytest.raises(EncryptionError, match="requires a recipient"):
+            mgr.encrypt_file(inp, out)
+
+    def test_encrypt_age_error(self, tmp_path):
+        mgr = EncryptionManager(method="age")
+        inp = tmp_path / "plain.txt"
+        out = tmp_path / "encrypted.age"
+        inp.write_text("data")
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=1, stderr="bad key")
+            with pytest.raises(EncryptionError, match="AGE encryption failed"):
+                mgr.encrypt_file(inp, out, recipient="age1test")
+
+    def test_encrypt_age_not_found(self, tmp_path):
+        mgr = EncryptionManager(method="age")
+        inp = tmp_path / "plain.txt"
+        out = tmp_path / "encrypted.age"
+        inp.write_text("data")
+
+        with patch("subprocess.run", side_effect=FileNotFoundError):
+            with pytest.raises(EncryptionError, match="AGE not installed"):
+                mgr.encrypt_file(inp, out, recipient="age1test")
+
+    def test_encrypt_age_timeout(self, tmp_path):
+        mgr = EncryptionManager(method="age")
+        inp = tmp_path / "plain.txt"
+        out = tmp_path / "encrypted.age"
+        inp.write_text("data")
+
+        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired("age", 30)):
+            with pytest.raises(EncryptionError, match="timed out"):
+                mgr.encrypt_file(inp, out, recipient="age1test")
+
+    def test_encrypt_unknown_method(self, tmp_path):
+        mgr = EncryptionManager(method="invalid")
+        inp = tmp_path / "plain.txt"
+        out = tmp_path / "out"
+        with pytest.raises(EncryptionError, match="Unknown encryption method"):
+            mgr.encrypt_file(inp, out)
+
+    def test_decrypt_gpg(self, tmp_path):
+        mgr = EncryptionManager(method="gpg")
+        inp = tmp_path / "encrypted.asc"
+        out = tmp_path / "decrypted.txt"
+        inp.write_text("encrypted data")
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            mgr.decrypt_file(inp, out)
+
+        args = mock_run.call_args[0][0]
+        assert "gpg" in args
+        assert "--decrypt" in args
+
+    def test_decrypt_gpg_with_recipient(self, tmp_path):
+        mgr = EncryptionManager(method="gpg")
+        inp = tmp_path / "encrypted.asc"
+        out = tmp_path / "decrypted.txt"
+        inp.write_text("data")
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            mgr.decrypt_file(inp, out, recipient="key-id")
+
+        args = mock_run.call_args[0][0]
+        assert "--recipient" in args
+        assert "key-id" in args
+
+    def test_decrypt_gpg_error(self, tmp_path):
+        mgr = EncryptionManager(method="gpg")
+        inp = tmp_path / "encrypted.asc"
+        out = tmp_path / "decrypted.txt"
+        inp.write_text("data")
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=1, stderr="bad pass")
+            with pytest.raises(EncryptionError, match="GPG decryption failed"):
+                mgr.decrypt_file(inp, out)
+
+    def test_decrypt_gpg_not_found(self, tmp_path):
+        mgr = EncryptionManager(method="gpg")
+        inp = tmp_path / "encrypted.asc"
+        out = tmp_path / "decrypted.txt"
+        inp.write_text("data")
+
+        with patch("subprocess.run", side_effect=FileNotFoundError):
+            with pytest.raises(EncryptionError, match="GPG not installed"):
+                mgr.decrypt_file(inp, out)
+
+    def test_decrypt_gpg_timeout(self, tmp_path):
+        mgr = EncryptionManager(method="gpg")
+        inp = tmp_path / "encrypted.asc"
+        out = tmp_path / "decrypted.txt"
+        inp.write_text("data")
+
+        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired("gpg", 30)):
+            with pytest.raises(EncryptionError, match="timed out"):
+                mgr.decrypt_file(inp, out)
+
+    def test_decrypt_age(self, tmp_path):
+        mgr = EncryptionManager(method="age")
+        inp = tmp_path / "encrypted.age"
+        out = tmp_path / "decrypted.txt"
+        inp.write_text("encrypted")
+
+        with (
+            patch("subprocess.run") as mock_run,
+            patch.dict(os.environ, {}, clear=True),
+        ):
+            mock_run.return_value = MagicMock(returncode=0)
+            mgr.decrypt_file(inp, out)
+
+        args = mock_run.call_args[0][0]
+        assert "age" in args
+        assert "--decrypt" in args
+        assert "-i" not in args
+
+    def test_decrypt_age_with_identity(self, tmp_path):
+        mgr = EncryptionManager(method="age")
+        inp = tmp_path / "encrypted.age"
+        out = tmp_path / "decrypted.txt"
+        inp.write_text("encrypted")
+
+        with (
+            patch("subprocess.run") as mock_run,
+            patch.dict(os.environ, {"AGE_IDENTITY_FILE": "/key.txt"}),
+        ):
+            mock_run.return_value = MagicMock(returncode=0)
+            mgr.decrypt_file(inp, out)
+
+        args = mock_run.call_args[0][0]
+        assert "-i" in args
+        assert "/key.txt" in args
+
+    def test_decrypt_age_error(self, tmp_path):
+        mgr = EncryptionManager(method="age")
+        inp = tmp_path / "encrypted.age"
+        out = tmp_path / "decrypted.txt"
+        inp.write_text("data")
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=1, stderr="bad key")
+            with pytest.raises(EncryptionError, match="AGE decryption failed"):
+                mgr.decrypt_file(inp, out)
+
+    def test_decrypt_age_not_found(self, tmp_path):
+        mgr = EncryptionManager(method="age")
+        inp = tmp_path / "encrypted.age"
+        out = tmp_path / "decrypted.txt"
+        inp.write_text("data")
+
+        with patch("subprocess.run", side_effect=FileNotFoundError):
+            with pytest.raises(EncryptionError, match="AGE not installed"):
+                mgr.decrypt_file(inp, out)
+
+    def test_decrypt_age_timeout(self, tmp_path):
+        mgr = EncryptionManager(method="age")
+        inp = tmp_path / "encrypted.age"
+        out = tmp_path / "decrypted.txt"
+        inp.write_text("data")
+
+        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired("age", 30)):
+            with pytest.raises(EncryptionError, match="timed out"):
+                mgr.decrypt_file(inp, out)
+
+    def test_decrypt_unknown_method(self, tmp_path):
+        mgr = EncryptionManager(method="invalid")
+        inp = tmp_path / "encrypted.asc"
+        out = tmp_path / "decrypted.txt"
+        with pytest.raises(EncryptionError, match="Unknown encryption method"):
+            mgr.decrypt_file(inp, out)
 
 
-class TestEncryptionError:
-    """Test EncryptionError exception."""
+class TestIsGpgAvailable:
+    def test_available(self):
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock()
+            assert is_gpg_available() is True
 
-    def test_encryption_error(self):
-        """Test EncryptionError can be raised."""
-        from dot_man.encryption import EncryptionError
-        from dot_man.exceptions import DotManError
+    def test_not_available(self):
+        with patch("subprocess.run", side_effect=FileNotFoundError):
+            assert is_gpg_available() is False
 
-        error = EncryptionError("Test error")
-        assert isinstance(error, DotManError)
-        assert str(error) == "Test error"
-
-
-class TestEncryptionManagerMethods:
-    """Test EncryptionManager methods."""
-
-    def test_encryption_manager_str(self):
-        """Test EncryptionManager string representation."""
-        from dot_man.encryption import EncryptionManager
-
-        enc = EncryptionManager("gpg")
-        assert "gpg" in str(enc).lower() or hasattr(enc, "method")
-
-    def test_encryption_invalid_method(self):
-        """Test EncryptionManager with invalid method."""
-        from dot_man.encryption import EncryptionManager
-
-        enc = EncryptionManager("invalid")
-        assert enc.method == "invalid"
+    def test_timeout(self):
+        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired("gpg", 5)):
+            assert is_gpg_available() is False
 
 
-class TestEncryptionHelpers:
-    """Test encryption helper functions."""
+class TestIsAgeAvailable:
+    def test_available(self):
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock()
+            assert is_age_available() is True
 
-    def test_encryption_available_returns_list(self):
-        """Test that detect_available_encryption returns list."""
-        from dot_man.encryption import detect_available_encryption
+    def test_not_available(self):
+        with patch("subprocess.run", side_effect=FileNotFoundError):
+            assert is_age_available() is False
 
-        result = detect_available_encryption()
-        assert isinstance(result, (list, tuple))
+    def test_timeout(self):
+        with patch("subprocess.run", side_effect=subprocess.TimeoutExpired("age", 5)):
+            assert is_age_available() is False
 
-    def test_gpg_check_returns_bool(self):
-        """Test that is_gpg_available returns bool."""
-        from dot_man.encryption import is_gpg_available
 
-        result = is_gpg_available()
-        assert result is True or result is False
+class TestDetectAvailableEncryption:
+    def test_both_available(self):
+        with (
+            patch("dot_man.encryption.is_gpg_available", return_value=True),
+            patch("dot_man.encryption.is_age_available", return_value=True),
+        ):
+            result = detect_available_encryption()
+        assert result == ["gpg", "age"]
 
-    def test_age_check_returns_bool(self):
-        """Test that is_age_available returns bool."""
-        from dot_man.encryption import is_age_available
+    def test_only_gpg(self):
+        with (
+            patch("dot_man.encryption.is_gpg_available", return_value=True),
+            patch("dot_man.encryption.is_age_available", return_value=False),
+        ):
+            result = detect_available_encryption()
+        assert result == ["gpg"]
 
-        result = is_age_available()
-        assert result is True or result is False
+    def test_only_age(self):
+        with (
+            patch("dot_man.encryption.is_gpg_available", return_value=False),
+            patch("dot_man.encryption.is_age_available", return_value=True),
+        ):
+            result = detect_available_encryption()
+        assert result == ["age"]
+
+    def test_none_available(self):
+        with (
+            patch("dot_man.encryption.is_gpg_available", return_value=False),
+            patch("dot_man.encryption.is_age_available", return_value=False),
+        ):
+            result = detect_available_encryption()
+        assert result == []

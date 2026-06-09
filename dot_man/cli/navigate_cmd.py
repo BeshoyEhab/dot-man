@@ -1,8 +1,10 @@
 """Navigate command for dot-man - unified switch + checkout with diff preview."""
 
+import logging
 import os
 import subprocess
 from datetime import datetime
+from pathlib import Path
 
 import click
 
@@ -12,11 +14,11 @@ from ..core import GitManager
 from ..files import compare_files
 from ..hooks import run_checkout_hooks, run_switch_hooks
 from .common import (
+    BRANCH,
     AliasedCommand,
     complete_switch_args,
     error,
     get_secret_handler,
-    parse_branch_arg,
     require_init,
     success,
     warn,
@@ -85,7 +87,7 @@ def generate_commit_message(
                 shown_files += f" +{len(changed_files) - 5} more"
             details.append(f"files: {shown_files}")
     except Exception:
-        pass
+        logging.debug("Failed to gather changed files for commit message")
 
     if details:
         msg += f" | {' | '.join(details)}"
@@ -111,7 +113,19 @@ def get_changed_sections(ops) -> list[str]:
                             sections.append(section_name)
         return sections
     except Exception:
+        logging.debug("Failed to get changed sections")
         return []
+
+
+def _warn_symlinks(save_result: dict) -> None:
+    """Warn user if any saved paths were symlinks."""
+    symlinks: list = save_result.get("symlinks", [])
+    for sym_path in symlinks:
+        target = Path(sym_path).resolve()
+        ui.console.print(f"  [yellow]⚠ {sym_path} is a symlink → {target}[/yellow]")
+        ui.console.print(
+            "  [dim]Edits affect the symlink target, not the dot-man repo.[/dim]"
+        )
 
 
 def run_branch_hooks(ops, hook_type: str) -> None:
@@ -154,21 +168,6 @@ def run_branch_hooks(ops, hook_type: str) -> None:
                 warn(f"Failed to run command '{cmd}': {e}")
         if hook_failed:
             ui.console.print("[dim]  Some hooks failed - continuing anyway[/dim]")
-
-
-class BranchParamType(click.ParamType):
-    """Parameter type that accepts branch, branch@tag, or commit SHA."""
-
-    name = "branch"
-
-    def convert(self, value, param, ctx):
-        if not value:
-            return None
-        parsed = parse_branch_arg(value)
-        return parsed
-
-
-BRANCH = BranchParamType()
 
 
 @main.command("navigate", cls=AliasedCommand, aliases=["nav"])
@@ -230,26 +229,16 @@ def navigate(
     This is the unified command for switching between configurations.
     It supports all branch, tag, and commit targets with full preview
     and diff capabilities.
-
-    Supports multiple formats:
-        \b
-        dot-man navigate work          # switch to branch
-        dot-man navigate work@tag     # switch to branch at tag position
-        dot-man navigate abc1234      # switch to specific commit
-        dot-man navigate my-tag       # switch to tag
-
-    Use --preview or -p to see changes before switching.
-    Use --diff or -d to show actual diff when previewing.
-    Use --files-only to only show commits that changed tracked files.
-    Use -m to provide a custom commit message for auto-save.
-    Use -m "auto" for auto-generated messages based on changes.
-
-    Examples:
-        dot-man navigate work                  # switch to branch
-        dot-man navigate work --preview        # preview changes
-        dot-man navigate work --preview --diff # show full diff
-        dot-man navigate work --files-only     # only changed commits
     """
+    _navigate_impl(
+        target, dry_run, force, save_mode, commit_message, preview, diff, files_only
+    )
+
+
+def _navigate_impl(
+    target, dry_run, force, save_mode, commit_message, preview, diff, files_only
+):
+    """Core implementation shared between navigate and switch commands."""
     try:
         from ..operations import get_operations
 
@@ -539,6 +528,7 @@ def _handle_commit_navigate(
         ui.console.print(f"[bold]Saving current branch '{current_branch}'...[/bold]")
         secret_handler = get_secret_handler()
         save_result = ops.save_all(secret_handler)
+        _warn_symlinks(save_result)
         saved_count = save_result["saved"]
         sections = get_changed_sections(ops)
 
@@ -603,6 +593,7 @@ def _handle_tag_navigate(
         ui.console.print(f"[bold]Saving current branch '{current_branch}'...[/bold]")
         secret_handler = get_secret_handler()
         save_result = ops.save_all(secret_handler)
+        _warn_symlinks(save_result)
         saved_count = save_result["saved"]
         sections = get_changed_sections(ops)
 
@@ -680,6 +671,7 @@ def _handle_branch_navigate(
     if save_mode == "save":
         secret_handler = get_secret_handler()
         save_result = ops.save_all(secret_handler)
+        _warn_symlinks(save_result)
         saved_count = save_result["saved"]
         secrets = save_result["secrets"]
         errors = save_result["errors"]
@@ -888,7 +880,10 @@ def hooks(command: str, phase: str | None, name: str | None):
     elif command == "create":
         if not phase or not name:
             error("'create' requires: pre|post NAME", exit_code=1)
-        assert isinstance(name, str) and isinstance(phase, str)
+            return
+        if not isinstance(name, str) or not isinstance(phase, str):
+            error("Hook name and phase must be strings", exit_code=1)
+            return
         hook_path = create_hook(name, phase)
         ui.console.print(f"[green]Created hook:[/green] {hook_path}")
         ui.console.print("  Edit this file to add your custom script.")
@@ -896,7 +891,8 @@ def hooks(command: str, phase: str | None, name: str | None):
     elif command == "delete":
         if not phase or not name:
             error("'delete' requires: pre|post NAME", exit_code=1)
-        assert isinstance(name, str) and isinstance(phase, str)
+        if not isinstance(name, str) or not isinstance(phase, str):
+            raise click.ClickException("Hook name and phase must be strings")
         deleted = delete_hook(name, phase)
         if deleted:
             success(f"Deleted hook: {phase}_{name}")

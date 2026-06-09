@@ -1,5 +1,6 @@
 """Log command for dot-man CLI."""
 
+import logging
 from pathlib import Path
 
 import click
@@ -203,6 +204,7 @@ def checkout(target: str):
                 ops.git.repo.commit(target)
                 _checkout_commit(ops, current_branch, target)
             except Exception:
+                logging.debug("Target is not a valid commit, trying as tag")
                 # Try as tag
                 tag_commit = ops.git.get_tag_commit(target)
                 if tag_commit:
@@ -221,6 +223,7 @@ def _checkout_commit(ops, current_branch: str, commit_sha: str):
     try:
         commit_obj = ops.git.repo.commit(commit_sha)
     except Exception:
+        logging.debug("Invalid commit SHA: %s", commit_sha)
         error(f"Invalid commit SHA: {commit_sha}", exit_code=1)
 
     # Save current changes if dirty
@@ -257,6 +260,7 @@ def _checkout_tag(ops, current_branch: str, tag_name: str):
         if tag_obj.tag:
             message = tag_obj.tag.message.strip().split("\n")[0]
     except Exception:
+        logging.debug("Failed to get tag message for %s", tag_name)
         message = ""
 
     # Checkout the tag

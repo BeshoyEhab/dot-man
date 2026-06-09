@@ -20,6 +20,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TypedDict
 
+from .constants import HOOK_ALIASES
+
 
 class MergeRegion(TypedDict):
     """A managed merge region in a file."""
@@ -313,36 +315,8 @@ def merge_files(
     return tgt.read_text()
 
 
-UNIVERSAL_HOOKS = {
-    "shell_reload": "source ~/.bashrc 2>/dev/null || source ~/.zshrc 2>/dev/null || true",
-    "fish_reload": "source ~/.config/fish/config.fish 2>/dev/null || true",
-    "zsh_reload": "source ~/.zshrc 2>/dev/null || true",
-    "bash_reload": "source ~/.bashrc 2>/dev/null || true",
-    "tmux_reload": "tmux source-file ~/.tmux.conf 2>/dev/null || true",
-    "nvim_sync": "nvim --headless +PackerSync +qa 2>/dev/null || true",
-    "kitty_reload": "killall -SIGUSR1 kitty 2>/dev/null || true",
-    "hyprland_reload": "hyprctl reload 2>/dev/null || true",
-    "sway_reload": "swaymsg reload 2>/dev/null || true",
-    "i3_reload": "i3-msg reload 2>/dev/null || true",
-    "awesome_reload": "awesome-client 'awesome.restart()' 2>/dev/null || true",
-    "polybar_reload": "pkill polybar 2>/dev/null; sleep 0.2; polybar -c ~/.config/polybar/config.ini top 2>/dev/null &",
-    "waybar_reload": "waybar-control reload 2>/dev/null || pkill waybar 2>/dev/null; sleep 0.2; waybar 2>/dev/null &",
-    "dunst_reload": "pkill dunst 2>/dev/null; sleep 0.2; dunst 2>/dev/null &",
-    "picom_reload": "pkill picom 2>/dev/null; sleep 0.2; picom -b 2>/dev/null &",
-    "alacritty_reload": "killall -SIGUSR1 alacritty 2>/dev/null || true",
-    "wezterm_reload": "wezterm inject-term-change 'reload' 2>/dev/null || true",
-    "xreload": "xrdb -load ~/.Xresources 2>/dev/null || true",
-    "gnome_reload": "gsettings reset-recursively org.gnome.shell 2>/dev/null || true",
-    "kde_reload": "qdbus org.kde.KWin /KWin reconfigure 2>/dev/null || true",
-    "ssh_reload": "ssh-add -l >/dev/null 2>&1 || true",
-    "git_reload": "git config --global --list >/dev/null 2>&1 || true",
-    "vim_reload": "vim +source\\ ~/.vimrc +qa 2>/dev/null || true",
-    "emacs_reload": "emacsclient -e '(load-file \"~/.emacs.d/init.el\")' 2>/dev/null || true",
-    "doom_reload": "~/.emacs.d/bin/doom-refresh 2>/dev/null || true",
-    "starship_reload": 'eval "$(starship config 2>/dev/null)" || true',
-    "fzf_reload": "killall fzf 2>/dev/null; source ~/.fzf.bash 2>/dev/null || source ~/.fzf.zsh 2>/dev/null || true",
-    "exaile_reload": "dbus-send --print-reply --dest=org.exaile.Exaile /org/exaile/Exaile org.exaile.Exaile.Quit 2>/dev/null || true",
-}
+UNIVERSAL_HOOKS = HOOK_ALIASES.copy()
+"""Alias for backward compatibility — HOOK_ALIASES in constants.py is canonical."""
 
 HOOK_CATEGORIES = {
     "shells": ["shell_reload", "bash_reload", "zsh_reload", "fish_reload"],

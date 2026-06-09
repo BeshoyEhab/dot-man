@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import shutil
 from pathlib import Path
@@ -25,6 +26,9 @@ __all__ = [
     "ensure_directory",
     "clear_comparison_cache",
     "get_content_hash",
+    "create_symlink",
+    "deploy_file_or_symlink",
+    "deploy_directory_with_symlinks",
 ]
 
 
@@ -330,6 +334,7 @@ def copy_directory(
                 if saved:
                     files_copied += 1
             except Exception:
+                logging.warning("Failed to copy file: %s", src_file)
                 files_failed += 1
 
     return files_copied, files_failed, all_secrets
@@ -417,6 +422,134 @@ def get_file_status(local_path: Path, repo_path: Path) -> str:
         return "IDENTICAL"
     else:
         return "MODIFIED"
+
+
+def create_symlink(source: Path, destination: Path) -> bool:
+    """Create a symbolic link from source to destination.
+
+    Removes destination first if it exists (file or broken symlink).
+    Creates parent directories as needed.
+
+    Uses source.absolute() (not source.resolve()) so that if the source
+    itself is a symlink, the new symlink points to the symlink path
+    rather than following through to its target.
+
+    Returns:
+        True if symlink was created or already correct, False on failure.
+    """
+    try:
+        # Use absolute path without following symlinks in the source
+        source_abs = source.absolute()
+        if not source_abs.exists():
+            return False
+
+        # If destination is already a symlink pointing to the right place, skip
+        if destination.is_symlink():
+            if destination.resolve() == source_abs.resolve():
+                return True
+            destination.unlink()
+        elif destination.exists():
+            backup_file(destination)
+            destination.unlink()
+
+        ensure_directory(destination.parent)
+        destination.symlink_to(source_abs)
+        return True
+    except OSError:
+        return False
+
+
+def deploy_file_or_symlink(
+    source: Path,
+    destination: Path,
+    deploy_method: str = "copy",
+    filter_secrets_enabled: bool = True,
+    secret_handler: Callable[[SecretMatch], str] | None = None,
+) -> tuple[bool, list[SecretMatch]]:
+    """Deploy a file from source to destination, either by copy or symlink.
+
+    Args:
+        source: Source file path
+        destination: Destination file path
+        deploy_method: "copy" (default) or "symlink"
+        filter_secrets_enabled: Whether to apply secret filtering (only for copy)
+        secret_handler: Callback for detected secrets (only for copy)
+
+    Returns:
+        Tuple of (success, detected_secrets)
+    """
+    if deploy_method == "symlink":
+        success = create_symlink(source, destination)
+        return success, []
+    return copy_file(
+        source,
+        destination,
+        filter_secrets_enabled=filter_secrets_enabled,
+        secret_handler=secret_handler,
+    )
+
+
+def deploy_directory_with_symlinks(
+    source: Path,
+    destination: Path,
+    include_patterns: list[str] | None = None,
+    exclude_patterns: list[str] | None = None,
+) -> tuple[int, int]:
+    """Deploy a directory by creating symlinks for each file.
+
+    Args:
+        source: Source directory path
+        destination: Destination directory path
+        include_patterns: Only include files matching these patterns
+        exclude_patterns: Exclude files/directories matching these patterns
+
+    Returns:
+        Tuple of (files_symlinked, files_failed)
+    """
+    include_patterns = include_patterns or []
+    exclude_patterns = exclude_patterns or []
+    symlinked = 0
+    failed = 0
+
+    for root, dirs, files in os.walk(source, topdown=True, followlinks=False):
+        root_path = Path(root)
+
+        # Prune excluded directories
+        if exclude_patterns:
+            try:
+                root_rel = root_path.relative_to(source)
+            except ValueError:
+                continue
+
+            for i in range(len(dirs) - 1, -1, -1):
+                d_name = dirs[i]
+                d_rel = root_rel / d_name
+                if matches_patterns(d_rel, exclude_patterns):
+                    del dirs[i]
+
+        for filename in files:
+            src_file = root_path / filename
+            try:
+                relative = src_file.relative_to(source)
+            except ValueError:
+                continue
+
+            if exclude_patterns and matches_patterns(relative, exclude_patterns):
+                continue
+            if include_patterns and not matches_patterns(relative, include_patterns):
+                continue
+
+            dest_path = destination / relative
+            try:
+                if create_symlink(src_file, dest_path):
+                    symlinked += 1
+                else:
+                    failed += 1
+            except Exception:
+                logging.warning("Failed to create symlink: %s", src_file)
+                failed += 1
+
+    return symlinked, failed
 
 
 def backup_file(path: Path) -> Path | None:

@@ -6,7 +6,6 @@ import os
 from pathlib import Path
 from typing import Any, Optional
 
-from .config_detector import ConfigDetector
 from .constants import (
     DEFAULT_IGNORED_DIRECTORIES,
     HOOK_ALIASES,
@@ -17,6 +16,9 @@ def _expand_path(path_str: str) -> Path:
     """Expand environment variables and ~ in a path string."""
     expanded = os.path.expandvars(os.path.expanduser(path_str))
     return Path(expanded)
+
+
+VALID_DEPLOY_METHODS = ["copy", "symlink"]
 
 
 class Section:
@@ -39,6 +41,7 @@ class Section:
         inherits: Optional[list[str]] = None,
         ignored_directories: Optional[list[str]] = None,
         follow_symlinks: Optional[bool] = None,
+        deploy_method: Optional[str] = None,
         encrypted: Optional[bool] = None,
         encryption_method: Optional[str] = None,
         encryption_recipient: Optional[str] = None,
@@ -75,6 +78,7 @@ class Section:
             else DEFAULT_IGNORED_DIRECTORIES
         )
         self.follow_symlinks = follow_symlinks if follow_symlinks is not None else False
+        self.deploy_method = deploy_method if deploy_method is not None else "copy"
 
         # Encryption options
         self.encrypted = encrypted if encrypted is not None else False
@@ -118,40 +122,60 @@ class Section:
         return first_path.stem or first_path.name
 
     def _resolve_hook(self, hook: str | None) -> str | None:
-        """Resolve hook aliases to actual commands.
+        """Resolve hook aliases to actual commands, replacing placeholders.
+
+        Placeholders:
+            {section_name}  — the section's config name (e.g., "nvim", "quickshell-ii")
+            {config_root}   — base directory of the first tracked path
+            {config_name}   — last path segment of the first tracked path (e.g., "ii")
+            {paths}         — space-separated list of all tracked paths
+            {branch}        — current branch name
+            {qs_config}     — alias for {config_name} (backward compat)
 
         Examples:
             "shell_reload" → "source ~/.bashrc || ..."
             "nvim_sync" → "nvim --headless +PackerSync +qa"
-            "quickshell_reload" → "killall qs; qs -c ii &" (with detected config)
+            "qs -c {config_name}" → "qs -c ii"
             "echo hello" → "echo hello" (unchanged)
         """
         if not hook:
             return None
 
-        # Check if it's an alias
         resolved = HOOK_ALIASES.get(hook, hook)
 
-        # Replace {qs_config} placeholder with detected quickshell config dir
-        if "{qs_config}" in resolved:
-            qs_config = self._detect_quickshell_config()
-            resolved = resolved.replace("{qs_config}", qs_config)
+        if "{" in resolved:
+            resolved = resolved.replace("{section_name}", self.name)
+            resolved = resolved.replace("{branch}", self._get_current_branch())
+            resolved = resolved.replace("{paths}", " ".join(str(p) for p in self.paths))
+
+            if self.paths:
+                first = self.paths[0]
+                config_root = str(first.parent)
+                config_name = first.name
+                if first.exists() and first.is_dir():
+                    config_name = first.name
+                elif first.exists() and first.is_file():
+                    config_root = str(first.parent)
+                else:
+                    config_root = str(first.expanduser().parent)
+                    config_name = first.expanduser().name
+                resolved = resolved.replace("{config_root}", config_root)
+                resolved = resolved.replace("{config_name}", config_name)
+                resolved = resolved.replace("{qs_config}", config_name)
 
         return resolved
 
-    def _detect_quickshell_config(self) -> str:
-        """Detect the quickshell config directory name from section paths.
+    @staticmethod
+    def _get_current_branch() -> str:
+        """Get current branch name from global config."""
+        try:
+            from .global_config import GlobalConfig
 
-        Uses ConfigDetector for comprehensive detection.
-
-        Returns:
-            Config directory name (e.g., "ii", "caelestea") or empty string if not found.
-        """
-        for path in self.paths:
-            config_name = ConfigDetector.get_quickshell_config_name(path)
-            if config_name:
-                return config_name
-        return ""
+            gc = GlobalConfig()
+            gc.load()
+            return gc.current_branch or "unknown"
+        except Exception:
+            return "unknown"
 
     def get_repo_path(self, local_path: Path, repo_dir: Path) -> Path:
         """Get the repository path for a local path."""
@@ -197,6 +221,8 @@ class Section:
             result["ignored_directories"] = self.ignored_directories
         if self.follow_symlinks is not False:
             result["follow_symlinks"] = self.follow_symlinks
+        if self.deploy_method != "copy":
+            result["deploy_method"] = self.deploy_method
         if self.encrypted:
             result["encrypted"] = self.encrypted
         if self.encryption_method != "gpg":

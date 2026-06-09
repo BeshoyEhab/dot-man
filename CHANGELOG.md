@@ -110,11 +110,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `checkout` → Use `navigate` instead
 - `tag switch` → Use `navigate` instead
 
-## [Unreleased]
+## [1.2.0] - 2026-06-09
 
 ### Added
-- **Custom Secret Patterns** - Support defining custom regex patterns for secret detection globally in `global.toml` or per-repository in `dot-man.toml`.
-- **Secret Scanner Customization** - Added option to disable default built-in secret pattern matching using `use_default_patterns = false`.
+- **Generalized placeholder system in hooks** — `{qs_config}` replaced with `{config_name}`, `{config_root}`, `{section_name}`, `{paths}`, `{branch}`
+- **Shell completions** — `encrypt <section>`, `export --branch`, `rollback <target>`
+- **Custom Secret Patterns** — Support defining custom regex patterns for secret detection in config
+- **Secret Scanner Customization** — `use_default_patterns = false` to disable built-in patterns
+- **Symlink Deploy Mode** — per-section `deploy_method = "symlink"` for edit-in-place workflows
+- **Quickshell Hook Aliases** — `quickshell_reload`, `quickshell_restart`, `quickshell_validate` with `{qs_config}` → `{config_name}` placeholder
+- **`complete_sections()`** — shell completion callback for section names
+
+### Changed
+- **`switch_cmd` consolidated → thin wrapper** — `switch` is now a 17-line wrapper calling `_navigate_impl()` (~80% code reduction)
+- **`BranchParamType` deduplicated** — moved from `switch_cmd.py`/`navigate_cmd.py` to `common.py`
+- **Schema keys deduplicated** — `VALID_SECTION_KEYS` defined once in `dotman_config.py`
+- **`HOOK_ALIASES` unified** — `constants.py` is canonical; `merge.py` imports from it
+- **Silent `except: pass` cleanup** — `logging.debug()`/`logging.warning()` added to 11+ bare exceptions across `common.py`, `navigate_cmd.py`, `rollback_cmd.py`, `core.py`, `files.py`, `init_cmd.py`
+- **Production `assert` statements removed** — all replaced with `if/error()` pattern in `navigate_cmd.py`, `encrypt_cmd.py`, `import_cmd.py`, `rollback_cmd.py`
+- **Coverage improved from 60% → 66%** — 1146 tests (up from 1021), 1 skipped
+
+### Fixed
+- **Weak `>=` assertions** in `test_section.py`, `test_save_deploy_ops.py`, `test_status_ops.py`, `test_core_extended.py`, and 4 new test files
+- **Missing f-string prefix** in `dotman_config.py:96`
+- **Stale `dot-man.ini` reference** in `status_ops.py:158`
+
+### New Tests
+| File | Tests | Coverage Impact |
+|------|-------|-----------------|
+| `test_files_comprehensive.py` | 55 | `files.py` 73% → 94% |
+| `test_branch_ops.py` | 39 | `branch_ops.py` 40% → 97% |
+| `test_encryption.py` | 32 | `encryption.py` 33% → 100% |
+| `test_completions_cmd.py` | 10 | `completions_cmd.py` 12% → 94% |
+| `test_shell_completions.py` | 7 | Shell completions verified |
+| `test_section.py` | 39 (+36) | `section.py` 70% → 95% |
+| `test_save_deploy_ops.py` | 26 | `save_deploy_ops.py` 52% → 75% |
+| `test_status_ops.py` | 17 | `status_ops.py` 59% → 89% |
+| `test_core_extended.py` | 46 | `core.py` 58% → 66% |
 
 ## [1.1.1] - 2026-05-20
 
