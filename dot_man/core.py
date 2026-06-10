@@ -291,7 +291,7 @@ class GitManager:
                     }
                 )
         except (GitCommandError, ValueError, OSError):
-            pass
+            logging.debug("Failed to get commit log from git")
         return commits
 
     def _relative_date(self, dt) -> str:

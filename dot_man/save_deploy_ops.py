@@ -116,6 +116,102 @@ class SaveDeployMixin:
             return f"Failed to restore secrets for {dest_path}: {e}"
         return None
 
+    @staticmethod
+    def _build_final_excludes(section: Section) -> list[str]:
+        """Merge section exclude patterns with ignored directories."""
+        return (section.exclude or []) + (section.ignored_directories or [])
+
+    def _deploy_repo_path(
+        self,
+        repo_path: Path,
+        local_path: Path,
+        section: Section,
+        final_excludes: list[str],
+        errors: list[str],
+    ) -> int:
+        """
+        Deploy a single repo_path (file or directory) to local_path.
+
+        Handles symlink and copy deploy methods, including secret restoration.
+        Appends error messages to the provided errors list.
+
+        Returns count of files deployed.
+        """
+        deployed = 0
+        try:
+            if repo_path.is_file():
+                if section.deploy_method == "symlink":
+                    symlinked, _ = deploy_file_or_symlink(
+                        repo_path, local_path, deploy_method="symlink"
+                    )
+                    if symlinked:
+                        deployed += 1
+                    else:
+                        errors.append(f"Failed to symlink {repo_path} to {local_path}")
+                else:
+                    success, _ = copy_file(
+                        repo_path, local_path, filter_secrets_enabled=False
+                    )
+                    if success:
+                        if section.secrets_filter:
+                            self._restore_file_secrets_inplace(
+                                local_path, str(local_path), errors
+                            )
+                        deployed += 1
+                    else:
+                        errors.append(f"Failed to copy {repo_path} to {local_path}")
+            elif repo_path.is_dir():
+                if section.deploy_method == "symlink":
+                    files_symlinked, files_failed = deploy_directory_with_symlinks(
+                        repo_path,
+                        local_path,
+                        include_patterns=section.include,
+                        exclude_patterns=final_excludes,
+                    )
+                    deployed += files_symlinked
+                else:
+                    files_copied, files_failed, _ = copy_directory(
+                        repo_path,
+                        local_path,
+                        filter_secrets_enabled=False,
+                        include_patterns=section.include,
+                        exclude_patterns=final_excludes,
+                        follow_symlinks=section.follow_symlinks,
+                    )
+                    if section.secrets_filter:
+                        for deployed_file in local_path.rglob("*"):
+                            if deployed_file.is_file():
+                                self._restore_file_secrets_inplace(
+                                    deployed_file, str(local_path), errors
+                                )
+                    deployed += files_copied
+                if files_failed > 0:
+                    errors.append(
+                        f"Failed to deploy {files_failed} files in {local_path}"
+                    )
+            else:
+                errors.append(f"Source not found in repo: {repo_path}")
+        except PermissionError:
+            errors.append(
+                f"Permission denied deploying {local_path}. Try running with sudo?"
+            )
+        except FileNotFoundError:
+            errors.append(f"File not found during deployment: {repo_path}")
+        except OSError as e:
+            errors.append(f"Error deploying {local_path}: {e}")
+        return deployed
+
+    def _restore_file_secrets_inplace(
+        self,
+        dest_path: Path,
+        original_path: str,
+        errors: list[str],
+    ) -> None:
+        """Restore secrets and append error message to the provided list if any."""
+        err = self._restore_file_secrets(dest_path, original_path, self.current_branch)
+        if err:
+            errors.append(err)
+
     def save_section(
         self,
         section: Section,
@@ -160,7 +256,7 @@ class SaveDeployMixin:
             return action
 
         # Merge exclude patterns with ignored directories
-        final_excludes = (section.exclude or []) + (section.ignored_directories or [])
+        final_excludes = self._build_final_excludes(section)
 
         for local_path in section.paths:
             if not local_path.exists():
@@ -215,16 +311,14 @@ class SaveDeployMixin:
         had_changes = False
         errors: list[str] = []
 
-        # Merge exclude patterns with ignored directories
-        final_excludes = (section.exclude or []) + (section.ignored_directories or [])
+        final_excludes = self._build_final_excludes(section)
 
         for local_path in section.paths:
             repo_path = section.get_repo_path(local_path, REPO_DIR)
-            # Handle update strategy
+
             if section.update_strategy == "ignore" and local_path.exists():
                 continue
 
-            # Check if will change (after strategy filtering)
             will_change = not local_path.exists() or not compare_files(
                 repo_path, local_path
             )
@@ -234,66 +328,9 @@ class SaveDeployMixin:
             if section.update_strategy == "rename_old" and local_path.exists():
                 backup_file(local_path)
 
-            # Helper to restore secrets after copy
-            def restore_file_secrets(dest_path: Path) -> None:
-                err = self._restore_file_secrets(
-                    dest_path, str(local_path), self.current_branch
-                )
-                if err:
-                    errors.append(err)
-
-            try:
-                if repo_path.is_file():
-                    if section.deploy_method == "symlink":
-                        symlinked, _ = deploy_file_or_symlink(
-                            repo_path, local_path, deploy_method="symlink"
-                        )
-                        if symlinked:
-                            deployed += 1
-                    else:
-                        success, _ = copy_file(
-                            repo_path, local_path, filter_secrets_enabled=False
-                        )
-                        if success:
-                            if section.secrets_filter:
-                                restore_file_secrets(local_path)
-                            deployed += 1
-                else:
-                    if section.deploy_method == "symlink":
-                        files_symlinked, files_failed = deploy_directory_with_symlinks(
-                            repo_path,
-                            local_path,
-                            include_patterns=section.include,
-                            exclude_patterns=final_excludes,
-                        )
-                        deployed += files_symlinked
-                    else:
-                        files_copied, files_failed, _ = copy_directory(
-                            repo_path,
-                            local_path,
-                            filter_secrets_enabled=False,
-                            include_patterns=section.include,
-                            exclude_patterns=final_excludes,
-                            follow_symlinks=section.follow_symlinks,
-                        )
-                        if section.secrets_filter:
-                            for deployed_file in local_path.rglob("*"):
-                                if deployed_file.is_file():
-                                    restore_file_secrets(deployed_file)
-
-                        deployed += files_copied
-                    if files_failed > 0:
-                        errors.append(
-                            f"Failed to deploy {files_failed} files in {local_path}"
-                        )
-            except PermissionError:
-                errors.append(
-                    f"Permission denied deploying {local_path}. Try running with sudo?"
-                )
-            except FileNotFoundError:
-                errors.append(f"File not found during deployment: {local_path}")
-            except OSError as e:
-                errors.append(f"Error deploying {local_path}: {e}")
+            deployed += self._deploy_repo_path(
+                repo_path, local_path, section, final_excludes, errors
+            )
 
         return deployed, had_changes, errors
 
@@ -365,90 +402,10 @@ class SaveDeployMixin:
                     if section.update_strategy == "rename_old" and local_path.exists():
                         backup_file(local_path)
 
-                    def restore_file_secrets(dest_path: Path) -> None:
-                        err = self._restore_file_secrets(
-                            dest_path, str(local_path), self.current_branch
-                        )
-                        if err:
-                            item_errors.append(err)
-
-                    final_excludes = (section.exclude or []) + (
-                        section.ignored_directories or []
+                    final_excludes = self._build_final_excludes(section)
+                    deployed_count = self._deploy_repo_path(
+                        repo_path, local_path, section, final_excludes, item_errors
                     )
-
-                    try:
-                        if repo_path.is_file():
-                            if section.deploy_method == "symlink":
-                                symlinked, _ = deploy_file_or_symlink(
-                                    repo_path,
-                                    local_path,
-                                    deploy_method="symlink",
-                                )
-                                if symlinked:
-                                    deployed_count += 1
-                                else:
-                                    item_errors.append(
-                                        f"Failed to symlink {repo_path} to {local_path}"
-                                    )
-                            else:
-                                success, _ = copy_file(
-                                    repo_path,
-                                    local_path,
-                                    filter_secrets_enabled=False,
-                                )
-                                if success:
-                                    if section.secrets_filter:
-                                        restore_file_secrets(local_path)
-                                    deployed_count += 1
-                                else:
-                                    item_errors.append(
-                                        f"Failed to copy {repo_path} to {local_path}"
-                                    )
-                        elif repo_path.is_dir():
-                            if section.deploy_method == "symlink":
-                                (
-                                    files_symlinked,
-                                    files_failed,
-                                ) = deploy_directory_with_symlinks(
-                                    repo_path,
-                                    local_path,
-                                    include_patterns=section.include,
-                                    exclude_patterns=final_excludes,
-                                )
-                                deployed_count += files_symlinked
-                            else:
-                                files_copied, files_failed, _ = copy_directory(
-                                    repo_path,
-                                    local_path,
-                                    filter_secrets_enabled=False,
-                                    include_patterns=section.include,
-                                    exclude_patterns=final_excludes,
-                                    follow_symlinks=section.follow_symlinks,
-                                )
-                                if section.secrets_filter:
-                                    for deployed_file in local_path.rglob("*"):
-                                        if deployed_file.is_file():
-                                            restore_file_secrets(deployed_file)
-
-                                deployed_count += files_copied
-                            if files_failed > 0:
-                                item_errors.append(
-                                    f"Failed to deploy {files_failed} files in {local_path}"
-                                )
-                        else:
-                            item_errors.append(f"Source not found in repo: {repo_path}")
-
-                    except PermissionError:
-                        item_errors.append(
-                            f"Permission denied deploying {local_path}. Try running with sudo?"
-                        )
-                    except FileNotFoundError:
-                        item_errors.append(
-                            f"File not found during deployment: {repo_path}"
-                        )
-                    except OSError as e:
-                        item_errors.append(f"Error deploying {local_path}: {e}")
-
                     return deployed_count, item_errors
 
                 futures = [

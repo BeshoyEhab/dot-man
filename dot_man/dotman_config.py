@@ -3,20 +3,8 @@
 __all__ = ["DotManConfig", "VALID_SECTION_KEYS"]
 
 import logging
-import sys
 from pathlib import Path
 from typing import Any, cast
-
-# Python 3.11+ has tomllib built-in, otherwise use tomli
-if sys.version_info >= (3, 11):
-    import tomllib
-else:
-    try:
-        import tomli as tomllib
-    except ImportError:
-        raise ImportError("Please install tomli: pip install tomli")
-
-import tomlkit
 
 from .constants import (
     CONFIG_FILE_PRIORITY,
@@ -25,7 +13,7 @@ from .constants import (
     VALID_UPDATE_STRATEGIES,
 )
 from .exceptions import ConfigurationError, ConfigValidationError
-from .global_config import GlobalConfig, write_config_file
+from .global_config import GlobalConfig, load_config_file, write_config_file
 from .section import Section
 
 VALID_SECTION_KEYS = {
@@ -89,27 +77,7 @@ class DotManConfig:
 
         Supports TOML (.toml) and YAML (.yaml/.yml) formats.
         """
-        if not self._path.exists():
-            raise ConfigurationError(f"Config not found: {self._path}")
-
-        content = self._path.read_text()
-
-        if self._path.suffix in (".yaml", ".yml"):
-            try:
-                from ruamel.yaml import YAML
-            except ImportError:
-                raise ConfigurationError(
-                    "YAML support requires ruamel.yaml. Install with: pip install dotman-git[yaml]"
-                )
-            yaml = YAML()
-            self._doc = yaml.load(content)
-            import yaml as pyyaml  # type: ignore[import-untyped]
-
-            self._data = pyyaml.safe_load(content) or {}
-        else:
-            self._data = tomllib.loads(content)
-            self._doc = tomlkit.parse(content)
-
+        self._data, self._doc = load_config_file(self._path)
         self._dirty = False
 
         warnings = self._validate_schema()

@@ -230,7 +230,6 @@ def _get_completion_cache() -> dict:
                 return _memory_cache
     except Exception:
         logging.debug("Failed to load completion cache from file")
-        pass
 
     _memory_cache = {}
     _memory_cache_time = time.time()
@@ -250,7 +249,6 @@ def _save_completion_cache(data: dict) -> None:
         _COMPLETION_CACHE_FILE.write_text(json.dumps(data))
     except Exception:
         logging.debug("Failed to save completion cache to file")
-        pass
 
 
 def _clear_completion_cache() -> None:
@@ -266,7 +264,6 @@ def _clear_completion_cache() -> None:
         logging.debug(
             "Failed to unlink completion cache file in _clear_completion_cache"
         )
-        pass
 
 
 def _clear_all_caches() -> None:
@@ -285,7 +282,6 @@ def _clear_all_caches() -> None:
             _COMPLETION_CACHE_FILE.unlink()
     except Exception:
         logging.debug("Failed to unlink completion cache file in _clear_all_caches")
-        pass
 
 
 def parse_branch_arg(arg: str) -> dict:

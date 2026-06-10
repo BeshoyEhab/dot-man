@@ -1,6 +1,7 @@
 """Config command for dot-man CLI."""
 
 import json
+from typing import Any
 
 import click
 from rich.table import Table
@@ -382,139 +383,132 @@ def config_tutorial(section: str | None, interactive: bool):
     return
 
 
-def _show_section_examples(section: str):
-    """Show examples for a specific section."""
-    from typing import Any
-
-    from rich.panel import Panel
-    from rich.syntax import Syntax
-
-    examples: dict[str, dict[str, Any]] = {
-        "basic": {
-            "title": "Basic File Tracking",
-            "description": "Track individual files with smart defaults",
-            "examples": [
-                {
-                    "title": "Simple file tracking",
-                    "config": """[bashrc]
+SECTION_EXAMPLES: dict[str, dict[str, Any]] = {
+    "basic": {
+        "title": "Basic File Tracking",
+        "description": "Track individual files with smart defaults",
+        "examples": [
+            {
+                "title": "Simple file tracking",
+                "config": """[bashrc]
 paths = ["~/.bashrc"]""",
-                    "explanation": "Tracks your bash configuration. dot-man automatically:\n"
-                    "• Generates repo_base as 'bashrc'\n"
-                    "• Uses 'replace' update_strategy\n"
-                    "• Enables secrets_filter",
-                },
-                {
-                    "title": "Multiple files in one section",
-                    "config": """[shell-files]
+                "explanation": "Tracks your bash configuration. dot-man automatically:\n"
+                "• Generates repo_base as 'bashrc'\n"
+                "• Uses 'replace' update_strategy\n"
+                "• Enables secrets_filter",
+            },
+            {
+                "title": "Multiple files in one section",
+                "config": """[shell-files]
 paths = ["~/.bashrc", "~/.zshrc", "~/.profile"]""",
-                    "explanation": "Group related files together. All files share the same settings.",
-                },
-                {
-                    "title": "Custom repository name",
-                    "config": """[my-config]
+                "explanation": "Group related files together. All files share the same settings.",
+            },
+            {
+                "title": "Custom repository name",
+                "config": """[my-config]
 paths = ["~/.myapp/config"]
 repo_base = "my-app-config" """,
-                    "explanation": "Override the auto-generated repo_base with a custom name.",
-                },
-            ],
-        },
-        "directories": {
-            "title": "Directory Tracking",
-            "description": "Track entire directories with include/exclude patterns",
-            "examples": [
-                {
-                    "title": "Basic directory tracking",
-                    "config": """[nvim]
+                "explanation": "Override the auto-generated repo_base with a custom name.",
+            },
+        ],
+    },
+    "directories": {
+        "title": "Directory Tracking",
+        "description": "Track entire directories with include/exclude patterns",
+        "examples": [
+            {
+                "title": "Basic directory tracking",
+                "config": """[nvim]
 paths = ["~/.config/nvim"]""",
-                    "explanation": "Tracks your entire Neovim config directory.",
-                },
-                {
-                    "title": "Directory with exclusions",
-                    "config": """[nvim]
+                "explanation": "Tracks your entire Neovim config directory.",
+            },
+            {
+                "title": "Directory with exclusions",
+                "config": """[nvim]
 paths = ["~/.config/nvim"]
 exclude = ["*.log", "plugin/packer_compiled.lua"]""",
-                    "explanation": "Exclude temporary files and compiled plugins from tracking.",
-                },
-                {
-                    "title": "Include only specific files",
-                    "config": """[dotfiles]
+                "explanation": "Exclude temporary files and compiled plugins from tracking.",
+            },
+            {
+                "title": "Include only specific files",
+                "config": """[dotfiles]
 paths = ["~/dotfiles"]
 include = ["*.conf", "*.sh", "README.md"]""",
-                    "explanation": "Only track configuration files, scripts, and documentation.",
-                },
-            ],
-        },
-        "hooks": {
-            "title": "Pre/Post Deploy Hooks",
-            "description": "Run commands before or after file deployment",
-            "examples": [
-                {
-                    "title": "Shell reload after config change",
-                    "config": """[bashrc]
+                "explanation": "Only track configuration files, scripts, and documentation.",
+            },
+        ],
+    },
+    "hooks": {
+        "title": "Pre/Post Deploy Hooks",
+        "description": "Run commands before or after file deployment",
+        "examples": [
+            {
+                "title": "Shell reload after config change",
+                "config": """[bashrc]
 paths = ["~/.bashrc"]
 post_deploy = "shell_reload" """,
-                    "explanation": "Reloads your shell after deploying bash config.\n"
-                    "'shell_reload' is an alias for: source ~/.bashrc || source ~/.zshrc",
-                },
-                {
-                    "title": "Neovim plugin sync",
-                    "config": """[nvim]
+                "explanation": "Reloads your shell after deploying bash config.\n"
+                "'shell_reload' is an alias for: source ~/.bashrc || source ~/.zshrc",
+            },
+            {
+                "title": "Neovim plugin sync",
+                "config": """[nvim]
 paths = ["~/.config/nvim"]
 post_deploy = "nvim_sync" """,
-                    "explanation": "Runs PackerSync after deploying Neovim config.\n"
-                    "'nvim_sync' is an alias for: nvim --headless +PackerSync +qa",
-                },
-                {
-                    "title": "Custom command",
-                    "config": """[custom-app]
+                "explanation": "Runs PackerSync after deploying Neovim config.\n"
+                "'nvim_sync' is an alias for: nvim --headless +PackerSync +qa",
+            },
+            {
+                "title": "Custom command",
+                "config": """[custom-app]
 paths = ["~/.config/myapp"]
 post_deploy = "systemctl --user restart myapp" """,
-                    "explanation": "Restart a user service after config deployment.",
-                },
-                {
-                    "title": "Pre-deploy backup",
-                    "config": """[important-config]
+                "explanation": "Restart a user service after config deployment.",
+            },
+            {
+                "title": "Pre-deploy backup",
+                "config": """[important-config]
 paths = ["~/.important"]
 pre_deploy = "cp ~/.important ~/.important.backup" """,
-                    "explanation": "Create a backup before overwriting important files.",
-                },
-            ],
-        },
-        "templates": {
-            "title": "Reusable Templates",
-            "description": "Define shared settings that can be inherited",
-            "examples": [
-                {
-                    "title": "Template definition",
-                    "config": """[templates.linux-desktop]
+                "explanation": "Create a backup before overwriting important files.",
+            },
+        ],
+    },
+    "templates": {
+        "title": "Reusable Templates",
+        "description": "Define shared settings that can be inherited",
+        "examples": [
+            {
+                "title": "Template definition",
+                "config": """[templates.linux-desktop]
 post_deploy = "notify-send 'Config updated'"
 update_strategy = "rename_old"
 
 [templates.dev-tools]
 secrets_filter = false
 pre_deploy = "echo 'Deploying dev config'" """,
-                    "explanation": "Define reusable templates with common settings.",
-                },
-                {
-                    "title": "Template inheritance",
-                    "config": """[hyprland]
+                "explanation": "Define reusable templates with common settings.",
+            },
+            {
+                "title": "Template inheritance",
+                "config": """[hyprland]
 paths = ["~/.config/hypr"]
 inherits = ["linux-desktop"]
 
 [git]
 paths = ["~/.gitconfig"]
 inherits = ["dev-tools"]""",
-                    "explanation": "Inherit settings from templates. Child settings override parent settings.",
-                },
-            ],
-        },
-        "advanced": {
-            "title": "Advanced Options",
-            "description": "Fine-tune behavior with advanced configuration options",
-            "examples": [
-                {
-                    "title": "Update strategies",
-                    "config": """[careful-config]
+                "explanation": "Inherit settings from templates. Child settings override parent settings.",
+            },
+        ],
+    },
+    "advanced": {
+        "title": "Advanced Options",
+        "description": "Fine-tune behavior with advanced configuration options",
+        "examples": [
+            {
+                "title": "Update strategies",
+                "config": """[careful-config]
 paths = ["~/.important"]
 update_strategy = "rename_old"
 
@@ -525,108 +519,108 @@ update_strategy = "replace"
 [readonly-config]
 paths = ["~/.readonly"]
 update_strategy = "ignore" """,
-                    "explanation": "• 'replace': Overwrite existing files (default)\n"
-                    "• 'rename_old': Backup existing files\n"
-                    "• 'ignore': Skip if file exists",
-                },
-                {
-                    "title": "Explicit repository paths",
-                    "config": """[special-file]
+                "explanation": "• 'replace': Overwrite existing files (default)\n"
+                "• 'rename_old': Backup existing files\n"
+                "• 'ignore': Skip if file exists",
+            },
+            {
+                "title": "Explicit repository paths",
+                "config": """[special-file]
 paths = ["~/.config/app/special.conf"]
 repo_path = "configs/special-config.toml" """,
-                    "explanation": "Override automatic repo path generation with explicit repo_path.",
-                },
-            ],
-        },
-        "secrets": {
-            "title": "Secret Detection & Filtering",
-            "description": "Automatically detect and handle sensitive information",
-            "examples": [
-                {
-                    "title": "Automatic secret filtering",
-                    "config": """[gitconfig]
+                "explanation": "Override automatic repo path generation with explicit repo_path.",
+            },
+        ],
+    },
+    "secrets": {
+        "title": "Secret Detection & Filtering",
+        "description": "Automatically detect and handle sensitive information",
+        "examples": [
+            {
+                "title": "Automatic secret filtering",
+                "config": """[gitconfig]
 paths = ["~/.gitconfig"]
 # secrets_filter = true  (enabled by default)""",
-                    "explanation": "Automatically redacts API keys, passwords, and tokens when saving.",
-                },
-                {
-                    "title": "Disable filtering for trusted files",
-                    "config": """[trusted-config]
+                "explanation": "Automatically redacts API keys, passwords, and tokens when saving.",
+            },
+            {
+                "title": "Disable filtering for trusted files",
+                "config": """[trusted-config]
 paths = ["~/.config/trusted"]
 secrets_filter = false""",
-                    "explanation": "Disable secret filtering for files you know are safe.",
-                },
-                {
-                    "title": "Check for secrets",
-                    "command": "dot-man audit",
-                    "explanation": "Scan your repository for secrets. Use --strict for CI/CD.",
-                },
-            ],
-        },
-        "activate": {
-            "title": "Branch Activation Hooks",
-            "description": "Run commands when entering/leaving branches",
-            "examples": [
-                {
-                    "title": "Start app on branch switch",
-                    "config": """[dots]
+                "explanation": "Disable secret filtering for files you know are safe.",
+            },
+            {
+                "title": "Check for secrets",
+                "command": "dot-man audit",
+                "explanation": "Scan your repository for secrets. Use --strict for CI/CD.",
+            },
+        ],
+    },
+    "activate": {
+        "title": "Branch Activation Hooks",
+        "description": "Run commands when entering/leaving branches",
+        "examples": [
+            {
+                "title": "Start app on branch switch",
+                "config": """[dots]
 paths = [".config/quickshell"]
 on_activate = "qs -c ii"
 on_deactivate = "pkill qs -9" """,
-                    "explanation": "Run 'qs -c ii' when switching TO this branch, "
-                    "and 'pkill qs -9' when leaving. Perfect for launching "
-                    "config-specific applications.",
-                },
-                {
-                    "title": "Reload environment",
-                    "config": """[work]
+                "explanation": "Run 'qs -c ii' when switching TO this branch, "
+                "and 'pkill qs -9' when leaving. Perfect for launching "
+                "config-specific applications.",
+            },
+            {
+                "title": "Reload environment",
+                "config": """[work]
 paths = [".config/work"]
 on_activate = "source ~/.config/work/env.sh"
 on_deactivate = "echo 'Leaving work config'" """,
-                    "explanation": "Load environment variables or run setup commands "
-                    "when entering a branch.",
-                },
-                {
-                    "title": "Multiple hooks",
-                    "config": """[dev]
+                "explanation": "Load environment variables or run setup commands "
+                "when entering a branch.",
+            },
+            {
+                "title": "Multiple hooks",
+                "config": """[dev]
 paths = [".config/dev"]
 on_activate = "echo 'Starting dev mode' && alacritty -e tmux"
 on_deactivate = "pkill -f 'alacritty -e tmux'" """,
-                    "explanation": "Chain multiple commands with && for complex activation.",
-                },
-            ],
-        },
-        "presets": {
-            "title": "Quick Setup Presets",
-            "description": "Pre-configured sections for popular dotfiles",
-            "examples": [
-                {
-                    "title": "Quickshell end-4",
-                    "config": """[qs-end4]
+                "explanation": "Chain multiple commands with && for complex activation.",
+            },
+        ],
+    },
+    "presets": {
+        "title": "Quick Setup Presets",
+        "description": "Pre-configured sections for popular dotfiles",
+        "examples": [
+            {
+                "title": "Quickshell end-4",
+                "config": """[qs-end4]
 paths = [".config/quickshell/end-4"]
 on_activate = "qs -c end-4"
 on_deactivate = "pkill qs -9" """,
-                    "explanation": "Quickshell with config 'end-4'. Auto-detected if exists.",
-                },
-                {
-                    "title": "Quickshell caelestia",
-                    "config": """[qs-caelestia]
+                "explanation": "Quickshell with config 'end-4'. Auto-detected if exists.",
+            },
+            {
+                "title": "Quickshell caelestia",
+                "config": """[qs-caelestia]
 paths = [".config/quickshell/caelestia"]
 on_activate = "qs -c caelestia"
 on_deactivate = "pkill qs -9" """,
-                    "explanation": "Quickshell with config 'caelestia'. Auto-detected if exists.",
-                },
-                {
-                    "title": "Quickshell custom",
-                    "config": """[qs-my-config]
+                "explanation": "Quickshell with config 'caelestia'. Auto-detected if exists.",
+            },
+            {
+                "title": "Quickshell custom",
+                "config": """[qs-my-config]
 paths = [".config/quickshell/my-config"]
 on_activate = "qs -c my-config"
 on_deactivate = "pkill qs -9" """,
-                    "explanation": "Replace 'my-config' with your quickshell config name.",
-                },
-                {
-                    "title": "Full shell setup",
-                    "config": """[shell]
+                "explanation": "Replace 'my-config' with your quickshell config name.",
+            },
+            {
+                "title": "Full shell setup",
+                "config": """[shell]
 paths = [".bashrc", ".zshrc", ".config/fish"]
 post_deploy = "shell_reload"
 
@@ -636,19 +630,25 @@ paths = [".config/nvim"]
 [tmux]
 paths = [".tmux.conf"]
 post_deploy = "tmux source-file ~/.tmux.conf" """,
-                    "explanation": "Complete shell setup with multiple sections. "
-                    "Run 'dot-man config detect' to auto-detect what's available.",
-                },
-            ],
-        },
-    }
+                "explanation": "Complete shell setup with multiple sections. "
+                "Run 'dot-man config detect' to auto-detect what's available.",
+            },
+        ],
+    },
+}
 
-    if section not in examples:
+
+def _show_section_examples(section: str):
+    """Show examples for a specific section."""
+    from rich.panel import Panel
+    from rich.syntax import Syntax
+
+    if section not in SECTION_EXAMPLES:
         ui.error(f"Unknown section: {section}", exit_code=0)
-        ui.console.print(f"Available sections: {', '.join(examples.keys())}")
+        ui.console.print(f"Available sections: {', '.join(SECTION_EXAMPLES.keys())}")
         return
 
-    data = examples[section]
+    data = SECTION_EXAMPLES[section]
 
     ui.console.print()
     ui.console.print(
@@ -678,7 +678,6 @@ post_deploy = "tmux source-file ~/.tmux.conf" """,
 def _run_interactive_tutorial():
     """Run interactive step-by-step tutorial with detailed explanations."""
     from rich.panel import Panel
-    from rich.syntax import Syntax
 
     ui.console.print()
     ui.console.print(
@@ -690,27 +689,43 @@ def _run_interactive_tutorial():
         )
     )
 
-    # Track user configurations for final summary
     user_configs = []
+    _tutorial_step1_basic_files()
+    _tutorial_step2_directory_patterns(user_configs)
+    _tutorial_step3_update_strategies()
+    _tutorial_step4_pre_deploy_hooks()
+    _tutorial_step5_templates()
+    _tutorial_step6_terminal(user_configs)
+    _tutorial_summary()
 
-    # Step 1: Basic files
+
+def _tutorial_step1_basic_files():
+    """Step 1: Basic file tracking examples."""
     ui.console.print("\n[bold cyan]📁 Step 1: Basic File Tracking[/bold cyan]")
     ui.console.print(
         "Every configuration section starts with [section-name] and defines what files to track."
     )
-
     ui.console.print("\n[bold green]✅ Example: Shell Configuration[/bold green]")
-    ui.console.print()
+    _tutorial_show_syntax()
+    _tutorial_explain_basics()
+    _tutorial_press_enter()
+    _tutorial_gitconfig_example()
+    _tutorial_press_enter()
 
-    # Show the config with explanations
+
+def _tutorial_show_syntax():
+    """Show the shell config TOML syntax."""
+    from rich.syntax import Syntax
+
     config_text = """[shell-config]
 paths = ["~/.bashrc", "~/.zshrc"]
 post_deploy = "shell_reload" """
-
     ui.console.print(Syntax(config_text, "toml", theme="monokai"))
     ui.console.print()
 
-    # Explain each part
+
+def _tutorial_explain_basics():
+    """Explain the basic config elements."""
     ui.console.print(
         "[bold cyan]🔍 [shell-config][/bold cyan] - A unique name for this group of files"
     )
@@ -724,25 +739,22 @@ post_deploy = "shell_reload" """
         "[bold cyan]🔄 shell_reload[/bold cyan] - Built-in alias that reloads bash/zsh"
     )
     ui.console.print("    [dim](runs: source ~/.bashrc || source ~/.zshrc)[/dim]")
-
     ui.console.print(
         "\n[dim]💡 Smart defaults apply automatically - you only specify what's different![/dim]"
     )
 
-    ui.console.print("\n[dim]Press Enter to continue...[/dim]")
-    input()
+
+def _tutorial_gitconfig_example():
+    """Show git config example with secret protection."""
+    from rich.syntax import Syntax
 
     ui.console.print(
         "\n[bold green]✅ Git Config with Automatic Secret Protection:[/bold green]"
     )
-    ui.console.print()
-
     config_text = """[gitconfig]
 paths = ["~/.gitconfig"]"""
-
     ui.console.print(Syntax(config_text, "toml", theme="monokai"))
     ui.console.print()
-
     ui.console.print(
         "[bold cyan]🔒 Automatic security[/bold cyan] - Git configs get special protection:"
     )
@@ -756,30 +768,33 @@ paths = ["~/.gitconfig"]"""
         '  • [yellow]update_strategy = "replace"[/yellow] - Safe for most config files'
     )
 
+
+def _tutorial_press_enter():
+    """Wait for user to press Enter."""
     ui.console.print("\n[dim]Press Enter to continue...[/dim]")
     input()
 
-    # Step 2: Directories with patterns
+
+def _tutorial_step2_directory_patterns(user_configs: list):
+    """Step 2: Directory tracking with include/exclude patterns."""
+    from rich.syntax import Syntax
+
     ui.console.print(
         "\n[bold cyan]📂 Step 2: Directory Tracking with Patterns[/bold cyan]"
     )
     ui.console.print(
         "When tracking directories, you can include/exclude specific files."
     )
-
     ui.console.print(
         "\n[bold green]✅ Neovim Config with Smart Exclusions:[/bold green]"
     )
-    ui.console.print()
 
     config_text = """[nvim]
 paths = ["~/.config/nvim"]
 exclude = ["*.log", "plugin/packer_compiled.lua"]
 post_deploy = "nvim_sync" """
-
     ui.console.print(Syntax(config_text, "toml", theme="monokai"))
     ui.console.print()
-
     ui.console.print(
         "[bold cyan]🎯 exclude[/bold cyan] - Patterns of files/directories to SKIP tracking"
     )
@@ -793,32 +808,22 @@ post_deploy = "nvim_sync" """
     ui.console.print(
         "[bold cyan]🔄 nvim_sync[/bold cyan] - Alias: nvim --headless +PackerSync +qa"
     )
-
     ui.console.print(
         '\n[dim]💡 Use ** for recursive: "**/*.tmp" matches all .tmp files in subdirs[/dim]'
     )
 
-    user_configs.append(
-        (
-            "nvim",
-            """[nvim]
-paths = ["~/.config/nvim"]
-exclude = ["*.log", "plugin/packer_compiled.lua"]
-post_deploy = "nvim_sync" """,
-        )
-    )
+    user_configs.append(("nvim", config_text))
+    _tutorial_press_enter()
 
-    ui.console.print("\n[dim]Press Enter to continue...[/dim]")
-    input()
 
-    # Step 3: Update strategies
+def _tutorial_step3_update_strategies():
+    """Step 3: Update strategies explanation."""
+    from rich.syntax import Syntax
+
     ui.console.print(
         "\n[bold cyan]🔄 Step 3: Update Strategies - How Files Are Deployed[/bold cyan]"
     )
     ui.console.print("Choose how dot-man handles existing files when deploying.")
-
-    # Show update strategy information
-
     ui.console.print("\n[bold green]📋 Update Strategy Options:[/bold green]")
 
     strategy_examples = {
@@ -835,23 +840,22 @@ post_deploy = "nvim_sync" """,
             "explanation": "• Skips files that already exist\n• Never overwrites your changes\n• Good for one-time setup files",
         },
     }
-
     for name, details in strategy_examples.items():
         ui.console.print(f"\n[yellow]{name}:[/yellow]")
         ui.console.print(Syntax(details["config"], "toml", theme="monokai"))
         ui.console.print(details["explanation"])
+    _tutorial_press_enter()
 
-    ui.console.print("\n[dim]Press Enter to continue...[/dim]")
-    input()
 
-    # Step 4: Pre-deploy hooks
+def _tutorial_step4_pre_deploy_hooks():
+    """Step 4: Pre-deploy hooks examples."""
+    from rich.syntax import Syntax
+
     ui.console.print(
         "\n[bold cyan]⚡ Step 4: Pre-Deploy Hooks - Actions Before Deployment[/bold cyan]"
     )
     ui.console.print("Sometimes you need to prepare before deploying files.")
-
     ui.console.print("\n[bold green]🔧 Pre-deploy Hook Examples:[/bold green]")
-    ui.console.print()
 
     examples = [
         {
@@ -869,24 +873,22 @@ pre_deploy = "systemctl --user stop my-service" """,
             "explanation": "Stops the service before updating its config files",
         },
     ]
-
     for example in examples:
         ui.console.print(f"[cyan]{example['title']}:[/cyan]")
         ui.console.print(Syntax(example["config"], "toml", theme="monokai"))
-        ui.console.print(f"  {example['explanation']}")
-        ui.console.print()
+        ui.console.print(f"  {example['explanation']}\n")
+    _tutorial_press_enter()
 
-    ui.console.print("\n[dim]Press Enter to continue...[/dim]")
-    input()
 
-    # Step 5: Templates
+def _tutorial_step5_templates():
+    """Step 5: Templates and inheritance."""
+    from rich.syntax import Syntax
+
     ui.console.print(
         "\n[bold cyan]📋 Step 5: Templates - Reusable Configuration[/bold cyan]"
     )
     ui.console.print("Define shared settings that multiple sections can inherit.")
-
     ui.console.print("\n[bold green]🎨 Template Example:[/bold green]")
-    ui.console.print()
 
     config_text = """# Define a template
 [templates.desktop-apps]
@@ -903,10 +905,8 @@ paths = ["~/.config/waybar"]
 inherits = ["desktop-apps"]
 # Override settings if needed
 update_strategy = "replace" """
-
     ui.console.print(Syntax(config_text, "toml", theme="monokai"))
     ui.console.print()
-
     ui.console.print(
         "[bold cyan]📋 Template definition[/bold cyan] - [templates.name] sections are reusable"
     )
@@ -919,23 +919,21 @@ update_strategy = "replace" """
     ui.console.print(
         "[bold cyan]🎯 Use case[/bold cyan] - Share notifications, strategies, etc."
     )
+    _tutorial_press_enter()
 
-    ui.console.print("\n[dim]Press Enter to continue...[/dim]")
-    input()
 
-    # Step 6: Terminal
+def _tutorial_step6_terminal(user_configs: list):
+    """Step 6: Terminal configuration example."""
+    from rich.syntax import Syntax
+
     ui.console.print("\n[bold cyan]💻 Step 6: Terminal Configuration[/bold cyan]")
-
     ui.console.print("\n[bold green]✅ Kitty Terminal Configuration:[/bold green]")
-    ui.console.print()
 
     config_text = """[kitty]
 paths = ["~/.config/kitty"]
 post_deploy = "kitty_reload" """
-
     ui.console.print(Syntax(config_text, "toml", theme="monokai"))
     ui.console.print()
-
     ui.console.print(
         "[bold cyan]🖥️ Kitty[/bold cyan] - Fast, GPU-accelerated terminal emulator"
     )
@@ -945,19 +943,12 @@ post_deploy = "kitty_reload" """
         "[bold cyan]🔄 kitty_reload[/bold cyan] - Sends SIGUSR1 to reload running instances"
     )
 
-    user_configs.append(
-        (
-            "kitty",
-            """[kitty]
-paths = ["~/.config/kitty"]
-post_deploy = "kitty_reload" """,
-        )
-    )
+    user_configs.append(("kitty", config_text))
+    _tutorial_press_enter()
 
-    ui.console.print("\n[dim]Press Enter to continue...[/dim]")
-    input()
 
-    # Final summary
+def _tutorial_summary():
+    """Final summary of the tutorial."""
     ui.console.print("\n[bold green]🎉 Tutorial Complete![/bold green]")
     ui.console.print("\n[dim]You've learned about:[/dim]")
     ui.console.print("  • 📁 Basic file and directory tracking")
@@ -966,7 +957,6 @@ post_deploy = "kitty_reload" """,
     ui.console.print("  • ⚡ Pre/post deploy hooks for automation")
     ui.console.print("  • 📋 Templates for reusable configuration")
     ui.console.print("  • 🔒 Automatic secret detection and filtering")
-
     ui.console.print("\n[dim]Next steps:[/dim]")
     ui.console.print(
         "[green]$ dot-man config create[/green] [dim]- Generate config file with examples[/dim]"

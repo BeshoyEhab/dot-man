@@ -47,30 +47,30 @@ New test files added: `test_files_comprehensive.py` (55), `test_branch_ops.py` (
 
 ### Eliminate Duplication
 
-- [ ] **Deduplicate deploy logic** — `deploy_section()` and `deploy_item()` in `save_deploy_ops.py` duplicate symlink/copy/secret-restore code. Extract shared helpers.
-- [ ] **Unify config loading** — `dotman_config.py` and `global_config.py` have nearly identical YAML/TOML loading patterns. Extract base class or utility.
+- [x] **Deduplicate deploy logic** — `deploy_section()` and `deploy_item()` in `save_deploy_ops.py` duplicate symlink/copy/secret-restore code. Extract shared helpers.
+- [x] **Unify config loading** — `dotman_config.py` and `global_config.py` have nearly identical YAML/TOML loading patterns. Extract base class or utility.
 
 ### Clean Up Silent `except: pass`
 
-- [ ] **Cache ops** — `common.py:230-280` silently swallows all cache save/load errors
-- [ ] **Git operations** — `core.py:330,441,456` silently swallows errors in diff/stash operations
+- [x] **Cache ops** — `common.py:230-280` silently swallows all cache save/load errors
+- [x] **Git operations** — `core.py:330,441,456` silently swallows errors in diff/stash operations
 - [ ] **Remote operations** — `init_cmd.py:104,117,130` silently swallows clone/fetch errors
 
 ### Break Up Long Functions
 
-- [ ] **`config_cmd.py`** — `_run_interactive_tutorial` (301 lines), `_show_section_examples` (290 lines)
+- [x] **`config_cmd.py`** — `_run_interactive_tutorial` (301 lines), `_show_section_examples` (290 lines)
 - [ ] **`init_cmd.py`** — `run_setup_wizard` (250 lines)
 - [ ] **`remote_cmd.py`** — `setup` (253 lines)
 - [ ] **`navigate_cmd.py`** — `_handle_branch_navigate` (211 lines)
-- [ ] **`save_deploy_ops.py`** — `execute_deployment_plan` (130 lines), `deploy_section` (92 lines)
+- [ ] **`save_deploy_ops.py`** — `execute_deployment_plan` (130 lines), `deploy_section` (92 lines) — improved via helper extraction
 - [ ] **`files.py`** — `copy_directory` (92 lines), `smart_save_file` (88 lines)
 
 ### Deep Nesting
 
-- [ ] **`config_cmd.py`** — `config_tutorial` has 12 levels of nesting
+- [x] **`config_cmd.py`** — `config_tutorial` has 12 levels of nesting
 - [ ] **`remote_cmd.py`** — `setup` has 11 levels
 - [ ] **`edit_cmd.py`** — `edit` has 9 levels
-- [ ] **`save_deploy_ops.py`** — `deploy_section` and `deploy_item` have 7 levels each
+- [ ] **`save_deploy_ops.py`** — `deploy_section` and `deploy_item` have 7 levels each — reduced via helper extraction
 
 ---
 

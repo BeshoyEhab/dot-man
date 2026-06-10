@@ -1,6 +1,12 @@
 """Global configuration management for dot-man."""
 
-__all__ = ["GlobalConfig", "write_config_file", "_write_toml", "substitute_templates"]
+__all__ = [
+    "GlobalConfig",
+    "load_config_file",
+    "write_config_file",
+    "_write_toml",
+    "substitute_templates",
+]
 
 import logging
 import os
@@ -103,6 +109,40 @@ def update_config_doc(doc: Any, data: dict) -> None:
             doc[k] = v
 
 
+def load_config_file(path: Path, label: str = "Config") -> tuple[dict, Any]:
+    """Load a TOML/YAML configuration file.
+
+    Args:
+        path: Path to the config file.
+        label: Label for error messages (e.g. "Global config", "dot-man config").
+
+    Returns:
+        (data_dict, doc_for_preserving_comments)
+    """
+    if not path.exists():
+        raise ConfigurationError(f"{label} not found: {path}")
+
+    content = path.read_text()
+
+    if path.suffix in (".yaml", ".yml"):
+        try:
+            from ruamel.yaml import YAML
+        except ImportError:
+            raise ConfigurationError(
+                "YAML support requires ruamel.yaml. Install with: pip install dotman-git[yaml]"
+            )
+        yaml = YAML()
+        doc = yaml.load(content)
+        import yaml as pyyaml  # type: ignore[import-untyped]
+
+        data = pyyaml.safe_load(content) or {}
+    else:
+        data = tomllib.loads(content)
+        doc = tomlkit.parse(content)
+
+    return data, doc
+
+
 def write_config_file(path: Path, data: dict, preserve_doc: Any = None) -> None:
     """Write TOML/YAML configuration data to file, preserving comments when possible.
 
@@ -150,27 +190,7 @@ class GlobalConfig:
 
         Supports TOML (.toml) and YAML (.yaml/.yml) formats.
         """
-        if not self._path.exists():
-            raise ConfigurationError(f"Global config not found: {self._path}")
-
-        content = self._path.read_text()
-
-        if self._path.suffix in (".yaml", ".yml"):
-            try:
-                from ruamel.yaml import YAML
-            except ImportError:
-                raise ConfigurationError(
-                    "YAML support requires ruamel.yaml. Install with: pip install dotman-git[yaml]"
-                )
-            yaml = YAML()
-            self._doc = yaml.load(content)
-            import yaml as pyyaml  # type: ignore[import-untyped]
-
-            self._data = pyyaml.safe_load(content) or {}
-        else:
-            self._data = tomllib.loads(content)
-            self._doc = tomlkit.parse(content)
-
+        self._data, self._doc = load_config_file(self._path, label="Global config")
         self._dirty = False
 
     def save(self, force: bool = True) -> None:

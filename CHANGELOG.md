@@ -5,6 +5,21 @@ All notable changes to dot-man will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Refactored
+
+- **Deduplicate deploy logic** — extracted `_build_final_excludes`, `_deploy_repo_path`, `_restore_file_secrets_inplace` from duplicate code in `deploy_section` and `deploy_item` (save_deploy_ops.py)
+- **Unify config loading** — extracted `load_config_file()` function in `global_config.py`, removing 30 lines of duplicate YAML/TOML loading from both `DotManConfig` and `GlobalConfig`
+- **Clean up silent `except: pass`** — removed 4 redundant `pass` statements after `logging.debug()` in `common.py`, added `logging.debug()` to a bare `except` in `core.py`
+- **Break up `_run_interactive_tutorial`** — 302-line function split into 8 discrete step functions (config_cmd.py)
+- **Extract `SECTION_EXAMPLES`** — 260-line data dict moved from function body to module-level constant (config_cmd.py)
+
+### Test Improvements
+
+- Strengthened loose assertions (24 tests): added output content checks, mock-call assertions, or file-state assertions
+- Coverage: 66% → 81%
+
 ## [1.0.1] - 2026-05-17
 
 ### Fixed
