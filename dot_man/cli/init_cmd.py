@@ -172,41 +172,9 @@ def init(
         handle_exception(e, "Initialization")
 
 
-def run_setup_wizard(
-    global_config: GlobalConfig, dotman_config: DotManConfig, git: GitManager
-):
-    """Interactive setup wizard for new users."""
-    ui.print_banner("🧙 Setup Wizard")
-    ui.console.print()
-    ui.console.print(
-        "Let's get your dotfiles set up! I'll detect common files automatically."
-    )
-    ui.console.print()
-
-    # Detect common dotfiles
-    ui.console.print("[bold]Detecting dotfiles...[/bold]")
-    ui.console.print()
-
-    # Detect quickshell configs using ConfigDetector
+def _wizard_detect_files(common_files: list) -> list:
+    """Detect quickshell configs and add them to common files list."""
     qs_configs = ConfigDetector.detect_quickshell_configs()
-
-    # Build common_files with quickshell detection
-    common_files = [
-        ("~/.bashrc", "Bash shell", "bashrc"),
-        ("~/.zshrc", "Zsh shell", "zshrc"),
-        ("~/.gitconfig", "Git config", "gitconfig"),
-        ("~/.vimrc", "Vim editor", "vimrc"),
-        ("~/.config/nvim", "Neovim", "nvim"),
-        ("~/.config/fish", "Fish shell", "fish"),
-        ("~/.config/kitty", "Kitty terminal", "kitty"),
-        ("~/.config/alacritty", "Alacritty terminal", "alacritty"),
-        ("~/.config/hypr", "Hyprland WM", "hypr"),
-        ("~/.config/i3", "i3 WM", "i3"),
-        ("~/.tmux.conf", "tmux", "tmux"),
-        ("~/.ssh/config", "SSH config", "ssh-config"),
-    ]
-
-    # Add quickshell configs as separate entries
     for qs_config in qs_configs:
         common_files.append(
             (
@@ -215,14 +183,16 @@ def run_setup_wizard(
                 qs_config["section_name"],
             )
         )
+    return common_files
 
-    files_to_add = []
+
+def _wizard_prompt_for_files(common_files: list, files_to_add: list) -> list:
+    """Iterate common_files, detect each path, ask user which to track."""
     found_count = 0
 
     for path_str, desc, section_name in common_files:
         path = Path(path_str).expanduser()
 
-        # Skip quickshell subdirs (detected separately by ConfigDetector)
         if section_name.startswith("qs-"):
             if path.exists():
                 found_count += 1
@@ -233,7 +203,6 @@ def run_setup_wizard(
                     files_to_add.append((path_str, section_name))
             continue
 
-        # Special handling for Quickshell root ambiguity
         if section_name == "quickshell" and path.exists():
             subdirs = sorted(
                 [
@@ -252,8 +221,7 @@ def run_setup_wizard(
                     "    [yellow]⚠️  Multiple configurations detected:[/yellow]"
                 )
 
-                # List options
-                options = subdirs + [path]  # subdirs + root
+                options = subdirs + [path]
                 for i, opt in enumerate(options, 1):
                     if opt == path:
                         label = f"Track root directory ({path_str})"
@@ -261,7 +229,6 @@ def run_setup_wizard(
                         label = f"Track '{opt.name}'"
                     ui.console.print(f"      [bold]{i}.[/bold] {label}")
 
-                # Ask user
                 while True:
                     choice = ui.ask(
                         f"    Which one to track? (1-{len(options)})",
@@ -272,7 +239,6 @@ def run_setup_wizard(
                         if 0 <= idx < len(options):
                             selected_path = options[idx]
 
-                            # Determine section name
                             if selected_path == path:
                                 final_section = section_name
                                 final_path_str = path_str
@@ -307,7 +273,11 @@ def run_setup_wizard(
     else:
         ui.console.print()
 
-    # Offer to add custom files
+    return files_to_add
+
+
+def _wizard_add_custom_files(files_to_add: list) -> list:
+    """Offer to add custom files not in the list."""
     if ui.confirm("Add custom files not in the list?", default=False):
         ui.console.print()
         while True:
@@ -325,7 +295,6 @@ def run_setup_wizard(
                 warn(f"Path doesn't exist: {custom_path}")
                 continue
 
-            # Auto-generate section name from path
             if path.name.startswith("."):
                 default_section = path.name[1:] if path.suffix else path.name[1:]
             else:
@@ -334,7 +303,13 @@ def run_setup_wizard(
             section_name = ui.ask("Section name", default=default_section)
             files_to_add.append((custom_path, section_name))
 
-    # Add files to config
+    return files_to_add
+
+
+def _wizard_save_and_summarize(
+    files_to_add: list, dotman_config: DotManConfig, git: GitManager
+):
+    """Add files to config, save, commit, show summary."""
     if files_to_add:
         ui.console.print()
         ui.console.print(f"[bold]Adding {len(files_to_add)} files...[/bold]")
@@ -346,11 +321,9 @@ def run_setup_wizard(
                     name=section_name,
                     paths=[path_str],
                 )
-                # Auto-detect and suggest hooks for popular configs
                 auto_hooks = get_auto_hooks_for_config(section_name, [path_str])
                 if auto_hooks:
                     for hook_type, hook_cmd in auto_hooks.items():
-                        # Map to actual config keys
                         if hook_type == "post_deploy":
                             dotman_config.update_section(
                                 section_name, post_deploy=hook_cmd
@@ -368,7 +341,6 @@ def run_setup_wizard(
 
         dotman_config.save()
 
-        # Commit the initial config
         git.add_all()
         git.commit("Add initial dotfiles configuration")
 
@@ -376,7 +348,6 @@ def run_setup_wizard(
         success(f"Added {len(files_to_add)} files to configuration")
         ui.console.print()
 
-        # Show what was configured
         ui.console.print("[bold]Your dotfiles are now tracked:[/bold]")
         for path_str, section_name in files_to_add[:5]:
             ui.console.print(f"  • [{section_name}] {path_str}")
@@ -385,7 +356,6 @@ def run_setup_wizard(
 
     ui.console.print()
 
-    # Offer remote setup
     if ui.confirm("Set up remote repository for syncing? (optional)", default=False):
         ui.console.print()
         from .remote_cmd import setup
@@ -393,7 +363,9 @@ def run_setup_wizard(
         ctx = click.Context(setup)
         ctx.invoke(setup)
 
-    # Final instructions
+
+def _wizard_show_next_steps(files_to_add: list):
+    """Final instructions and next steps."""
     ui.console.print()
     ui.print_banner("🎉 Setup Complete!")
     ui.console.print()
@@ -422,6 +394,42 @@ def run_setup_wizard(
     ui.console.print()
     ui.console.print("[dim]💡 Run 'dot-man --help' to see all commands[/dim]")
     ui.console.print()
+
+
+def run_setup_wizard(
+    global_config: GlobalConfig, dotman_config: DotManConfig, git: GitManager
+):
+    """Interactive setup wizard for new users."""
+    ui.print_banner("🧙 Setup Wizard")
+    ui.console.print()
+    ui.console.print(
+        "Let's get your dotfiles set up! I'll detect common files automatically."
+    )
+    ui.console.print()
+
+    ui.console.print("[bold]Detecting dotfiles...[/bold]")
+    ui.console.print()
+
+    common_files = [
+        ("~/.bashrc", "Bash shell", "bashrc"),
+        ("~/.zshrc", "Zsh shell", "zshrc"),
+        ("~/.gitconfig", "Git config", "gitconfig"),
+        ("~/.vimrc", "Vim editor", "vimrc"),
+        ("~/.config/nvim", "Neovim", "nvim"),
+        ("~/.config/fish", "Fish shell", "fish"),
+        ("~/.config/kitty", "Kitty terminal", "kitty"),
+        ("~/.config/alacritty", "Alacritty terminal", "alacritty"),
+        ("~/.config/hypr", "Hyprland WM", "hypr"),
+        ("~/.config/i3", "i3 WM", "i3"),
+        ("~/.tmux.conf", "tmux", "tmux"),
+        ("~/.ssh/config", "SSH config", "ssh-config"),
+    ]
+
+    common_files = _wizard_detect_files(common_files)
+    files_to_add = _wizard_prompt_for_files(common_files, [])
+    files_to_add = _wizard_add_custom_files(files_to_add)
+    _wizard_save_and_summarize(files_to_add, dotman_config, git)
+    _wizard_show_next_steps(files_to_add)
 
 
 def show_quick_start():

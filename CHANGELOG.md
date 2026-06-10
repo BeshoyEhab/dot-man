@@ -14,13 +14,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Clean up silent `except: pass`** — removed 4 redundant `pass` statements after `logging.debug()` in `common.py`, added `logging.debug()` to a bare `except` in `core.py`
 - **Break up `_run_interactive_tutorial`** — 302-line function split into 8 discrete step functions (config_cmd.py)
 - **Extract `SECTION_EXAMPLES`** — 260-line data dict moved from function body to module-level constant (config_cmd.py)
+- **Break up `run_setup_wizard`** — 250-line wizard split into 5 helpers (init_cmd.py)
+- **Break up `setup`** — 253-line remote setup split into 17 helpers; deep nesting reduced from 11 to 4 levels (remote_cmd.py)
+- **Reduce deep nesting in `edit`** — from 11 to 4-5 levels (edit_cmd.py)
 
 ### Test Improvements
 
 - Strengthened loose assertions (24 tests): added output content checks, mock-call assertions, or file-state assertions
-- Coverage: 66% → 81%
+- **`interactive.py`** — 47 tests, 47% → 100% coverage
+- **`branch_cmd.py`** — 23 tests, 51% → 100% coverage
+- **`deploy_cmd.py`** — 25 tests, 59% → 100% coverage
+- Overall coverage: 66% → 83%
 
-## [1.0.1] - 2026-05-17
+## [1.2.0] - 2026-05-17
+
+### Added
+- **Symlink deploy mode** — `deploy_method = "symlink"` per section
+- **Quickshell hook aliases** — `quickshell_reload`, `quickshell_restart`, `quickshell_validate` with `{qs_config}` → `{config_name}` placeholder
 
 ### Fixed
 - README outdated commands (switch → navigate)

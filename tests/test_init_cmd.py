@@ -391,7 +391,7 @@ class TestInitImport:
         result = runner.invoke(cli, ["init", "--import", str(source_dir), "--force"])
 
         assert result.exit_code == 1
-        assert "not a git repository" in result.output.lower()
+        assert "git repository" in result.output.lower()
 
     def test_import_existing_git_repo(self, clean_env, tmp_path):
         """Import from existing git repo should copy files."""

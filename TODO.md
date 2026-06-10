@@ -54,45 +54,48 @@ New test files added: `test_files_comprehensive.py` (55), `test_branch_ops.py` (
 
 - [x] **Cache ops** — `common.py:230-280` silently swallows all cache save/load errors
 - [x] **Git operations** — `core.py:330,441,456` silently swallows errors in diff/stash operations
-- [ ] **Remote operations** — `init_cmd.py:104,117,130` silently swallows clone/fetch errors
+- [x] **Remote operations** — `init_cmd.py:104,117,130` silently swallows clone/fetch errors
 
 ### Break Up Long Functions
 
 - [x] **`config_cmd.py`** — `_run_interactive_tutorial` (301 lines), `_show_section_examples` (290 lines)
-- [ ] **`init_cmd.py`** — `run_setup_wizard` (250 lines)
-- [ ] **`remote_cmd.py`** — `setup` (253 lines)
+- [x] **`init_cmd.py`** — `run_setup_wizard` (250 lines)
+- [x] **`remote_cmd.py`** — `setup` (253 lines)
 - [ ] **`navigate_cmd.py`** — `_handle_branch_navigate` (211 lines)
-- [ ] **`save_deploy_ops.py`** — `execute_deployment_plan` (130 lines), `deploy_section` (92 lines) — improved via helper extraction
 - [ ] **`files.py`** — `copy_directory` (92 lines), `smart_save_file` (88 lines)
 
 ### Deep Nesting
 
 - [x] **`config_cmd.py`** — `config_tutorial` has 12 levels of nesting
-- [ ] **`remote_cmd.py`** — `setup` has 11 levels
-- [ ] **`edit_cmd.py`** — `edit` has 9 levels
+- [x] **`remote_cmd.py`** — `setup` has 11 levels
+- [x] **`edit_cmd.py`** — `edit` has 9 levels
 - [ ] **`save_deploy_ops.py`** — `deploy_section` and `deploy_item` have 7 levels each — reduced via helper extraction
 
 ---
 
-## 🧪 Test Coverage (Current ~66%, Target 80%+)
+## 🧪 Test Coverage (Current ~83%, Target 80%+)
 
-### Lowest coverage modules (below 50%)
+### Lowest coverage modules (below 70%)
 
 | Module | Coverage |
 |--------|----------|
-| `watch_cmd.py` | 19% |
-| `edit_cmd.py` | 16% |
-| `rollback_cmd.py` | 14% |
-| `discover_cmd.py` | 33% |
-| `doctor_cmd.py` | 36% |
-| `remote_cmd.py` | 30% |
-| `import_cmd.py` | 31% |
-| `config_cmd.py` | 49% |
-| `encrypt_cmd.py` | 49% |
-| `log_cmd.py` | 48% |
-| `interactive.py` | 47% |
-| `onboarding.py` | 47% |
-| `branch_cmd.py` | 51% |
+| `navigate_cmd.py` | 59% |
+| `core.py` | 66% |
+| `common.py` | 66% |
+| `init_cmd.py` | 70% |
+| `watch_cmd.py` | 67% |
+
+### At 80%+ coverage
+
+| Module | Coverage |
+|--------|----------|
+| `interactive.py` | **100%** |
+| `branch_cmd.py` | **100%** |
+| `deploy_cmd.py` | **100%** |
+| `config_cmd.py` | 97% |
+| `doctor_cmd.py` | 99% |
+| `encrypt_cmd.py` | 91% |
+| `log_cmd.py` | 78% → rising
 
 ---
 
@@ -139,36 +142,36 @@ New test files added: `test_files_comprehensive.py` (55), `test_branch_ops.py` (
 
 ---
 
-## Coverage Inventory (as of last run, 66% overall)
+## Coverage Inventory (as of last run, 83% overall)
 
 | Module | Coverage | Module | Coverage |
 |--------|----------|--------|----------|
 | `__init__.py` | 100% | `backups.py` | 71% |
 | `branch_ops.py` | **97%** | `cli/__init__.py` | 100% |
 | `cli/add_cmd.py` | 82% | `cli/audit_cmd.py` | 70% |
-| `cli/backup_cmd.py` | 72% | `cli/branch_cmd.py` | 51% |
+| `cli/backup_cmd.py` | 72% | `cli/branch_cmd.py` | **100%** |
 | `cli/clean_cmd.py` | 81% | `cli/common.py` | 66% |
-| `cli/completions_cmd.py` | **94%** | `cli/config_cmd.py` | 49% |
-| `cli/deploy_cmd.py` | 59% | `cli/discover_cmd.py` | 33% |
-| `cli/doctor_cmd.py` | 36% | `cli/edit_cmd.py` | 16% |
-| `cli/encrypt_cmd.py` | 49% | `cli/export_cmd.py` | 82% |
-| `cli/import_cmd.py` | 31% | `cli/init_cmd.py` | 70% |
-| `cli/log_cmd.py` | 48% | `cli/navigate_cmd.py` | 59% |
-| `cli/onboarding.py` | 47% | `cli/profile_cmd.py` | 94% |
-| `cli/remote_cmd.py` | 30% | `cli/restore_cmd.py` | 82% |
-| `cli/revert_cmd.py` | 68% | `cli/rollback_cmd.py` | 14% |
+| `cli/completions_cmd.py` | **94%** | `cli/config_cmd.py` | 97% |
+| `cli/deploy_cmd.py` | **100%** | `cli/discover_cmd.py` | 100% |
+| `cli/doctor_cmd.py` | 99% | `cli/edit_cmd.py` | 72% |
+| `cli/encrypt_cmd.py` | 91% | `cli/export_cmd.py` | 82% |
+| `cli/import_cmd.py` | 93% | `cli/init_cmd.py` | 70% |
+| `cli/log_cmd.py` | 78% | `cli/navigate_cmd.py` | 59% |
+| `cli/onboarding.py` | 100% | `cli/profile_cmd.py` | 94% |
+| `cli/remote_cmd.py` | 93% | `cli/restore_cmd.py` | 82% |
+| `cli/revert_cmd.py` | 68% | `cli/rollback_cmd.py` | 90% |
 | `cli/show_cmd.py` | 86% | `cli/status_cmd.py` | 76% |
 | `cli/switch_cmd.py` | 94% | `cli/tag_cmd.py` | 68% |
 | `cli/template_cmd.py` | 90% | `cli/verify_cmd.py` | 70% |
-| `cli/watch_cmd.py` | 19% | `config.py` | 100% |
+| `cli/watch_cmd.py` | 67% | `config.py` | 100% |
 | `config_detector.py` | 87% | `constants.py` | 100% |
 | `core.py` | 66% | `dotman_config.py` | 78% |
 | `encryption.py` | **100%** | `exceptions.py` | 89% |
 | `files.py` | **94%** | `global_config.py` | 89% |
-| `hooks.py` | 80% | `interactive.py` | 47% |
+| `hooks.py` | 80% | `interactive.py` | **100%** |
 | `lock.py` | 79% | `merge.py` | 80% |
 | `operations.py` | 82% | `save_deploy_ops.py` | 75% |
 | `secrets.py` | 86% | `section.py` | **95%** |
 | `status_ops.py` | **89%** | `ui.py` | 78% |
 | `utils.py` | 81% | `vault.py` | 85% |
-| **TOTAL** | **66%** | **(7383 lines)** | |
+| **TOTAL** | **83%** | **(7443 lines)** | |
