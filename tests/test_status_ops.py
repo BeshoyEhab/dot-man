@@ -10,10 +10,13 @@ from dot_man.status_ops import StatusMixin
 class FakeOps(StatusMixin):
     """Minimal StatusMixin subclass for testing."""
 
-    def __init__(self, sections=None, current_branch="main", global_config=None):
+    def __init__(
+        self, sections=None, current_branch="main", global_config=None, repo_dir=None
+    ):
         self._sections = sections or {}
         self._current_branch = current_branch
         self._global_config = global_config or MagicMock()
+        self._repo_dir = repo_dir or REPO_DIR
 
     @property
     def global_config(self):
@@ -31,7 +34,7 @@ class FakeOps(StatusMixin):
 
     def iter_section_paths(self, section):
         for local_path in section.paths:
-            repo_path = section.get_repo_path(local_path, REPO_DIR)
+            repo_path = section.get_repo_path(local_path, self._repo_dir)
             if local_path.is_file() and repo_path.exists():
                 yield local_path, repo_path, "MODIFIED"
             elif local_path.is_file() and not repo_path.exists():
@@ -156,8 +159,8 @@ class TestGetDetailedStatus:
         repo = tmp_path / "repo"
         (repo / "bashrc" / ".bashrc").parent.mkdir(parents=True)
         (repo / "bashrc" / ".bashrc").write_text("bash")
-        (repo / "nvim" / "init.lua").parent.mkdir(parents=True)
-        (repo / "nvim" / "init.lua").write_text("nvim")
+        (repo / "nvim" / "nvim" / "init.lua").parent.mkdir(parents=True)
+        (repo / "nvim" / "nvim" / "init.lua").write_text("nvim")
 
         local_bash = tmp_path / "local" / ".bashrc"
         local_bash.parent.mkdir(parents=True)
@@ -182,6 +185,7 @@ class TestGetDetailedStatus:
         ops = FakeOps(
             sections={"bash": bash_section, "nvim": nvim_section},
             current_branch="main",
+            repo_dir=repo,
         )
         with patch("dot_man.status_ops.REPO_DIR", repo):
             items = list(ops.get_detailed_status())

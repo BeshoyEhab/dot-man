@@ -413,8 +413,10 @@ class TestCompareFiles:
         f1.write_text("content")
         f2.write_text("content")
 
-        with patch.object(Path, "stat", side_effect=OSError("no access")):
-            assert compare_files(f1, f2) is False
+        f1.chmod(0o000)
+        result = compare_files(f1, f2)
+        f1.chmod(0o644)
+        assert result is False
 
 
 class TestGetFileStatus:
