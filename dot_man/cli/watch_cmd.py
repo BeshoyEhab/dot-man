@@ -212,6 +212,20 @@ def watch(interval: float, commit: bool, message: str, dry_run: bool):
             warn("No paths to watch.")
             return
 
+        # Scan for symlinks
+        symlink_paths = [p for p in tracked_paths if p.is_symlink()]
+        if symlink_paths:
+            ui.console.print()
+            for sym_path in symlink_paths:
+                target = sym_path.resolve()
+                ui.console.print(
+                    f"  [yellow]⚠ {sym_path} is a symlink → {target}[/yellow]"
+                )
+                ui.console.print(
+                    "  [dim]  Edits affect the symlink target, not the dot-man repo.[/dim]"
+                )
+            ui.console.print()
+
         backend = "watchdog" if _WATCHDOG_AVAILABLE else "polling"
         ui.console.print(
             f"[bold]👁  dot-man watch[/bold]  [dim]({backend} backend)[/dim]"

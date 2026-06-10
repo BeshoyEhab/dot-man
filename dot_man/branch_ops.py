@@ -54,7 +54,9 @@ class BranchMixin:
 
     @abstractmethod
     def save_all(
-        self, secret_handler: Optional[Callable[[SecretMatch], str]] = None
+        self,
+        secret_handler: Optional[Callable[[SecretMatch], str]] = None,
+        symlink_ignore: Optional[set[Path]] = None,
     ) -> dict[str, Any]: ...
 
     @property
@@ -93,9 +95,16 @@ class BranchMixin:
         target_branch: str,
         dry_run: bool = False,
         secret_handler: Optional[Callable[[SecretMatch], str]] = None,
+        symlink_ignore: Optional[set[Path]] = None,
     ) -> dict:
         """
         Switch to a different branch.
+
+        Args:
+            target_branch: Branch to switch to.
+            dry_run: If True, don't make changes.
+            secret_handler: Optional callback for secret handling.
+            symlink_ignore: Set of symlinked paths to skip when saving.
 
         Returns dict with:
             - saved_count: files saved from current branch
@@ -127,7 +136,7 @@ class BranchMixin:
         with lock_context:
             # Phase 1: Save current branch
             if not dry_run:
-                save_result = self.save_all(secret_handler)
+                save_result = self.save_all(secret_handler, symlink_ignore)
                 result["saved_count"] = save_result["saved"]
                 result["secrets_redacted"] = len(save_result["secrets"])
                 result["errors"].extend(save_result["errors"])

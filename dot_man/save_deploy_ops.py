@@ -216,9 +216,15 @@ class SaveDeployMixin:
         self,
         section: Section,
         secret_handler: Optional[Callable[[SecretMatch], str]] = None,
+        symlink_ignore: Optional[set[Path]] = None,
     ) -> tuple[int, list[SecretMatch], list[str], list[Path]]:
         """
         Save a section from local to repo.
+
+        Args:
+            section: Section to save.
+            secret_handler: Optional callback for secret handling.
+            symlink_ignore: Set of symlinked paths to skip (ignore).
 
         Returns:
             (files_saved, secrets_detected, errors, symlink_paths)
@@ -258,13 +264,17 @@ class SaveDeployMixin:
         # Merge exclude patterns with ignored directories
         final_excludes = self._build_final_excludes(section)
 
+        symlink_ignore = symlink_ignore or set()
+
         for local_path in section.paths:
             if not local_path.exists():
                 continue
 
-            # Warn if path is a symlink (real content lives elsewhere)
+            # If path is a symlink, check if user chose to ignore it
             if local_path.is_symlink():
                 symlink_paths.append(local_path)
+                if local_path in symlink_ignore:
+                    continue
 
             repo_path = section.get_repo_path(local_path, REPO_DIR)
 
@@ -431,7 +441,9 @@ class SaveDeployMixin:
         }
 
     def save_all(
-        self, secret_handler: Optional[Callable[[SecretMatch], str]] = None
+        self,
+        secret_handler: Optional[Callable[[SecretMatch], str]] = None,
+        symlink_ignore: Optional[set[Path]] = None,
     ) -> dict:
         """
         Save all sections from local to repo.
@@ -447,7 +459,9 @@ class SaveDeployMixin:
 
             with self.vault.batch(), ThreadPoolExecutor() as executor:
                 future_to_section = {
-                    executor.submit(self.save_section, section, secret_handler): section
+                    executor.submit(
+                        self.save_section, section, secret_handler, symlink_ignore
+                    ): section
                     for section in sections
                 }
 

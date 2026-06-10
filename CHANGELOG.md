@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.2] - 2026-06-10
+
+### Added
+
+- **Interactive symlink handling** — When `dot-man navigate` encounters a symlinked config path, it now prompts the user with three choices: follow the link and save the target's content (default), ignore the symlink and skip it, or ignore all symlinks in the operation. Choices are available in `dot_man/interactive.py:prompt_symlink_action()` and wired through `save_section(symlink_ignore=...)`.
+
+### Fixed
+
+- **Python 3.10 CI compatibility** — `dot_man/cli/__init__.py` no longer shadows module names with same-named function imports (`from .discover_cmd import discover_cmd` → `from . import discover_cmd`). On Python 3.10, `unittest.mock.patch` resolves dotted paths via attribute lookup, so the shadowing caused `AttributeError` when test patches tried to access module-level names like `ConfigDetector` on the Click command function instead of the module. (Affected `test_discover_cmd.py`, `test_encrypt_cmd.py`, `test_import_cmd.py`.)
+
+## [1.2.1] - 2026-06-10
+
 ### Refactored
 
 - **Deduplicate deploy logic** — extracted `_build_final_excludes`, `_deploy_repo_path`, `_restore_file_secrets_inplace` from duplicate code in `deploy_section` and `deploy_item` (save_deploy_ops.py)

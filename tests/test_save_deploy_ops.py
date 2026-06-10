@@ -203,6 +203,94 @@ class TestSaveSection:
             assert errors
             assert "Disk full" in errors[0]
 
+    def test_save_section_symlink_followed_by_default(self, tmp_path):
+        """Symlinked file is followed and saved by default (symlink_ignore not set)."""
+        local = tmp_path / "local" / "linked_file.txt"
+        target = tmp_path / "target" / "real_file.txt"
+        target.parent.mkdir(parents=True)
+        target.write_text("real content")
+        local.parent.mkdir(parents=True)
+        local.symlink_to(target)
+
+        section = Section(
+            name="test",
+            paths=[local],
+            repo_base="test",
+            secrets_filter=False,
+        )
+        ops = FakeOps(current_branch="main")
+        repo_dir = tmp_path / "repo"
+        with patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir):
+            saved, secrets, errors, symlinks = ops.save_section(section)
+            assert saved == 1
+            assert symlinks == [local]
+            # Verify the repo file has the target's content
+            repo_path = repo_dir / "test" / "linked_file.txt"
+            assert repo_path.read_text() == "real content"
+
+    def test_save_section_symlink_ignored(self, tmp_path):
+        """Symlinked file is skipped when in symlink_ignore set."""
+        local = tmp_path / "local" / "linked_file.txt"
+        target = tmp_path / "target" / "real_file.txt"
+        target.parent.mkdir(parents=True)
+        target.write_text("real content")
+        local.parent.mkdir(parents=True)
+        local.symlink_to(target)
+
+        section = Section(
+            name="test",
+            paths=[local],
+            repo_base="test",
+            secrets_filter=False,
+        )
+        ops = FakeOps(current_branch="main")
+        repo_dir = tmp_path / "repo"
+        with patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir):
+            saved, secrets, errors, symlinks = ops.save_section(
+                section, symlink_ignore={local}
+            )
+            assert saved == 0
+            assert symlinks == [local]
+            # Verify no repo file was created
+            repo_path = repo_dir / "test" / "linked_file.txt"
+            assert not repo_path.exists()
+
+    def test_save_section_symlink_ignore_non_matching(self, tmp_path):
+        """Only the exact ignored symlink is skipped; others are still saved."""
+        local1 = tmp_path / "local" / "linked1.txt"
+        target1 = tmp_path / "target1" / "real1.txt"
+        target1.parent.mkdir(parents=True)
+        target1.write_text("content1")
+        local1.parent.mkdir(parents=True)
+        local1.symlink_to(target1)
+
+        local2 = tmp_path / "local" / "linked2.txt"
+        target2 = tmp_path / "target2" / "real2.txt"
+        target2.parent.mkdir(parents=True)
+        target2.write_text("content2")
+        local2.symlink_to(target2)
+
+        section = Section(
+            name="test",
+            paths=[local1, local2],
+            repo_base="test",
+            secrets_filter=False,
+        )
+        ops = FakeOps(current_branch="main")
+        repo_dir = tmp_path / "repo"
+        with patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir):
+            saved, secrets, errors, symlinks = ops.save_section(
+                section, symlink_ignore={local1}
+            )
+            assert saved == 1
+            assert local1 in symlinks
+            assert local2 in symlinks
+            # local1 was ignored, local2 was saved
+            repo_path1 = repo_dir / "test" / "linked1.txt"
+            repo_path2 = repo_dir / "test" / "linked2.txt"
+            assert not repo_path1.exists()
+            assert repo_path2.read_text() == "content2"
+
 
 # ─── deploy_section ───────────────────────────────────────
 
@@ -532,6 +620,41 @@ class TestSaveAll:
             result = ops.save_all()
             assert result["saved"] == 0
             assert any("Boom" in e for e in result["errors"])
+
+    def test_save_all_passes_symlink_ignore(self, tmp_path):
+        """save_all should pass symlink_ignore to save_section."""
+        local1 = tmp_path / "local" / "linked1.txt"
+        target1 = tmp_path / "_target1" / "real1.txt"
+        target1.parent.mkdir(parents=True)
+        target1.write_text("content1")
+        local1.parent.mkdir(parents=True)
+        local1.symlink_to(target1)
+
+        local2 = tmp_path / "local" / "linked2.txt"
+        target2 = tmp_path / "_target2" / "real2.txt"
+        target2.parent.mkdir(parents=True)
+        target2.write_text("content2")
+        local2.symlink_to(target2)
+
+        section = Section(
+            name="test",
+            paths=[local1, local2],
+            repo_base="test",
+            secrets_filter=False,
+        )
+        vault = MagicMock(spec=SecretVault)
+        ops = FakeOps(vault=vault, current_branch="main", sections={"test": section})
+        repo_dir = tmp_path / "repo"
+        with patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir):
+            result = ops.save_all(symlink_ignore={local1})
+            assert result["saved"] == 1
+            assert local1 in result["symlinks"]
+            assert local2 in result["symlinks"]
+            # local1 ignored, local2 saved
+            repo_path1 = repo_dir / "test" / "linked1.txt"
+            repo_path2 = repo_dir / "test" / "linked2.txt"
+            assert not repo_path1.exists()
+            assert repo_path2.read_text() == "content2"
 
 
 # ─── deploy_all ───────────────────────────────────────────

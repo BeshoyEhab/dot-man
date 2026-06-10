@@ -70,7 +70,18 @@ def add(
         dot-man add ~/.config/hypr --inherits linux-gui --post-deploy "hyprctl reload"
     """
     try:
-        local_path = Path(path).expanduser().resolve()
+        raw_path = Path(path).expanduser()
+
+        # Warn if path is a symlink
+        if raw_path.is_symlink():
+            from ..interactive import prompt_symlink_action
+
+            action = prompt_symlink_action(raw_path)
+            if action in ("ignore", "all_ignore"):
+                warn(f"Skipped symlink: {raw_path}")
+                return
+
+        local_path = raw_path.resolve()
 
         # Auto-generate section name if not provided
         if not section:

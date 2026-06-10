@@ -30,7 +30,7 @@ class FakeOps(BranchMixin):
     def current_branch(self) -> str:
         return self._current_branch
 
-    def save_all(self, secret_handler=None):
+    def save_all(self, secret_handler=None, symlink_ignore=None):
         return self._save_all_result
 
     @property

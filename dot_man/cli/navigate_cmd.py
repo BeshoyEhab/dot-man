@@ -128,6 +128,37 @@ def _warn_symlinks(save_result: dict) -> None:
         )
 
 
+def _prompt_for_symlinks(ops) -> set[Path]:
+    """Scan sections for symlinks and prompt user how to handle each.
+
+    Returns a set of symlinked paths the user chose to ignore.
+    """
+    from ..interactive import prompt_symlink_action
+
+    symlink_ignore: set[Path] = set()
+    ignore_all = False
+
+    for section_name in ops.get_sections():
+        section = ops.get_section(section_name)
+        for path in section.paths:
+            if not path.is_symlink():
+                continue
+            if ignore_all:
+                symlink_ignore.add(path)
+                continue
+            if path in symlink_ignore:
+                continue
+            action = prompt_symlink_action(path)
+            if action == "ignore":
+                symlink_ignore.add(path)
+            elif action == "all_ignore":
+                symlink_ignore.add(path)
+                ignore_all = True
+            # "follow" — no-op, proceed with default behavior
+
+    return symlink_ignore
+
+
 def run_branch_hooks(ops, hook_type: str) -> None:
     """Run on_activate or on_deactivate hooks from sections.
 
@@ -527,7 +558,8 @@ def _handle_commit_navigate(
     if save_mode == "save":
         ui.console.print(f"[bold]Saving current branch '{current_branch}'...[/bold]")
         secret_handler = get_secret_handler()
-        save_result = ops.save_all(secret_handler)
+        symlink_ignore = _prompt_for_symlinks(ops)
+        save_result = ops.save_all(secret_handler, symlink_ignore=symlink_ignore)
         _warn_symlinks(save_result)
         saved_count = save_result["saved"]
         sections = get_changed_sections(ops)
@@ -592,7 +624,8 @@ def _handle_tag_navigate(
     if save_mode == "save":
         ui.console.print(f"[bold]Saving current branch '{current_branch}'...[/bold]")
         secret_handler = get_secret_handler()
-        save_result = ops.save_all(secret_handler)
+        symlink_ignore = _prompt_for_symlinks(ops)
+        save_result = ops.save_all(secret_handler, symlink_ignore=symlink_ignore)
         _warn_symlinks(save_result)
         saved_count = save_result["saved"]
         sections = get_changed_sections(ops)
@@ -670,7 +703,8 @@ def _handle_branch_navigate(
 
     if save_mode == "save":
         secret_handler = get_secret_handler()
-        save_result = ops.save_all(secret_handler)
+        symlink_ignore = _prompt_for_symlinks(ops)
+        save_result = ops.save_all(secret_handler, symlink_ignore=symlink_ignore)
         _warn_symlinks(save_result)
         saved_count = save_result["saved"]
         secrets = save_result["secrets"]

@@ -12,7 +12,7 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
-[![Coverage](https://img.shields.io/badge/coverage-60%25-green)](https://github.com/BeshoyEhab/dot-man)
+[![Coverage](https://img.shields.io/badge/coverage-83%25-green)](https://github.com/BeshoyEhab/dot-man)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/BeshoyEhab/dot-man/pulls)
 
 ---
@@ -423,10 +423,10 @@ System variables (`{{HOSTNAME}}`, `{{USER}}`, `{{SHELL}}`, etc.) are auto-popula
 
 | Metric | Value |
 |--------|-------|
-| Version | `1.1.1` |
-| Python | `3.9+` |
+| Version | `1.2.2` |
+| Python | `3.10 · 3.11 · 3.12 · 3.13` |
 | Platforms | Linux, macOS |
-| Test Coverage | 59% (869 tests) |
+| Test Coverage | 83% (1519 tests) |
 | Commands | 30+ |
 | PyPI | [`dotman-git`](https://pypi.org/project/dotman-git/) |
 
@@ -455,9 +455,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) and [DEVELOPMENT.md](DEVELOPMENT.md) for 
 
 ## Roadmap
 
-- [ ] 80%+ test coverage
+- [x] 80%+ test coverage
 - [ ] Full documentation site (mkdocs)
-- [ ] Symlink mode
+- [x] Symlink mode
 - [x] `dot-man watch` — auto-sync on file change
 - [x] Deploy rollback (transaction-style)
 - [ ] Plugin system

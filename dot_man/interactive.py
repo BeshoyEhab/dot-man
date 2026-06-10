@@ -5,9 +5,11 @@ __all__ = [
     "run_global_wizard",
     "run_templates_wizard",
     "edit_template",
+    "prompt_symlink_action",
 ]
 
 from pathlib import Path
+from typing import cast
 
 import questionary
 from questionary import Style, ValidationError, Validator
@@ -458,3 +460,43 @@ def edit_template(config: DotManConfig, name: str):
             ).ask()
             if val:
                 template["update_strategy"] = val
+
+
+def prompt_symlink_action(path: Path) -> str:
+    """Ask the user how to handle a symlinked config path.
+
+    Args:
+        path: The symlinked path.
+
+    Returns:
+        "follow" to save the symlink target content,
+        "ignore" to skip this path,
+        "all_ignore" to skip this and all remaining symlinks.
+    """
+    target = path.resolve()
+    warn(
+        f"{path} is a symlink to {target}. "
+        "Changes to the repo may not affect the original file."
+    )
+    choice = questionary.select(
+        "How would you like to handle this symlink?",
+        choices=[
+            questionary.Choice(
+                title="Follow the link — save the target file's content into the repo",
+                value="follow",
+            ),
+            questionary.Choice(
+                title="Ignore — don't track this path",
+                value="ignore",
+            ),
+            questionary.Choice(
+                title="Ignore all — skip all symlinked paths in this operation",
+                value="all_ignore",
+            ),
+        ],
+        default="follow",
+        style=custom_style,
+    ).ask()
+    if choice is None:
+        return "follow"
+    return cast(str, choice)
