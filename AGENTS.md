@@ -4,6 +4,16 @@ This file contains instructions for AI models working on the dot-man project.
 
 ---
 
+## CI/CD
+
+GitHub Actions workflows use `uv` (Astral) for Python package management and dependency resolution. The `uv.lock` file is committed to ensure reproducible builds.
+
+- **Package install**: `uv sync --extra dev` (installs project + dev dependencies)
+- **Run commands**: `uv run <command>` (runs in the uv-managed virtual environment)
+- **Build**: `uv build` (used in publish workflow)
+
+---
+
 ## Project Overview
 
 **dot-man** is a dotfile manager with git-powered branching. Each branch represents a different configuration (work, personal, minimal, server).

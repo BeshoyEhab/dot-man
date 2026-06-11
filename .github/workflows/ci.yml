@@ -21,14 +21,14 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+        run: uv sync --extra dev
 
       - name: Run tests with coverage
-        run: |
-          pytest tests/ --cov=dot_man --cov-report=term-missing -q -p no:mypy
+        run: uv run pytest tests/ --cov=dot_man --cov-report=term-missing -q
 
   lint:
     runs-on: ubuntu-latest
@@ -41,16 +41,17 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v3
+
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+        run: uv sync --extra dev
 
       - name: Check formatting with Black
-        run: black --check dot_man/ tests/
+        run: uv run black --check dot_man/ tests/
 
       - name: Lint with Ruff
-        run: ruff check dot_man/ tests/
+        run: uv run ruff check dot_man/ tests/
 
       - name: Type check with mypy
-        run: mypy dot_man/ --ignore-missing-imports
+        run: uv run mypy dot_man/ --ignore-missing-imports
