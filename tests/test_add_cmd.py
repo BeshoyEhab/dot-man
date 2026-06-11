@@ -94,6 +94,71 @@ class TestAddWithInit:
 
         assert result.exit_code in [0, 1, 7]
 
+    def test_add_symlink_follows(self, clean_env):
+        """Add follows a symlink when prompt returns 'follow'."""
+        runner, dot_man_dir, repo_dir, global_toml, home = clean_env
+
+        # Create minimal global config
+        if not global_toml.parent.exists():
+            global_toml.parent.mkdir(parents=True)
+        global_toml.write_text("[defaults]\n")
+
+        from git import Repo
+
+        repo = Repo.init(repo_dir)
+        config_writer = repo.config_writer()
+        config_writer.set_value("user", "name", "Test")
+        config_writer.set_value("user", "email", "test@test.com")
+        config_writer.release()
+
+        (repo_dir / "test.txt").write_text("test")
+        repo.index.add(["test.txt"])
+        repo.index.commit("Initial")
+
+        target = home / "real_config.txt"
+        target.write_text("real content")
+
+        link = home / ".linked_config"
+        link.symlink_to(target)
+
+        with patch("dot_man.interactive.prompt_symlink_action", return_value="follow"):
+            result = runner.invoke(cli, ["add", str(link)])
+
+        assert result.exit_code in [0, 1, 7]
+
+    def test_add_symlink_ignore(self, clean_env):
+        """Add skips a symlink when prompt returns 'ignore'."""
+        runner, dot_man_dir, repo_dir, global_toml, home = clean_env
+
+        # Create minimal global config
+        if not global_toml.parent.exists():
+            global_toml.parent.mkdir(parents=True)
+        global_toml.write_text("[defaults]\n")
+
+        from git import Repo
+
+        repo = Repo.init(repo_dir)
+        config_writer = repo.config_writer()
+        config_writer.set_value("user", "name", "Test")
+        config_writer.set_value("user", "email", "test@test.com")
+        config_writer.release()
+
+        (repo_dir / "test.txt").write_text("test")
+        repo.index.add(["test.txt"])
+        repo.index.commit("Initial")
+
+        target = home / "real_config.txt"
+        target.write_text("real content")
+
+        link = home / ".linked_config"
+        link.symlink_to(target)
+
+        with patch("dot_man.interactive.prompt_symlink_action", return_value="ignore"):
+            result = runner.invoke(cli, ["add", str(link)])
+
+        assert result.exit_code == 0
+        assert "Skipped symlink" in result.output
+
     def test_add_directory(self, clean_env):
         """Add a directory to tracking."""
         runner, dot_man_dir, repo_dir, global_toml, home = clean_env

@@ -423,7 +423,7 @@ System variables (`{{HOSTNAME}}`, `{{USER}}`, `{{SHELL}}`, etc.) are auto-popula
 
 | Metric | Value |
 |--------|-------|
-| Version | `1.2.2` |
+| Version | `1.2.3` |
 | Python | `3.10 · 3.11 · 3.12 · 3.13` |
 | Platforms | Linux, macOS |
 | Test Coverage | 83% (1519 tests) |

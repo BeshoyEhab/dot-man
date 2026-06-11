@@ -422,6 +422,35 @@ class TestDeploySection:
             assert errors
             assert "Permission denied" in errors[0]
 
+    def test_deploy_symlink_local_path_warns(self, tmp_path):
+        """Deploy warns when overwriting a symlinked local path."""
+        repo_file = tmp_path / "repo" / "bashrc" / ".bashrc"
+        repo_file.parent.mkdir(parents=True)
+        repo_file.write_text("repo content")
+
+        target = tmp_path / "target" / "real_file.txt"
+        target.parent.mkdir(parents=True)
+        target.write_text("real content")
+
+        local = tmp_path / "local" / ".bashrc"
+        local.parent.mkdir(parents=True)
+        local.symlink_to(target)
+
+        section = Section(
+            name="bash",
+            paths=[local],
+            repo_base="bashrc",
+            secrets_filter=False,
+        )
+        ops = FakeOps(current_branch="main")
+        with (
+            patch("dot_man.save_deploy_ops.REPO_DIR", tmp_path / "repo"),
+            patch("dot_man.save_deploy_ops.compare_files", return_value=False),
+        ):
+            deployed, had_changes, errors = ops.deploy_section(section)
+            assert deployed == 1
+            assert any("symlink" in e.lower() for e in errors)
+
     def test_deploy_directory_copy(self, tmp_path):
         """Deploy a directory via copy."""
         repo_dir = tmp_path / "repo"

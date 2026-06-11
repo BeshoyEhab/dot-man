@@ -326,6 +326,12 @@ class SaveDeployMixin:
         for local_path in section.paths:
             repo_path = section.get_repo_path(local_path, REPO_DIR)
 
+            if local_path.is_symlink():
+                errors.append(
+                    f"⚠ {local_path} is a symlink → {local_path.resolve()}. "
+                    f"Deploy will overwrite it with a regular file."
+                )
+
             if section.update_strategy == "ignore" and local_path.exists():
                 continue
 
