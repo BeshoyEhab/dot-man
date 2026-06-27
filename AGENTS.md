@@ -451,7 +451,7 @@ AI models should focus on the following core needs of the project:
 
 - **Improve Test Coverage to 80%+**: Add unit and integration tests to low-coverage modules:
   - `audit_cmd.py`, `log_cmd.py`, `tag_cmd.py`, `switch_cmd.py`.
-- **Docs Generation**: Set up and host a complete documentation site (e.g., using `mkdocs` or `sphinx`).
+- **Docs Generation**: Set up and host a complete documentation site (e.g., using `mkdocs` or `sphinx`). ✅
 - **Release Verification**: Test PyPI package builds and installation.
 
 ### 2. Extensibility (v1.2.0 - Plugin System)
@@ -469,6 +469,68 @@ AI models should focus on the following core needs of the project:
 
 - **Cloud sync backends**: Native support for S3, Google Drive, and Dropbox.
 - **YAML Config Auto-Preservation**: Ensure changes to YAML configs are saved back as YAML, not converted to TOML.
+
+---
+
+## Development Rules
+
+### Setup
+
+```bash
+git clone https://github.com/BeshoyEhab/dot-man.git
+cd dot-man
+uv sync --extra dev
+```
+
+### Code Style
+
+- **Formatter**: Black (line length 88)
+- **Linter**: ruff (rules: E, F, W, I)
+- **Type checker**: mypy (`--ignore-missing-imports`)
+
+```bash
+uv run black dot_man/ tests/
+uv run ruff check dot_man/ tests/
+uv run mypy dot_man/ --ignore-missing-imports
+uv run pytest tests/ -v
+```
+
+### Pre-commit Hooks
+
+```bash
+pre-commit install
+```
+
+Runs Black, ruff, and mypy automatically on every commit.
+
+### Adding Commands
+
+1. Create `dot_man/cli/<command>_cmd.py`
+2. Import in `dot_man/cli/__init__.py`
+3. Add completions in `dot_man/cli/common.py`
+4. Add tests in `tests/test_<command>_cmd.py`
+5. Update docs and CHANGELOG
+
+### Testing
+
+```bash
+uv run pytest tests/ -v                    # All tests
+uv run pytest tests/test_core.py -v        # Specific file
+uv run pytest --cov=dot_man --cov-report=term  # With coverage
+```
+
+### Commit Messages
+
+```
+<type>(<scope>): <subject>
+
+feat(diff): add dot-man diff command
+fix(vault): handle missing key file
+docs(readme): update installation instructions
+test(status): add JSON output tests
+```
+
+**Types:** `feat`, `fix`, `docs`, `test`, `refactor`, `chore`, `perf`
 
 ---
 

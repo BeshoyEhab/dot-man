@@ -13,14 +13,14 @@
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
 [![Coverage](https://img.shields.io/badge/coverage-83%25-green)](https://github.com/BeshoyEhab/dot-man)
-[![Docs](https://img.shields.io/badge/docs-online-blue)](https://bishoyehab.github.io/dot-man/)
+[![Docs](https://img.shields.io/badge/docs-online-blue)](https://beshoyehab.github.io/dot-man/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/BeshoyEhab/dot-man/pulls)
 
 ---
 
 *Switch your entire development environment in one command.*
 
-[**Install**](#installation) · [**Quick Start**](#quick-start) · [**Commands**](#commands) · [**Config**](#configuration) · [**Docs**](https://bishoyehab.github.io/dot-man/)
+[**Install**](#installation) · [**Quick Start**](#quick-start) · [**Commands**](#commands) · [**Config**](#configuration) · [**Docs**](https://beshoyehab.github.io/dot-man/)
 
 </div>
 
