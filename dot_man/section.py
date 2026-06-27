@@ -85,6 +85,9 @@ class Section:
         self.encryption_method = encryption_method or "gpg"
         self.encryption_recipient = encryption_recipient
 
+        # Template rendering ({{VAR}} substitution + conditionals)
+        self.render_templates = True
+
     def _generate_repo_base(self) -> str:
         """Auto-generate repo_base from first path.
 

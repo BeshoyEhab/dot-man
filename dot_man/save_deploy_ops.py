@@ -153,6 +153,8 @@ class SaveDeployMixin:
                         repo_path, local_path, filter_secrets_enabled=False
                     )
                     if success:
+                        if section.render_templates:
+                            self._render_templates_inplace(local_path, errors)
                         if section.secrets_filter:
                             self._restore_file_secrets_inplace(
                                 local_path, str(local_path), errors
@@ -178,6 +180,10 @@ class SaveDeployMixin:
                         exclude_patterns=final_excludes,
                         follow_symlinks=section.follow_symlinks,
                     )
+                    if section.render_templates:
+                        for deployed_file in local_path.rglob("*"):
+                            if deployed_file.is_file():
+                                self._render_templates_inplace(deployed_file, errors)
                     if section.secrets_filter:
                         for deployed_file in local_path.rglob("*"):
                             if deployed_file.is_file():
@@ -200,6 +206,22 @@ class SaveDeployMixin:
         except OSError as e:
             errors.append(f"Error deploying {local_path}: {e}")
         return deployed
+
+    def _render_templates_inplace(
+        self,
+        file_path: Path,
+        errors: list[str],
+    ) -> None:
+        """Render {{VAR}} template variables in a deployed file in-place."""
+        try:
+            content = file_path.read_text(encoding="utf-8", errors="replace")
+            from .global_config import substitute_templates
+
+            rendered = substitute_templates(content)
+            if rendered != content:
+                atomic_write_text(file_path, rendered)
+        except Exception as e:
+            errors.append(f"Warning: template rendering failed for {file_path}: {e}")
 
     def _restore_file_secrets_inplace(
         self,

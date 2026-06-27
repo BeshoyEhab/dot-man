@@ -315,3 +315,46 @@ class SecretVault:
             return match.group(0)  # Keep redaction if not found
 
         return pattern.sub(replace_match, content)
+
+    def rotate_key(self) -> int:
+        """Generate a new key and re-encrypt all secrets.
+
+        Returns the number of secrets re-encrypted.
+        Raises VaultError if any decryption fails (aborts without modifying).
+        """
+        with self._lock:
+            self.load()
+            old_fernet = self._get_fernet()
+
+            # Decrypt all secrets with old key
+            plaintexts: list[bytes] = []
+            for s in self._data["secrets"]:
+                try:
+                    pt = old_fernet.decrypt(s["encrypted_value"].encode())
+                    plaintexts.append(pt)
+                except (ValueError, TypeError) as e:
+                    raise VaultError(
+                        f"Failed to decrypt secret in {s['file_path']}: {e}"
+                    )
+
+            # Generate new key
+            new_key = Fernet.generate_key()
+            new_fernet = Fernet(new_key)
+
+            # Re-encrypt with new key
+            for s, pt in zip(self._data["secrets"], plaintexts):
+                s["encrypted_value"] = new_fernet.encrypt(pt).decode("utf-8")
+
+            # Backup old key, write new key
+            backup = self.key_file.with_suffix(".key.bak")
+            if backup.exists():
+                backup.unlink()
+            self.key_file.rename(backup)
+            self.key_file.write_bytes(new_key)
+            self.key_file.chmod(0o600)
+
+            # Update state
+            self._fernet = new_fernet
+            self.save()
+
+            return len(self._data["secrets"])

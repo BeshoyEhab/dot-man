@@ -176,9 +176,7 @@ class TestRunBranchHooks:
         ops.get_sections.return_value = ["test"]
         ops.get_section.return_value = section
         with patch("dot_man.cli.navigate_cmd.subprocess") as mock_sub:
-            mock_sub.run.return_value = MagicMock(
-                returncode=1, stderr="error msg"
-            )
+            mock_sub.run.return_value = MagicMock(returncode=1, stderr="error msg")
             with patch("dot_man.cli.navigate_cmd.ui"):
                 run_branch_hooks(ops, "on_activate")
         # Should not raise, just warn

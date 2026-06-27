@@ -243,17 +243,23 @@ class TestSaveExceptions:
     def test_dotman_error(self, runner, mock_ops):
         from dot_man.exceptions import DotManError
 
-        with patch("dot_man.operations.get_operations", side_effect=DotManError("test error")):
+        with patch(
+            "dot_man.operations.get_operations", side_effect=DotManError("test error")
+        ):
             result = runner.invoke(cli, ["save"])
         assert result.exit_code != 0
 
     def test_keyboard_interrupt(self, runner, mock_ops):
-        with patch("dot_man.operations.get_operations", side_effect=KeyboardInterrupt()):
+        with patch(
+            "dot_man.operations.get_operations", side_effect=KeyboardInterrupt()
+        ):
             result = runner.invoke(cli, ["save"])
         assert result.exit_code != 0
 
     def test_generic_exception(self, runner, mock_ops):
-        with patch("dot_man.operations.get_operations", side_effect=RuntimeError("boom")):
+        with patch(
+            "dot_man.operations.get_operations", side_effect=RuntimeError("boom")
+        ):
             result = runner.invoke(cli, ["save"])
         assert result.exit_code != 0
 

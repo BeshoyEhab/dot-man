@@ -104,7 +104,9 @@ class TestStatusSecrets:
         mock_scanner = MagicMock()
         mock_scanner.scan_file.return_value = []
         with patch("dot_man.operations.get_operations", return_value=mock_ops):
-            with patch("dot_man.cli.status_cmd.get_custom_scanner", return_value=mock_scanner):
+            with patch(
+                "dot_man.cli.status_cmd.get_custom_scanner", return_value=mock_scanner
+            ):
                 result = runner.invoke(cli, ["status", "--secrets"])
         assert result.exit_code == 0
         mock_scanner.scan_file.assert_called()
@@ -131,7 +133,9 @@ class TestStatusSecrets:
         ]
 
         with patch("dot_man.operations.get_operations", return_value=mock_ops):
-            with patch("dot_man.cli.status_cmd.get_custom_scanner", return_value=mock_scanner):
+            with patch(
+                "dot_man.cli.status_cmd.get_custom_scanner", return_value=mock_scanner
+            ):
                 result = runner.invoke(cli, ["status", "--secrets"])
         assert result.exit_code == 0
 
@@ -209,16 +213,22 @@ class TestStatusExceptions:
     def test_dotman_error(self, runner, mock_ops):
         from dot_man.exceptions import DotManError
 
-        with patch("dot_man.operations.get_operations", side_effect=DotManError("fail")):
+        with patch(
+            "dot_man.operations.get_operations", side_effect=DotManError("fail")
+        ):
             result = runner.invoke(cli, ["status"])
         assert result.exit_code != 0
 
     def test_keyboard_interrupt(self, runner, mock_ops):
-        with patch("dot_man.operations.get_operations", side_effect=KeyboardInterrupt()):
+        with patch(
+            "dot_man.operations.get_operations", side_effect=KeyboardInterrupt()
+        ):
             result = runner.invoke(cli, ["status"])
         assert result.exit_code != 0
 
     def test_generic_exception(self, runner, mock_ops):
-        with patch("dot_man.operations.get_operations", side_effect=RuntimeError("boom")):
+        with patch(
+            "dot_man.operations.get_operations", side_effect=RuntimeError("boom")
+        ):
             result = runner.invoke(cli, ["status"])
         assert result.exit_code != 0

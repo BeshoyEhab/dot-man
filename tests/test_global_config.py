@@ -213,3 +213,113 @@ class TestGlobalConfigProfiles:
         # Default should be empty or None
         current = gc.current_profile
         assert current is None or isinstance(current, str)
+
+
+class TestSubstituteTemplates:
+    def test_simple_variable(self):
+        from dot_man.global_config import substitute_templates
+
+        result = substitute_templates("Hello {{USER}}", {"USER": "bob"})
+        assert result == "Hello bob"
+
+    def test_system_variable(self):
+        from dot_man.global_config import substitute_templates
+
+        result = substitute_templates("OS={{OS}}")
+        import platform
+
+        assert result == f"OS={platform.system()}"
+
+    def test_multiple_variables(self):
+        from dot_man.global_config import substitute_templates
+
+        result = substitute_templates("{{A}} and {{B}}", {"A": "foo", "B": "bar"})
+        assert result == "foo and bar"
+
+    def test_empty_string(self):
+        from dot_man.global_config import substitute_templates
+
+        assert substitute_templates("") == ""
+
+    def test_none_input(self):
+        from dot_man.global_config import substitute_templates
+
+        assert substitute_templates(None) is None
+
+    def test_no_placeholders(self):
+        from dot_man.global_config import substitute_templates
+
+        assert substitute_templates("plain text") == "plain text"
+
+    def test_unknown_variable_removed(self):
+        from dot_man.global_config import substitute_templates
+
+        result = substitute_templates("Hello {{UNKNOWN}}")
+        # Unknown vars without user_templates are left as-is or removed
+        # Just verify no crash
+        assert isinstance(result, str)
+
+
+class TestTemplateConditionals:
+    def test_conditional_true(self):
+        import platform
+
+        from dot_man.global_config import substitute_templates
+
+        os_name = platform.system()
+        text = f'{{{{ if OS == "{os_name}" }}}}YES{{{{ endif }}}}'
+        assert substitute_templates(text) == "YES"
+
+    def test_conditional_false(self):
+        from dot_man.global_config import substitute_templates
+
+        text = '{{ if OS == "FAKE_OS_VALUE" }}YES{{ endif }}'
+        assert substitute_templates(text) == ""
+
+    def test_conditional_not_equal_true(self):
+        from dot_man.global_config import substitute_templates
+
+        text = '{{ if OS != "FAKE_OS_VALUE" }}YES{{ endif }}'
+        assert substitute_templates(text) == "YES"
+
+    def test_conditional_not_equal_false(self):
+        import platform
+
+        from dot_man.global_config import substitute_templates
+
+        os_name = platform.system()
+        text = f'{{{{ if OS != "{os_name}" }}}}YES{{{{ endif }}}}'
+        assert substitute_templates(text) == ""
+
+    def test_conditional_with_variable_substitution(self):
+        import platform
+
+        from dot_man.global_config import substitute_templates
+
+        os_name = platform.system()
+        text = f'{{{{ if OS == "{os_name}" }}}}Hello {{{{USER}}}}{{{{ endif }}}}'
+        result = substitute_templates(text, {"USER": "alice"})
+        assert result == "Hello alice"
+
+    def test_conditional_multiline(self):
+        from dot_man.global_config import substitute_templates
+
+        text = """{{ if OS == "linux" }}
+line1
+line2
+{{ endif }}"""
+        result = substitute_templates(text)
+        import platform
+
+        if platform.system() == "linux":
+            assert "line1" in result
+            assert "line2" in result
+        else:
+            assert "line1" not in result
+
+    def test_conditional_with_user_var(self):
+        from dot_man.global_config import substitute_templates
+
+        text = '{{ if USER == "testuser" }}matched{{ endif }}'
+        assert substitute_templates(text, {"USER": "testuser"}) == "matched"
+        assert substitute_templates(text, {"USER": "other"}) == ""

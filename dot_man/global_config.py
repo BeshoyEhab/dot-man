@@ -35,8 +35,13 @@ SYSTEM_VARS = {
 def substitute_templates(text: str, user_templates: dict | None = None) -> str:
     """Substitute template variables in a string.
 
+    Supports:
+      - Variable substitution: {{HOSTNAME}}, {{USER}}, {{OS}}
+      - Conditionals: {{ if OS == "darwin" }}...{{ endif }}
+      - Negation: {{ if OS != "windows" }}...{{ endif }}
+
     Args:
-        text: String containing template placeholders like {{HOSTNAME}}
+        text: String containing template placeholders
         user_templates: Optional dict of user-defined templates
 
     Returns:
@@ -47,24 +52,53 @@ def substitute_templates(text: str, user_templates: dict | None = None) -> str:
 
     result = text
 
-    # First replace system variables
+    # Build combined variable dict
+    vars_dict: dict[str, str] = {}
     for var_name, getter in SYSTEM_VARS.items():
-        placeholder = f"{{{{{var_name}}}}}"
-        if placeholder in result:
-            try:
-                val = getter()
-                if val:
-                    result = result.replace(placeholder, str(val))
-            except Exception as e:
-                logging.debug(f"Could not get system variable {var_name}: {e}")
+        try:
+            val = getter()
+            if val:
+                vars_dict[var_name] = str(val)
+        except Exception as e:
+            logging.debug(f"Could not get system variable {var_name}: {e}")
 
-    # Then replace user-defined templates
     if user_templates:
-        for key, value in user_templates.items():
-            placeholder = f"{{{{{key}}}}}"
-            result = result.replace(placeholder, str(value))
+        vars_dict.update({k: str(v) for k, v in user_templates.items()})
+
+    # Process conditionals first
+    result = _process_conditionals(result, vars_dict)
+
+    # Then replace simple {{VAR}} placeholders
+    for var_name, val in vars_dict.items():
+        placeholder = f"{{{{{var_name}}}}}"
+        result = result.replace(placeholder, val)
 
     return result
+
+
+def _process_conditionals(text: str, vars_dict: dict[str, str]) -> str:
+    """Process {{ if VAR == "value" }}...{{ endif }} conditionals."""
+    import re
+
+    pattern = re.compile(
+        r'\{\{\s*if\s+(\w+)\s*(==|!=)\s*"([^"]*)"\s*\}\}(.*?)\{\{\s*endif\s*\}\}',
+        re.DOTALL,
+    )
+
+    def _eval_conditional(match: re.Match[str]) -> str:
+        var_name = str(match.group(1))
+        op = str(match.group(2))
+        expected = str(match.group(3))
+        body = str(match.group(4))
+
+        actual = vars_dict.get(var_name, "")
+        if op == "==" and actual == expected:
+            return body
+        if op == "!=" and actual != expected:
+            return body
+        return ""
+
+    return pattern.sub(_eval_conditional, text)
 
 
 # Python 3.11+ has tomllib built-in, otherwise use tomli
