@@ -4,7 +4,7 @@ This package provides the CLI entry point for dot-man.
 It exposes the modular CLI implementation.
 """
 
-from . import discover_cmd, encrypt_cmd, export_cmd, import_cmd
+from . import bootstrap_cmd, discover_cmd, encrypt_cmd, export_cmd, import_cmd
 from .add_cmd import add
 from .audit_cmd import audit
 from .backup_cmd import backup
@@ -35,13 +35,13 @@ from .config_cmd import config
 from .deploy_cmd import deploy
 from .doctor_cmd import doctor
 from .edit_cmd import edit
+from .hooks_cmd import hooks
 
 # Import commands for easier access and backward compatibility
 from .init_cmd import init
 from .interface import cli
 from .log_cmd import checkout, diff, log
 from .main import main
-from .hooks_cmd import hooks
 from .navigate_cmd import navigate
 from .onboarding import is_first_run, mark_onboarded, run_onboarding
 from .profile_cmd import profile
@@ -115,6 +115,7 @@ __all__ = [
     "export_cmd",
     "encrypt_cmd",
     "discover_cmd",
+    "bootstrap_cmd",
     "completions",
     "watch",
     "rollback",

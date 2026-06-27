@@ -170,13 +170,14 @@ class Section:
 
     @staticmethod
     def _get_current_branch() -> str:
-        """Get current branch name from global config."""
+        """Get current branch name via git."""
         try:
-            from .global_config import GlobalConfig
+            import git as _git
 
-            gc = GlobalConfig()
-            gc.load()
-            return gc.current_branch or "unknown"
+            from .constants import REPO_DIR
+
+            repo = _git.Repo(REPO_DIR, search_parent_directories=True)
+            return repo.active_branch.name
         except Exception:
             return "unknown"
 

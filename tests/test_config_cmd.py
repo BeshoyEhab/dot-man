@@ -7,7 +7,10 @@ from unittest.mock import patch
 import pytest
 from click.testing import CliRunner
 
-from dot_man.cli.config_tutorial import _run_interactive_tutorial, _show_section_examples
+from dot_man.cli.config_tutorial import (
+    _run_interactive_tutorial,
+    _show_section_examples,
+)
 from dot_man.cli.interface import cli
 
 

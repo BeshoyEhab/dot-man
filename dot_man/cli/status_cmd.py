@@ -1,5 +1,7 @@
 """Status command for dot-man CLI."""
 
+import json
+from itertools import groupby
 from pathlib import Path
 
 import click
@@ -17,8 +19,9 @@ from .interface import cli as main
 @main.command("status", cls=AliasedCommand, aliases=["sta"])
 @click.option("-v", "--verbose", is_flag=True, help="Show detailed information")
 @click.option("--secrets", is_flag=True, help="Highlight files with detected secrets")
+@click.option("--json", "json_output", is_flag=True, help="Output as JSON for scripting")
 @require_init
-def status(verbose: bool, secrets: bool):
+def status(verbose: bool, secrets: bool, json_output: bool):
     """Display current repository status.
 
     Shows the current branch, tracked files, and any pending changes
@@ -68,9 +71,40 @@ def status(verbose: bool, secrets: bool):
 
         all_section_names = ops.get_sections()
         if not all_section_names:
-            ui.console.print(
-                "[dim]No sections tracked. Run 'dot-man add <path>' to add files.[/dim]"
-            )
+            if json_output:
+                click.echo(json.dumps({"sections": [], "summary": summary}))
+            else:
+                ui.console.print(
+                    "[dim]No sections tracked. Run 'dot-man add <path>' to add files.[/dim]"
+                )
+            return
+
+        # JSON output mode
+        if json_output:
+            output = {
+                "branch": branch,
+                "remote": ops.global_config.remote_url or "",
+                "repository": str(REPO_DIR),
+                "sections": [],
+                "summary": summary,
+            }
+
+            for section_name, group in groupby(status_items, key=lambda x: x["section"]):
+                items = list(group)
+                section_data = {
+                    "name": section_name,
+                    "files": [],
+                }
+                for item in items:
+                    section_data["files"].append(
+                        {
+                            "path": str(item["local_path"]),
+                            "status": item["status"],
+                        }
+                    )
+                output["sections"].append(section_data)
+
+            click.echo(json.dumps(output, indent=2))
             return
 
         file_table = Table(title=f"Tracked Sections ({len(all_section_names)})")
@@ -87,8 +121,6 @@ def status(verbose: bool, secrets: bool):
 
         scanner = get_custom_scanner() if secrets else None
         secrets_found = []
-
-        from itertools import groupby
 
         # Items are already sorted by section iteration order from get_detailed_status
         displayed_sections = 0
