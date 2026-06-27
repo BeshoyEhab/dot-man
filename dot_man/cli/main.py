@@ -3,6 +3,8 @@
 This module aggregates all subcommands and exposes the main entry point.
 """
 
+import logging
+
 # Import the shared CLI group (interface)
 from .interface import cli
 
@@ -26,8 +28,8 @@ def main() -> None:
         from .completions_cmd import run_install
 
         run_install()
-    except Exception:
-        pass
+    except Exception as e:
+        logging.debug("Shell completion installation skipped: %s", e)
 
     cli()
 

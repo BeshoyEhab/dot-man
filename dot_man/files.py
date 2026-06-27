@@ -333,8 +333,8 @@ def copy_directory(
                 all_secrets.extend(secrets)
                 if saved:
                     files_copied += 1
-            except Exception:
-                logging.warning("Failed to copy file: %s", src_file)
+            except Exception as e:
+                logging.warning("Failed to copy file %s: %s", src_file, e)
                 files_failed += 1
 
     return files_copied, files_failed, all_secrets
@@ -545,8 +545,8 @@ def deploy_directory_with_symlinks(
                     symlinked += 1
                 else:
                     failed += 1
-            except Exception:
-                logging.warning("Failed to create symlink: %s", src_file)
+            except Exception as e:
+                logging.warning("Failed to create symlink %s: %s", src_file, e)
                 failed += 1
 
     return symlinked, failed

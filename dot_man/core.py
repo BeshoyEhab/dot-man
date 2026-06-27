@@ -440,8 +440,10 @@ class GitManager:
             if stashed:
                 try:
                     self.repo.git.stash("pop")
-                except Exception:
-                    logging.debug("Failed to restore stash after pull conflict error")
+                except Exception as stash_err:
+                    logging.warning(
+                        "Failed to restore stash after pull conflict: %s", stash_err
+                    )
 
             if "CONFLICT" in str(e.stdout) or "conflict" in str(e.stderr):
                 raise GitOperationError(
@@ -455,8 +457,10 @@ class GitManager:
             if stashed:
                 try:
                     self.repo.git.stash("pop")
-                except Exception:
-                    logging.debug("Failed to restore stash after pull OSError")
+                except Exception as stash_err:
+                    logging.warning(
+                        "Failed to restore stash after pull OSError: %s", stash_err
+                    )
             raise GitOperationError(f"Failed to pull: {e}")
 
     def push(self, set_upstream: bool = True) -> str:

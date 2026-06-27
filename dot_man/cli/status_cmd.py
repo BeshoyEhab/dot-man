@@ -19,7 +19,9 @@ from .interface import cli as main
 @main.command("status", cls=AliasedCommand, aliases=["sta"])
 @click.option("-v", "--verbose", is_flag=True, help="Show detailed information")
 @click.option("--secrets", is_flag=True, help="Highlight files with detected secrets")
-@click.option("--json", "json_output", is_flag=True, help="Output as JSON for scripting")
+@click.option(
+    "--json", "json_output", is_flag=True, help="Output as JSON for scripting"
+)
 @require_init
 def status(verbose: bool, secrets: bool, json_output: bool):
     """Display current repository status.
@@ -81,15 +83,18 @@ def status(verbose: bool, secrets: bool, json_output: bool):
 
         # JSON output mode
         if json_output:
+            sections_list: list[dict] = []
             output = {
                 "branch": branch,
                 "remote": ops.global_config.remote_url or "",
                 "repository": str(REPO_DIR),
-                "sections": [],
+                "sections": sections_list,
                 "summary": summary,
             }
 
-            for section_name, group in groupby(status_items, key=lambda x: x["section"]):
+            for section_name, group in groupby(
+                status_items, key=lambda x: x["section"]
+            ):
                 items = list(group)
                 section_data = {
                     "name": section_name,
@@ -102,7 +107,7 @@ def status(verbose: bool, secrets: bool, json_output: bool):
                             "status": item["status"],
                         }
                     )
-                output["sections"].append(section_data)
+                sections_list.append(section_data)
 
             click.echo(json.dumps(output, indent=2))
             return
