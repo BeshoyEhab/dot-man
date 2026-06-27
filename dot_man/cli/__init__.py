@@ -46,6 +46,7 @@ from .onboarding import is_first_run, mark_onboarded, run_onboarding
 from .profile_cmd import profile
 from .remote_cmd import remote, sync
 from .restore_cmd import restore
+from .save_cmd import save
 from .revert_cmd import revert
 from .rollback_cmd import rollback
 from .show_cmd import show
@@ -96,6 +97,7 @@ __all__ = [
     "config",
     "revert",
     "restore",
+    "save",
     "clean",
     "doctor",
     "verify",
