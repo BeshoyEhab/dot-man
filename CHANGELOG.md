@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-06-27
+
+### Added
+
+- **Template substitution in deployed files** — `{{VAR}}` placeholders in config files (e.g. `{{HOSTNAME}}`, `{{USER}}`, `{{OS}}`) are now rendered automatically during deploy. Enabled by default via `render_templates` on each section.
+- **Conditional template syntax** — `{{ if OS == "darwin" }}...{{ endif }}` and `{{ if VAR != "value" }}...{{ endif }}` blocks in config files. Conditionals are evaluated before variable substitution. Uses stdlib regex, no new dependencies.
+- **Vault key rotation** — `dot-man vault rotate-key` re-encrypts all secrets with a new Fernet key. Old key backed up to `.key.bak`. `dot-man vault status` shows vault stats.
+- **Expanded `--dry-run` on navigate** — now shows all 4 phases: sections that would save, branch status, files that would deploy + hooks, config update.
+- **62 new tests** — `test_save_cmd.py` (23), `test_status_cmd.py` (18), `test_navigate_helpers.py` (21), plus 14 template/conditional tests.
+- **Shell completions split** — extracted completion functions into `completions.py` (310 lines), `common.py` reduced from 642 to 260 lines.
+- **Priority improvement plan** — documented 20-item prioritized improvement roadmap in `docs/PRIORITY_PLAN.md`.
+
+### Fixed
+
+- **`doctor_cmd.py:117`** — `.exists()` called on string instead of `Path`. Added `from pathlib import Path` and wrapped `DOT_MAN_TOML` in `Path()`.
+- **`remote_cmd.py:225`** — `Path` passed where API expects `str`. Added `str()` conversion.
+- **Stale coverage claims** — README and TODO updated from 83% to 81% (actual), test count from 1519 to 1526.
+- **`test_doctor_cmd.py`** — fixed test to properly mock `DOT_MAN_DIR` instead of relying on bug-induced crash.
+- **Import patch targets** — `test_completion.py` and `test_shell_completions.py` updated to patch `dot_man.cli.completions._git_runner`.
+
+### Refactored
+
+- **Deduplicate hook execution in navigate** — extracted `_run_shell_hooks()` helper, replacing 3 identical ~25-line hook blocks.
+- **Split `common.py`** — completion functions moved to `completions.py`, backward-compatible re-exports preserved.
+
 ## [1.2.3] - 2026-06-11
 
 ### Added
