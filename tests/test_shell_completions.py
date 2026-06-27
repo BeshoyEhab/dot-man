@@ -112,11 +112,10 @@ class TestCompleteCommits:
         def mock_runner(args, cwd=None, timeout=2):
             return make_mock_result("abc1234\ndef5678\n")
 
-        with patch("dot_man.cli.completions._git_runner", mock_runner):
-            _set_git_runner(mock_runner)
-            result = complete_commits(None, None, "")
-            assert "abc1234" in result
-            assert "def5678" in result
+        _set_git_runner(mock_runner)
+        result = complete_commits(None, None, "")
+        assert "abc1234" in result
+        assert "def5678" in result
         _set_git_runner(None)
 
     def test_complete_commits_filters(self):
@@ -126,11 +125,10 @@ class TestCompleteCommits:
         def mock_runner(args, cwd=None, timeout=2):
             return make_mock_result("abc1234\ndef5678\n")
 
-        with patch("dot_man.cli.completions._git_runner", mock_runner):
-            _set_git_runner(mock_runner)
-            result = complete_commits(None, None, "abc")
-            assert result == ["abc1234"]
+        _set_git_runner(mock_runner)
+        result = complete_commits(None, None, "abc")
+        assert result == ["abc1234"]
 
-            result = complete_commits(None, None, "xyz")
-            assert result == []
+        result = complete_commits(None, None, "xyz")
+        assert result == []
         _set_git_runner(None)

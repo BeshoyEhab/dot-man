@@ -1,5 +1,4 @@
 import subprocess
-from unittest.mock import patch
 
 from dot_man.cli import complete_branches
 from dot_man.cli.common import _clear_all_caches, _set_git_runner
@@ -22,19 +21,18 @@ def test_complete_branches_filtering():
             return make_mock_result("main\nmaster\ndev\nfeature/abc\n")
         return make_mock_result()
 
-    with patch("dot_man.cli.completions._git_runner", mock_runner):
-        _set_git_runner(mock_runner)
-        result = complete_branches(None, None, "")
-        assert result == ["main", "master", "dev", "feature/abc"]
+    _set_git_runner(mock_runner)
+    result = complete_branches(None, None, "")
+    assert result == ["main", "master", "dev", "feature/abc"]
 
-        result = complete_branches(None, None, "m")
-        assert result == ["main", "master"]
+    result = complete_branches(None, None, "m")
+    assert result == ["main", "master"]
 
-        result = complete_branches(None, None, "feat")
-        assert result == ["feature/abc"]
+    result = complete_branches(None, None, "feat")
+    assert result == ["feature/abc"]
 
-        result = complete_branches(None, None, "z")
-        assert result == []
+    result = complete_branches(None, None, "z")
+    assert result == []
     _set_git_runner(None)
 
 
