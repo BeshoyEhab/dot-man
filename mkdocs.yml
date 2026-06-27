@@ -57,6 +57,8 @@ nav:
 
 markdown_extensions:
   - admonition
+  - attr_list
+  - md_in_html
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.superfences
