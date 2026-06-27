@@ -54,4 +54,4 @@ temp/
 manifest.json
 
 *cache*
-.benchmarks/
+.benchmarks/site/

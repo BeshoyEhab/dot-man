@@ -1,0 +1,80 @@
+site_name: dot-man
+site_description: Dotfile manager with git-powered branching
+site_url: https://bishoyehab.github.io/dot-man/
+repo_url: https://github.com/BeshoyEhab/dot-man
+repo_name: BeshoyEhab/dot-man
+
+theme:
+  name: material
+  palette:
+    - scheme: default
+      primary: blue
+      accent: light blue
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: blue
+      accent: light blue
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - content.code.copy
+    - content.code.annotate
+    - navigation.instant
+    - navigation.sections
+    - navigation.expand
+    - search.highlight
+
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quickstart.md
+    - Configuration: getting-started/configuration.md
+  - Commands:
+    - Overview: commands/index.md
+    - navigate: commands/navigate.md
+    - save: commands/save.md
+    - status: commands/status.md
+    - config: commands/config.md
+    - audit: commands/audit.md
+    - bootstrap: commands/bootstrap.md
+    - doctor: commands/doctor.md
+    - vault: commands/vault.md
+    - Other Commands: commands/other.md
+  - Concepts:
+    - Branch Profiles: concepts/branches.md
+    - Secret Detection: concepts/secrets.md
+    - Template Variables: concepts/templates.md
+    - Hooks: concepts/hooks.md
+    - Conditional Config: concepts/conditionals.md
+    - Deploy Methods: concepts/deploy.md
+  - Development:
+    - Architecture: development/architecture.md
+    - Contributing: development/contributing.md
+
+markdown_extensions:
+  - admonition
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+  - def_list
+
+plugins:
+  - search
+
+exclude_docs: |
+  ARCHITECTURE.md
+  DEVELOPMENT_GUIDE_MANUAL.md
+  API_STABILITY.md
+  PRIORITY_PLAN.md
+  roadmap.md
+  modules/
+  review/
+  specs/
