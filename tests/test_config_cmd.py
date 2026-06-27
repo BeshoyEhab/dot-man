@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 from click.testing import CliRunner
 
-from dot_man.cli.config_cmd import _run_interactive_tutorial, _show_section_examples
+from dot_man.cli.config_tutorial import _run_interactive_tutorial, _show_section_examples
 from dot_man.cli.interface import cli
 
 
@@ -257,7 +257,7 @@ class TestConfigCreate:
 
     def test_create_without_force_prompt_cancel(self, integration_runner):
         integration_runner.invoke(cli, ["config", "create", "--force"])
-        with patch("dot_man.cli.config_cmd.ui.confirm", return_value=False):
+        with patch("dot_man.cli.config_tutorial.ui.confirm", return_value=False):
             result = integration_runner.invoke(cli, ["config", "create"])
         assert result.exit_code == 0
         assert "Cancelled" in result.output
@@ -336,21 +336,21 @@ class TestShowSectionExamples:
     """Tests for _show_section_examples helper function."""
 
     def test_unknown_section_calls_error(self):
-        with patch("dot_man.cli.config_cmd.ui.error") as mock_error:
+        with patch("dot_man.cli.config_tutorial.ui.error") as mock_error:
             _show_section_examples("nonexistent")
             mock_error.assert_called_once_with(
                 "Unknown section: nonexistent", exit_code=0
             )
 
     def test_unknown_section_lists_available(self):
-        with patch("dot_man.cli.config_cmd.ui.error"):
-            with patch("dot_man.cli.config_cmd.ui.console.print") as mock_print:
+        with patch("dot_man.cli.config_tutorial.ui.error"):
+            with patch("dot_man.cli.config_tutorial.ui.console.print") as mock_print:
                 _show_section_examples("nonexistent")
                 call_args = " ".join(str(c) for c in mock_print.call_args_list)
                 assert "basic" in call_args
 
     def test_basic_section_runs_without_error(self):
-        with patch("dot_man.cli.config_cmd.ui.console.print"):
+        with patch("dot_man.cli.config_tutorial.ui.console.print"):
             _show_section_examples("basic")
 
     def test_all_sections_run_without_error(self):
@@ -365,7 +365,7 @@ class TestShowSectionExamples:
             "presets",
         ]
         for section in sections:
-            with patch("dot_man.cli.config_cmd.ui.console.print"):
+            with patch("dot_man.cli.config_tutorial.ui.console.print"):
                 _show_section_examples(section)
 
 
@@ -375,7 +375,7 @@ class TestRunInteractiveTutorial:
     def test_tutorial_completes_successfully(self):
         with (
             patch("builtins.input", return_value=""),
-            patch("dot_man.cli.config_cmd.ui.console.print"),
+            patch("dot_man.cli.config_tutorial.ui.console.print"),
         ):
             _run_interactive_tutorial()
 
@@ -388,7 +388,7 @@ class TestRunInteractiveTutorial:
 
         with (
             patch("builtins.input", return_value=""),
-            patch("dot_man.cli.config_cmd.ui.console.print", side_effect=capture),
+            patch("dot_man.cli.config_tutorial.ui.console.print", side_effect=capture),
         ):
             _run_interactive_tutorial()
         full = " ".join(captured)

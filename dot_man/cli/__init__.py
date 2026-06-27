@@ -41,7 +41,8 @@ from .init_cmd import init
 from .interface import cli
 from .log_cmd import checkout, diff, log
 from .main import main
-from .navigate_cmd import hooks, navigate
+from .hooks_cmd import hooks
+from .navigate_cmd import navigate
 from .onboarding import is_first_run, mark_onboarded, run_onboarding
 from .profile_cmd import profile
 from .remote_cmd import remote, sync
