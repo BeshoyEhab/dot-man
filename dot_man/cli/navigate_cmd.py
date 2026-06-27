@@ -139,9 +139,7 @@ def _run_shell_hooks(commands: list[str], label: str) -> bool:
         ui.console.print(f"  Exec: [cyan]{cmd}[/cyan]")
         try:
             shell = os.environ.get("SHELL", "/bin/sh")
-            result = subprocess.run(
-                [shell, "-c", cmd], capture_output=True, text=True
-            )
+            result = subprocess.run([shell, "-c", cmd], capture_output=True, text=True)
             if result.returncode != 0:
                 hook_failed = True
                 ui.console.print(
@@ -693,9 +691,74 @@ def _handle_branch_navigate(
         return
 
     if dry_run:
-        ui.console.print("[dim]Dry run - no changes will be made[/dim]")
+        ui.console.print(
+            f"[bold]Dry Run:[/bold] Navigate [cyan]{current_branch}[/cyan] → [cyan]{target_branch}[/cyan]"
+        )
         ui.console.print()
-        _show_branch_diff_preview(ops, current_branch, target_branch, show_diff)
+
+        # Phase 1: What would be saved
+        sections = get_changed_sections(ops)
+        if sections:
+            ui.console.print(
+                f"[bold]Phase 1:[/bold] Would save {len(sections)} section(s): {', '.join(sections)}"
+            )
+        else:
+            ui.console.print("[bold]Phase 1:[/bold] No changes to save")
+        ui.console.print()
+
+        # Phase 2: Branch switch
+        branch_exists = ops.git.branch_exists(target_branch)
+        if branch_exists:
+            ui.console.print(
+                f"[bold]Phase 2:[/bold] Would checkout existing branch: [cyan]{target_branch}[/cyan]"
+            )
+        else:
+            ui.console.print(
+                f"[bold]Phase 2:[/bold] Would create and checkout new branch: [cyan]{target_branch}[/cyan]"
+            )
+        ui.console.print()
+
+        # Phase 3: What would be deployed
+        ui.console.print("[bold]Phase 3:[/bold] Would deploy configuration...")
+        pre_hooks, post_hooks = [], []
+        deploy_items = []
+        for section_name in ops.get_sections():
+            section = ops.get_section(section_name)
+            if section.pre_deploy:
+                pre_hooks.append(section.pre_deploy)
+            if section.post_deploy:
+                post_hooks.append(section.post_deploy)
+            for local_path in section.paths:
+                repo_path = section.get_repo_path(local_path, REPO_DIR)
+                if repo_path.exists():
+                    if not local_path.exists() or not compare_files(
+                        repo_path, local_path
+                    ):
+                        method = (
+                            f" [dim]({section.deploy_method})[/dim]"
+                            if section.deploy_method == "symlink"
+                            else ""
+                        )
+                        deploy_items.append((local_path, method))
+
+        pre_hooks = list(dict.fromkeys(pre_hooks))
+        post_hooks = list(dict.fromkeys(post_hooks))
+
+        if deploy_items:
+            for local, method in deploy_items:
+                ui.console.print(f"  [yellow]{local}[/yellow]{method}")
+        else:
+            ui.console.print("  [dim]No files would change[/dim]")
+
+        if pre_hooks:
+            ui.console.print(f"  pre_deploy: {', '.join(pre_hooks)}")
+        if post_hooks:
+            ui.console.print(f"  post_deploy: {', '.join(post_hooks)}")
+
+        ui.console.print()
+        ui.console.print(
+            f"[bold]Phase 4:[/bold] Would update current_branch → {target_branch}"
+        )
         return
 
     ui.console.print(
