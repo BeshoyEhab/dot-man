@@ -128,6 +128,36 @@ def _warn_symlinks(save_result: dict) -> None:
         )
 
 
+def _run_shell_hooks(commands: list[str], label: str) -> bool:
+    """Run a list of shell commands as hooks. Returns True if any failed."""
+    if not commands:
+        return False
+    ui.console.print()
+    ui.console.print(f"[bold]{label}...[/bold]")
+    hook_failed = False
+    for cmd in commands:
+        ui.console.print(f"  Exec: [cyan]{cmd}[/cyan]")
+        try:
+            shell = os.environ.get("SHELL", "/bin/sh")
+            result = subprocess.run(
+                [shell, "-c", cmd], capture_output=True, text=True
+            )
+            if result.returncode != 0:
+                hook_failed = True
+                ui.console.print(
+                    f"  [yellow]⚠ Hook failed (exit code {result.returncode})[/yellow]"
+                )
+                if result.stderr:
+                    for line in result.stderr.splitlines()[:3]:
+                        ui.console.print(f"    [dim]{line}[/dim]")
+        except Exception as e:
+            hook_failed = True
+            warn(f"Failed to run command '{cmd}': {e}")
+    if hook_failed:
+        ui.console.print("[dim]  Some hooks failed - continuing anyway[/dim]")
+    return hook_failed
+
+
 def _prompt_for_symlinks(ops) -> set[Path]:
     """Scan sections for symlinks and prompt user how to handle each.
 
@@ -174,31 +204,7 @@ def run_branch_hooks(ops, hook_type: str) -> None:
             commands.append(cmd)
 
     commands = list(dict.fromkeys(commands))
-
-    if commands:
-        ui.console.print()
-        ui.console.print(f"[bold]Running {hook_type} hooks...[/bold]")
-        hook_failed = False
-        for cmd in commands:
-            ui.console.print(f"  Exec: [cyan]{cmd}[/cyan]")
-            try:
-                shell = os.environ.get("SHELL", "/bin/sh")
-                result = subprocess.run(
-                    [shell, "-c", cmd], capture_output=True, text=True
-                )
-                if result.returncode != 0:
-                    hook_failed = True
-                    ui.console.print(
-                        f"  [yellow]⚠ Hook failed (exit code {result.returncode})[/yellow]"
-                    )
-                    if result.stderr:
-                        for line in result.stderr.splitlines()[:3]:
-                            ui.console.print(f"    [dim]{line}[/dim]")
-            except Exception as e:
-                hook_failed = True
-                warn(f"Failed to run command '{cmd}': {e}")
-        if hook_failed:
-            ui.console.print("[dim]  Some hooks failed - continuing anyway[/dim]")
+    _run_shell_hooks(commands, f"Running {hook_type} hooks")
 
 
 @main.command("navigate", cls=AliasedCommand, aliases=["nav"])
@@ -792,31 +798,7 @@ def _handle_branch_navigate(
     pre_hooks = list(dict.fromkeys(pre_hooks))
     post_hooks = list(dict.fromkeys(post_hooks))
 
-    if pre_hooks:
-        ui.console.print()
-        ui.console.print("[bold]Running pre-deploy hooks...[/bold]")
-        hook_failed = False
-        for cmd in pre_hooks:
-            ui.console.print(f"  Exec: [cyan]{cmd}[/cyan]")
-            try:
-                shell = os.environ.get("SHELL", "/bin/sh")
-                result = subprocess.run(
-                    [shell, "-c", cmd], capture_output=True, text=True
-                )
-                if result.returncode != 0:
-                    hook_failed = True
-                    ui.console.print(
-                        f"  [yellow]⚠ Hook failed (exit code {result.returncode})[/yellow]"
-                    )
-                    if result.stderr:
-                        for line in result.stderr.splitlines()[:3]:
-                            ui.console.print(f"    [dim]{line}[/dim]")
-            except Exception as e:
-                hook_failed = True
-                warn(f"Failed to run command '{cmd}': {e}")
-        if hook_failed:
-            ui.console.print("[dim]  Some hooks failed - continuing anyway[/dim]")
-        ui.console.print()
+    _run_shell_hooks(pre_hooks, "Running pre-deploy hooks")
 
     deploy_result = ops.deploy_all()
     deployed_count = deploy_result["deployed"]
@@ -829,30 +811,7 @@ def _handle_branch_navigate(
 
     ui.console.print(f"  Deployed {deployed_count} files")
 
-    if post_hooks:
-        ui.console.print()
-        ui.console.print("[bold]Running post-deploy hooks...[/bold]")
-        hook_failed = False
-        for cmd in post_hooks:
-            ui.console.print(f"  Exec: [cyan]{cmd}[/cyan]")
-            try:
-                shell = os.environ.get("SHELL", "/bin/sh")
-                result = subprocess.run(
-                    [shell, "-c", cmd], capture_output=True, text=True
-                )
-                if result.returncode != 0:
-                    hook_failed = True
-                    ui.console.print(
-                        f"  [yellow]⚠ Hook failed (exit code {result.returncode})[/yellow]"
-                    )
-                    if result.stderr:
-                        for line in result.stderr.splitlines()[:3]:
-                            ui.console.print(f"    [dim]{line}[/dim]")
-            except Exception as e:
-                hook_failed = True
-                warn(f"Failed to run command '{cmd}': {e}")
-        if hook_failed:
-            ui.console.print("[dim]  Some hooks failed - continuing anyway[/dim]")
+    _run_shell_hooks(post_hooks, "Running post-deploy hooks")
 
     ops.global_config.current_branch = target_branch
     ops.global_config.save()

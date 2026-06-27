@@ -22,7 +22,7 @@ def test_complete_branches_filtering():
             return make_mock_result("main\nmaster\ndev\nfeature/abc\n")
         return make_mock_result()
 
-    with patch("dot_man.cli.common._git_runner", mock_runner):
+    with patch("dot_man.cli.completions._git_runner", mock_runner):
         _set_git_runner(mock_runner)
         result = complete_branches(None, None, "")
         assert result == ["main", "master", "dev", "feature/abc"]

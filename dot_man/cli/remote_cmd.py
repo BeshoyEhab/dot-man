@@ -222,7 +222,7 @@ def setup():
     gh_available = shutil.which("gh") is not None
 
     if gh_available:
-        if _setup_run_gh_flow(git, subprocess, REPO_DIR):
+        if _setup_run_gh_flow(git, subprocess, str(REPO_DIR)):
             return
 
     if not gh_available:

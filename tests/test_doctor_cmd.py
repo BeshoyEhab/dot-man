@@ -183,9 +183,11 @@ class TestDoctorHelp:
 
 
 class TestDoctorWithoutInit:
-    def test_doctor_fails_without_init(self, runner):
+    def test_doctor_fails_without_init(self, runner, tmp_path):
         """Doctor without init should exit with code 1."""
-        result = runner.invoke(cli, ["doctor"])
+        fake_dir = tmp_path / "nonexistent" / "dot-man"
+        with patch("dot_man.cli.common.DOT_MAN_DIR", fake_dir):
+            result = runner.invoke(cli, ["doctor"])
         assert result.exit_code == 1
         assert "init" in result.output.lower() or "error" in result.output.lower()
 

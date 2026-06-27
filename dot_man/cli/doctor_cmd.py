@@ -2,6 +2,7 @@
 
 import os
 import shutil
+from pathlib import Path
 
 from .. import ui
 from ..constants import DOT_MAN_DIR, DOT_MAN_TOML, GLOBAL_TOML, REPO_DIR
@@ -114,8 +115,9 @@ def doctor():
     else:
         check_warn("No global config", "Will use defaults")
 
-    if DOT_MAN_TOML.exists():
-        check_pass("dot-man.toml exists", str(DOT_MAN_TOML))
+    dot_man_toml_path = Path(DOT_MAN_TOML)
+    if dot_man_toml_path.exists():
+        check_pass("dot-man.toml exists", str(dot_man_toml_path))
         # Try to parse it
         try:
             ops = get_operations()
