@@ -16,7 +16,7 @@ Welcome to the `dot-man` development guide! This document provides instructions 
 ## 🛠️ Development Setup
 
 ### 1. Prerequisites
-- Python 3.9+
+- Python 3.10+
 - Git
 - `pip` or `uv` (recommended for faster dependency resolution)
 

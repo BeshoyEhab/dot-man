@@ -18,7 +18,7 @@ GitHub Actions workflows use `uv` (Astral) for Python package management and dep
 
 **dot-man** is a dotfile manager with git-powered branching. Each branch represents a different configuration (work, personal, minimal, server).
 
-- **Language**: Python 3.9+
+- **Language**: Python 3.10+
 - **CLI Framework**: Click
 - **Testing**: pytest
 - **Current Version**: 1.2.0 (Stable)
