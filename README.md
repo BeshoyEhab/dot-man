@@ -20,7 +20,7 @@
 
 *Switch your entire development environment in one command.*
 
-[**Install**](#installation) · [**Quick Start**](#quick-start) · [**Commands**](#commands) · [**Config**](#configuration) · [**Docs**](https://beshoyehab.github.io/dot-man/)
+[**Install**](https://github.com/BeshoyEhab/dot-man#installation) · [**Quick Start**](https://github.com/BeshoyEhab/dot-man#quick-start) · [**Commands**](https://github.com/BeshoyEhab/dot-man#commands) · [**Config**](https://github.com/BeshoyEhab/dot-man#configuration) · [**Docs**](https://beshoyehab.github.io/dot-man/)
 
 </div>
 
