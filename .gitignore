@@ -55,3 +55,6 @@ manifest.json
 
 *cache*
 .benchmarks/site/
+
+# MkDocs build output
+site/
