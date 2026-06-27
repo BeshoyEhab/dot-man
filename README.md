@@ -7,7 +7,7 @@
 [![CI](https://github.com/BeshoyEhab/dot-man/actions/workflows/ci.yml/badge.svg)](https://github.com/BeshoyEhab/dot-man/actions/workflows/ci.yml)
 [![PyPI version](https://img.shields.io/pypi/v/dotman-git?color=blue&logo=pypi&logoColor=white)](https://pypi.org/project/dotman-git/)
 [![PyPI downloads](https://img.shields.io/pypi/dm/dotman-git?color=blue&logo=pypi&logoColor=white)](https://pypi.org/project/dotman-git/)
-[![Python](https://img.shields.io/pypi/pyversions/dotman-git?logo=python&logoColor=white)](https://pypi.org/project/dotman-git/)
+[![Python](https://img.shields.io/pypi/pyversions/dotman-git?logo=python&logoColor=white&v=2)](https://pypi.org/project/dotman-git/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
