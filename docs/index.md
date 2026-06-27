@@ -9,10 +9,37 @@ hide:
 
 <div class="grid cards" markdown>
 
-- :material-download: **Install** — `pip install dotman-git`
-- :material-rocket-launch: **Quick Start** — Get running in 60 seconds
-- :material-console: **Commands** — Full CLI reference
-- :material-book-open-variant: **Concepts** — How dot-man works
+-   :material-download:{ .lg .middle } **Install**
+
+    ---
+
+    `pip install dotman-git`
+
+    [:octicons-arrow-right-24: Getting started](getting-started/installation.md)
+
+-   :material-rocket-launch:{ .lg .middle } **Quick Start**
+
+    ---
+
+    Get running in 60 seconds
+
+    [:octicons-arrow-right-24: Quick start](getting-started/quickstart.md)
+
+-   :material-console:{ .lg .middle } **Commands**
+
+    ---
+
+    Full CLI reference
+
+    [:octicons-arrow-right-24: Commands](commands/index.md)
+
+-   :material-book-open-variant:{ .lg .middle } **Concepts**
+
+    ---
+
+    How dot-man works
+
+    [:octicons-arrow-right-24: Concepts](concepts/branches.md)
 
 </div>
 
