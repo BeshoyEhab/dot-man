@@ -46,9 +46,9 @@ from .onboarding import is_first_run, mark_onboarded, run_onboarding
 from .profile_cmd import profile
 from .remote_cmd import remote, sync
 from .restore_cmd import restore
-from .save_cmd import save
 from .revert_cmd import revert
 from .rollback_cmd import rollback
+from .save_cmd import save
 from .show_cmd import show
 from .status_cmd import status
 from .switch_cmd import switch
