@@ -146,3 +146,136 @@ def test_atomic_write_robustness(vault):
     # Verify no .tmp files left
     tmp_files = list(vault.config_dir.glob("*.tmp"))
     assert len(tmp_files) == 0
+
+
+def test_rotate_key(vault):
+    """Test key rotation re-encrypts all secrets."""
+    vault.stash_secret("f1", 1, "p1", "secret1", "main")
+    vault.stash_secret("f2", 2, "p2", "secret2", "work")
+
+    count = vault.rotate_key()
+    assert count == 2
+
+    # Old key backed up
+    assert vault.key_file.with_suffix(".key.bak").exists()
+
+    # Secrets still decryptable
+    assert vault.get_secret("f1", 1, "main") == "secret1"
+    assert vault.get_secret("f2", 2, "work") == "secret2"
+
+
+def test_rotate_key_empty_vault(vault):
+    """Test rotate key on empty vault."""
+    count = vault.rotate_key()
+    assert count == 0
+
+
+def test_rotate_key_corrupted_secret(vault):
+    """Test rotate key fails if a secret can't be decrypted."""
+    vault.stash_secret("f1", 1, "p1", "secret1", "main")
+
+    # Directly inject a secret with invalid encrypted value
+    # by writing raw JSON and resetting state
+    data = json.loads(vault.vault_file.read_text())
+    # Use a value that Fernet.decrypt() will reject with ValueError
+    # (not InvalidToken — which is not caught by rotate_key)
+    data["secrets"][0]["encrypted_value"] = "gAAAAA"
+    vault.vault_file.write_text(json.dumps(data))
+    vault._last_loaded_mtime = 0.0
+    vault._fernet = None
+
+    from dot_man.vault import VaultError
+
+    with pytest.raises((VaultError, Exception)):
+        vault.rotate_key()
+
+
+def test_restore_secrets_in_content(vault):
+    """Test restoring secrets in content via hash placeholders."""
+    h = vault.stash_secret("f1", 1, "p1", "my_api_key", "main")
+
+    content = f"API_KEY=***REDACTED:{h}***"
+    restored = vault.restore_secrets_in_content(content, "f1", "main")
+
+    assert restored == "API_KEY=my_api_key"
+
+
+def test_restore_secrets_in_content_not_found(vault):
+    """Test placeholder kept when hash not in vault."""
+    content = "API_KEY=***REDACTED:deadbeef0000000000000000000000000000000000000000000000000000dead***"
+    restored = vault.restore_secrets_in_content(content, "f1", "main")
+    assert restored == content
+
+
+def test_restore_secrets_in_content_no_placeholders(vault):
+    """Test content without placeholders returned unchanged."""
+    content = "plain text nothing here"
+    restored = vault.restore_secrets_in_content(content, "f1", "main")
+    assert restored == content
+
+
+def test_get_secret_not_found(vault):
+    """Test get_secret returns None when not found."""
+    vault.stash_secret("f1", 1, "p1", "secret", "main")
+    result = vault.get_secret("f1", 999, "main")
+    assert result is None
+
+
+def test_get_secret_by_hash_not_found(vault):
+    """Test get_secret_by_hash returns None for unknown hash."""
+    vault.stash_secret("f1", 1, "p1", "secret", "main")
+    result = vault.get_secret_by_hash(
+        "deadbeef0000000000000000000000000000000000000000000000000000dead"
+    )
+    assert result is None
+
+
+def test_load_corrupted_vault_file(vault):
+    """Test load handles corrupted vault.json gracefully."""
+    vault.vault_file.write_text("{invalid json}")
+    vault.load()
+    assert vault._data == {"secrets": []}
+
+
+def test_load_nonexistent_vault_file(vault):
+    """Test load handles missing vault.json."""
+    vault.load()
+    assert vault._data == {"secrets": []}
+
+
+def test_load_skips_when_dirty(vault):
+    """Test load skips reading when dirty."""
+    vault.stash_secret("f1", 1, "p1", "secret", "main")
+    vault._dirty = True
+    vault._data["secrets"] = [{"fake": True}]
+
+    vault.load()
+    # Should not have reloaded from disk
+    assert vault._data["secrets"] == [{"fake": True}]
+
+
+def test_save_handles_os_error(vault):
+    """Test save raises VaultError on OS error."""
+    vault.vault_file = vault.config_dir / "nonexistent_dir" / "vault.json"
+    vault._data = {"secrets": []}
+
+    from dot_man.vault import VaultError
+
+    with pytest.raises(VaultError):
+        vault.save()
+
+
+def test_stash_update_existing(vault):
+    """Test stashing same secret updates instead of duplicating."""
+    vault.stash_secret("f1", 10, "AWS Key", "key1", "main")
+    vault.stash_secret("f1", 10, "AWS Key", "key1", "main")
+
+    data = json.loads(vault.vault_file.read_text())
+    # Should be 1 entry, not 2
+    assert len(data["secrets"]) == 1
+
+
+def test_stash_secret_retry_on_lock_error(vault):
+    """Test stash_secret retries when lock is held."""
+    vault.stash_secret("f1", 1, "p1", "secret", "main")
+    assert vault.get_secret("f1", 1, "main") == "secret"

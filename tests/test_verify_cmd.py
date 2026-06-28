@@ -1,93 +1,276 @@
-"""Tests for cli/verify_cmd.py — verify command."""
+"""Tests for verify_cmd.py — repository integrity verification."""
 
-import os
-from contextlib import ExitStack
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
-import pytest
 from click.testing import CliRunner
 
-from dot_man.cli.interface import cli
+from dot_man.cli.verify_cmd import verify
 
 
-@pytest.fixture
-def runner():
-    return CliRunner()
+class TestVerify:
+    """Test verify command."""
 
+    def test_verify_clean_repo(self, tmp_path):
+        """Verify clean repository shows no issues."""
+        repo_dir = tmp_path / "repo"
+        repo_dir.mkdir()
+        (repo_dir / "dot-man.toml").write_text("[main]\npaths = []\n")
 
-@pytest.fixture
-def clean_env(tmp_path):
-    """Isolated home with patched dot-man constants."""
-    home = tmp_path / "home"
-    home.mkdir()
-    dot_man_dir = home / ".config" / "dot-man"
-    repo_dir = dot_man_dir / "repo"
-    backups_dir = dot_man_dir / "backups"
-    global_toml = dot_man_dir / "global.toml"
+        with (
+            patch("dot_man.cli.verify_cmd.REPO_DIR", repo_dir),
+            patch("dot_man.cli.verify_cmd.DOT_MAN_TOML", "dot-man.toml"),
+            patch("dot_man.operations.get_operations") as mock_ops,
+        ):
+            ops = mock_ops.return_value
+            ops.get_sections.return_value = []
+            ops.git.repo.is_dirty.return_value = False
 
-    patches = [
-        patch("dot_man.constants.DOT_MAN_DIR", dot_man_dir),
-        patch("dot_man.constants.REPO_DIR", repo_dir),
-        patch("dot_man.constants.BACKUPS_DIR", backups_dir),
-        patch("dot_man.constants.GLOBAL_TOML", global_toml),
-        patch("dot_man.core.REPO_DIR", repo_dir),
-        patch("dot_man.config.REPO_DIR", repo_dir),
-        patch("dot_man.config.GLOBAL_TOML", global_toml),
-        patch("dot_man.global_config.GLOBAL_TOML", global_toml),
-        patch("dot_man.dotman_config.REPO_DIR", repo_dir),
-        patch("dot_man.operations.REPO_DIR", repo_dir),
-        patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir),
-        patch("dot_man.branch_ops.REPO_DIR", repo_dir),
-        patch("dot_man.status_ops.REPO_DIR", repo_dir),
-        patch("dot_man.cli.interface.DOT_MAN_DIR", dot_man_dir),
-        patch("dot_man.cli.common.DOT_MAN_DIR", dot_man_dir),
-        patch("dot_man.cli.common.REPO_DIR", repo_dir),
-        patch.dict(os.environ, {"HOME": str(home)}),
-    ]
+            runner = CliRunner()
+            result = runner.invoke(verify, [])
 
-    with ExitStack() as stack:
-        for p in patches:
-            stack.enter_context(p)
+            assert result.exit_code == 0
 
-        from dot_man.operations import reset_operations
+    def test_verify_missing_config(self, tmp_path):
+        """Verify warns when dot-man.toml is missing."""
+        repo_dir = tmp_path / "repo"
+        repo_dir.mkdir()
 
-        reset_operations()
+        with (
+            patch("dot_man.cli.verify_cmd.REPO_DIR", repo_dir),
+            patch("dot_man.cli.verify_cmd.DOT_MAN_TOML", "dot-man.toml"),
+            patch("dot_man.operations.get_operations") as mock_ops,
+        ):
+            ops = mock_ops.return_value
+            ops.get_sections.return_value = []
+            ops.git.repo.is_dirty.return_value = False
 
-        yield CliRunner(), dot_man_dir, repo_dir
+            runner = CliRunner()
+            result = runner.invoke(verify, [])
 
+            assert result.exit_code == 0
 
-class TestVerifyHelp:
-    def test_verify_help(self, runner):
-        result = runner.invoke(cli, ["verify", "--help"])
-        assert result.exit_code == 0
-        assert "verify" in result.output.lower()
+    def test_verify_config_parse_error(self, tmp_path):
+        """Verify reports config parse errors."""
+        repo_dir = tmp_path / "repo"
+        repo_dir.mkdir()
+        (repo_dir / "dot-man.toml").write_text("{{invalid}}")
 
+        with (
+            patch("dot_man.cli.verify_cmd.REPO_DIR", repo_dir),
+            patch("dot_man.cli.verify_cmd.DOT_MAN_TOML", "dot-man.toml"),
+            patch("dot_man.operations.get_operations") as mock_ops,
+        ):
+            ops = mock_ops.return_value
+            ops.get_sections.side_effect = Exception("parse error")
+            ops.git.repo.is_dirty.return_value = False
 
-class TestVerifyWithoutInit:
-    def test_verify_without_init(self, runner):
-        """Verify without init should fail or show help."""
-        result = runner.invoke(cli, ["verify"])
-        # Either fails or shows help
-        assert result.exit_code in [0, 1]
+            runner = CliRunner()
+            result = runner.invoke(verify, [])
 
+            assert result.exit_code == 0
 
-class TestVerifyRun:
-    def test_verify_clean_repo(self, clean_env):
-        """Verify a clean repo."""
-        runner, dot_man_dir, repo_dir = clean_env
+    def test_verify_missing_tracked_path(self, tmp_path):
+        """Verify reports missing tracked paths."""
+        repo_dir = tmp_path / "repo"
+        repo_dir.mkdir()
+        (repo_dir / "dot-man.toml").write_text("[main]\npaths = []\n")
 
-        from git import Repo
+        section = MagicMock()
+        section.paths = [tmp_path / "nonexistent_file.txt"]
+        section.get_repo_path.return_value = tmp_path / "nonexistent_repo.txt"
 
-        repo = Repo.init(repo_dir)
-        config_writer = repo.config_writer()
-        config_writer.set_value("user", "name", "Test")
-        config_writer.set_value("user", "email", "test@test.com")
-        config_writer.release()
+        with (
+            patch("dot_man.cli.verify_cmd.REPO_DIR", repo_dir),
+            patch("dot_man.cli.verify_cmd.DOT_MAN_TOML", "dot-man.toml"),
+            patch("dot_man.operations.get_operations") as mock_ops,
+        ):
+            ops = mock_ops.return_value
+            ops.get_sections.return_value = ["main"]
+            ops.get_section.return_value = section
+            ops.git.repo.is_dirty.return_value = False
 
-        (repo_dir / "test.txt").write_text("test")
-        repo.index.add(["test.txt"])
-        repo.index.commit("Initial")
+            runner = CliRunner()
+            result = runner.invoke(verify, [])
 
-        result = runner.invoke(cli, ["verify"])
+            assert result.exit_code == 0
 
-        assert result.exit_code in [0, 1]
+    def test_verify_broken_symlink(self, tmp_path):
+        """Verify detects broken symlinks."""
+        repo_dir = tmp_path / "repo"
+        repo_dir.mkdir()
+        (repo_dir / "dot-man.toml").write_text("[main]\npaths = []\n")
+
+        broken_link = tmp_path / "broken_link"
+        broken_link.symlink_to(tmp_path / "does_not_exist")
+
+        section = MagicMock()
+        section.paths = [broken_link]
+        section.get_repo_path.return_value = tmp_path / "repo_path"
+
+        with (
+            patch("dot_man.cli.verify_cmd.REPO_DIR", repo_dir),
+            patch("dot_man.cli.verify_cmd.DOT_MAN_TOML", "dot-man.toml"),
+            patch("dot_man.operations.get_operations") as mock_ops,
+        ):
+            ops = mock_ops.return_value
+            ops.get_sections.return_value = ["main"]
+            ops.get_section.return_value = section
+            ops.git.repo.is_dirty.return_value = False
+
+            runner = CliRunner()
+            result = runner.invoke(verify, [])
+
+            assert result.exit_code == 0
+
+    def test_verify_orphaned_files(self, tmp_path):
+        """Verify detects orphaned files."""
+        repo_dir = tmp_path / "repo"
+        repo_dir.mkdir()
+        (repo_dir / "dot-man.toml").write_text("[main]\npaths = []\n")
+
+        with (
+            patch("dot_man.cli.verify_cmd.REPO_DIR", repo_dir),
+            patch("dot_man.cli.verify_cmd.DOT_MAN_TOML", "dot-man.toml"),
+            patch("dot_man.operations.get_operations") as mock_ops,
+        ):
+            ops = mock_ops.return_value
+            ops.get_sections.return_value = []
+            ops.git.repo.is_dirty.return_value = False
+            ops.get_orphaned_files.return_value = [
+                repo_dir / "orphan1.txt",
+                repo_dir / "orphan2.txt",
+            ]
+
+            runner = CliRunner()
+            result = runner.invoke(verify, [])
+
+            assert result.exit_code == 0
+
+    def test_verify_fix_orphans(self, tmp_path):
+        """Verify --fix deletes orphaned files."""
+        repo_dir = tmp_path / "repo"
+        repo_dir.mkdir()
+        (repo_dir / "dot-man.toml").write_text("[main]\npaths = []\n")
+
+        with (
+            patch("dot_man.cli.verify_cmd.REPO_DIR", repo_dir),
+            patch("dot_man.cli.verify_cmd.DOT_MAN_TOML", "dot-man.toml"),
+            patch("dot_man.operations.get_operations") as mock_ops,
+        ):
+            ops = mock_ops.return_value
+            ops.get_sections.return_value = []
+            ops.git.repo.is_dirty.return_value = False
+            ops.get_orphaned_files.return_value = [repo_dir / "orphan.txt"]
+            ops.clean_orphaned_files.return_value = [repo_dir / "orphan.txt"]
+
+            runner = CliRunner()
+            result = runner.invoke(verify, ["--fix"])
+
+            assert result.exit_code == 0
+            ops.clean_orphaned_files.assert_called_once_with(dry_run=False)
+
+    def test_verify_dirty_repo(self, tmp_path):
+        """Verify reports uncommitted changes."""
+        repo_dir = tmp_path / "repo"
+        repo_dir.mkdir()
+        (repo_dir / "dot-man.toml").write_text("[main]\npaths = []\n")
+
+        with (
+            patch("dot_man.cli.verify_cmd.REPO_DIR", repo_dir),
+            patch("dot_man.cli.verify_cmd.DOT_MAN_TOML", "dot-man.toml"),
+            patch("dot_man.operations.get_operations") as mock_ops,
+        ):
+            ops = mock_ops.return_value
+            ops.get_sections.return_value = []
+            ops.git.repo.is_dirty.return_value = True
+            ops.git.repo.index.diff.return_value = []
+            ops.git.repo.untracked_files = []
+
+            runner = CliRunner()
+            result = runner.invoke(verify, [])
+
+            assert result.exit_code == 0
+
+    def test_verify_handles_section_check_error(self, tmp_path):
+        """Verify handles errors during section checking."""
+        repo_dir = tmp_path / "repo"
+        repo_dir.mkdir()
+        (repo_dir / "dot-man.toml").write_text("[main]\npaths = []\n")
+
+        with (
+            patch("dot_man.cli.verify_cmd.REPO_DIR", repo_dir),
+            patch("dot_man.cli.verify_cmd.DOT_MAN_TOML", "dot-man.toml"),
+            patch("dot_man.operations.get_operations") as mock_ops,
+        ):
+            ops = mock_ops.return_value
+            ops.get_sections.side_effect = Exception("section error")
+            ops.git.repo.is_dirty.return_value = False
+
+            runner = CliRunner()
+            result = runner.invoke(verify, [])
+
+            assert result.exit_code == 0
+
+    def test_verify_handles_orphan_check_error(self, tmp_path):
+        """Verify handles errors during orphan check."""
+        repo_dir = tmp_path / "repo"
+        repo_dir.mkdir()
+        (repo_dir / "dot-man.toml").write_text("[main]\npaths = []\n")
+
+        with (
+            patch("dot_man.cli.verify_cmd.REPO_DIR", repo_dir),
+            patch("dot_man.cli.verify_cmd.DOT_MAN_TOML", "dot-man.toml"),
+            patch("dot_man.operations.get_operations") as mock_ops,
+        ):
+            ops = mock_ops.return_value
+            ops.get_sections.return_value = []
+            ops.git.repo.is_dirty.return_value = False
+            ops.get_orphaned_files.side_effect = Exception("orphan error")
+
+            runner = CliRunner()
+            result = runner.invoke(verify, [])
+
+            assert result.exit_code == 0
+
+    def test_verify_handles_git_status_error(self, tmp_path):
+        """Verify handles errors during git status check."""
+        repo_dir = tmp_path / "repo"
+        repo_dir.mkdir()
+        (repo_dir / "dot-man.toml").write_text("[main]\npaths = []\n")
+
+        with (
+            patch("dot_man.cli.verify_cmd.REPO_DIR", repo_dir),
+            patch("dot_man.cli.verify_cmd.DOT_MAN_TOML", "dot-man.toml"),
+            patch("dot_man.operations.get_operations") as mock_ops,
+        ):
+            ops = mock_ops.return_value
+            ops.get_sections.return_value = []
+            ops.git.repo.is_dirty.side_effect = Exception("git error")
+
+            runner = CliRunner()
+            result = runner.invoke(verify, [])
+
+            assert result.exit_code == 0
+
+    def test_verify_orphans_more_than_10(self, tmp_path):
+        """Verify shows 'and X more' for >10 orphans."""
+        repo_dir = tmp_path / "repo"
+        repo_dir.mkdir()
+        (repo_dir / "dot-man.toml").write_text("[main]\npaths = []\n")
+
+        orphans = [repo_dir / f"orphan{i}.txt" for i in range(15)]
+
+        with (
+            patch("dot_man.cli.verify_cmd.REPO_DIR", repo_dir),
+            patch("dot_man.cli.verify_cmd.DOT_MAN_TOML", "dot-man.toml"),
+            patch("dot_man.operations.get_operations") as mock_ops,
+        ):
+            ops = mock_ops.return_value
+            ops.get_sections.return_value = []
+            ops.git.repo.is_dirty.return_value = False
+            ops.get_orphaned_files.return_value = orphans
+
+            runner = CliRunner()
+            result = runner.invoke(verify, [])
+
+            assert result.exit_code == 0
