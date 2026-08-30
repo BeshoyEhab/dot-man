@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Shell completions for `add` command** — file/directory path completion using `@completes("add", param="path")` decorator
+- **Shell completions for `bootstrap` command** — package manager name completion (`brew`, `apt`, `dnf`, `pacman`, etc.) via `@completes("bootstrap", param="pm")` decorator
+- **19 new documentation pages** — dedicated pages for `init`, `add`, `deploy`, `tag`, `log`, `diff`, `revert`, `import`, `export`, `discover`, `encrypt`, `hooks`, `template`, `profile`, `watch`, `rollback`, `backup`, `verify`, `completions` commands
+- **Docs navigation restructured** — commands grouped by category (Core, Configuration, Inspection, Tags, Encryption, Import/Export, Hooks, Shell)
+- **Roadmap updated** — consistent with v1.4.0 state, removed stale duplicate sections
+
+### Fixed
+
+- **`save_cmd.py`** — fixed `_sync_shared_sections` → `sync_shared_sections` name mismatch that caused `NameError` on `--commit` flag
+- **`shared_sync.py`** — `_sync_branch` now records overridden sections in `report.skipped` even when other shared sections are still wanted (partial overrides)
+- **`test_shared_sync.py`** — fixed test expectations for `test_edits_reach_non_overriding_branches` (work overrides fish, so only server gets propagated), `test_unparsable_target_config_is_skipped_safely` (fixed `run_git()` call to use `subprocess.run` with `input=`), `test_source_branch_never_modified` (fixed log assertion to use `-1` flag)
+- **Tests** — all 1700 tests passing (up from 1691), 1 skipped
+
+### Changed
+
+- **Repository cleanup** — single source of truth for completion scripts (`dot_man/completions/`); removed the duplicated `scripts/completions/` copies and the unused packaged `install.sh`. `install.sh` now installs completions via the built-in `dot-man completions` command. Removed the stale `docs/development/roadmap.md` duplicate and surfaced `docs/roadmap.md` in the docs site nav.
+
+### Removed
+
+- **Tracked artifacts** — dropped `coverage.json` (256 KB CI artifact) and the author's personal `config.toml` from version control; both now gitignored along with benchmark output.
+- **Local clutter** — `.gitignore` fixed (broken merged pattern) and extended: coverage reports, benchmarks, stale build/dist/site outputs no longer pollute the working tree.
+
+## [1.4.0] - 2026-08-25
+
+### Added
+
+- **Decorator-driven completion engine** — new `dot_man/cli/completion_engine.py` gathers commands, subcommands, options, accepted values (static or dynamic) and defaults from the Click CLI definition itself. Extended via the `@completes(path, param=...)` decorator registry; a `(path, param)` registration wins over the generic one.
+- **`dot-man --complete <shell>` protocol** — handled before onboarding/git/side effects in `main()`. Fish output uses `value<TAB>description` lines so descriptions render natively.
+- **Defaults & choices surfaced** — option completions now show `[choices: bash|zsh|fish|all]` and `[default: all]` inline (e.g. `dot-man completions --s<TAB>`).
+- **Alias labeling** — shell shortcuts like `nav`, `cpl`, `aud` are listed as `(alias)` entries instead of indistinguishable duplicates.
+- **`--option=<TAB>` form** — completing after `=` emits full tokens (`--shell=fish`).
+- **Static choice provider** — `config set KEY <TAB>` suggests `true`/`false`.
+
+### Fixed
+
+- **Fish completions showed invalid/stale choices** — the hand-written `dot-man.fish` listed missing commands (`backup`, `tag`, `template`, `profile`, `doctor`, ...), treated navigate options as subcommands, and kept deprecated `switch` prominent. It is now a tiny delegating script calling `dot-man --complete fish` on every TAB (wifi-tracker style), so completions can never go stale.
+- **Unformatted fish output** — the old script's naive `string split ","` broke on help text containing commas and dropped descriptions. Tab-separated engine output renders descriptions natively in fish.
+
+### Tests
+
+- 37 new tests in `tests/test_completion_engine.py` (registry priority, root/subcommand listing, static choices, defaults display, alias labeling, eq-form values, dynamic git-backed callbacks, request parsing, formatting, entry safety). Suite: 1682 passed, coverage 84% (up from 81%).
+
 ## [1.3.0] - 2026-06-27
 
 ### Added

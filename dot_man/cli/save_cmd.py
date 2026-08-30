@@ -14,6 +14,7 @@ from .common import (
     handle_exception,
     require_init,
     success,
+    sync_shared_sections,
     warn,
 )
 from .interface import cli as main
@@ -171,6 +172,7 @@ def save(
             commit_sha = ops.git.commit(msg)
             if commit_sha:
                 ui.console.print(f"  Committed: [dim]{commit_sha[:7]}[/dim]")
+                sync_shared_sections(ops)
             else:
                 ui.console.print("  [dim]Nothing to commit[/dim]")
         elif commit and saved_count == 0:

@@ -35,15 +35,42 @@ nav:
     - Configuration: getting-started/configuration.md
   - Commands:
     - Overview: commands/index.md
-    - navigate: commands/navigate.md
-    - save: commands/save.md
-    - status: commands/status.md
-    - config: commands/config.md
-    - audit: commands/audit.md
-    - bootstrap: commands/bootstrap.md
-    - doctor: commands/doctor.md
-    - vault: commands/vault.md
-    - Other Commands: commands/other.md
+    - Core Workflow:
+      - init: commands/init.md
+      - navigate: commands/navigate.md
+      - save: commands/save.md
+      - add: commands/add.md
+      - status: commands/status.md
+      - deploy: commands/deploy.md
+    - Configuration:
+      - config: commands/config.md
+      - bootstrap: commands/bootstrap.md
+      - discover: commands/discover.md
+    - Inspection:
+      - audit: commands/audit.md
+      - diff: commands/diff.md
+      - log: commands/log.md
+      - revert: commands/revert.md
+      - doctor: commands/doctor.md
+      - verify: commands/verify.md
+    - Tags & History:
+      - tag: commands/tag.md
+      - rollback: commands/rollback.md
+      - backup: commands/backup.md
+    - Encryption & Vault:
+      - vault: commands/vault.md
+      - encrypt: commands/encrypt.md
+    - Import & Export:
+      - import: commands/import.md
+      - export: commands/export.md
+    - Hooks & Templates:
+      - hooks: commands/hooks.md
+      - template: commands/template.md
+      - profile: commands/profile.md
+    - Shell & Misc:
+      - completions: commands/completions.md
+      - watch: commands/watch.md
+      - Other Commands: commands/other.md
   - Concepts:
     - Branch Profiles: concepts/branches.md
     - Secret Detection: concepts/secrets.md
@@ -54,6 +81,7 @@ nav:
   - Development:
     - Architecture: development/architecture.md
     - Contributing: development/contributing.md
+    - Roadmap: roadmap.md
 
 markdown_extensions:
   - admonition
@@ -79,7 +107,6 @@ exclude_docs: |
   DEVELOPMENT_GUIDE_MANUAL.md
   API_STABILITY.md
   PRIORITY_PLAN.md
-  roadmap.md
   modules/
   review/
   specs/
