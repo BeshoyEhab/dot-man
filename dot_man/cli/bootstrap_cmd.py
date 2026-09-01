@@ -7,7 +7,7 @@ import subprocess
 import click
 
 from .. import ui
-from .common import require_init, success, warn
+from .common import success, warn
 from .interface import cli as main
 
 # Package manager detection: command → (install_cmd, update_cmd)
@@ -139,7 +139,6 @@ def _run_with_pm(pm: str, command_template: str, package: str) -> bool:
 @click.option("--pm", help="Package manager to use (auto-detected if not specified)")
 @click.option("--update", is_flag=True, help="Update package manager first")
 @click.argument("packages", nargs=-1)
-@require_init
 def bootstrap(list_only: bool, pm: str | None, update: bool, packages: tuple[str, ...]):
     """Install system packages via package managers.
 

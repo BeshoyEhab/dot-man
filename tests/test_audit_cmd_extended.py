@@ -19,9 +19,24 @@ def runner():
 def clean_repo(tmp_path):
     """Create a minimal repo structure for testing."""
     repo_dir = tmp_path / "repo"
+    repo_dir.mkdir(exist_ok=True)
+    (repo_dir / ".git").mkdir(exist_ok=True)
+    return repo_dir
+
+
+@pytest.fixture(autouse=True)
+def patch_dot_man_dir(tmp_path):
+    """Patch DOT_MAN_DIR to exist in tmp_path for tests."""
+    dot_man_dir = tmp_path / ".config" / "dot-man"
+    dot_man_dir.mkdir(parents=True)
+    repo_dir = tmp_path / "repo"
     repo_dir.mkdir()
     (repo_dir / ".git").mkdir()
-    return repo_dir
+    with (
+        patch("dot_man.cli.common.DOT_MAN_DIR", dot_man_dir),
+        patch("dot_man.cli.common.REPO_DIR", repo_dir),
+    ):
+        yield
 
 
 def make_match(
