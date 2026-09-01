@@ -17,7 +17,10 @@ def main() -> None:
     On the very first launch (no ~/.config/dot-man/ or sentinel missing),
     the onboarding tutorial runs automatically before anything else.
     """
+    from .completion_engine import maybe_run_completion
     from .onboarding import is_first_run, run_onboarding
+
+    maybe_run_completion()
 
     if is_first_run():
         run_onboarding()

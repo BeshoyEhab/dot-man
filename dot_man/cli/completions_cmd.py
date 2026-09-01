@@ -91,6 +91,20 @@ def completions(shell: str, source_only: bool):
         )
 
 
+def _install_script(src: Path, dest: Path) -> bool:
+    """Copy a completion script unless an identical copy already exists.
+
+    Overwrites stale installs from older dot-man versions so updated
+    completion scripts actually reach users on upgrade. Returns True
+    when the file was written.
+    """
+    if dest.exists() and dest.read_text() == src.read_text():
+        return False
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy(src, dest)
+    return True
+
+
 def run_install() -> None:
     """Entry point for pip install hook - silently installs completions."""
     try:
@@ -98,31 +112,32 @@ def run_install() -> None:
     except ImportError:
         return
 
-    home = Path.home()
     completions_path = Path(completions_pkg.__file__).parent
 
     # Bash
-    bash_dest = (
-        home / ".local" / "share" / "bash-completion" / "completions" / "dot-man"
-    )
-    if not bash_dest.exists():
-        bash_src = completions_path / "dot-man.bash"
-        if bash_src.exists():
-            bash_dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy(bash_src, bash_dest)
+    bash_src = completions_path / "dot-man.bash"
+    if bash_src.exists():
+        _install_script(
+            bash_src,
+            Path.home()
+            / ".local"
+            / "share"
+            / "bash-completion"
+            / "completions"
+            / "dot-man",
+        )
 
     # Zsh
-    zsh_dest = home / ".local" / "share" / "zsh" / "site-functions" / "_dot-man"
-    if not zsh_dest.exists():
-        zsh_src = completions_path / "_dot-man.zsh"
-        if zsh_src.exists():
-            zsh_dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy(zsh_src, zsh_dest)
+    zsh_src = completions_path / "_dot-man.zsh"
+    if zsh_src.exists():
+        _install_script(
+            zsh_src,
+            Path.home() / ".local" / "share" / "zsh" / "site-functions" / "_dot-man",
+        )
 
     # Fish
-    fish_dest = home / ".config" / "fish" / "completions" / "dot-man.fish"
-    if not fish_dest.exists():
-        fish_src = completions_path / "dot-man.fish"
-        if fish_src.exists():
-            fish_dest.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy(fish_src, fish_dest)
+    fish_src = completions_path / "dot-man.fish"
+    if fish_src.exists():
+        _install_script(
+            fish_src, Path.home() / ".config" / "fish" / "completions" / "dot-man.fish"
+        )

@@ -111,6 +111,28 @@ class DotManGroup(click.Group):
         ctx.exit(2)
 
 
+def sync_shared_sections(ops) -> None:
+    """Propagate ``shared = true`` sections to non-overriding branches.
+
+    Called after a commit was created on the current branch. Failures
+    are reported but never abort the surrounding command.
+    """
+    try:
+        from ..shared_sync import SharedSectionSync
+
+        report = SharedSectionSync(ops).sync()
+        if not report.shared_sections:
+            return
+        for branch, sections in report.propagated.items():
+            ui.console.print(
+                f"  [dim]↔ shared → '{branch}': {', '.join(sections)}[/dim]"
+            )
+        for branch, reason in report.errors.items():
+            warn(f"Shared-section sync failed for '{branch}': {reason}")
+    except Exception as e:
+        logging.debug("Shared-section sync skipped: %s", e)
+
+
 def require_init(func):
     """Decorator to require initialization before running command."""
 

@@ -69,7 +69,7 @@ Your Machine                  dot-man Repo               Any Machine
 <td>
 
 **Developer**
-- 🐚 Shell completions (bash/zsh/fish)
+- 🐚 Shell completions (bash/zsh/fish) — decorator-driven engine, always in sync with the CLI
 - 🎨 Syntax-highlighted rich diffs
 - 🩺 `doctor` and `verify` diagnostics
 - 📦 PyPI — `pip install dotman-git`
@@ -125,7 +125,6 @@ dot-man add ~/.config/nvim
 
 # 3. Create a "work" profile (branch)
 dot-man navigate work
-# btw it was "switch" instead of "navigate" untill Bishoy decided to change it to "navigate" for some silly reasons and push that changes so as community help us to make it "switch" again.
 
 # 4. Edit your work-specific configs, then switch back — changes are saved automatically
 dot-man navigate main
@@ -424,10 +423,10 @@ System variables (`{{HOSTNAME}}`, `{{USER}}`, `{{SHELL}}`, etc.) are auto-popula
 
 | Metric | Value |
 |--------|-------|
-| Version | `1.2.3` |
+| Version | `1.4.0` |
 | Python | `3.10 · 3.11 · 3.12 · 3.13` |
 | Platforms | Linux, macOS |
-| Test Coverage | 81% (1526 tests) |
+| Test Coverage | 84% (1682 tests) |
 | Commands | 30+ |
 | PyPI | [`dotman-git`](https://pypi.org/project/dotman-git/) |
 

@@ -45,6 +45,7 @@ class Section:
         encrypted: Optional[bool] = None,
         encryption_method: Optional[str] = None,
         encryption_recipient: Optional[str] = None,
+        shared: Optional[bool] = None,
     ):
         self.name = name
         # Expand environment variables in paths
@@ -84,6 +85,10 @@ class Section:
         self.encrypted = encrypted if encrypted is not None else False
         self.encryption_method = encryption_method or "gpg"
         self.encryption_recipient = encryption_recipient
+
+        # Shared sections propagate edits to every branch that does not
+        # define its own override for this section name.
+        self.shared = shared if shared is not None else False
 
         # Template rendering ({{VAR}} substitution + conditionals)
         self.render_templates = True
@@ -233,5 +238,7 @@ class Section:
             result["encryption_method"] = self.encryption_method
         if self.encryption_recipient:
             result["encryption_recipient"] = self.encryption_recipient
+        if self.shared:
+            result["shared"] = True
 
         return result

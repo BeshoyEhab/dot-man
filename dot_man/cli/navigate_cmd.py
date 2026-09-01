@@ -21,6 +21,7 @@ from .common import (
     get_secret_handler,
     require_init,
     success,
+    sync_shared_sections,
     warn,
 )
 from .interface import cli as main
@@ -588,6 +589,7 @@ def _handle_branch_navigate(
                 ui.console.print(f"  Committed: [dim]{commit_sha[:7]}[/dim]")
                 if commit_message.lower() != "auto":
                     ui.console.print(f"  [dim]Commit: {commit_msg}[/dim]")
+                sync_shared_sections(ops)
         else:
             commit_sha = None
 

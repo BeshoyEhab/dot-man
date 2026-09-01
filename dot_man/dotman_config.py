@@ -35,6 +35,7 @@ VALID_SECTION_KEYS = {
     "encrypted",
     "encryption_method",
     "encryption_recipient",
+    "shared",
 }
 """Canonical set of valid keys for section config."""
 
@@ -333,6 +334,7 @@ class DotManConfig:
             ignored_directories=settings.get("ignored_directories"),
             follow_symlinks=settings.get("follow_symlinks"),
             deploy_method=settings.get("deploy_method", "copy"),
+            shared=settings.get("shared", False),
         )
 
     def add_section(

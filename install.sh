@@ -11,7 +11,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Source utilities and helper scripts
 source "$SCRIPT_DIR/scripts/utils.sh"
-source "$SCRIPT_DIR/scripts/completions/install.sh"
 source "$SCRIPT_DIR/scripts/path-setup.sh"
 
 # Get version from pyproject.toml
@@ -37,8 +36,16 @@ fi
 
 echo ""
 
-# Install completions
-install_completions
+# Install completions via the CLI (uses the packaged scripts)
+if command -v dot-man > /dev/null 2>&1; then
+    if dot-man completions --shell all; then
+        print_status "Shell completions installed"
+    else
+        print_info "Completions install skipped. Run 'dot-man completions' later."
+    fi
+else
+    print_info "dot-man not on PATH yet — run 'dot-man completions' after installing."
+fi
 
 echo ""
 echo "╔══════════════════════════════════════╗"

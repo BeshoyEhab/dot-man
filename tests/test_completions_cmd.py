@@ -170,7 +170,8 @@ class TestRunInstall:
         assert fish_dest.exists()
         assert fish_dest.read_text() == "# fish"
 
-    def test_run_install_skips_existing(self, tmp_path):
+    def test_run_install_overwrites_stale_existing(self, tmp_path):
+        """Stale completions from older versions must be replaced on install."""
         src_dir = tmp_path / "completions_src"
         src_dir.mkdir()
         (src_dir / "dot-man.bash").write_text("# new version")
@@ -183,7 +184,7 @@ class TestRunInstall:
             / "dot-man"
         )
         bash_dest.parent.mkdir(parents=True)
-        bash_dest.write_text("# existing")
+        bash_dest.write_text("# old broken version")
         import dot_man.completions as pkg
 
         with (
@@ -194,4 +195,33 @@ class TestRunInstall:
 
             run_install()
 
-        assert bash_dest.read_text() == "# existing"
+        assert bash_dest.read_text() == "# new version"
+
+    def test_run_install_skips_identical_existing(self, tmp_path):
+        """Identical installed scripts are left untouched (no rewrite)."""
+        src_dir = tmp_path / "completions_src"
+        src_dir.mkdir()
+        (src_dir / "dot-man.bash").write_text("# same")
+        bash_dest = (
+            tmp_path
+            / ".local"
+            / "share"
+            / "bash-completion"
+            / "completions"
+            / "dot-man"
+        )
+        bash_dest.parent.mkdir(parents=True)
+        bash_dest.write_text("# same")
+        dest_mtime = bash_dest.stat().st_mtime_ns
+        import dot_man.completions as pkg
+
+        with (
+            patch.object(pkg, "__file__", str(src_dir / "__init__.py")),
+            patch("pathlib.Path.home", return_value=tmp_path),
+        ):
+            from dot_man.cli.completions_cmd import run_install
+
+            run_install()
+
+        assert bash_dest.read_text() == "# same"
+        assert bash_dest.stat().st_mtime_ns == dest_mtime

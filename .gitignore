@@ -27,11 +27,12 @@ dist/
 # Testing
 .pytest_cache/
 .coverage
+.coverage.*
 htmlcov/
 .tox/
 .nox/
 
-# Type checking
+# Type checking / linting caches
 .mypy_cache/
 .ruff_cache/
 
@@ -53,8 +54,15 @@ temp/
 *.zip
 manifest.json
 
-*cache*
-.benchmarks/site/
+# Coverage reports
+coverage.json
+coverage.xml
 
 # MkDocs build output
 site/
+
+# Benchmarks
+.benchmarks/
+
+# Personal dot-man config (author's machine)
+/config.toml
