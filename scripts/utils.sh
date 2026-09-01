@@ -61,11 +61,20 @@ install_package() {
     if command -v pipx &> /dev/null; then
         echo -e "  Using ${CYAN}pipx${NC} for installation..."
         
-        # Uninstall first if exists (to handle reinstalls)
-        pipx uninstall dot-man 2>/dev/null || true
+        # Check if already installed
+        if pipx list 2>/dev/null | grep -q "dotman-git\|dot-man"; then
+            echo -e "  ${CYAN}dot-man already installed — upgrading...${NC}"
+            if pipx upgrade dotman-git > /dev/null 2>&1; then
+                print_status "Package upgraded successfully with pipx"
+                return 0
+            fi
+            # If upgrade fails (e.g. name mismatch), fall through to reinstall
+            echo -e "  ${YELLOW}Upgrade failed, reinstalling...${NC}"
+            pipx uninstall dotman-git 2>/dev/null || pipx uninstall dot-man 2>/dev/null || true
+        fi
         
-        # Install with pipx
-        if pipx install . --force > /dev/null 2>&1; then
+        # Fresh install with pipx
+        if pipx install . > /dev/null 2>&1; then
             print_status "Package installed successfully with pipx"
             return 0
         else
