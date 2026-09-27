@@ -539,3 +539,43 @@ class TestGitHubImport:
 
         result = _parse_github_url("https://github.com")
         assert result is None
+
+
+def test_hook_suggestion_shown(tmp_path):
+    """Detected tool hooks are announced inline while prompting."""
+    from dot_man.cli import init_cmd
+
+    target = tmp_path / ".bashrc"
+    target.write_text("export X=1")
+    with (
+        patch("dot_man.cli.init_cmd.ui") as mock_ui,
+        patch(
+            "dot_man.cli.init_cmd.get_auto_hooks_for_config",
+            return_value={"post_deploy": "echo reloaded"},
+        ),
+    ):
+        mock_ui.confirm.return_value = True
+        init_cmd._wizard_prompt_for_files([(str(target), "Bash shell", "bashrc")], [])
+    printed = " ".join(str(c) for c in mock_ui.console.print.call_args_list)
+    assert "post_deploy" in printed
+    assert "echo reloaded" in printed
+
+
+def test_format_hook_example():
+    from dot_man.cli.init_cmd import _format_hook_example
+
+    assert _format_hook_example("bash", None) is None
+    line = _format_hook_example("bash", "echo reloaded")
+    assert "bash" in line
+    assert "echo reloaded" in line
+
+
+def test_show_next_steps_mentions_navigate():
+    from dot_man.cli import init_cmd
+
+    with patch("dot_man.cli.init_cmd.ui") as mock_ui:
+        with patch("dot_man.cli.init_cmd.status_cmd") as mock_status:
+            init_cmd._wizard_show_next_steps([("~/.bashrc", "bashrc")])
+    printed = " ".join(str(c) for c in mock_ui.console.print.call_args_list)
+    assert "navigate" in printed
+    mock_status.status.callback.assert_called_once_with(False, False, False)

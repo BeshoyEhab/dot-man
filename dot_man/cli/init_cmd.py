@@ -13,6 +13,7 @@ from ..config_detector import ConfigDetector, get_auto_hooks_for_config
 from ..constants import BACKUPS_DIR, DOT_MAN_DIR, FILE_PERMISSIONS, REPO_DIR
 from ..core import GitManager
 from ..utils import is_git_installed
+from . import status_cmd
 from .common import AliasedCommand, ExitCode, error, handle_exception, success, warn
 from .interface import cli as main
 
@@ -185,6 +186,13 @@ def _wizard_detect_files(common_files: list) -> list:
     return common_files
 
 
+def _format_hook_example(section_name: str, hook_cmd: str | None) -> str | None:
+    """One-line hook example for the first tracked section."""
+    if not hook_cmd:
+        return None
+    return f"  [dim]Example: [{section_name}] runs '{hook_cmd}' after deploy[/dim]"
+
+
 def _wizard_prompt_for_files(common_files: list, files_to_add: list) -> list:
     """Iterate common_files, detect each path, ask user which to track."""
     found_count = 0
@@ -261,6 +269,12 @@ def _wizard_prompt_for_files(common_files: list, files_to_add: list) -> list:
             ui.console.print(
                 f"  [green]✓[/green] Found: [cyan]{path_str}[/cyan] ({desc})"
             )
+            auto_hooks = get_auto_hooks_for_config(section_name, [path_str])
+            if auto_hooks:
+                for hook_type, hook_cmd in auto_hooks.items():
+                    ui.console.print(
+                        f"    [dim]Will run {hook_type} hook: {hook_cmd}[/dim]"
+                    )
             if ui.confirm("    Track this?", default=True):
                 files_to_add.append((path_str, section_name))
 
@@ -345,6 +359,14 @@ def _wizard_save_and_summarize(
 
         ui.console.print()
         success(f"Added {len(files_to_add)} files to configuration")
+        first_section = files_to_add[0][1]
+        try:
+            first_hook = dotman_config.get_section(first_section).post_deploy
+        except Exception:
+            first_hook = None
+        example = _format_hook_example(first_section, first_hook)
+        if example:
+            ui.console.print(example)
         ui.console.print()
 
         ui.console.print("[bold]Your dotfiles are now tracked:[/bold]")
@@ -365,6 +387,9 @@ def _wizard_save_and_summarize(
 
 def _wizard_show_next_steps(files_to_add: list):
     """Final instructions and next steps."""
+    ui.console.print(
+        "[dim]Your files are tracked. `dot-man status` shows them live below.[/dim]"
+    )
     ui.console.print()
     ui.print_banner("🎉 Setup Complete!")
     ui.console.print()
@@ -394,6 +419,11 @@ def _wizard_show_next_steps(files_to_add: list):
     ui.console.print("[dim]💡 Run 'dot-man --help' to see all commands[/dim]")
     ui.console.print()
 
+    try:
+        status_cmd.status.callback(False, False, False)  # type: ignore[misc]
+    except Exception as e:
+        logging.debug("Closing status display skipped: %s", e)
+
 
 def run_setup_wizard(
     global_config: GlobalConfig, dotman_config: DotManConfig, git: GitManager
@@ -403,6 +433,9 @@ def run_setup_wizard(
     ui.console.print()
     ui.console.print(
         "Let's get your dotfiles set up! I'll detect common files automatically."
+    )
+    ui.console.print(
+        "[dim]Each file you track gets snapshotted, so you can `dot-man navigate` between configurations.[/dim]"
     )
     ui.console.print()
 
