@@ -1,6 +1,6 @@
 # TODO
 
-**Status:** v1.4.0 · 1787 tests passing · coverage 86% · docs site live
+**Status:** v1.4.0 · 1811 tests passing · coverage 86% · docs site live
 
 ---
 
@@ -32,7 +32,7 @@
 
 - [x] **Hook scripts directory** — `file:<script> [args]` tokens in any section hook resolve from `<repo>/hooks/` (versioned) with `~/.config/dot-man/hooks/` fallback
 - [ ] **Plugin API** — ⏸️ parked for now (too big); revisit after the simplification track
-- [ ] **Template variables in config values (decided)** — render `{{section_name}}`, `{{config_name}}`, `{{branch}}`, `{{paths}}` inside config values at load using the existing template engine (substitution only, no new syntax); hook `{x}` single-brace form stays as the shell-friendly spelling of the same vocabulary
+- [x] **Template variables in config values** — `{{section_name}}`/`{{config_name}}`/`{{branch}}`/`{{paths}}` + machine vars + conditionals render at load; hook `{x}` stays as shell-friendly spelling
 
 ---
 
@@ -78,10 +78,11 @@ Lowest-covered modules (regenerated 2026-09-27):
 ### Unreleased
 
 - [x] **Two-level help** — `help`/`--help` show 6 happy-path commands, `help-all` shows everything, man page + installer
+- [x] **Template variables in config values** — section + machine vars + conditionals render at load
 - [x] **Hook scripts directory** — `file:` tokens in section hooks, repo `hooks/` + global fallback
 - [x] **Consistent exit codes** — `ExitCode` enum; zero `sys.exit()` calls left in `dot_man/`
 - [x] **Centralized error handling** — `DotManGroup.invoke()` routes every command through `handle_exception()`; `navigate`/`bootstrap`/`config get`/`doctor` fixed to use shared helpers
-- [x] **35 new tests** (`test_exit_codes.py`: 15, `test_hook_scripts.py`: 12, `test_help_cmd.py`: 8); suite 1787 passed, coverage 84% → 86%
+- [x] **New suites** — `test_exit_codes`, `test_hook_scripts`, `test_help_cmd`, `test_hook_engine`, `test_config_template_vars`; suite 1811 passed, coverage 84% → 86%
 
 ### v1.4.0
 

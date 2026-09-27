@@ -60,3 +60,28 @@ Per section:
 [main]
 render_templates = false
 ```
+
+## Variables in Config Values
+
+Section config values support the same `{{ }}` syntax, rendered at
+load with section context on top of the machine variables above:
+
+```toml
+[nvim]
+paths = ["~/.config/{{HOSTNAME}}/nvim"]
+post_deploy = "notify '{{section_name}} deployed on {{HOSTNAME}}'"
+```
+
+Available section names: `{{section_name}}`, `{{config_name}}`
+(derived from the rendered first path), `{{config_root}}`,
+`{{paths}}`, `{{branch}}`. Conditionals work too, so one repo can
+serve macOS and Linux:
+
+```toml
+[tool]
+paths = ["{{ if OS == \"darwin\" }}~/.config/tool-mac{{ endif }}"]
+```
+
+Unknown variables pass through literally. Hook `{x}` placeholders
+(`{config_name}`, `{branch}`, …) resolve afterward at `Section`
+construction, so both spellings compose in one hook string.

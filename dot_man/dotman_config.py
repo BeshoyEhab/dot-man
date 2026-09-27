@@ -13,7 +13,12 @@ from .constants import (
     VALID_UPDATE_STRATEGIES,
 )
 from .exceptions import ConfigurationError, ConfigValidationError
-from .global_config import GlobalConfig, load_config_file, write_config_file
+from .global_config import (
+    GlobalConfig,
+    load_config_file,
+    substitute_templates,
+    write_config_file,
+)
 from .section import Section
 
 VALID_SECTION_KEYS = {
@@ -264,6 +269,49 @@ class DotManConfig:
             result[key] = value
         return result
 
+    def _render_section_templates(self, name: str, settings: dict) -> dict:
+        """Render `{{VAR}}` templates in string settings (two passes).
+
+        Pass 1 renders `paths` with section name, branch, and machine
+        variables; pass 2 derives `config_name`/`config_root` from the
+        rendered first path and renders every other string value (and
+        string items in lists) with the full context. Unknown variables
+        pass through literally.
+        """
+        import os
+
+        base = {"section_name": name, "branch": Section._get_current_branch()}
+
+        rendered = dict(settings)
+        paths_raw = rendered.get("paths", [])
+        single = isinstance(paths_raw, str)
+        rendered_paths = [
+            substitute_templates(p, dict(base))
+            for p in ([paths_raw] if single else paths_raw)
+        ]
+        rendered["paths"] = rendered_paths[0] if single else rendered_paths
+
+        first = rendered_paths[0] if rendered_paths else ""
+        expanded = os.path.expandvars(os.path.expanduser(first))
+        full = {
+            **base,
+            "config_name": Path(expanded).name,
+            "config_root": str(Path(expanded).parent),
+            "paths": " ".join(rendered_paths),
+        }
+
+        for key, value in rendered.items():
+            if key == "paths":
+                continue
+            if isinstance(value, str):
+                rendered[key] = substitute_templates(value, dict(full))
+            elif isinstance(value, list):
+                rendered[key] = [
+                    substitute_templates(v, dict(full)) if isinstance(v, str) else v
+                    for v in value
+                ]
+        return rendered
+
     def get_section(self, name: str) -> Section:
         """Get a fully resolved section with inheritance applied."""
         if name not in self._data or name == "templates":
@@ -287,6 +335,10 @@ class DotManConfig:
 
         # Apply section-specific settings
         settings = self._merge_settings(settings, raw)
+
+        # Render {{ }} template variables with section context so values
+        # like hooks and paths can use {{section_name}}/{{config_name}}.
+        settings = self._render_section_templates(name, settings)
 
         # Parse paths with environment variable expansion
         import os
