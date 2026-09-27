@@ -420,7 +420,11 @@ def _wizard_show_next_steps(files_to_add: list):
     ui.console.print()
 
     try:
-        status_cmd.status.callback(False, False, False)  # type: ignore[misc]
+        callback = status_cmd.status.callback
+        if callback is None:
+            logging.debug("Status callback unavailable; skipping closing display")
+            return
+        callback(False, False, False)
     except Exception as e:
         logging.debug("Closing status display skipped: %s", e)
 
