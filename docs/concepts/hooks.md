@@ -49,3 +49,26 @@ Within hooks, the `$DOT_MAN_BRANCH` variable contains the active branch name.
 ```bash
 on_activate = "echo \"Switched to $DOT_MAN_BRANCH config\""
 ```
+
+## Script Files (`file:` references)
+
+Inline strings get unwieldy for multi-line logic. Any hook value can
+embed `file:<script> [args]` tokens that resolve to executable scripts
+from a hooks folder — composable with inline shell in a single line:
+
+```toml
+[work]
+post_deploy = "echo 'start'; file:log.sh 'this is test'"
+on_activate = "file:setup-env.sh {config_name}"
+```
+
+Lookup order:
+
+1. `<repo>/hooks/` — versioned per branch, synced like your dotfiles
+2. `~/.config/dot-man/hooks/` — machine-local fallback
+
+The token is replaced with the quoted absolute script path; trailing
+args are passed through untouched, and `{placeholders}` still resolve.
+A missing script fails the hook with a `ConfigurationError` naming the
+script and both searched folders. Scripts gain the exec bit
+automatically, and `../` escapes outside the hooks folder are rejected.

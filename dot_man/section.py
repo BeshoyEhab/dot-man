@@ -10,6 +10,7 @@ from .constants import (
     DEFAULT_IGNORED_DIRECTORIES,
     HOOK_ALIASES,
 )
+from .hooks import resolve_hook_files
 
 
 def _expand_path(path_str: str) -> Path:
@@ -68,8 +69,8 @@ class Section:
         # Resolve hook aliases
         self.pre_deploy = self._resolve_hook(pre_deploy)
         self.post_deploy = self._resolve_hook(post_deploy)
-        self.on_activate = on_activate
-        self.on_deactivate = on_deactivate
+        self.on_activate = self._resolve_hook(on_activate)
+        self.on_deactivate = self._resolve_hook(on_deactivate)
 
         self.inherits = inherits or []
 
@@ -171,7 +172,7 @@ class Section:
                 resolved = resolved.replace("{config_name}", config_name)
                 resolved = resolved.replace("{qs_config}", config_name)
 
-        return resolved
+        return resolve_hook_files(resolved)
 
     @staticmethod
     def _get_current_branch() -> str:
