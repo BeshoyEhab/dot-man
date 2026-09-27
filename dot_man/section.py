@@ -6,11 +6,11 @@ import os
 from pathlib import Path
 from typing import Any, Optional
 
+from . import constants as _constants
 from .constants import (
     DEFAULT_IGNORED_DIRECTORIES,
-    HOOK_ALIASES,
 )
-from .hooks import resolve_hook_files
+from .hook_engine import HookContext, resolve_hook
 
 
 def _expand_path(path_str: str) -> Path:
@@ -150,29 +150,29 @@ class Section:
         if not hook:
             return None
 
-        resolved = HOOK_ALIASES.get(hook, hook)
+        expanded = _constants.HOOK_ALIASES.get(hook, hook)
 
-        if "{" in resolved:
-            resolved = resolved.replace("{section_name}", self.name)
-            resolved = resolved.replace("{branch}", self._get_current_branch())
-            resolved = resolved.replace("{paths}", " ".join(str(p) for p in self.paths))
+        context = HookContext(section_name=self.name)
+        if "{" in expanded:
+            context = HookContext(
+                section_name=self.name,
+                branch=self._get_current_branch(),
+                paths=tuple(str(p) for p in self.paths),
+                **self._config_names(),
+            )
+        return resolve_hook(hook, context)
 
-            if self.paths:
-                first = self.paths[0]
-                config_root = str(first.parent)
-                config_name = first.name
-                if first.exists() and first.is_dir():
-                    config_name = first.name
-                elif first.exists() and first.is_file():
-                    config_root = str(first.parent)
-                else:
-                    config_root = str(first.expanduser().parent)
-                    config_name = first.expanduser().name
-                resolved = resolved.replace("{config_root}", config_root)
-                resolved = resolved.replace("{config_name}", config_name)
-                resolved = resolved.replace("{qs_config}", config_name)
-
-        return resolve_hook_files(resolved)
+    def _config_names(self) -> dict[str, str]:
+        """Derive config_root/config_name from the first tracked path."""
+        if not self.paths:
+            return {}
+        first = self.paths[0]
+        if first.exists() and first.is_dir():
+            return {"config_root": str(first.parent), "config_name": first.name}
+        if first.exists() and first.is_file():
+            return {"config_root": str(first.parent), "config_name": first.name}
+        expanded = first.expanduser()
+        return {"config_root": str(expanded.parent), "config_name": expanded.name}
 
     @staticmethod
     def _get_current_branch() -> str:
