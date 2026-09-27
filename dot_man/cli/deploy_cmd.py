@@ -121,7 +121,7 @@ def deploy(branch: str, force: bool, dry_run: bool):
 
         # Execute Pre-Hooks
         if pre_hooks:
-            run_hooks(pre_hooks, "\nRunning pre-deploy hooks", HookContext())
+            run_hooks(pre_hooks, "Running pre-deploy hooks", HookContext())
 
         # Phase 2: Execute Deployment (Parallel)
         ui.console.print("\n[bold]Deploying files...[/bold]")
@@ -141,7 +141,7 @@ def deploy(branch: str, force: bool, dry_run: bool):
 
         # Execute Post-Hooks
         if post_hooks:
-            run_hooks(post_hooks, "\nRunning post-deploy hooks", HookContext())
+            run_hooks(post_hooks, "Running post-deploy hooks", HookContext())
 
         # Update global config
         ops.global_config.current_branch = branch

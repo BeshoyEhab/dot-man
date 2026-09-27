@@ -317,19 +317,27 @@ class BranchMixin:
             file_str = str(file_path)
 
             section_name = self._find_section_for_file(file_str)
-            context = HookContext()
+            section = None
             if section_name:
                 try:
                     section = self.get_section(section_name)
-                    first = str(section.paths[0]) if section.paths else ""
-                    context = HookContext(
-                        section_name=section_name,
-                        config_name=Path(first).name if first else "",
-                        config_root=str(Path(first).parent) if first else "",
-                        paths=tuple(str(p) for p in section.paths),
-                    )
                 except Exception:
-                    context = HookContext()
+                    section = None
+            try:
+                branch = self.current_branch
+            except Exception:
+                branch = ""
+            if section is not None:
+                first = str(section.paths[0]) if section.paths else ""
+                context = HookContext(
+                    section_name=section_name or "",
+                    config_name=Path(first).name if first else "",
+                    config_root=str(Path(first).parent) if first else "",
+                    paths=tuple(str(p) for p in section.paths),
+                    branch=branch if isinstance(branch, str) else "",
+                )
+            else:
+                context = HookContext(branch=branch if isinstance(branch, str) else "")
 
             for pattern, hook_name in FILE_TO_HOOK_MAP.items():
                 if pattern in file_str or file_str.endswith(pattern):
@@ -344,8 +352,7 @@ class BranchMixin:
                             hooks_to_run.add(fallback_cmd)
                     break
 
-            if section_name:
-                section = self.get_section(section_name)
+            if section is not None:
                 if section.pre_deploy:
                     hooks_to_run.add(section.pre_deploy)
                 if section.post_deploy:

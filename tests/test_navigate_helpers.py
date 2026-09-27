@@ -165,7 +165,7 @@ class TestRunBranchHooks:
         ops.get_section.return_value = section
         with patch("dot_man.hook_engine.subprocess") as mock_sub:
             mock_sub.run.return_value = MagicMock(returncode=0)
-            with patch("dot_man.cli.navigate_cmd.ui"):
+            with patch("dot_man.hook_engine.ui"):
                 run_branch_hooks(ops, "on_activate")
             mock_sub.run.assert_called_once()
 
@@ -177,7 +177,7 @@ class TestRunBranchHooks:
         ops.get_section.return_value = section
         with patch("dot_man.hook_engine.subprocess") as mock_sub:
             mock_sub.run.return_value = MagicMock(returncode=1, stderr="error msg")
-            with patch("dot_man.cli.navigate_cmd.ui"):
+            with patch("dot_man.hook_engine.ui"):
                 run_branch_hooks(ops, "on_activate")
         # Should not raise, just warn
 
@@ -191,7 +191,7 @@ class TestRunBranchHooks:
         ops.get_section.side_effect = lambda name: {"s1": s1, "s2": s2}[name]
         with patch("dot_man.hook_engine.subprocess") as mock_sub:
             mock_sub.run.return_value = MagicMock(returncode=0)
-            with patch("dot_man.cli.navigate_cmd.ui"):
+            with patch("dot_man.hook_engine.ui"):
                 run_branch_hooks(ops, "on_activate")
         # Should only run once due to dedup
         assert mock_sub.run.call_count == 1

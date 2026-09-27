@@ -109,7 +109,8 @@ Lookup order:
 2. `~/.config/dot-man/hooks/` — machine-local fallback
 
 The token is replaced with the quoted absolute script path; trailing
-args are passed through untouched, and `{placeholders}` still resolve.
+args pass through untouched; `{x}` in the whole string (including args)
+resolves in the earlier placeholder step.
 A missing script fails the hook with a `ConfigurationError` naming the
 script and both searched folders. Scripts gain the exec bit
 automatically, and `../` escapes outside the hooks folder are rejected.

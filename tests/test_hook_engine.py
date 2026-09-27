@@ -88,6 +88,45 @@ def test_run_failure_warns_and_continues():
     assert mock_sub.run.call_count == 2
 
 
+def test_repo_script_takes_precedence_over_global(hook_dirs):
+    repo_hooks, global_hooks = hook_dirs
+    repo_script = repo_hooks / "dup.sh"
+    repo_script.write_text("#!/bin/sh\necho repo\n")
+    repo_script.chmod(0o755)
+    global_script = global_hooks / "dup.sh"
+    global_script.write_text("#!/bin/sh\necho global\n")
+    global_script.chmod(0o755)
+    ctx = HookContext(section_name="nvim")
+    assert resolve_hook("file:dup.sh", ctx) == shlex.quote(str(repo_script))
+
+
+def test_dotdot_traversal_rejected(hook_dirs):
+    repo_hooks, _ = hook_dirs
+    outside = repo_hooks.parent / "evil.sh"
+    outside.write_text("#!/bin/sh\necho evil\n")
+    outside.chmod(0o755)
+    ctx = HookContext(section_name="nvim")
+    with pytest.raises(ConfigurationError):
+        resolve_hook("file:../evil.sh", ctx)
+
+
+def test_run_hooks_passes_env_to_subprocess():
+    import os
+
+    from dot_man.hook_engine import run_hooks
+
+    with patch("dot_man.hook_engine.subprocess") as mock_sub:
+        mock_sub.run.return_value = MagicMock(returncode=0, stderr="")
+        with patch("dot_man.hook_engine.ui"):
+            assert (
+                run_hooks(["echo hi"], "Label", _ctx(), env={"DOT_MAN_HOOK": "yes"})
+                is False
+            )
+    _, kwargs = mock_sub.run.call_args
+    assert kwargs["env"]["DOT_MAN_HOOK"] == "yes"
+    assert kwargs["env"]["PATH"] == os.environ["PATH"]
+
+
 def test_run_reports_failure_for_deploy_style_hooks():
     """Deploy migration: nonzero exits warn instead of vanishing."""
     from dot_man.hook_engine import run_hooks

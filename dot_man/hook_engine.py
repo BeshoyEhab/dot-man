@@ -52,7 +52,7 @@ def find_hook_script(name: str) -> Path | None:
         candidate = hooks_dir / name
         try:
             inside = candidate.resolve().is_relative_to(hooks_dir.resolve())
-        except OSError:
+        except (OSError, RuntimeError):
             continue
         if inside and candidate.is_file():
             return candidate
@@ -93,6 +93,7 @@ def run_hooks(
 ) -> bool:
     """Run shell hook commands; warn and continue on failure.
 
+    context: reserved for future use; execution is context-free.
     Returns True if any hook failed (matches legacy contract).
     """
     if not commands:
