@@ -5,9 +5,11 @@ from __future__ import annotations
 import os
 import re
 import shlex
+import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import ui
 from .constants import DOT_MAN_DIR, HOOK_ALIASES, REPO_DIR
 from .exceptions import ConfigurationError
 
@@ -81,3 +83,44 @@ def resolve_hook(hook: str | None, context: HookContext) -> str | None:
 
     resolved = HOOK_FILE_PATTERN.sub(_replace, resolved)
     return HOOK_FILE_ESCAPE_PATTERN.sub(r"\1", resolved)
+
+
+def run_hooks(
+    commands: list[str],
+    label: str,
+    context: HookContext,
+    env: dict[str, str] | None = None,
+) -> bool:
+    """Run shell hook commands; warn and continue on failure.
+
+    Returns True if any hook failed (matches legacy contract).
+    """
+    if not commands:
+        return False
+    ui.console.print()
+    ui.console.print(f"[bold]{label}...[/bold]")
+    hook_failed = False
+    for cmd in commands:
+        ui.console.print(f"  Exec: [cyan]{cmd}[/cyan]")
+        try:
+            shell = os.environ.get("SHELL", "/bin/sh")
+            result = subprocess.run(
+                [shell, "-c", cmd],
+                capture_output=True,
+                text=True,
+                env={**os.environ, **(env or {})},
+            )
+            if result.returncode != 0:
+                hook_failed = True
+                ui.console.print(
+                    f"  [yellow]⚠ Hook failed (exit code {result.returncode})[/yellow]"
+                )
+                if result.stderr:
+                    for line in result.stderr.splitlines()[:3]:
+                        ui.console.print(f"    [dim]{line}[/dim]")
+        except Exception as e:
+            hook_failed = True
+            ui.console.print(f"  [yellow]⚠ Failed to run command '{cmd}': {e}[/yellow]")
+    if hook_failed:
+        ui.console.print("[dim]  Some hooks failed - continuing anyway[/dim]")
+    return hook_failed

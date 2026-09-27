@@ -163,7 +163,7 @@ class TestRunBranchHooks:
         section.on_activate = "echo hello"
         ops.get_sections.return_value = ["test"]
         ops.get_section.return_value = section
-        with patch("dot_man.cli.navigate_cmd.subprocess") as mock_sub:
+        with patch("dot_man.hook_engine.subprocess") as mock_sub:
             mock_sub.run.return_value = MagicMock(returncode=0)
             with patch("dot_man.cli.navigate_cmd.ui"):
                 run_branch_hooks(ops, "on_activate")
@@ -175,7 +175,7 @@ class TestRunBranchHooks:
         section.on_activate = "false"
         ops.get_sections.return_value = ["test"]
         ops.get_section.return_value = section
-        with patch("dot_man.cli.navigate_cmd.subprocess") as mock_sub:
+        with patch("dot_man.hook_engine.subprocess") as mock_sub:
             mock_sub.run.return_value = MagicMock(returncode=1, stderr="error msg")
             with patch("dot_man.cli.navigate_cmd.ui"):
                 run_branch_hooks(ops, "on_activate")
@@ -189,7 +189,7 @@ class TestRunBranchHooks:
         s2.on_activate = "echo shared"
         ops.get_sections.return_value = ["s1", "s2"]
         ops.get_section.side_effect = lambda name: {"s1": s1, "s2": s2}[name]
-        with patch("dot_man.cli.navigate_cmd.subprocess") as mock_sub:
+        with patch("dot_man.hook_engine.subprocess") as mock_sub:
             mock_sub.run.return_value = MagicMock(returncode=0)
             with patch("dot_man.cli.navigate_cmd.ui"):
                 run_branch_hooks(ops, "on_activate")

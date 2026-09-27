@@ -1,7 +1,7 @@
 """Tests for dot_man/hook_engine.py resolve pipeline."""
 
 import shlex
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -62,3 +62,27 @@ def test_missing_script_raises(hook_dirs):
 
 def test_none_passes_through():
     assert resolve_hook(None, HookContext()) is None
+
+
+def _ctx():
+    return HookContext(section_name="nvim")
+
+
+def test_run_success():
+    from dot_man.hook_engine import run_hooks
+
+    with patch("dot_man.hook_engine.subprocess") as mock_sub:
+        mock_sub.run.return_value = MagicMock(returncode=0, stderr="")
+        with patch("dot_man.hook_engine.ui"):
+            assert run_hooks(["echo hi"], "Label", _ctx()) is False
+    mock_sub.run.assert_called_once()
+
+
+def test_run_failure_warns_and_continues():
+    from dot_man.hook_engine import run_hooks
+
+    with patch("dot_man.hook_engine.subprocess") as mock_sub:
+        mock_sub.run.return_value = MagicMock(returncode=1, stderr="boom")
+        with patch("dot_man.hook_engine.ui"):
+            assert run_hooks(["false", "echo hi"], "Label", _ctx()) is True
+    assert mock_sub.run.call_count == 2

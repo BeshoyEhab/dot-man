@@ -1,8 +1,6 @@
 """Navigate command for dot-man - unified switch + checkout with diff preview."""
 
 import logging
-import os
-import subprocess
 from datetime import datetime
 from pathlib import Path
 
@@ -125,30 +123,9 @@ def _warn_symlinks(save_result: dict) -> None:
 
 def _run_shell_hooks(commands: list[str], label: str) -> bool:
     """Run a list of shell commands as hooks. Returns True if any failed."""
-    if not commands:
-        return False
-    ui.console.print()
-    ui.console.print(f"[bold]{label}...[/bold]")
-    hook_failed = False
-    for cmd in commands:
-        ui.console.print(f"  Exec: [cyan]{cmd}[/cyan]")
-        try:
-            shell = os.environ.get("SHELL", "/bin/sh")
-            result = subprocess.run([shell, "-c", cmd], capture_output=True, text=True)
-            if result.returncode != 0:
-                hook_failed = True
-                ui.console.print(
-                    f"  [yellow]⚠ Hook failed (exit code {result.returncode})[/yellow]"
-                )
-                if result.stderr:
-                    for line in result.stderr.splitlines()[:3]:
-                        ui.console.print(f"    [dim]{line}[/dim]")
-        except Exception as e:
-            hook_failed = True
-            warn(f"Failed to run command '{cmd}': {e}")
-    if hook_failed:
-        ui.console.print("[dim]  Some hooks failed - continuing anyway[/dim]")
-    return hook_failed
+    from ..hook_engine import HookContext, run_hooks
+
+    return run_hooks(commands, label, HookContext())
 
 
 def _prompt_for_symlinks(ops) -> set[Path]:
