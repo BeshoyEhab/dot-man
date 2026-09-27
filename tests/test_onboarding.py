@@ -432,6 +432,15 @@ class TestOfferFirstBranch:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
+def _printed_text(mock_console) -> str:
+    """Extract printable text from console.print calls, unwrapping Panels."""
+    parts = []
+    for call in mock_console.print.call_args_list:
+        for arg in call.args:
+            parts.append(str(getattr(arg, "renderable", arg)))
+    return " ".join(parts)
+
+
 class TestRunOnboarding:
     """Tests for run_onboarding()."""
 
@@ -617,3 +626,21 @@ class TestRunOnboarding:
         mock_init.assert_called_once()
         mock_branch.assert_called_once()
         mock_onboarded.assert_called_once()
+
+    @patch("dot_man.cli.onboarding.mark_onboarded")
+    @patch("dot_man.cli.onboarding._offer_first_branch")
+    @patch("dot_man.cli.onboarding._run_init_direct", return_value=True)
+    @patch("dot_man.cli.onboarding.Prompt.ask", return_value="s")
+    @patch("dot_man.cli.onboarding._console")
+    def test_finale_teaches_navigate_and_help_all(
+        self, mock_console, mock_prompt, mock_init, mock_branch, mock_onboarded
+    ):
+        """Finale panel teaches navigate/help-all, never switch."""
+        from dot_man.cli.onboarding import run_onboarding
+
+        run_onboarding()
+
+        output = _printed_text(mock_console)
+        assert "dot-man navigate" in output
+        assert "help-all" in output
+        assert "dot-man switch" not in output

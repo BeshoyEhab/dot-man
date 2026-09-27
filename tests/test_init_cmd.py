@@ -189,12 +189,12 @@ class TestShowQuickStart:
         assert result.exit_code == 0, result.output
         assert "status" in result.output
 
-    def test_quick_start_shows_switch_command(self, clean_env):
+    def test_quick_start_shows_navigate_command(self, clean_env):
         runner, *_ = clean_env
 
         result = runner.invoke(cli, ["init", "--force", "--no-wizard"])
         assert result.exit_code == 0, result.output
-        assert "switch" in result.output
+        assert "navigate" in result.output
 
     def test_quick_start_shows_config_hint(self, clean_env):
         """Quick-start should show where the config file lives."""

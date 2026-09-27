@@ -423,7 +423,7 @@ def _offer_first_branch() -> None:
         _console.print()
         _console.print(
             "[dim]No problem — you can create one later with:[/dim]\n"
-            "  [bold cyan]dot-man switch <branch-name>[/bold cyan]\n"
+            "  [bold cyan]dot-man navigate <branch-name>[/bold cyan]\n"
         )
         return
 
@@ -461,7 +461,7 @@ def _offer_first_branch() -> None:
     except Exception as exc:
         _console.print(f"[red]Could not create branch: {exc}[/red]")
         _console.print(
-            f"[dim]Try manually: [bold]dot-man switch {branch_name}[/bold][/dim]"
+            f"[dim]Try manually: [bold]dot-man navigate {branch_name}[/bold][/dim]"
         )
 
 
@@ -519,9 +519,9 @@ def run_onboarding() -> None:
                 "You're ready to use dot-man. Some useful commands:\n\n"
                 "  [cyan]dot-man status[/cyan]          — see tracked files\n"
                 "  [cyan]dot-man add <path>[/cyan]      — track a new file\n"
-                "  [cyan]dot-man switch <name>[/cyan]   — switch branch\n"
+                "  [cyan]dot-man navigate <name>[/cyan] — switch configuration\n"
                 "  [cyan]dot-man config defaults[/cyan] — view/change default settings\n"
-                "  [cyan]dot-man --help[/cyan]          — full command list",
+                "  [cyan]dot-man help-all[/cyan]        — full command list",
                 border_style="green",
                 padding=(1, 4),
             )
