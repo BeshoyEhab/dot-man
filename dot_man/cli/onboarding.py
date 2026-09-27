@@ -13,8 +13,6 @@ creates the user's first branch.
 
 from __future__ import annotations
 
-import sys
-
 from rich.console import Console
 from rich.panel import Panel
 from rich.prompt import Confirm, Prompt
@@ -543,4 +541,4 @@ def run_onboarding() -> None:
         # Leave sentinel un-written so they see the tutorial again next time
 
     if interrupted:
-        sys.exit(0)
+        raise SystemExit(0)

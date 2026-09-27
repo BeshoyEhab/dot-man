@@ -6,6 +6,8 @@ init flow, branch creation, and the main run_onboarding orchestrator.
 
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Sentinel functions
 # ──────────────────────────────────────────────────────────────────────────────
@@ -556,7 +558,6 @@ class TestRunOnboarding:
         mock_branch.assert_not_called()
         mock_onboarded.assert_called_once()
 
-    @patch("dot_man.cli.onboarding.sys.exit")
     @patch("dot_man.cli.onboarding.mark_onboarded")
     @patch("dot_man.cli.onboarding._offer_first_branch")
     @patch("dot_man.cli.onboarding._run_init_direct")
@@ -573,16 +574,16 @@ class TestRunOnboarding:
         mock_init,
         mock_branch,
         mock_onboarded,
-        mock_exit,
     ):
         """KeyboardInterrupt during prompt is caught, prints message, exits."""
         from dot_man.cli.onboarding import run_onboarding
 
         # Make Prompt.ask raise KeyboardInterrupt after welcome
         with patch("dot_man.cli.onboarding.Prompt.ask", side_effect=KeyboardInterrupt):
-            run_onboarding()
+            with pytest.raises(SystemExit) as exc_info:
+                run_onboarding()
 
-        mock_exit.assert_called_once_with(0)
+        assert exc_info.value.code == 0
         output = " ".join(str(c) for c in mock_console.print.call_args_list)
         assert "interrupted" in output.lower()
 

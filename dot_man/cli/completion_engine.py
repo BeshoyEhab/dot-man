@@ -393,7 +393,7 @@ def maybe_run_completion(argv: list[str] | None = None) -> None:
     argv = list(sys.argv if argv is None else argv)
     if "--complete" not in argv:
         return
-    sys.exit(run_completion_request(argv))
+    raise SystemExit(run_completion_request(argv))
 
 
 @completes("config set", param="value")

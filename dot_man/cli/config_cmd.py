@@ -130,9 +130,8 @@ def config_get(key: str):
             if isinstance(current, dict) and part in current:
                 current = current[part]
             else:
-                ui.console.print(f"[red]Key not found:[/red] {key}")
                 ui.hint("Run 'dot-man config list' to see all available keys")
-                raise SystemExit(1)
+                error(f"Key not found: {key}")
 
         if isinstance(current, dict):
             ui.console.print(f"[dim]Section '{key}' contains:[/dim]")

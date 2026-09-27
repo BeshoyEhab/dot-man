@@ -7,7 +7,7 @@ import subprocess
 import click
 
 from .. import ui
-from .common import success, warn
+from .common import ExitCode, error, success, warn
 from .interface import cli as main
 
 # Package manager detection: command → (install_cmd, update_cmd)
@@ -163,16 +163,17 @@ def bootstrap(list_only: bool, pm: str | None, update: bool, packages: tuple[str
     if not pm:
         pm = _detect_package_manager()
         if not pm:
-            ui.console.print("[red]No supported package manager found.[/red]")
-            ui.console.print(
-                "Supported: brew, apt, dnf, pacman, zypper, nix-env, xbps-install, pkg"
+            error(
+                "No supported package manager found. "
+                "Supported: brew, apt, dnf, pacman, zypper, nix-env, "
+                "xbps-install, pkg. Use --pm to specify one manually.",
+                exit_code=ExitCode.ERROR,
             )
-            ui.console.print("Use --pm to specify one manually.")
-            raise SystemExit(1)
+            return
 
     if pm not in PACKAGE_MANAGERS:
-        ui.console.print(f"[red]Unknown package manager: {pm}[/red]")
-        raise SystemExit(1)
+        error(f"Unknown package manager: {pm}", exit_code=ExitCode.ERROR)
+        return
 
     pm_info = PACKAGE_MANAGERS[pm]
     ui.console.print(f"[bold]Using package manager:[/bold] [cyan]{pm}[/cyan]")

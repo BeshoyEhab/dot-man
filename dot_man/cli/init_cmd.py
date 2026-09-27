@@ -3,7 +3,6 @@
 import logging
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 
 import click
@@ -14,7 +13,7 @@ from ..config_detector import ConfigDetector, get_auto_hooks_for_config
 from ..constants import BACKUPS_DIR, DOT_MAN_DIR, FILE_PERMISSIONS, REPO_DIR
 from ..core import GitManager
 from ..utils import is_git_installed
-from .common import AliasedCommand, error, handle_exception, success, warn
+from .common import AliasedCommand, ExitCode, error, handle_exception, success, warn
 from .interface import cli as main
 
 
@@ -58,7 +57,7 @@ def init(
             "Repository already initialized. Reinitialize? (This will DELETE all data)"
         ):
             ui.info("Aborted.")
-            sys.exit(1)
+            raise SystemExit(ExitCode.ERROR)
 
         shutil.rmtree(DOT_MAN_DIR)
 

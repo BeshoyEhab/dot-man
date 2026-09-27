@@ -1,6 +1,5 @@
 """Centralized UI module for dot-man using Rich."""
 
-import sys
 from typing import Any, Optional
 
 from rich.console import Console
@@ -57,10 +56,14 @@ def warn(message: str) -> None:
 
 
 def error(message: str, exit_code: int = 1) -> None:
-    """Print an error message and optionally exit."""
+    """Print an error message and optionally exit.
+
+    Exits via ``raise SystemExit`` (never ``sys.exit``) so exit codes
+    stay consistent and testable across all commands.
+    """
     error_console.print(f"[error]✗ Error:[/error] {message}")
     if exit_code != 0:
-        sys.exit(exit_code)
+        raise SystemExit(exit_code)
 
 
 def confirm(question: str, default: bool = False) -> bool:

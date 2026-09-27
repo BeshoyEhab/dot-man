@@ -226,6 +226,5 @@ def doctor():
         ui.console.print()
         error(
             f"{checks_failed} check(s) failed. See above for details.",
-            exit_code=0,
+            exit_code=1,
         )
-        raise SystemExit(1)

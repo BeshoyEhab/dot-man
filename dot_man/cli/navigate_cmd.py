@@ -19,6 +19,7 @@ from .common import (
     complete_switch_args,
     error,
     get_secret_handler,
+    handle_exception,
     require_init,
     success,
     sync_shared_sections,
@@ -312,14 +313,7 @@ def _navigate_impl(
             )
 
     except Exception as e:
-        from ..exceptions import ErrorDiagnostic
-
-        ui.console.print()
-        ui.console.print(
-            f"[red bold]{ErrorDiagnostic.from_exception(e).title}[/red bold]"
-        )
-        ui.console.print(f"[red]{ErrorDiagnostic.from_exception(e).details}[/red]")
-        raise SystemExit(1)
+        handle_exception(e, "Navigate")
 
 
 def _handle_commit_navigate(

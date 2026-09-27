@@ -2,6 +2,7 @@
 
 import logging
 import re
+from enum import IntEnum
 from functools import wraps
 from typing import Callable
 
@@ -24,6 +25,27 @@ from .completions import (  # noqa: F401 — re-exports for backward compat
     complete_tags,
     complete_template_keys,
 )
+
+
+class ExitCode(IntEnum):
+    """Canonical process exit codes for all dot-man commands.
+
+    All error paths must exit via ``raise SystemExit(ExitCode.X)``,
+    ``error(..., exit_code=...)``, or ``handle_exception()`` — never
+    bare ``sys.exit()`` — so codes stay consistent and testable.
+    """
+
+    OK = 0
+    ERROR = 1
+    USAGE = 2
+    CONFIG = 7
+    INTERRUPTED = 130
+
+
+HAPPY_PATH_COMMANDS = ("init", "add", "status", "navigate", "deploy", "doctor")
+"""Commands shown by `dot-man help` and bare `--help`; everything else
+lives in `dot-man help-all`. Aliases and deprecated shims are never
+listed in the short view."""
 
 
 def error(message: str, exit_code: int = 1) -> None:
@@ -52,7 +74,7 @@ def handle_exception(exc: BaseException, context: str = "Operation") -> None:
     if isinstance(exc, KeyboardInterrupt):
         ui.console.print()
         warn("Operation cancelled by user")
-        raise SystemExit(130)
+        raise SystemExit(ExitCode.INTERRUPTED)
 
     diagnostic = ErrorDiagnostic.from_exception(exc)  # type: ignore[arg-type]
     ui.console.print()
@@ -60,7 +82,7 @@ def handle_exception(exc: BaseException, context: str = "Operation") -> None:
     ui.console.print(f"[red]{diagnostic.details}[/red]")
     ui.console.print()
     ui.console.print(f"[dim]💡 {diagnostic.suggestion}[/dim]")
-    raise SystemExit(1)
+    raise SystemExit(ExitCode.ERROR)
 
 
 class AliasedCommand(click.Command):
@@ -109,6 +131,50 @@ class DotManGroup(click.Group):
             ui.warn(f"Did you mean '{suggestion}'?")
 
         ctx.exit(2)
+
+    def format_commands(
+        self, ctx: click.Context, formatter: click.HelpFormatter
+    ) -> None:
+        """List happy-path commands only.
+
+        Aliases and deprecated shims stay hidden here; `help-all` shows
+        the exhaustive listing via the base-class implementation.
+        """
+        rows = []
+        for name in HAPPY_PATH_COMMANDS:
+            cmd = self.get_command(ctx, name)
+            if cmd is None or cmd.hidden:
+                continue
+            rows.append((name, cmd))
+
+        if rows:
+            limit = formatter.width - 6 - max(len(row[0]) for row in rows)
+            with formatter.section("Commands"):
+                formatter.write_dl(
+                    [(name, cmd.get_short_help_str(limit)) for name, cmd in rows]
+                )
+        canonical = {cmd.name for cmd in self.commands.values()}
+        formatter.write_text(
+            f"  Run 'dot-man help-all' to see all {len(canonical)} commands."
+        )
+
+    def invoke(self, ctx):
+        """Invoke a subcommand with centralized error handling.
+
+        Any exception escaping a subcommand is routed through
+        :func:`handle_exception` for consistent diagnostics and exit
+        codes. Click control-flow exceptions (``ClickException``,
+        ``Abort``, ``Exit``) and ``SystemExit`` pass through untouched
+        so ``--help``, usage errors, and deliberate exits keep working.
+        """
+        try:
+            return super().invoke(ctx)
+        except (SystemExit, click.ClickException, click.Abort, click.exceptions.Exit):
+            raise
+        except KeyboardInterrupt as e:
+            handle_exception(e)
+        except Exception as e:
+            handle_exception(e)
 
 
 def sync_shared_sections(ops) -> None:
@@ -182,7 +248,7 @@ def require_init(func):
             ui.console.print()
             ui.console.print("[dim]💡 Run 'dot-man init' to get started![/dim]")
             ui.console.print()
-            raise SystemExit(1)
+            raise SystemExit(ExitCode.ERROR)
 
         if not REPO_DIR.exists() or not (REPO_DIR / ".git").exists():
             error("Repository not initialized. Run 'dot-man init' first.", exit_code=1)
