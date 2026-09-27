@@ -17,14 +17,14 @@ from dot_man.section import Section
 
 @pytest.fixture
 def hook_dirs(tmp_path):
-    """Fake repo hooks dir + global hooks dir, wired into dot_man.hooks."""
+    """Fake repo hooks dir + global hooks dir, wired into dot_man.hook_engine."""
     repo_hooks = tmp_path / "repo" / "hooks"
     global_hooks = tmp_path / "global-hooks"
     repo_hooks.mkdir(parents=True)
     global_hooks.mkdir(parents=True)
     with (
-        patch("dot_man.hooks.REPO_DIR", tmp_path / "repo"),
-        patch("dot_man.hooks.HOOKS_DIR", global_hooks),
+        patch("dot_man.hook_engine.REPO_DIR", tmp_path / "repo"),
+        patch("dot_man.hook_engine.HOOKS_DIR", global_hooks),
     ):
         yield repo_hooks, global_hooks
 
