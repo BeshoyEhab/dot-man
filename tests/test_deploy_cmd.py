@@ -577,3 +577,18 @@ pre_deploy = "echo 'pre-hook ran'"
         assert result.exit_code == 0
         assert "Error:" in result.output
         assert "Failed to copy" in result.output
+
+
+class TestDeployNextSteps:
+    def test_deploy_suggests_next_steps(self, clean_env):
+        """Deploy ends with happy-path next steps."""
+        runner, dot_man_dir, repo_dir, global_toml, home = clean_env
+        _init_repo(repo_dir)
+        _setup_global_toml(global_toml)
+        _setup_bashrc_section(repo_dir, content='alias ll="ls -la"\n')
+
+        result = runner.invoke(cli, ["deploy", "main", "--force"])
+
+        assert result.exit_code == 0, result.output
+        assert "Next Steps" in result.output
+        assert "dot-man status" in result.output

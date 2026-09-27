@@ -148,6 +148,12 @@ def deploy(branch: str, force: bool, dry_run: bool):
         ops.global_config.save()
 
         success(f"Deployment complete! ({deployed} files)")
+        ui.next_steps(
+            [
+                "Run [cyan]dot-man status[/cyan] to verify the deployment",
+                "Run [cyan]dot-man navigate <branch>[/cyan] to switch configurations",
+            ]
+        )
 
     except DotManError as e:
         error(str(e), e.exit_code)

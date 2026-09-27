@@ -599,6 +599,23 @@ def test_show_next_steps_mentions_navigate():
     with patch("dot_man.cli.init_cmd.ui") as mock_ui:
         with patch("dot_man.cli.init_cmd.status_cmd") as mock_status:
             init_cmd._wizard_show_next_steps([("~/.bashrc", "bashrc")])
-    printed = " ".join(str(c) for c in mock_ui.console.print.call_args_list)
-    assert "navigate" in printed
+    steps = mock_ui.next_steps.call_args[0][0]
+    assert any("navigate" in step for step in steps)
     mock_status.status.callback.assert_called_once_with(False, False, False)
+
+
+def test_show_next_steps_uses_next_steps_block():
+    """Wizard finale renders through the shared next-steps block."""
+    from dot_man.cli import init_cmd
+
+    with patch("dot_man.cli.init_cmd.ui") as mock_ui:
+        with patch("dot_man.cli.init_cmd.status_cmd"):
+            init_cmd._wizard_show_next_steps([("~/.bashrc", "bashrc")])
+    steps = mock_ui.next_steps.call_args[0][0]
+    assert any("dot-man status" in step for step in steps)
+
+    with patch("dot_man.cli.init_cmd.ui") as mock_ui:
+        with patch("dot_man.cli.init_cmd.status_cmd"):
+            init_cmd._wizard_show_next_steps([])
+    steps = mock_ui.next_steps.call_args[0][0]
+    assert any("dot-man add" in step for step in steps)

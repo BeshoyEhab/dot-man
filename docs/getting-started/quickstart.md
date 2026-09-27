@@ -1,5 +1,8 @@
 # Quick Start
 
+The happy path is four steps: `init` → `add` → `status` → `navigate`.
+Every command points at the next one, so you never land on a dead end.
+
 ## 1. Initialize
 
 ```bash

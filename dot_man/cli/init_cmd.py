@@ -400,25 +400,21 @@ def _wizard_show_next_steps(files_to_add: list):
     ui.console.print()
 
     if files_to_add:
-        ui.console.print("[bold]Next steps:[/bold]")
-        ui.console.print(
-            "  1. [cyan]dot-man status[/cyan]            - View your tracked files"
-        )
-        ui.console.print(
-            "  2. [cyan]dot-man navigate work[/cyan]     - Create a work configuration branch"
-        )
-        ui.console.print(
-            "  3. [cyan]dot-man add <path>[/cyan]       - Track more files"
+        ui.next_steps(
+            [
+                "Run [cyan]dot-man status[/cyan] to view your tracked files",
+                "Run [cyan]dot-man navigate work[/cyan] to create a work configuration branch",
+                "Run [cyan]dot-man add <path>[/cyan] to track more files",
+            ]
         )
     else:
-        ui.console.print("[bold]Get started:[/bold]")
-        ui.console.print(
-            "  [cyan]dot-man add ~/.bashrc[/cyan]        - Add files to track"
+        ui.next_steps(
+            [
+                "Run [cyan]dot-man add ~/.bashrc[/cyan] to add files to track",
+                "Run [cyan]dot-man edit[/cyan] to edit config manually",
+                "Run [cyan]dot-man status[/cyan] to view status",
+            ]
         )
-        ui.console.print(
-            "  [cyan]dot-man edit[/cyan]                 - Edit config file"
-        )
-        ui.console.print("  [cyan]dot-man status[/cyan]               - View status")
 
     ui.console.print()
     ui.console.print("[dim]💡 Run 'dot-man help-all' to see all commands[/dim]")

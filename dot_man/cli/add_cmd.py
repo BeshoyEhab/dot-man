@@ -176,8 +176,12 @@ def add(
         if inherits:
             ui.console.print(f"  Inherits: {', '.join(inherits)}")
 
-        ui.console.print()
-        ui.console.print("[dim]Run 'dot-man switch <branch>' to commit changes.[/dim]")
+        ui.next_steps(
+            [
+                "Run [cyan]dot-man status[/cyan] to verify your tracked files",
+                "Run [cyan]dot-man navigate work[/cyan] to start a work configuration",
+            ]
+        )
 
     except DotManError as e:
         error(str(e), e.exit_code)

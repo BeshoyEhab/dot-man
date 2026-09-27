@@ -214,6 +214,16 @@ def status(verbose: bool, secrets: bool, json_output: bool):
             ui.console.print()
             ui.console.print("[yellow]Repository has uncommitted changes.[/yellow]")
 
+        # Next steps, only when there is something to act on
+        pending = summary["modified"] + summary["new"] + summary["deleted"]
+        if pending:
+            ui.next_steps(
+                [
+                    'Run [cyan]dot-man save "message"[/cyan] to snapshot your changes',
+                    "Run [cyan]dot-man navigate <branch>[/cyan] to save and switch",
+                ]
+            )
+
     except DotManError as e:
         error(str(e), e.exit_code)
     except KeyboardInterrupt:

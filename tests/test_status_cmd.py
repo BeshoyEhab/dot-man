@@ -232,3 +232,38 @@ class TestStatusExceptions:
         ):
             result = runner.invoke(cli, ["status"])
         assert result.exit_code != 0
+
+
+class TestStatusNextSteps:
+    def test_hints_when_changes_exist(self, runner, mock_ops):
+        """Status with pending changes points at save/navigate."""
+        with patch("dot_man.operations.get_operations", return_value=mock_ops):
+            result = runner.invoke(cli, ["status"])
+
+        assert result.exit_code == 0, result.output
+        assert "Next Steps" in result.output
+        assert "dot-man save" in result.output
+        assert "dot-man navigate" in result.output
+
+    def test_silent_when_clean(self, runner, mock_ops):
+        """Status with no changes stays silent."""
+        from unittest.mock import MagicMock
+
+        clean_path = MagicMock()
+        clean_path.__str__ = lambda self: "/home/user/.bashrc"
+        mock_ops.get_detailed_status.return_value = [
+            {"section": "shell", "local_path": clean_path, "status": "IDENTICAL"},
+        ]
+        with patch("dot_man.operations.get_operations", return_value=mock_ops):
+            result = runner.invoke(cli, ["status"])
+
+        assert result.exit_code == 0, result.output
+        assert "Next Steps" not in result.output
+
+    def test_silent_in_json_mode(self, runner, mock_ops):
+        """Machine-readable output never carries hints."""
+        with patch("dot_man.operations.get_operations", return_value=mock_ops):
+            result = runner.invoke(cli, ["status", "--json"])
+
+        assert result.exit_code == 0, result.output
+        assert "Next Steps" not in result.output

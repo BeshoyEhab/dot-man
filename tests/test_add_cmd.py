@@ -42,6 +42,9 @@ def clean_env(tmp_path):
         patch("dot_man.cli.interface.DOT_MAN_DIR", dot_man_dir),
         patch("dot_man.cli.common.DOT_MAN_DIR", dot_man_dir),
         patch("dot_man.cli.common.REPO_DIR", repo_dir),
+        # add_cmd binds REPO_DIR at import: without this, add copies
+        # files into the real repo instead of the sandbox.
+        patch("dot_man.cli.add_cmd.REPO_DIR", repo_dir),
         patch.dict(os.environ, {"HOME": str(home)}),
     ]
 
@@ -207,3 +210,33 @@ class TestAddOptions:
         result = runner.invoke(cli, ["add", str(test_file), "--section", "bash"])
 
         assert result.exit_code in [0, 1, 7]
+
+
+class TestAddNextSteps:
+    def test_add_suggests_next_steps(self, clean_env):
+        """Add ends with happy-path next steps, never switch."""
+        runner, dot_man_dir, repo_dir, global_toml, home = clean_env
+
+        dot_man_dir.mkdir(parents=True, exist_ok=True)
+        global_toml.write_text("[defaults]\n")
+
+        from git import Repo
+
+        repo = Repo.init(repo_dir)
+        with repo.config_writer() as cw:
+            cw.set_value("user", "name", "Test")
+            cw.set_value("user", "email", "test@test.com")
+        (repo_dir / "test.txt").write_text("test")
+        repo.index.add(["test.txt"])
+        repo.index.commit("Initial")
+
+        test_file = home / ".bashrc"
+        test_file.write_text("# bashrc\n")
+
+        result = runner.invoke(cli, ["add", str(test_file), "--section", "bash"])
+
+        assert result.exit_code == 0, result.output
+        assert "Next Steps" in result.output
+        assert "dot-man status" in result.output
+        assert "dot-man navigate" in result.output
+        assert "dot-man switch" not in result.output
