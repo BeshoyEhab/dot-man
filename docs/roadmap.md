@@ -23,13 +23,17 @@
 
 ### User Experience
 
-- [ ] Consistent exit codes — replace `sys.exit(1)` / `raise SystemExit(1)` mix
-- [ ] Centered error handling — route all commands through `handle_exception()`
+- [x] Consistent exit codes — `ExitCode` enum, `sys.exit()` eliminated ✅
+- [x] Centralized error handling — `DotManGroup.invoke()` routes all commands through `handle_exception()` ✅
 
 ### Extensibility
 
-- [ ] Hook scripts directory — support executing custom hook scripts from a folder
+- [x] Hook scripts directory — `file:<script> [args]` in section hooks, repo `hooks/` + global fallback ✅
 - [ ] Plugin API — extension mechanism for third-party tools
+
+### Simplification
+
+- [x] Two-level help — `help`/`--help` show happy-path commands, `help-all` shows everything, man page ✅
 
 ---
 

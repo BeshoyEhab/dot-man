@@ -1,474 +1,23 @@
 # AGENTS.md - Guidelines for AI Models
 
-This file contains instructions for AI models working on the dot-man project.
+Instructions for AI models working on dot-man. Keep this file in sync with
+`TODO.md` and `docs/roadmap.md` — numbers and priorities live there; this file
+holds the rules. You may self-update it when versions bump, patterns change,
+or priorities shift (see "AI Autonomy" at the bottom).
 
 ---
 
-## CI/CD
+## Project Snapshot
 
-GitHub Actions workflows use `uv` (Astral) for Python package management and dependency resolution. The `uv.lock` file is committed to ensure reproducible builds.
+**dot-man** — git-powered dotfile manager; each branch is a configuration
+(work, personal, minimal, server).
 
-- **Package install**: `uv sync --extra dev` (installs project + dev dependencies)
-- **Run commands**: `uv run <command>` (runs in the uv-managed virtual environment)
-- **Build**: `uv build` (used in publish workflow)
+- **Language**: Python 3.10+ · **CLI**: Click · **Tests**: pytest · **Packages**: `uv`
+- **Version**: 1.4.0 · **Tests**: 1779 passing · **Coverage**: 86% · **Docs**: mkdocs Material on GitHub Pages
+- **CI**: GitHub Actions with `uv` (`uv.lock` committed); pre-commit runs Black, ruff, mypy; `uv build` in the publish workflow
 
----
-
-## Project Overview
-
-**dot-man** is a dotfile manager with git-powered branching. Each branch represents a different configuration (work, personal, minimal, server).
-
-- **Language**: Python 3.10+
-- **CLI Framework**: Click
-- **Testing**: pytest
-- **Current Version**: 1.2.0 (Stable)
-
----
-
-## File Update Checklist
-
-When making changes, always update these files as needed:
-
-| File              | When to Update                                             |
-| ----------------- | ---------------------------------------------------------- |
-| `CHANGELOG.md`    | Add new features, bug fixes, changes under current version |
-| `TODO.md`         | Mark completed items with ✅, add new items                |
-| `README.md`       | Update command tables, add examples, features, version, test coverage, and technologies used |
-| `docs/roadmap.md` | Update version status, add completed items                 |
-| `pyproject.toml`  | Bump version for releases                                  |
-| `AGENTS.md`       | Add new guidelines as project evolves                      |
-
----
-
-## Pre-Push Quality Checklist
-
-**Before EVERY commit/push, run ALL checks in order. All MUST pass with zero errors.**
-
-```bash
-# 1. Format code
-black dot_man/ tests/
-
-# 2. Lint (must be 0 errors)
-ruff check dot_man/ tests/
-
-# 3. Type check (must be 0 errors)
-mypy dot_man/ --ignore-missing-imports
-
-# 4. Run tests (all must pass)
-pytest tests/ -v
-
-# 5. Coverage check (must not decrease)
-pytest --cov=dot_man --cov-report=term
-```
-
-**If ANY check fails, fix before committing. Do NOT push with known lint, type, or test errors.**
-
-### Pre-commit Hooks
-
-The project uses `pre-commit` for automatic enforcement. After cloning:
-
-```bash
-pip install pre-commit
-pre-commit install
-```
-
-This runs Black, ruff, and mypy automatically on every `git commit`.
-
----
-
-## Making Commits
-
-### Commit Message Format
-
-```
-<type>(<scope>): <subject>
-
-<body>
-
-<footer>
-```
-
-**Types:**
-
-- `feat` - New feature
-- `fix` - Bug fix
-- `perf` - Performance improvement
-- `docs` - Documentation
-- `test` - Tests
-- `refactor` - Code refactoring
-- `chore` - Maintenance
-
-**Examples:**
-
-```
-feat(diff): add dot-man diff command
-
-- Show uncommitted changes
-- Compare branches with --branch flag
-- Show staged changes
-
-Closes #123
-```
-
----
-
-## Shell Completions
-
-When adding new CLI commands, **ALWAYS add shell completions**:
-
-1. Import completion functions from `dot_man.cli.common`:
-
-```python
-from .common import complete_branches, complete_tags, complete_commits, complete_profiles, complete_template_keys
-```
-
-2. Add `shell_complete` to click arguments:
-
-```python
-@click.argument("branch", shell_complete=complete_branches)
-@click.option("--commit", "-c", shell_complete=complete_commits)
-```
-
-3. Add new completion functions if needed in `common.py`:
-
-```python
-def complete_new_thing(ctx, param, incomplete):
-    """Shell completion callback for new thing."""
-    try:
-        # Implementation...
-    except Exception:
-        return []
-```
-
----
-
-## Working with Tests
-
-### ✅ Strong Tests Requirements
-
-When writing tests, follow these guidelines:
-
-1. **Use real git repositories** - Create actual `git.Repo` instances
-2. **Test actual file operations** - Use `tmp_path` to create real files
-3. **Test real CLI commands** - Use `CliRunner` from Click
-4. **Assert real behavior** - Check actual values, not just existence
-5. **Clean up after tests** - Use fixtures properly
-6. **Never write existence-only tests** - Tests that only check `hasattr()`, `callable()`, `is not None`, or just import a module are NOT acceptable
-
-### Example of Strong Test
-
-```python
-def test_git_manager_create_branch(self, tmp_path):
-    """Test creating a branch - REAL test."""
-    from dot_man.core import GitManager
-    from git import Repo
-
-    # Create real git repo
-    repo_dir = tmp_path / "repo"
-    repo_dir.mkdir()
-    repo = Repo.init(repo_dir)
-
-    # Configure git
-    with repo.config_writer() as config:
-        config.set_value("user", "name", "Test")
-        config.set_value("user", "email", "test@test.com")
-
-    # Create initial commit
-    (repo_dir / "test.txt").write_text("test")
-    repo.index.add(["test.txt"])
-    repo.index.commit("Initial")
-
-    # Test GitManager
-    gm = GitManager(repo_dir)
-    gm.create_branch("new-branch")
-
-    assert "new-branch" in gm.list_branches()  # REAL assertion
-```
-
-### ❌ Weak Tests to Avoid
-
-```python
-def test_weak():  # DON'T DO THIS
-    """Weak test - just checks if method exists."""
-    from dot_man.core import GitManager
-    assert hasattr(GitManager, "create_branch")  # This is useless
-
-def test_also_weak():  # DON'T DO THIS
-    """Weak test - no real assertions."""
-    from dot_man.config import Section
-    section = Section(name="test", paths=[], repo_base="test")
-    _ = section.name  # Just accessing, no assertion
-
-def test_import_check():  # DON'T DO THIS
-    """Weak test - just checks if something is importable/callable."""
-    from dot_man.interactive import run_global_wizard
-    assert callable(run_global_wizard)  # This tests Python, not our code
-```
-
-### Test File Location
-
-- Put tests in `tests/test_<module_name>.py`
-- Use descriptive class names: `TestGitManagerBasic`, `TestSectionClass`
-- Group related tests in classes
-
----
-
-## Running Tests
-
-### Using pipx (recommended on Linux systems)
-
-```bash
-# Install dev dependencies with pipx
-pipx install -e ".[dev]"
-
-# Run all tests
-pipx run pytest tests/ -v
-
-# Run with coverage
-PYTHONPATH=. pipx run pytest tests/ --cov=dot_man --cov-report=term
-
-# Run specific test file
-PYTHONPATH=. pipx run pytest tests/test_core.py -v
-```
-
-### Using pip with --break-system-packages (alternative)
-
-```bash
-pip install -e ".[dev]" --break-system-packages
-pytest tests/ -v
-```
-
-### Standard pytest commands
-
-```bash
-# Run all tests
-pytest tests/ -v
-
-# Run with coverage
-pytest --cov=dot_man --cov-report=term
-
-# Run specific test file
-pytest tests/test_core.py -v
-
-# Run with verbose output
-pytest -vv
-```
-
-### Important: Tests directory requires **init**.py
-
-The `tests/` directory must contain a `__init__.py` file to be a proper package:
-
-```
-tests/
-├── __init__.py      # REQUIRED - makes tests a package
-├── conftest.py
-├── utils.py
-└── test_*.py
-```
-
-Without `tests/__init__.py`, pytest will fail with `ModuleNotFoundError`.
-
----
-
-## Code Style
-
-- **Format**: Black (line length 88)
-- **Type Checking**: mypy (`--ignore-missing-imports`, 0 errors required)
-- **Linting**: ruff (rules: E, F, W, I — configured in `pyproject.toml`)
-
-```bash
-# Format code
-black dot_man/ tests/
-
-# Lint
-ruff check dot_man/ tests/
-
-# Auto-fix lint issues
-ruff check dot_man/ tests/ --fix
-
-# Type check
-mypy dot_man/ --ignore-missing-imports
-```
-
----
-
-## Scenario Responses
-
-### When adding a new CLI command:
-
-1. Create `dot_man/cli/<command>_cmd.py`
-2. Import in `dot_man/cli/__init__.py`
-3. Add shell completions in `dot_man/cli/common.py`
-4. Add tests in `tests/test_<command>_cmd.py`
-5. Update `README.md` command tables
-6. Update `CHANGELOG.md`
-7. **Run the full Pre-Push Quality Checklist**
-
-### When adding a new module:
-
-1. Create `dot_man/<module>.py`
-2. Add `__all__` exports
-3. Add type hints throughout
-4. Add tests in `tests/test_<module>.py`
-5. Update `CHANGELOG.md`
-6. **Run the full Pre-Push Quality Checklist**
-
-### When fixing a bug:
-
-1. Write a test that reproduces the bug first
-2. Fix the bug
-3. Verify the test passes
-4. Update `CHANGELOG.md` if significant
-5. **Run the full Pre-Push Quality Checklist**
-
-### When adding a feature:
-
-1. Implement the feature
-2. Write tests for it
-3. Update `CHANGELOG.md`
-4. Update `TODO.md` to mark complete if applicable
-5. **Run the full Pre-Push Quality Checklist**
-
----
-
-## Version Bump Checklist
-
-When releasing a new version:
-
-1. ✅ Update `pyproject.toml` version (e.g., 0.8.0 → 0.9.0)
-2. ✅ Update `dot_man/__init__.py` version
-3. ✅ Update `CHANGELOG.md` - move "Unreleased" to version date
-4. ✅ Update `TODO.md` - mark completed items with ✅
-5. ✅ Update `README.md` - update "What's New" section, version metrics, technologies, and test coverage
-6. ✅ Update `docs/roadmap.md` - update version status
-7. ✅ Run full quality gate:
-   - `black --check dot_man/ tests/`
-   - `ruff check dot_man/ tests/`
-   - `mypy dot_man/ --ignore-missing-imports`
-   - `pytest tests/ -v`
-   - `pytest --cov=dot_man --cov-report=term`
-8. ✅ Create git commit and tag
-
----
-
-## Section Config Fields
-
-When working with Section config, here are the available fields:
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `paths` | `list[str]` | required | File/directory paths to track |
-| `repo_base` | `str` | auto | Base directory name in repo |
-| `repo_path` | `str` | None | Explicit repo path for single files |
-| `secrets_filter` | `bool` | `true` | Enable secret detection |
-| `update_strategy` | `str` | `"replace"` | `"replace"`, `"rename_old"`, `"ignore"` |
-| `deploy_method` | `str` | `"copy"` | `"copy"` or `"symlink"` |
-| `include` | `list[str]` | `[]` | Glob patterns to include |
-| `exclude` | `list[str]` | `[]` | Glob patterns to exclude |
-| `pre_deploy` | `str` | None | Command to run before deploy |
-| `post_deploy` | `str` | None | Command to run after deploy |
-| `on_activate` | `str` | None | Command when branch is activated |
-| `on_deactivate` | `str` | None | Command when branch is deactivated |
-| `inherits` | `list[str]` | `[]` | Template names to inherit |
-| `follow_symlinks` | `bool` | `false` | Follow symlinks during traversal |
-
-### Quickshell Config Example
-
-Quickshell is managed through the default hooks system — users define
-`on_activate` and `on_deactivate` in their section config:
-
-```toml
-[quickshell-ii]
-paths = ["~/.config/quickshell/ii"]
-deploy_method = "copy"
-post_deploy = "quickshell_reload"
-on_deactivate = "killall qs 2>/dev/null || true"
-on_activate = "qs -c ii &"
-```
-
-The `quickshell_reload`, `quickshell_restart`, and `quickshell_validate`
-hook aliases are available in `HOOK_ALIASES` and can be referenced by name.
-The `{qs_config}` placeholder is resolved automatically from the section's
-paths when using these aliases via `Section._resolve_hook()`.
-
----
-
-## Project Structure
-
-```
-dot-man/
-├── dot_man/              # Main package
-│   ├── cli/             # CLI commands
-│   │   ├── main.py      # Entry point
-│   │   ├── interface.py # CLI interface
-│   │   ├── common.py    # Common utilities & completions
-│   │   └── *_cmd.py     # Individual commands
-│   ├── core.py          # GitManager
-│   ├── operations.py   # Business logic
-│   ├── config.py       # Config classes
-│   ├── secrets.py      # Secret detection
-│   ├── vault.py       # Secret storage
-│   └── ...
-├── tests/               # Test files
-├── scripts/            # Scripts & completions
-└── docs/              # Documentation
-```
-
----
-
-## Key Commands
-
-| Command            | Description           |
-| ------------------ | --------------------- |
-| `dot-man init`     | Initialize repository |
-| `dot-man navigate` | Switch branches       |
-| `dot-man status`   | Show status           |
-| `dot-man audit`    | Scan for secrets      |
-| `dot-man diff`     | Show changes          |
-| `dot-man log`      | Show commit history   |
-| `dot-man template` | Template variables    |
-| `dot-man profile`  | Machine profiles      |
-
----
-
-## Updating This File & AI Autonomy
-
-AI models working on this project have the authority to self-update this `AGENTS.md` file whenever:
-
-1. The project version bumps or release milestones are completed.
-2. New coding patterns, guidelines, or shell completion callbacks are established.
-3. Project requirements, checklists, or active development priorities change.
-
-When updating `AGENTS.md`, ensure the checklist, key commands, and priorities are kept in sync with `TODO.md` and `docs/roadmap.md`.
-
----
-
-## Active Project Priorities
-
-AI models should focus on the following core needs of the project:
-
-### 1. Hardening & Release Verification (v1.x Stable)
-
-- **Improve Test Coverage to 80%+**: Add unit and integration tests to low-coverage modules:
-  - `audit_cmd.py`, `log_cmd.py`, `tag_cmd.py`, `switch_cmd.py`.
-- **Docs Generation**: Set up and host a complete documentation site (e.g., using `mkdocs` or `sphinx`). ✅
-- **Release Verification**: Test PyPI package builds and installation.
-
-### 2. Extensibility (v1.2.0 - Plugin System)
-
-- **Custom Secret Patterns**: Allow users to define custom regex patterns for secret detection in their config. ✅
-- **Hook Scripts Directory**: Support executing custom hook scripts located in a specific folder.
-- **Plugin API**: Create an extension mechanism for third-party tools (e.g., integrating `pro-mgr`).
-
-### 3. v1.2.0 - Completed
-
-- **Symlink Mode**: Option to symlink files instead of copying them (`deploy_method = "symlink"`). ✅
-- **Quickshell Hook Aliases**: Built-in `quickshell_reload`, `quickshell_restart`, and `quickshell_validate` hook aliases with `{qs_config}` placeholder resolution. ✅
-
-### 4. Future Enhancements (v2.0+)
-
-- **Cloud sync backends**: Native support for S3, Google Drive, and Dropbox.
-- **YAML Config Auto-Preservation**: Ensure changes to YAML configs are saved back as YAML, not converted to TOML.
+Canonical command vocabulary: **`navigate`** (alias `nav`) switches
+configurations. `switch`/`checkout` are deprecated shims, kept until v2.0.
 
 ---
 
@@ -480,60 +29,315 @@ AI models should focus on the following core needs of the project:
 git clone https://github.com/BeshoyEhab/dot-man.git
 cd dot-man
 uv sync --extra dev
+pre-commit install
 ```
 
-### Code Style
+Every command below runs under `uv run` (uv-managed venv). Never bare
+`pytest`/`black` — `uv run` is the repo standard.
 
-- **Formatter**: Black (line length 88)
-- **Linter**: ruff (rules: E, F, W, I)
-- **Type checker**: mypy (`--ignore-missing-imports`)
+### Code style
+
+- **Format**: Black (line length 88) · **Lint**: ruff (`E, F, W, I`) · **Types**: mypy (`--ignore-missing-imports`, 0 errors)
+
+```bash
+uv run black dot_man/ tests/
+uv run ruff check dot_man/ tests/       # append --fix to autofix
+uv run mypy dot_man/ --ignore-missing-imports
+```
+
+### Testing
+
+```bash
+uv run pytest tests/ -v                        # all tests
+uv run pytest tests/test_core.py -v            # one file
+uv run pytest --cov=dot_man --cov-report=term  # coverage (must not decrease)
+```
+
+Strong-test requirements (see examples below):
+
+1. Real `git.Repo` instances, real files via `tmp_path`, real CLI via `CliRunner`
+2. Assert values and behavior — never existence (`hasattr`, `callable`, `is not None`, bare imports are NOT tests)
+3. Group related tests in classes; put files in `tests/test_<module>.py`
+4. `tests/__init__.py` must exist or pytest fails with `ModuleNotFoundError`
+
+### Commits
+
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+Types: `feat`, `fix`, `docs`, `test`, `refactor`, `chore`, `perf`.
+Example: `feat(diff): add dot-man diff command`. Never commit secrets; if a
+commit fails hooks, fix forward — don't amend the failed commit.
+
+---
+
+## Design Principles
+
+1. **Schema first, then build.** When a feature connects components (hooks,
+   config, CLI), write the unifying schema before code: what are the units,
+   how do they connect, what is duplicated? Example: one global hook schema
+   covering section hooks, `file:` scripts, global `pre_<cmd>`/`post_<cmd>`
+   scripts, aliases, and placeholders — deduplicate the systems against it,
+   then document from it.
+2. **Happy path first.** A normal user is productive in 5 minutes via
+   `init` → `add` → `status` → `navigate`. New features must be discoverable
+   from there, never required up front. Prefer sensible defaults over new
+   options.
+3. **One vocabulary.** `navigate` for switching configurations; `{{ }}`
+   template syntax for substitution (hook `{x}` is the shell-friendly
+   spelling of the same names); `ExitCode` for exits. Never introduce a
+   second name or syntax for an existing concept.
+4. **Centralized errors.** Failures exit via `raise SystemExit(ExitCode.X)`,
+   `error(..., exit_code=...)`, or `handle_exception()` — never `sys.exit()`.
+   `DotManGroup.invoke()` already routes uncaught command errors centrally;
+   per-command handlers delegate: `handle_exception(e, "<Context>")`.
+
+---
+
+## Pre-Push Quality Checklist
+
+Before EVERY commit/push, in order — all must pass with zero errors:
 
 ```bash
 uv run black dot_man/ tests/
 uv run ruff check dot_man/ tests/
 uv run mypy dot_man/ --ignore-missing-imports
 uv run pytest tests/ -v
+uv run pytest --cov=dot_man --cov-report=term
 ```
 
-### Pre-commit Hooks
-
-```bash
-pre-commit install
-```
-
-Runs Black, ruff, and mypy automatically on every commit.
-
-### Adding Commands
-
-1. Create `dot_man/cli/<command>_cmd.py`
-2. Import in `dot_man/cli/__init__.py`
-3. Add completions in `dot_man/cli/common.py`
-4. Add tests in `tests/test_<command>_cmd.py`
-5. Update docs and CHANGELOG
-
-### Testing
-
-```bash
-uv run pytest tests/ -v                    # All tests
-uv run pytest tests/test_core.py -v        # Specific file
-uv run pytest --cov=dot_man --cov-report=term  # With coverage
-```
-
-### Commit Messages
-
-```
-<type>(<scope>): <subject>
-
-feat(diff): add dot-man diff command
-fix(vault): handle missing key file
-docs(readme): update installation instructions
-test(status): add JSON output tests
-```
-
-**Types:** `feat`, `fix`, `docs`, `test`, `refactor`, `chore`, `perf`
+Fix before committing. Do NOT push with known errors.
 
 ---
 
+## Scenario Responses
+
+### Adding a CLI command
+
+1. Create `dot_man/cli/<command>_cmd.py`; register it via import in `dot_man/cli/__init__.py`
+2. Add completions with the `@completes` decorator (next section)
+3. Route failures through `handle_exception(e, "<Command>")` with `ExitCode` values
+4. Strong tests in `tests/test_<command>_cmd.py`
+5. Update `README.md` tables, `CHANGELOG.md`, `TODO.md` if applicable
+6. Run the full Pre-Push Quality Checklist
+
+### Adding a module
+
+1. Create `dot_man/<module>.py` with `__all__` exports and type hints throughout
+2. Strong tests in `tests/test_<module>.py`
+3. Update `CHANGELOG.md`; run the full checklist
+
+### Fixing a bug
+
+Reproduce with a failing test first → fix → verify green → update
+`CHANGELOG.md` if significant → full checklist.
+
+### Adding a feature
+
+Schema first (Principle 1) → tests → implement → `CHANGELOG.md` + `TODO.md`
+→ full checklist.
+
+---
+
+## Shell Completions
+
+The engine (`dot_man/cli/completion_engine.py`) reads commands, options,
+choices, and defaults from the Click tree. Extend it with `@completes` —
+never hand-written callbacks:
+
+```python
+from .completion_engine import CompletionContext, ProviderResult, completes
+
+@completes("bootstrap", param="pm")
+def _complete_bootstrap_pm(ctx: CompletionContext) -> ProviderResult:
+    """Complete package manager names for the bootstrap command."""
+    return [("brew", "macOS package manager"), ("apt", "Debian/Ubuntu")]
+```
+
+Providers return plain values or `(value, description)` pairs. Dynamic,
+git-backed providers live in `dot_man/cli/completions.py` and must never
+raise — return `[]` on failure:
+
+```python
+def complete_branches(ctx, param, incomplete):
+    """Shell completion callback for branches."""
+    try:
+        # Implementation...
+    except Exception:
+        return []
+```
+
+---
+
+## Strong vs Weak Tests
+
+Strong test — real repo, real files, real assertion:
+
+```python
+def test_git_manager_create_branch(self, tmp_path):
+    """Test creating a branch - REAL test."""
+    from dot_man.core import GitManager
+    from git import Repo
+
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    repo = Repo.init(repo_dir)
+    with repo.config_writer() as config:
+        config.set_value("user", "name", "Test")
+        config.set_value("user", "email", "test@test.com")
+
+    (repo_dir / "test.txt").write_text("test")
+    repo.index.add(["test.txt"])
+    repo.index.commit("Initial")
+
+    gm = GitManager(repo_dir)
+    gm.create_branch("new-branch")
+
+    assert "new-branch" in gm.list_branches()  # REAL assertion
+```
+
+Weak tests — NEVER write these (existence checks test Python, not our code):
+
+```python
+def test_weak():  # DON'T DO THIS
+    from dot_man.core import GitManager
+    assert hasattr(GitManager, "create_branch")  # useless
+
+def test_also_weak():  # DON'T DO THIS
+    from dot_man.config import Section
+    section = Section(name="test", paths=[], repo_base="test")
+    _ = section.name  # no assertion at all
+```
+
+---
+
+## Section Config Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `paths` | `list[str]` | required | File/directory paths to track |
+| `repo_base` | `str` | auto | Base directory name in repo |
+| `repo_path` | `str` | None | Explicit repo path for single files |
+| `secrets_filter` | `bool` | `true` | Enable secret detection |
+| `update_strategy` | `str` | `"replace"` | `"replace"`, `"rename_old"`, `"ignore"` |
+| `deploy_method` | `str` | `"copy"` | `"copy"` or `"symlink"` |
+| `include` / `exclude` | `list[str]` | `[]` | Glob patterns to include/exclude |
+| `pre_deploy` / `post_deploy` | `str` | None | Shell command around deploy; may embed `file:<script> [args]` (resolved from `<repo>/hooks/`, fallback `~/.config/dot-man/hooks/`) |
+| `on_activate` / `on_deactivate` | `str` | None | Shell command on branch switch to/from |
+| `inherits` | `list[str]` | `[]` | Template names to inherit |
+| `follow_symlinks` | `bool` | `false` | Follow symlinks during traversal |
+| `shared` | `bool` | `false` | Propagate edits to non-overriding branches |
+| `ignored_directories` | `list[str]` | defaults | Directories skipped during traversal |
+| `encrypted` / `encryption_method` / `encryption_recipient` | `bool` / `str` / `str` | `false` / `"gpg"` / None | Per-section encryption |
+
+### Quickshell Config Example
+
+```toml
+[quickshell-ii]
+paths = ["~/.config/quickshell/ii"]
+deploy_method = "copy"
+post_deploy = "quickshell_reload"
+on_deactivate = "killall qs 2>/dev/null || true"
+on_activate = "qs -c ii &"
+```
+
+`quickshell_reload`, `quickshell_restart`, `quickshell_validate` are
+`HOOK_ALIASES` resolved by `Section._resolve_hook()`, which also resolves
+`{section_name}`, `{config_root}`, `{config_name}`, `{paths}`, `{branch}`
+(`{qs_config}` is the backward-compat alias for `{config_name}`).
+
+---
+
+## Key Commands
+
+| Command | Description |
+| ------- | ----------- |
+| `dot-man init` | Initialize repository |
+| `dot-man add <path>` | Track files |
+| `dot-man status` | Show status |
+| `dot-man navigate <branch>` | Switch configurations (canonical; `nav` alias; `switch`/`checkout` deprecated until v2.0) |
+| `dot-man audit` | Scan for secrets |
+| `dot-man diff` | Show changes |
+| `dot-man log` | Show commit history |
+| `dot-man template` | Template variables |
+| `dot-man profile` | Machine profiles |
+
+---
+
+## File Update Checklist
+
+| File | When to Update |
+| ---- | -------------- |
+| `CHANGELOG.md` | New features, bug fixes, changes under Unreleased |
+| `TODO.md` | Check off items, add new ones (source of truth for priorities/numbers) |
+| `README.md` | Command tables, examples, version, coverage |
+| `docs/roadmap.md` | Version status, completed items |
+| `pyproject.toml` + `dot_man/__init__.py` | Version bumps (keep the two in sync) |
+| `AGENTS.md` | New principles/patterns as the project evolves |
+
+---
+
+## Version Bump Checklist
+
+1. Bump `pyproject.toml` **and** `dot_man/__init__.py` (e.g., 1.4.0 → 1.5.0)
+2. Move `CHANGELOG.md` "Unreleased" to the version date
+3. Check off `TODO.md`; update `README.md` (Features, metrics, coverage); update `docs/roadmap.md`; refresh this file's snapshot (version, tests, coverage)
+4. Run the full quality gate (`black --check`, `ruff`, `mypy`, `pytest -v`, coverage)
+5. Smoke-test the artifact: `uv build`, install the wheel in a clean venv, run `dot-man --help` and `dot-man doctor`
+6. Commit and tag
+6. **Policy**: majors remove/change APIs (e.g., dropping `switch`/`checkout` lands in v2.0); minors only add deprecation notices
+
+---
+
+## Active Priorities (detail in TODO.md)
+
+1. **Simplification & real-world usability** — happy path, two-level help (`help`/`help-all` + man page), defaults over options, one onboarding, `next_steps` everywhere, docs real-world-first
+2. **Coverage floor** — raise the lowest modules (current table in TODO.md; regenerate before trusting)
+3. **Global hook schema + template vars in config values** — schema first, then deduplicate and document from it
+4. **v2.0 removals** — `switch`/`checkout` shims (kept with warnings until then)
+5. **Parked** — Plugin API (too big; revisit after simplification)
+
+---
+
+## Project Structure
+
+```
+dot-man/
+├── dot_man/              # Main package
+│   ├── cli/              # CLI commands (registered via imports in __init__.py)
+│   │   ├── main.py       # Entry point (calls cli() from interface.py)
+│   │   ├── interface.py  # Shared Click group (DotManGroup)
+│   │   ├── common.py     # ExitCode, error(), handle_exception(), guards
+│   │   ├── completions.py      # Dynamic completion providers
+│   │   ├── completion_engine.py # @completes registry + --complete protocol
+│   │   └── *_cmd.py      # One file per command
+│   ├── core.py           # GitManager
+│   ├── operations.py     # DotManOperations (mixin composition root)
+│   ├── *_ops.py          # Operation mixins (branch, status, save/deploy, ...)
+│   ├── section.py        # Section config + hook/placeholder resolution
+│   ├── hooks.py          # Global hooks + file: script resolution
+│   ├── exceptions.py     # DotManError hierarchy (carries exit_code) + diagnostics
+│   ├── ui.py             # Rich console helpers (never sys.exit)
+│   ├── config.py / secrets.py / vault.py / ...
+├── tests/                # tests/test_*.py (+ required __init__.py)
+├── scripts/              # Shell helpers (path-setup.sh, utils.sh)
+└── docs/                 # mkdocs Material site + roadmap
+```
+
+---
+
+## AI Autonomy
+
+You may self-update this file when versions bump, milestones complete, new
+patterns emerge, or priorities shift. Keep the checklist, key commands, and
+priorities in sync with `TODO.md` and `docs/roadmap.md`.
+
 ## Questions?
 
-Check the existing code and tests for patterns. When in doubt, look at similar commands in `dot_man/cli/` directory.
+Check existing code and tests for patterns first — similar commands in
+`dot_man/cli/` are the reference implementation.
