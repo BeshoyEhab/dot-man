@@ -1,13 +1,12 @@
 """Tests for dot_man/hook_engine.py resolve pipeline."""
 
 import shlex
-from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 from dot_man.exceptions import ConfigurationError
-from dot_man.hook_engine import HookContext, find_hook_script, resolve_hook
+from dot_man.hook_engine import HookContext, resolve_hook
 
 
 @pytest.fixture
