@@ -31,7 +31,7 @@ def is_first_run() -> bool:
     A run is considered "first" when either:
       - ~/.config/dot-man/ doesn't exist yet, OR
       - the directory exists but the .onboarded sentinel is missing
-        (e.g. the user deleted it to replay the tutorial).
+        (e.g. the user deleted it to replay the onboarding flow).
     """
     if not DOT_MAN_DIR.exists():
         return True
@@ -39,7 +39,7 @@ def is_first_run() -> bool:
 
 
 def mark_onboarded() -> None:
-    """Write the sentinel file so the tutorial never re-fires."""
+    """Write the sentinel file so the onboarding flow never re-fires."""
     DOT_MAN_DIR.mkdir(parents=True, exist_ok=True)
     SENTINEL.touch()
 
@@ -294,7 +294,7 @@ def run_onboarding() -> None:
         interrupted = True
         _console.print()
         _console.print(
-            "\n[yellow]⚠  Tutorial interrupted.[/yellow]\n"
+            "\n[yellow]⚠  Onboarding interrupted.[/yellow]\n"
             "[dim]Run [bold]dot-man init[/bold] when you're ready to set up.[/dim]\n"
         )
         # Leave sentinel un-written so they see the tutorial again next time

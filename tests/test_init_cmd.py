@@ -561,6 +561,29 @@ def test_hook_suggestion_shown(tmp_path):
     assert "echo reloaded" in printed
 
 
+def test_hook_suggestion_shown_qs_branch(tmp_path):
+    """Hook suggestion also prints on the qs- early-continue path."""
+    from dot_man.cli import init_cmd
+
+    target = tmp_path / "my-config"
+    target.mkdir()
+    (target / "shell.qml").write_text("// qml")
+    with (
+        patch("dot_man.cli.init_cmd.ui") as mock_ui,
+        patch(
+            "dot_man.cli.init_cmd.get_auto_hooks_for_config",
+            return_value={"post_deploy": "echo reloaded"},
+        ),
+    ):
+        mock_ui.confirm.return_value = True
+        init_cmd._wizard_prompt_for_files(
+            [(str(target), "Quickshell foo", "qs-foo")], []
+        )
+    printed = " ".join(str(c) for c in mock_ui.console.print.call_args_list)
+    assert "post_deploy" in printed
+    assert "echo reloaded" in printed
+
+
 def test_format_hook_example():
     from dot_man.cli.init_cmd import _format_hook_example
 

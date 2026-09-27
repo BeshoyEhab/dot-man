@@ -193,6 +193,14 @@ def _format_hook_example(section_name: str, hook_cmd: str | None) -> str | None:
     return f"  [dim]Example: [{section_name}] runs '{hook_cmd}' after deploy[/dim]"
 
 
+def _print_hook_suggestion(section_name: str, paths: list[str]) -> None:
+    """Print auto-detected hook suggestions for a section being prompted."""
+    auto_hooks = get_auto_hooks_for_config(section_name, paths)
+    if auto_hooks:
+        for hook_type, hook_cmd in auto_hooks.items():
+            ui.console.print(f"    [dim]Will run {hook_type} hook: {hook_cmd}[/dim]")
+
+
 def _wizard_prompt_for_files(common_files: list, files_to_add: list) -> list:
     """Iterate common_files, detect each path, ask user which to track."""
     found_count = 0
@@ -206,6 +214,7 @@ def _wizard_prompt_for_files(common_files: list, files_to_add: list) -> list:
                 ui.console.print(
                     f"  [green]✓[/green] Found: [cyan]{path_str}[/cyan] ({desc})"
                 )
+                _print_hook_suggestion(section_name, [path_str])
                 if ui.confirm("    Track this?", default=True):
                     files_to_add.append((path_str, section_name))
             continue
@@ -224,6 +233,7 @@ def _wizard_prompt_for_files(common_files: list, files_to_add: list) -> list:
                 ui.console.print(
                     f"  [green]✓[/green] Found: [cyan]{path_str}[/cyan] ({desc})"
                 )
+                _print_hook_suggestion(section_name, [path_str])
                 ui.console.print(
                     "    [yellow]⚠️  Multiple configurations detected:[/yellow]"
                 )
@@ -269,12 +279,7 @@ def _wizard_prompt_for_files(common_files: list, files_to_add: list) -> list:
             ui.console.print(
                 f"  [green]✓[/green] Found: [cyan]{path_str}[/cyan] ({desc})"
             )
-            auto_hooks = get_auto_hooks_for_config(section_name, [path_str])
-            if auto_hooks:
-                for hook_type, hook_cmd in auto_hooks.items():
-                    ui.console.print(
-                        f"    [dim]Will run {hook_type} hook: {hook_cmd}[/dim]"
-                    )
+            _print_hook_suggestion(section_name, [path_str])
             if ui.confirm("    Track this?", default=True):
                 files_to_add.append((path_str, section_name))
 
@@ -416,7 +421,7 @@ def _wizard_show_next_steps(files_to_add: list):
         ui.console.print("  [cyan]dot-man status[/cyan]               - View status")
 
     ui.console.print()
-    ui.console.print("[dim]💡 Run 'dot-man --help' to see all commands[/dim]")
+    ui.console.print("[dim]💡 Run 'dot-man help-all' to see all commands[/dim]")
     ui.console.print()
 
     try:
