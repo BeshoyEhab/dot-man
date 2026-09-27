@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Unified hook engine** — new `dot_man/hook_engine.py`: one resolve path (alias → placeholders → `file:`) and one shell runner for all hook shell; auto-detected hooks now resolve `{config_name}`; deploy hook failures warn instead of vanishing
 - **Canonical `ExitCode` enum** (`dot_man/cli/common.py`) — `OK=0`, `ERROR=1`, `USAGE=2`, `CONFIG=7`, `INTERRUPTED=130`; single vocabulary for every exit path
 - **Centralized error handling** — `DotManGroup.invoke()` routes unexpected failures from *every* command through `handle_exception()`; `ClickException`/`Abort`/`Exit`/`SystemExit` pass through untouched so `--help`, usage errors (exit 2), and deliberate exits keep working
 - **Hook scripts directory** — section hooks accept `file:<script> [args]` tokens (e.g. `post_deploy = "echo 'start'; file:log.sh 'hi'"`), resolved from `<repo>/hooks/` (versioned per branch) with `~/.config/dot-man/hooks/` fallback; missing scripts raise `ConfigurationError`, `../` escapes rejected, exec bit auto-added; `on_activate`/`on_deactivate` now also get alias/placeholder resolution
