@@ -1,0 +1,69 @@
+.TH DOT-MAN 1 "September 2026" "dot-man 1.4.0" "User Commands"
+.SH NAME
+dot-man \- git-powered dotfile manager
+.SH SYNOPSIS
+.B dot-man
+[\fIOPTIONS\fR] \fICOMMAND\fR [\fIARGS\fR]...
+.SH DESCRIPTION
+dot-man tracks your dotfiles in git. Each branch is a complete
+configuration (work, personal, minimal, server) — switch between them
+and dot-man saves the current state, deploys the target files, and runs
+your hooks.
+.PP
+Everyday workflow:
+.BR init ,
+.BR add ,
+.BR status ,
+.BR navigate .
+Run
+.B "dot-man help-all"
+for the full command list.
+.SH COMMANDS
+.TP
+.B "init [--no-wizard]"
+Initialize a new dot-man repository (interactive wizard by default).
+.TP
+.B "add <path>"
+Track a file or directory.
+.TP
+.B status
+Show tracked files and pending changes.
+.TP
+.B "navigate <branch>"
+Save current changes and switch to another configuration branch, tag,
+or commit. Alias:
+.BR nav .
+.TP
+.B "deploy <branch>"
+One-way deployment of a branch configuration.
+.TP
+.B doctor
+Run diagnostics and health checks.
+.SH OPTIONS
+.TP
+.BR --help
+Show the happy-path commands.
+.TP
+.BR --version
+Show the version and exit.
+.TP
+.BR "-v, --verbose"
+Show detailed output on console.
+.TP
+.BR --debug
+Enable debug logging to file.
+.SH FILES
+.TP
+.I ~/.config/dot-man/
+Configuration directory (repository, global config, hooks).
+.TP
+.I ~/.config/dot-man/repo/dot-man.toml
+Section definitions: which paths to track and their hooks.
+.TP
+.I <repo>/hooks/
+Versioned hook scripts, referenced as
+.BR "file:<script>" .
+.SH "SEE ALSO"
+Full reference: https://beshoyehab.github.io/dot-man/
+.SH AUTHOR
+dot-man contributors.

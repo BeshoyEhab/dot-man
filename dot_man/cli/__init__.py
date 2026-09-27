@@ -35,9 +35,10 @@ from .config_cmd import config
 from .deploy_cmd import deploy
 from .doctor_cmd import doctor
 from .edit_cmd import edit
-from .hooks_cmd import hooks
 
 # Import commands for easier access and backward compatibility
+from .help_cmd import help_all, help_cmd
+from .hooks_cmd import hooks
 from .init_cmd import init
 from .interface import cli
 from .log_cmd import checkout, diff, log
@@ -119,4 +120,6 @@ __all__ = [
     "completions",
     "watch",
     "rollback",
+    "help_cmd",
+    "help_all",
 ]

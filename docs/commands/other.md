@@ -111,3 +111,15 @@ dot-man migrate chezmoi
 dot-man migrate yadm
 dot-man migrate stow
 ```
+
+## help
+
+Show the happy-path commands for everyday use (`init`, `add`, `status`,
+`navigate`, `deploy`, `doctor`). Bare `dot-man --help` shows the same
+short listing.
+
+```bash
+dot-man help                 # happy-path commands
+dot-man help-all             # every command, incl. aliases
+dot-man help --install-man   # install dot-man.1 to ~/.local/share/man
+```
