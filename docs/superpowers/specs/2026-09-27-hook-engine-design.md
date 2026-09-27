@@ -72,17 +72,27 @@ pass through literally — never an error.
   resolution happens at Section load).
 - Global `run_hook()`, `hooks_cmd`, command firing untouched.
 
-## 6. Failure semantics (unchanged)
+## 6. Failure semantics (one intended change)
 
 Resolve-time problems raise `ConfigurationError`. Run-time failures
-warn and continue; `run()` reports. No new exit paths, no fail-fast.
+warn and continue; `run()` reports. No fail-fast.
+
+Carve-out: deploy's inline loops currently swallow nonzero exits
+silently (`check=False`, no output); after migrating to `run()`,
+failing deploy hooks print the same warning navigate prints today.
+No test pins the silence (verified); the change is an improvement,
+not a regression.
 
 ## 7. Testing
 
 TDD: new `tests/test_hook_engine.py` — pipeline order, escape,
 vocabulary, repo-over-global precedence, traversal rejection, run
 success/failure/mixed, env passthrough. All existing hook, section,
-navigate, and deploy tests must pass unmodified. Full quality gate
+navigate, and deploy tests must pass with behavior intact; two
+mechanical repoints allowed (no behavior change): `test_hook_scripts.py`
+fixture patches move to `dot_man.hook_engine`, and the three
+`run_branch_hooks` tests patch `dot_man.hook_engine.subprocess`
+instead of `dot_man.cli.navigate_cmd.subprocess`. Full quality gate
 (black, ruff, mypy, pytest, coverage must not decrease).
 
 ## 8. Docs
