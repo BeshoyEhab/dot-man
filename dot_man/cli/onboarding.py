@@ -1,14 +1,9 @@
-"""First-time onboarding and tutorial flow for dot-man.
+"""First-time onboarding flow for dot-man.
 
 This module is invoked automatically on the very first launch of dot-man
 (detected by the absence of ~/.config/dot-man/ or the .onboarded sentinel).
-It walks new users through:
-
-  1. An Architecture section – how dot-man works internally.
-  2. A Manual section     – practical usage with ASCII examples.
-
-After the tutorial, it runs 'dot-man init' automatically and optionally
-creates the user's first branch.
+It welcomes the user, runs 'dot-man init' automatically (including the
+interactive setup wizard), and optionally creates the user's first branch.
 """
 
 from __future__ import annotations
@@ -93,12 +88,6 @@ def _ascii_panel(title: str, art: str) -> None:
     )
 
 
-def _confirm_next(prompt: str = "Ready for the next section?") -> bool:
-    """Ask the user if they want to continue."""
-    _console.print()
-    return Confirm.ask(f"[bold]{prompt}[/bold]", default=True, console=_console)
-
-
 # ──────────────────────────────────────────────────────────────────────────────
 # Welcome banner
 # ──────────────────────────────────────────────────────────────────────────────
@@ -121,224 +110,17 @@ def _show_welcome() -> None:
             "[bold white]Welcome to dot-man![/bold white]\n"
             "[dim]The Dotfile Manager with Git-Powered Branching[/dim]\n\n"
             "This is your [bold cyan]first launch[/bold cyan]. "
-            "We'll walk you through a short tutorial\n"
-            "before setting everything up automatically.\n\n"
-            "[dim]The tutorial has 2 sections and takes about 2 minutes.[/dim]",
+            "We'll get your dotfiles tracked in about a minute.\n\n"
+            "[dim]No reading required — just answer a few prompts.[/dim]",
             border_style="cyan",
             padding=(1, 4),
         )
     )
     _console.print()
 
-    menu_text = (
-        "  [bold cyan][1][/bold cyan]  Architecture  — how dot-man works internally\n"
-        "  [bold cyan][2][/bold cyan]  Manual        — practical usage examples\n"
-        "  [bold cyan][s][/bold cyan]  Skip tutorial and go straight to setup"
-    )
-    _console.print(
-        Panel(
-            menu_text,
-            title="[bold]Tutorial Menu[/bold]",
-            border_style="dim",
-            padding=(0, 2),
-        )
-    )
-    _console.print()
-
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Section 1 — Architecture
-# ──────────────────────────────────────────────────────────────────────────────
-
-ARCH_OVERVIEW = """\
-  Your Home Directory          dot-man Repo              Your System
-  ───────────────────          ────────────              ───────────
-
-  ~/.bashrc        ──save──►  branch: main  ──deploy──►  ~/.bashrc
-  ~/.vimrc         ──save──►  branch: work  ──deploy──►  ~/.vimrc
-  ~/.gitconfig     ──save──►  branch: home              ~/.gitconfig
-  ~/.config/nvim/  ──save──►  branch: server
-
-  Each branch stores a COMPLETE snapshot of your dotfiles.
-  Switching branches swaps your entire configuration instantly."""
-
-BRANCH_DIAGRAM = """\
-  main ──┬── work      ← office: proxy settings, work aliases
-         │
-         ├── home      ← personal: gaming tweaks, personal aliases
-         │
-         ├── server    ← minimal: headless, no GUI tools
-         │
-         └── laptop    ← mobile: battery saving, HiDPI settings
-
-  All branches share the same tracked files list.
-  Each branch stores its own version of those files."""
-
-INIT_FLOW = """\
-  $ dot-man init
-        │
-        ├─► Create ~/.config/dot-man/           (config root)
-        │         ├── repo/                     (git repository)
-        │         │     └── dot-man.toml        (file mappings)
-        │         ├── backups/                  (safety backups)
-        │         └── global.toml              (global settings)
-        │
-        ├─► git init  inside repo/
-        ├─► Initial commit "dot-man: Initial commit"
-        └─► Setup wizard  (auto-detect common dotfiles)"""
-
-COMPONENTS = """\
-  ┌────────────────┬──────────────────────────────────────────┐
-  │  Component     │  Role                                    │
-  ├────────────────┼──────────────────────────────────────────┤
-  │  GitManager    │  git branches, commits, checkout         │
-  │  DotManConfig  │  which files go in which section         │
-  │  GlobalConfig  │  current branch, remote URL, settings    │
-  │  Operations    │  save files  →  repo, deploy  →  system  │
-  │  SecretGuard   │  redact passwords/keys before committing │
-  └────────────────┴──────────────────────────────────────────┘"""
-
-
-def _section_architecture() -> None:
-    _section_rule("Section 1 of 2 — Architecture")
-
-    _console.print("[bold]What is dot-man?[/bold]")
-    _console.print(
-        "dot-man tracks your dotfiles inside a [bold cyan]git repository[/bold cyan] "
-        "and uses [bold cyan]branches[/bold cyan] to store different\n"
-        "configurations. Switching branches swaps your entire dotfile setup instantly.\n"
-    )
-    _ascii_panel("How Files Flow", ARCH_OVERVIEW)
-    _pause()
-
-    _console.print("[bold]The Branch System[/bold]")
-    _console.print(
-        "Think of branches as named [bold cyan]configuration profiles[/bold cyan]. "
-        "You can have one for work,\none for home, one for a minimal server — "
-        "all managed from a single tool.\n"
-    )
-    _ascii_panel("Branch Model", BRANCH_DIAGRAM)
-    _pause()
-
-    _console.print("[bold]Core Components[/bold]")
-    _console.print(
-        "dot-man is composed of a few focused components that work together:\n"
-    )
-    _ascii_panel("Components", COMPONENTS)
-    _pause()
-
-    _console.print("[bold]Initialization Flow[/bold]")
-    _console.print(
-        "When you run [bold cyan]dot-man init[/bold cyan] for the first time, "
-        "this is what happens:\n"
-    )
-    _ascii_panel("dot-man init", INIT_FLOW)
-    _pause()
-
-    _console.print("[bold green]✓[/bold green]  Architecture section complete!\n")
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Section 2 — Manual / How to Use
-# ──────────────────────────────────────────────────────────────────────────────
-
-SWITCH_FLOW = """\
-  $ dot-man switch work
-        │
-        ├─► Phase 1: Save current branch state
-        │     └─► copies ~/yourfiles  →  repo/ (commits them in git)
-        │
-        ├─► Phase 2: Switch git branch
-        │     └─► git checkout work  (creates it if new)
-        │
-        └─► Phase 3: Deploy new branch files
-              └─► copies repo/ files  →  ~/yourfiles"""
-
-WORKFLOW_LOOP = """\
-  ╔══════════════════════════════════════════════════════════╗
-  ║              Typical dot-man Workflow                    ║
-  ╠══════════════════════════════════════════════════════════╣
-  ║                                                          ║
-  ║  1.  dot-man init              ──►  set up the repo      ║
-  ║  2.  dot-man add ~/.bashrc     ──►  start tracking       ║
-  ║  3.  dot-man add ~/.config/nvim                          ║
-  ║  4.  dot-man switch work       ──►  create work branch   ║
-  ║      (edit ~/.bashrc, configs…)                          ║
-  ║  5.  dot-man switch home       ──►  auto-saves + deploys ║
-  ║  6.  dot-man status            ──►  see what changed     ║
-  ║  7.  dot-man sync              ──►  push to GitHub       ║
-  ║                                                          ║
-  ╚══════════════════════════════════════════════════════════╝"""
-
-COMMANDS_TABLE = """\
-  ┌────────────────────────────────┬──────────────────────────────────┐
-  │  Command                       │  What it does                    │
-  ├────────────────────────────────┼──────────────────────────────────┤
-  │  dot-man init                  │  Initialize repository           │
-  │  dot-man add <path>            │  Track a file or directory       │
-  │  dot-man switch <branch>       │  Switch configuration branch     │
-  │  dot-man status                │  Show tracked files & changes    │
-  │  dot-man deploy                │  Deploy repo files to system     │
-  │  dot-man sync                  │  Push/pull from remote           │
-  │  dot-man log                   │  Show commit history             │
-  │  dot-man diff                  │  Show uncommitted changes        │
-  │  dot-man audit                 │  Scan for secrets / passwords    │
-  │  dot-man backup                │  Create a manual backup          │
-  │  dot-man --help                │  Full command reference          │
-  └────────────────────────────────┴──────────────────────────────────┘"""
-
-
-def _section_manual() -> None:
-    _section_rule("Section 2 of 2 — Manual / How To Use")
-
-    _console.print("[bold]Step 1 — Initialization[/bold]")
-    _console.print("The first thing you do is initialize the repository:\n")
-    _code_block("$ dot-man init")
-    _console.print(
-        "\nThe setup wizard will detect common dotfiles on your system\n"
-        "and ask which ones you'd like to track.\n"
-    )
-    _pause()
-
-    _console.print("[bold]Step 2 — Adding Files to Track[/bold]")
-    _console.print("You can always add more files later:\n")
-    _code_block(
-        "$ dot-man add ~/.bashrc          # single file\n"
-        "$ dot-man add ~/.config/nvim     # entire directory\n"
-        "$ dot-man add ~/.gitconfig       # git settings\n"
-        "$ dot-man add ~/.ssh/config      # SSH config"
-    )
-    _console.print(
-        "\nFiles are [bold cyan]copied into the git repo[/bold cyan] and tracked per branch.\n"
-    )
-    _pause()
-
-    _console.print("[bold]Step 3 — Branches (Profiles)[/bold]")
-    _console.print(
-        "Use branches to maintain separate configurations.\n"
-        "[bold cyan]dot-man switch[/bold cyan] does three things automatically:\n"
-    )
-    _ascii_panel("How 'switch' Works", SWITCH_FLOW)
-    _code_block(
-        "$ dot-man switch work    # create + switch to 'work' branch\n"
-        "$ dot-man switch home    # switch back to 'home' branch\n"
-        "$ dot-man switch server  # minimal server configuration"
-    )
-    _pause()
-
-    _console.print("[bold]Step 4 — Full Workflow[/bold]\n")
-    _ascii_panel("Complete Workflow", WORKFLOW_LOOP)
-    _pause()
-
-    _console.print("[bold]Quick Reference — All Commands[/bold]\n")
-    _ascii_panel("Commands", COMMANDS_TABLE)
-    _pause()
-
-    _console.print("[bold green]✓[/bold green]  Manual section complete!\n")
-
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Post-tutorial: init + first branch
+# Setup: init + first branch
 # ──────────────────────────────────────────────────────────────────────────────
 
 
@@ -475,38 +257,15 @@ def run_onboarding() -> None:
 
     Order:
       1. Welcome banner
-      2. Tutorial menu (user picks Architecture / Manual / Skip)
-      3. dot-man init (always runs)
-      4. Offer first branch creation
-      5. Write sentinel so flow never repeats
+      2. dot-man init (always runs, with interactive wizard)
+      3. Offer first branch creation
+      4. Write sentinel so flow never repeats
     """
     interrupted = False
     try:
         _show_welcome()
 
-        choice = Prompt.ask(
-            "[bold]Choose an option[/bold]",
-            choices=["1", "2", "s"],
-            default="1",
-            console=_console,
-        )
-
-        if choice == "1":
-            _section_architecture()
-            if _confirm_next("Continue to the Manual section?"):
-                _section_manual()
-        elif choice == "2":
-            _section_manual()
-            if _confirm_next("Go back and read the Architecture section?"):
-                _section_architecture()
-        # choice == "s" → skip tutorial
-
-        _console.print()
-        _console.print(
-            Rule("[bold green]Tutorial Complete[/bold green]", style="green")
-        )
-
-        # Always run init (the real one, with interactive wizard)
+        # Run init (the real one, with interactive wizard)
         init_ok = _run_init_direct()
 
         if init_ok:

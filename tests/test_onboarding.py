@@ -1,6 +1,6 @@
 """Comprehensive tests for the onboarding module.
 
-Covers sentinel detection, internal helpers, tutorial sections,
+Covers sentinel detection, internal helpers, welcome banner,
 init flow, branch creation, and the main run_onboarding orchestrator.
 """
 
@@ -148,35 +148,8 @@ class TestAsciiPanel:
         assert "some art" in str(panel_arg.renderable)
 
 
-class TestConfirmNext:
-    """Tests for _confirm_next()."""
-
-    @patch("dot_man.cli.onboarding.Confirm.ask")
-    @patch("dot_man.cli.onboarding._console")
-    def test_default_prompt(self, mock_console, mock_ask):
-        """Uses default prompt text when none given."""
-        from dot_man.cli.onboarding import _confirm_next
-
-        mock_ask.return_value = True
-        result = _confirm_next()
-        assert result is True
-        prompt_text = mock_ask.call_args[0][0] if mock_ask.call_args[0] else ""
-        assert "Ready for the next section" in str(prompt_text)
-
-    @patch("dot_man.cli.onboarding.Confirm.ask")
-    @patch("dot_man.cli.onboarding._console")
-    def test_custom_prompt(self, mock_console, mock_ask):
-        """Custom prompt text is forwarded to Confirm.ask."""
-        from dot_man.cli.onboarding import _confirm_next
-
-        mock_ask.return_value = False
-        result = _confirm_next("Continue?")
-        assert result is False
-        assert "Continue?" in str(mock_ask.call_args[0][0])
-
-
 # ──────────────────────────────────────────────────────────────────────────────
-# Welcome and tutorial sections
+# Welcome banner
 # ──────────────────────────────────────────────────────────────────────────────
 
 
@@ -184,16 +157,13 @@ class TestShowWelcome:
     """Tests for _show_welcome()."""
 
     @patch("dot_man.cli.onboarding._console")
-    def test_prints_welcome_art_and_menu(self, mock_console):
-        """Welcome art, title, and menu options are printed."""
-        from dot_man.cli.onboarding import _show_welcome
+    def test_prints_welcome_art_without_menu(self, mock_console):
+        """Welcome art and title print; the Tutorial Menu panel is gone."""
+        from dot_man.cli.onboarding import WELCOME_ART, _show_welcome
 
         _show_welcome()
 
-        # Should have multiple print calls: art, welcome panel, menu
-        assert mock_console.print.call_count >= 4
-
-        # Check the welcome panel and menu panel contain expected text
+        # Check the welcome panel contains expected text
         panel_texts = []
         for args, _ in mock_console.print.call_args_list:
             for arg in args:
@@ -204,53 +174,14 @@ class TestShowWelcome:
 
         combined = " ".join(panel_texts)
         assert "Welcome" in combined
-        assert "Architecture" in combined
-        assert "Manual" in combined
-        assert "Skip tutorial" in combined
+        assert "Tutorial Menu" not in combined
+        assert "Architecture" not in combined
+        assert "Skip tutorial" not in combined
 
-
-class TestSectionArchitecture:
-    """Tests for _section_architecture()."""
-
-    @patch("dot_man.cli.onboarding._pause")
-    @patch("dot_man.cli.onboarding._section_rule")
-    @patch("dot_man.cli.onboarding._console")
-    def test_displays_all_topics(self, mock_console, mock_rule, mock_pause):
-        """All architecture topics are displayed in order."""
-        from dot_man.cli.onboarding import _section_architecture
-
-        _section_architecture()
-        mock_rule.assert_called_once()
-        assert "Architecture" in str(mock_rule.call_args[0][0])
-
-        output = " ".join(str(c) for c in mock_console.print.call_args_list)
-        assert "What is dot-man" in output
-        assert "Branch System" in output
-        assert "Core Components" in output
-        assert "Initialization Flow" in output
-        assert mock_pause.call_count == 4
-
-
-class TestSectionManual:
-    """Tests for _section_manual()."""
-
-    @patch("dot_man.cli.onboarding._pause")
-    @patch("dot_man.cli.onboarding._section_rule")
-    @patch("dot_man.cli.onboarding._console")
-    def test_displays_all_steps(self, mock_console, mock_rule, mock_pause):
-        """All manual steps are displayed in order."""
-        from dot_man.cli.onboarding import _section_manual
-
-        _section_manual()
-        mock_rule.assert_called_once()
-        assert "Manual" in str(mock_rule.call_args[0][0])
-
-        output = " ".join(str(c) for c in mock_console.print.call_args_list)
-        assert "Initialization" in output
-        assert "Adding Files" in output
-        assert "Branches" in output
-        assert "Full Workflow" in output
-        assert mock_pause.call_count == 5
+        # Art itself still renders
+        art_calls = " ".join(str(c) for c in mock_console.print.call_args_list)
+        assert "████" in art_calls or "Welcome" in combined
+        assert WELCOME_ART.strip()[:10] in art_calls
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -447,92 +378,15 @@ class TestRunOnboarding:
     @patch("dot_man.cli.onboarding.mark_onboarded")
     @patch("dot_man.cli.onboarding._offer_first_branch")
     @patch("dot_man.cli.onboarding._run_init_direct", return_value=True)
-    @patch("dot_man.cli.onboarding._confirm_next", return_value=True)
-    @patch("dot_man.cli.onboarding._section_manual")
-    @patch("dot_man.cli.onboarding._section_architecture")
-    @patch("dot_man.cli.onboarding.Prompt.ask", return_value="1")
     @patch("dot_man.cli.onboarding._console")
-    def test_choice_architecture(
-        self,
-        mock_console,
-        mock_prompt,
-        mock_arch,
-        mock_manual,
-        mock_confirm,
-        mock_init,
-        mock_branch,
-        mock_onboarded,
+    def test_straight_through_runs_wizard_and_branch(
+        self, mock_console, mock_init, mock_branch, mock_onboarded
     ):
-        """Choice 1 shows architecture, then manual on confirm, then init + branch."""
+        """No menu: welcome goes straight to init, branch, sentinel."""
         from dot_man.cli.onboarding import run_onboarding
 
         run_onboarding()
 
-        mock_arch.assert_called_once()
-        mock_confirm.assert_called_once()
-        mock_manual.assert_called_once()
-        mock_init.assert_called_once()
-        mock_branch.assert_called_once()
-        mock_onboarded.assert_called_once()
-
-    @patch("dot_man.cli.onboarding.mark_onboarded")
-    @patch("dot_man.cli.onboarding._offer_first_branch")
-    @patch("dot_man.cli.onboarding._run_init_direct", return_value=True)
-    @patch("dot_man.cli.onboarding._confirm_next", return_value=True)
-    @patch("dot_man.cli.onboarding._section_manual")
-    @patch("dot_man.cli.onboarding._section_architecture")
-    @patch("dot_man.cli.onboarding.Prompt.ask", return_value="2")
-    @patch("dot_man.cli.onboarding._console")
-    def test_choice_manual(
-        self,
-        mock_console,
-        mock_prompt,
-        mock_arch,
-        mock_manual,
-        mock_confirm,
-        mock_init,
-        mock_branch,
-        mock_onboarded,
-    ):
-        """Choice 2 shows manual, then architecture on confirm, then init + branch."""
-        from dot_man.cli.onboarding import run_onboarding
-
-        run_onboarding()
-
-        mock_manual.assert_called_once()
-        mock_confirm.assert_called_once()
-        mock_arch.assert_called_once()
-        mock_init.assert_called_once()
-        mock_branch.assert_called_once()
-        mock_onboarded.assert_called_once()
-
-    @patch("dot_man.cli.onboarding.mark_onboarded")
-    @patch("dot_man.cli.onboarding._offer_first_branch")
-    @patch("dot_man.cli.onboarding._run_init_direct", return_value=True)
-    @patch("dot_man.cli.onboarding._confirm_next")
-    @patch("dot_man.cli.onboarding._section_manual")
-    @patch("dot_man.cli.onboarding._section_architecture")
-    @patch("dot_man.cli.onboarding.Prompt.ask", return_value="s")
-    @patch("dot_man.cli.onboarding._console")
-    def test_choice_skip(
-        self,
-        mock_console,
-        mock_prompt,
-        mock_arch,
-        mock_manual,
-        mock_confirm,
-        mock_init,
-        mock_branch,
-        mock_onboarded,
-    ):
-        """Skip choice skips both sections and goes straight to init."""
-        from dot_man.cli.onboarding import run_onboarding
-
-        run_onboarding()
-
-        mock_arch.assert_not_called()
-        mock_manual.assert_not_called()
-        mock_confirm.assert_not_called()
         mock_init.assert_called_once()
         mock_branch.assert_called_once()
         mock_onboarded.assert_called_once()
@@ -540,18 +394,10 @@ class TestRunOnboarding:
     @patch("dot_man.cli.onboarding.mark_onboarded")
     @patch("dot_man.cli.onboarding._offer_first_branch")
     @patch("dot_man.cli.onboarding._run_init_direct", return_value=False)
-    @patch("dot_man.cli.onboarding._confirm_next", return_value=True)
-    @patch("dot_man.cli.onboarding._section_manual")
-    @patch("dot_man.cli.onboarding._section_architecture")
-    @patch("dot_man.cli.onboarding.Prompt.ask", return_value="1")
     @patch("dot_man.cli.onboarding._console")
     def test_init_failure_skips_branch(
         self,
         mock_console,
-        mock_prompt,
-        mock_arch,
-        mock_manual,
-        mock_confirm,
         mock_init,
         mock_branch,
         mock_onboarded,
@@ -561,79 +407,41 @@ class TestRunOnboarding:
 
         run_onboarding()
 
-        mock_arch.assert_called_once()
-        mock_manual.assert_called_once()
         mock_init.assert_called_once()
         mock_branch.assert_not_called()
         mock_onboarded.assert_called_once()
 
     @patch("dot_man.cli.onboarding.mark_onboarded")
     @patch("dot_man.cli.onboarding._offer_first_branch")
-    @patch("dot_man.cli.onboarding._run_init_direct")
-    @patch("dot_man.cli.onboarding._confirm_next")
-    @patch("dot_man.cli.onboarding._section_manual")
-    @patch("dot_man.cli.onboarding._section_architecture")
+    @patch(
+        "dot_man.cli.onboarding._run_init_direct",
+        side_effect=KeyboardInterrupt,
+    )
     @patch("dot_man.cli.onboarding._console")
     def test_keyboard_interrupt(
         self,
         mock_console,
-        mock_arch,
-        mock_manual,
-        mock_confirm,
         mock_init,
         mock_branch,
         mock_onboarded,
     ):
-        """KeyboardInterrupt during prompt is caught, prints message, exits."""
+        """KeyboardInterrupt mid-flow is caught, prints message, exits."""
         from dot_man.cli.onboarding import run_onboarding
 
-        # Make Prompt.ask raise KeyboardInterrupt after welcome
-        with patch("dot_man.cli.onboarding.Prompt.ask", side_effect=KeyboardInterrupt):
-            with pytest.raises(SystemExit) as exc_info:
-                run_onboarding()
+        with pytest.raises(SystemExit) as exc_info:
+            run_onboarding()
 
         assert exc_info.value.code == 0
         output = " ".join(str(c) for c in mock_console.print.call_args_list)
         assert "interrupted" in output.lower()
+        mock_onboarded.assert_not_called()
 
     @patch("dot_man.cli.onboarding.mark_onboarded")
     @patch("dot_man.cli.onboarding._offer_first_branch")
     @patch("dot_man.cli.onboarding._run_init_direct", return_value=True)
-    @patch("dot_man.cli.onboarding._confirm_next", return_value=False)
-    @patch("dot_man.cli.onboarding._section_manual")
-    @patch("dot_man.cli.onboarding._section_architecture")
-    @patch("dot_man.cli.onboarding.Prompt.ask", return_value="1")
-    @patch("dot_man.cli.onboarding._console")
-    def test_confirm_false_skips_manual(
-        self,
-        mock_console,
-        mock_prompt,
-        mock_arch,
-        mock_manual,
-        mock_confirm,
-        mock_init,
-        mock_branch,
-        mock_onboarded,
-    ):
-        """When confirm returns False, the second section is skipped."""
-        from dot_man.cli.onboarding import run_onboarding
-
-        run_onboarding()
-
-        mock_arch.assert_called_once()
-        mock_manual.assert_not_called()
-        mock_confirm.assert_called_once()
-        mock_init.assert_called_once()
-        mock_branch.assert_called_once()
-        mock_onboarded.assert_called_once()
-
-    @patch("dot_man.cli.onboarding.mark_onboarded")
-    @patch("dot_man.cli.onboarding._offer_first_branch")
-    @patch("dot_man.cli.onboarding._run_init_direct", return_value=True)
-    @patch("dot_man.cli.onboarding.Prompt.ask", return_value="s")
     @patch("dot_man.cli.onboarding._console")
     def test_finale_teaches_navigate_and_help_all(
-        self, mock_console, mock_prompt, mock_init, mock_branch, mock_onboarded
+        self, mock_console, mock_init, mock_branch, mock_onboarded
     ):
         """Finale panel teaches navigate/help-all, never switch."""
         from dot_man.cli.onboarding import run_onboarding
