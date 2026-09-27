@@ -86,3 +86,15 @@ def test_run_failure_warns_and_continues():
         with patch("dot_man.hook_engine.ui"):
             assert run_hooks(["false", "echo hi"], "Label", _ctx()) is True
     assert mock_sub.run.call_count == 2
+
+
+def test_run_reports_failure_for_deploy_style_hooks():
+    """Deploy migration: nonzero exits warn instead of vanishing."""
+    from dot_man.hook_engine import run_hooks
+
+    with patch("dot_man.hook_engine.subprocess") as mock_sub:
+        mock_sub.run.return_value = MagicMock(returncode=2, stderr="denied")
+        with patch("dot_man.hook_engine.ui") as mock_ui:
+            assert run_hooks(["systemctl stop x"], "Pre", _ctx()) is True
+    printed = " ".join(str(c) for c in mock_ui.console.print.call_args_list)
+    assert "exit code 2" in printed

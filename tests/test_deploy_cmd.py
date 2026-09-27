@@ -484,7 +484,7 @@ pre_deploy = "exit 1"
         repo.index.commit("Add with failing pre-hook")
 
         with patch(
-            "dot_man.cli.deploy_cmd.subprocess.run",
+            "dot_man.hook_engine.subprocess.run",
             side_effect=OSError("command not found"),
         ):
             result = runner.invoke(cli, ["deploy", "main", "--force"])
@@ -516,7 +516,7 @@ post_deploy = "exit 1"
         repo.index.commit("Add with failing post-hook")
 
         with patch(
-            "dot_man.cli.deploy_cmd.subprocess.run",
+            "dot_man.hook_engine.subprocess.run",
             side_effect=OSError("command not found"),
         ):
             result = runner.invoke(cli, ["deploy", "main", "--force"])

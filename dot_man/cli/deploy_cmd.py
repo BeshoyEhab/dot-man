@@ -1,12 +1,11 @@
 """Deploy command for dot-man CLI."""
 
-import subprocess
-
 import click
 from rich.panel import Panel
 
 from .. import ui
 from ..exceptions import DotManError
+from ..hook_engine import HookContext, run_hooks
 from .common import (
     AliasedCommand,
     complete_branches,
@@ -122,13 +121,7 @@ def deploy(branch: str, force: bool, dry_run: bool):
 
         # Execute Pre-Hooks
         if pre_hooks:
-            ui.console.print("\n[bold]Running pre-deploy hooks...[/bold]")
-            for cmd in pre_hooks:
-                ui.console.print(f"  Exec: [cyan]{cmd}[/cyan]")
-                try:
-                    subprocess.run(cmd, shell=True, check=False)
-                except Exception as e:
-                    warn(f"Failed to run command '{cmd}': {e}")
+            run_hooks(pre_hooks, "\nRunning pre-deploy hooks", HookContext())
 
         # Phase 2: Execute Deployment (Parallel)
         ui.console.print("\n[bold]Deploying files...[/bold]")
@@ -148,13 +141,7 @@ def deploy(branch: str, force: bool, dry_run: bool):
 
         # Execute Post-Hooks
         if post_hooks:
-            ui.console.print("\n[bold]Running post-deploy hooks...[/bold]")
-            for cmd in post_hooks:
-                ui.console.print(f"  Exec: [cyan]{cmd}[/cyan]")
-                try:
-                    subprocess.run(cmd, shell=True, check=False)
-                except Exception as e:
-                    warn(f"Failed to run command '{cmd}': {e}")
+            run_hooks(post_hooks, "\nRunning post-deploy hooks", HookContext())
 
         # Update global config
         ops.global_config.current_branch = branch
