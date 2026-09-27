@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **19 new documentation pages** — dedicated pages for `init`, `add`, `deploy`, `tag`, `log`, `diff`, `revert`, `import`, `export`, `discover`, `encrypt`, `hooks`, `template`, `profile`, `watch`, `rollback`, `backup`, `verify`, `completions` commands
 - **Docs navigation restructured** — commands grouped by category (Core, Configuration, Inspection, Tags, Encryption, Import/Export, Hooks, Shell)
 - **Roadmap updated** — consistent with v1.4.0 state, removed stale duplicate sections
+- **Unified onboarding** — the init wizard is the single interactive path (first-run tutorial menu and Architecture/Manual sections removed; `config tutorial` stays as opt-in reference); wizard suggests hooks inline, shows a hook example, and ends with a live `status`; finale teaches `navigate`/`help-all`
 
 ### Fixed
 

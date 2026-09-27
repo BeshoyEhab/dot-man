@@ -1,6 +1,6 @@
 # TODO
 
-**Status:** v1.4.0 · 1811 tests passing · coverage 86% · docs site live
+**Status:** v1.4.0 · 1808 tests passing · coverage 86% · docs site live
 
 ---
 
@@ -14,7 +14,7 @@
 - [ ] **Define the 5-minute happy path** — `init` → `add` → `status` → `navigate`; everything else discoverable from there, not required up front
 - [x] **Trim the command surface** — two-level help: `help` shows happy-path commands only, `help-all` shows everything, plus a man page (`docs/man/dot-man.1`, `help --install-man`); `switch`/`checkout` shims stay until v2.0 (`navigate` is canonical)
 - [ ] **Sensible defaults over configuration** — a minimal `dot-man.toml` works with zero optional keys; advanced keys (`deploy_method`, hooks, templates) surface only when needed
-- [ ] **One guided onboarding** — a single `init` wizard path that ends with a working tracked file (no tutorial-vs-wizard-vs-manual confusion); suggests `post_deploy`/`on_activate` hooks when popular tools are detected and shows a hook example with the first section
+- [x] **One guided onboarding** — a single `init` wizard path that ends with a working tracked file (no tutorial-vs-wizard-vs-manual confusion); suggests `post_deploy`/`on_activate` hooks when popular tools are detected and shows a hook example with the first section
 - [ ] **Every command teaches the next step** — use the existing `ui.next_steps()` after `init`/`add`/`deploy` so users never land on a dead end
 - [ ] **Docs: real-world-first** — a "Start in 5 minutes" guide at the top of the docs site; exhaustive reference moves below; each page opens with a normal-user example
 

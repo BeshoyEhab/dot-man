@@ -7,7 +7,7 @@ Initialize a dot-man repository with interactive setup wizard.
 ```bash
 dot-man init
 dot-man init --import        # Import from existing git repo
-dot-man init --yes           # Skip prompts, use defaults
+dot-man init --no-wizard    # Manual setup without the wizard
 ```
 
 ## What It Does
@@ -34,9 +34,10 @@ The wizard auto-detects common dotfile locations:
 
 | Flag | Description |
 |------|-------------|
+| `--force` | Reinitialize even if already exists |
+| `--no-wizard` | Skip interactive setup wizard |
+| `--sandbox` | Test init in a temporary sandbox directory |
 | `--import` | Import from an existing git repository |
-| `--yes` | Accept all defaults without prompting |
-| `--verbose` | Show detailed output |
 
 ## Examples
 
@@ -48,8 +49,8 @@ dot-man init
 cd ~/my-dotfiles
 dot-man init --import
 
-# Non-interactive setup
-dot-man init --yes
+# Manual setup without the wizard
+dot-man init --no-wizard
 ```
 
 ## Post-Init
