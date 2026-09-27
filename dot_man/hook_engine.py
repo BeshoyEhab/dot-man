@@ -9,8 +9,8 @@ import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import ui
-from .constants import DOT_MAN_DIR, HOOK_ALIASES, REPO_DIR
+from . import constants, ui
+from .constants import DOT_MAN_DIR, REPO_DIR
 from .exceptions import ConfigurationError
 
 HOOKS_DIR = DOT_MAN_DIR / "hooks"
@@ -63,7 +63,7 @@ def resolve_hook(hook: str | None, context: HookContext) -> str | None:
     """Resolve one hook string: alias, then `{x}`, then `file:` tokens."""
     if not hook:
         return None
-    resolved = HOOK_ALIASES.get(hook, hook)
+    resolved = constants.HOOK_ALIASES.get(hook, hook)
     for name, value in context.placeholders().items():
         if value:
             resolved = resolved.replace("{" + name + "}", value)

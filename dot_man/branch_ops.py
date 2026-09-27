@@ -334,7 +334,7 @@ class BranchMixin:
             for pattern, hook_name in FILE_TO_HOOK_MAP.items():
                 if pattern in file_str or file_str.endswith(pattern):
                     if hook_name in HOOK_ALIASES:
-                        resolved = resolve_hook(HOOK_ALIASES[hook_name], context)
+                        resolved = resolve_hook(hook_name, context)
                         if resolved:
                             hooks_to_run.add(resolved)
                     else:
