@@ -477,6 +477,26 @@ class TestDetectHooksForChangedFiles:
         assert "echo custom" in hooks
         assert any("source" in h for h in hooks)
 
+    def test_auto_detected_alias_resolves_placeholders(self):
+        """Auto-detected aliases must not ship raw {config_name}."""
+        from dot_man.config import Section
+
+        section = Section(name="qs", paths=[Path("/home/user/.config/quickshell/ii")])
+        ops = FakeOps(sections={"qs": section})
+
+        with patch(
+            "dot_man.constants.HOOK_ALIASES",
+            {"qs_reload": "qs -c {config_name} &"},
+        ):
+            with patch.dict(
+                "dot_man.branch_ops.FILE_TO_HOOK_MAP",
+                {".config/quickshell": "qs_reload"},
+            ):
+                hooks = ops.detect_hooks_for_changed_files(
+                    ["/home/user/.config/quickshell/ii"]
+                )
+        assert hooks == ["qs -c ii &"]
+
 
 class TestFindSectionForFile:
     def test_find_exact_match(self):

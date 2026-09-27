@@ -308,19 +308,35 @@ class BranchMixin:
         Returns:
             List of hook commands to execute (deduplicated)
         """
+        from .constants import HOOK_ALIASES
+        from .hook_engine import HookContext, resolve_hook
+
         hooks_to_run = set()
 
         for file_path in changed_files:
             file_str = str(file_path)
 
+            section_name = self._find_section_for_file(file_str)
+            context = HookContext()
+            if section_name:
+                try:
+                    section = self.get_section(section_name)
+                    first = str(section.paths[0]) if section.paths else ""
+                    context = HookContext(
+                        section_name=section_name,
+                        config_name=Path(first).name if first else "",
+                        config_root=str(Path(first).parent) if first else "",
+                        paths=tuple(str(p) for p in section.paths),
+                    )
+                except Exception:
+                    context = HookContext()
+
             for pattern, hook_name in FILE_TO_HOOK_MAP.items():
                 if pattern in file_str or file_str.endswith(pattern):
-                    # Try to resolve the hook alias first
-                    from .constants import HOOK_ALIASES
-
                     if hook_name in HOOK_ALIASES:
-                        resolved_cmd: str = HOOK_ALIASES[hook_name]
-                        hooks_to_run.add(resolved_cmd)
+                        resolved = resolve_hook(HOOK_ALIASES[hook_name], context)
+                        if resolved:
+                            hooks_to_run.add(resolved)
                     else:
                         # Fallback to get_hook_for_config
                         fallback_cmd = get_hook_for_config(pattern)
@@ -328,7 +344,6 @@ class BranchMixin:
                             hooks_to_run.add(fallback_cmd)
                     break
 
-            section_name = self._find_section_for_file(file_path)
             if section_name:
                 section = self.get_section(section_name)
                 if section.pre_deploy:
