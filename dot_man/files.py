@@ -74,6 +74,58 @@ def atomic_write_text(path: Path, content: str, encoding: str = "utf-8") -> None
         raise
 
 
+def _filter_file_secrets(
+    src_path: Path,
+    src_content: str,
+    secret_handler: Callable[[SecretMatch], str] | None,
+    check_secrets: bool,
+) -> tuple[str, list[SecretMatch]]:
+    """Filter secrets from file content; returns (content, matches)."""
+    if not check_secrets:
+        return src_content, []
+
+    # Use lazy-loaded guards
+    allow_guard = _get_secret_guard()
+    redact_guard = _get_redact_guard()
+
+    def wrapped_handler(match: SecretMatch) -> str:
+        # Check allow list first
+        if allow_guard.is_allowed(src_path, match.line_content, match.pattern_name):
+            return "IGNORE"
+
+        # Check permanent redact list
+        if redact_guard.should_redact(src_path, match.line_content, match.pattern_name):
+            return "REDACT"
+
+        # Delegate to user handler
+        if secret_handler:
+            return secret_handler(match)
+        return "REDACT"
+
+    return filter_secrets(src_content, callback=wrapped_handler, file_path=src_path)
+
+
+def _destination_differs(src_path: Path, dest_path: Path, final_content: str) -> bool:
+    """Check whether the destination needs (re)writing."""
+    if not dest_path.is_file():
+        return True
+    try:
+        # Check permissions first
+        src_stat = src_path.stat()
+        dest_stat = dest_path.stat()
+        if src_stat.st_mode != dest_stat.st_mode:
+            return True
+
+        # Compare content
+        with dest_path.open("r", encoding="utf-8", newline="") as f:
+            dest_content = f.read()
+
+        return final_content != dest_content
+
+    except (UnicodeDecodeError, OSError):
+        return True  # Assume changed if can't read dest
+
+
 def smart_save_file(
     src_path: Path,
     dest_path: Path,
@@ -104,52 +156,12 @@ def smart_save_file(
         return _handle_binary_copy(src_path, dest_path, check_secrets)
 
     # 2. Filter secrets (lazy load guards only when needed)
-    final_content = src_content
-    detected_secrets = []
-    if check_secrets:
-        # Use lazy-loaded guards
-        allow_guard = _get_secret_guard()
-        redact_guard = _get_redact_guard()
+    final_content, detected_secrets = _filter_file_secrets(
+        src_path, src_content, secret_handler, check_secrets
+    )
 
-        def wrapped_handler(match: SecretMatch) -> str:
-            # Check allow list first
-            if allow_guard.is_allowed(src_path, match.line_content, match.pattern_name):
-                return "IGNORE"
-
-            # Check permanent redact list
-            if redact_guard.should_redact(
-                src_path, match.line_content, match.pattern_name
-            ):
-                return "REDACT"
-
-            # Delegate to user handler
-            if secret_handler:
-                return secret_handler(match)
-            return "REDACT"
-
-        final_content, detected_secrets = filter_secrets(
-            src_content, callback=wrapped_handler, file_path=src_path
-        )
-
-    # 3. Compare with destination
-    should_save = True
-    if dest_path.is_file():
-        try:
-            # Check permissions first
-            src_stat = src_path.stat()
-            dest_stat = dest_path.stat()
-            if src_stat.st_mode != dest_stat.st_mode:
-                should_save = True
-            else:
-                # Compare content
-                with dest_path.open("r", encoding="utf-8", newline="") as f:
-                    dest_content = f.read()
-
-                if final_content == dest_content:
-                    should_save = False
-
-        except (UnicodeDecodeError, OSError):
-            should_save = True  # Assume changed if can't read dest
+    # 3. Compare with destination, 4. write if different
+    should_save = _destination_differs(src_path, dest_path, final_content)
 
     # 4. Atomic Write if needed
     if should_save:
@@ -245,6 +257,72 @@ def matches_patterns(path: Path, patterns: list[str]) -> bool:
     return False
 
 
+def _prune_excluded_dirs(
+    source: Path, root_path: Path, dirs: list[str], exclude_patterns: list[str]
+) -> None:
+    """Remove excluded directories in-place to avoid traversing them."""
+    # Since matches_patterns expects a Path relative to source, we construct it.
+    # root_rel is the relative path of current directory from source.
+    try:
+        root_rel = root_path.relative_to(source)
+    except ValueError:
+        # Should not happen as we walk source
+        return
+
+    # Iterate backwards to safely remove items
+    for i in range(len(dirs) - 1, -1, -1):
+        d_name = dirs[i]
+        d_rel = root_rel / d_name
+
+        # Check if this directory should be excluded
+        if matches_patterns(d_rel, exclude_patterns):
+            del dirs[i]
+            continue
+
+
+def _copy_walk_file(
+    source: Path,
+    destination: Path,
+    root_path: Path,
+    filename: str,
+    include_patterns: list[str],
+    exclude_patterns: list[str],
+    filter_secrets_enabled: bool,
+    secret_handler: Callable[[SecretMatch], str] | None,
+) -> tuple[int, int, list[SecretMatch]]:
+    """Copy one walked file; returns (copied, failed, secrets)."""
+    src_file = root_path / filename
+
+    # Calculate relative path from source root
+    try:
+        relative = src_file.relative_to(source)
+    except ValueError:
+        return 0, 0, []
+
+    # Check exclude patterns
+    if exclude_patterns and matches_patterns(relative, exclude_patterns):
+        return 0, 0, []
+
+    # Check include patterns (if specified, file must match at least one)
+    if include_patterns and not matches_patterns(relative, include_patterns):
+        return 0, 0, []
+
+    dest_path = destination / relative
+
+    try:
+        # Use smart_save_file for single pass, robust saving
+        saved, secrets = smart_save_file(
+            src_file,
+            dest_path,
+            secret_handler=secret_handler,
+            check_secrets=filter_secrets_enabled,
+        )
+        return (1, 0, secrets) if saved else (0, 0, secrets)
+    except Exception as e:
+        logging.warning("Failed to copy file %s: %s", src_file, e)
+        return 0, 1, []
+
+
 def copy_directory(
     source: Path,
     destination: Path,
@@ -280,62 +358,23 @@ def copy_directory(
 
         # Prune ignored directories in-place to avoid traversing them
         if exclude_patterns:
-            # We need to calculate relative path for each dir to check against patterns
-            # Note: dirs[:] = [d for d in dirs if not matches_patterns...]
-            # The check needs to be efficient.
-
-            # Since matches_patterns expects a Path relative to source, we construct it.
-            # root_rel is the relative path of current directory from source.
-            try:
-                root_rel = root_path.relative_to(source)
-            except ValueError:
-                # Should not happen as we walk source
-                continue
-
-            # Iterate backwards to safely remove items
-            for i in range(len(dirs) - 1, -1, -1):
-                d_name = dirs[i]
-                d_rel = root_rel / d_name
-
-                # Check if this directory should be excluded
-                if matches_patterns(d_rel, exclude_patterns):
-                    del dirs[i]
-                    continue
+            _prune_excluded_dirs(source, root_path, dirs, exclude_patterns)
 
         # Process files
         for filename in files:
-            src_file = root_path / filename
-
-            # Calculate relative path from source root
-            try:
-                relative = src_file.relative_to(source)
-            except ValueError:
-                continue
-
-            # Check exclude patterns
-            if exclude_patterns and matches_patterns(relative, exclude_patterns):
-                continue
-
-            # Check include patterns (if specified, file must match at least one)
-            if include_patterns and not matches_patterns(relative, include_patterns):
-                continue
-
-            dest_path = destination / relative
-
-            try:
-                # Use smart_save_file for single pass, robust saving
-                saved, secrets = smart_save_file(
-                    src_file,
-                    dest_path,
-                    secret_handler=secret_handler,
-                    check_secrets=filter_secrets_enabled,
-                )
-                all_secrets.extend(secrets)
-                if saved:
-                    files_copied += 1
-            except Exception as e:
-                logging.warning("Failed to copy file %s: %s", src_file, e)
-                files_failed += 1
+            copied, failed, secrets = _copy_walk_file(
+                source,
+                destination,
+                root_path,
+                filename,
+                include_patterns,
+                exclude_patterns,
+                filter_secrets_enabled,
+                secret_handler,
+            )
+            files_copied += copied
+            files_failed += failed
+            all_secrets.extend(secrets)
 
     return files_copied, files_failed, all_secrets
 
