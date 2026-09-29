@@ -1,9 +1,10 @@
 """Extended tests for GitManager (init, checkout_commit, delete_branch, etc.)."""
 
+import shutil
 from pathlib import Path
 
 import pytest
-from git import Repo
+from git import GitCommandError, Repo
 
 from dot_man.core import GitManager
 from dot_man.exceptions import (
@@ -483,3 +484,582 @@ class TestGetSyncStatus:
         gm = GitManager(repo_path)
         status = gm.get_sync_status()
         assert status["remote_configured"] is False
+
+
+def _seed_bare_origin(tmp_path: Path, name: str = "origin.git"):
+    """Create a bare origin repo seeded with one commit via a temp clone."""
+    bare = tmp_path / name
+    Repo.init(bare, bare=True)
+    seed_dir = tmp_path / f"seed-{name.replace('.git', '')}"
+    seed = Repo.clone_from(str(bare), str(seed_dir))
+    with seed.config_writer() as config:
+        config.set_value("user", "name", "Test")
+        config.set_value("user", "email", "test@test.com")
+    (seed_dir / "f.txt").write_text("line1\nline2\n")
+    seed.index.add(["f.txt"])
+    seed.index.commit("seed commit")
+    branch = seed.active_branch.name
+    seed.git.push("-u", "origin", branch)
+    return bare, branch
+
+
+def _clone_from(bare: Path, dest: Path):
+    """Clone a bare repo with test identity configured."""
+    clone = Repo.clone_from(str(bare), str(dest))
+    with clone.config_writer() as config:
+        config.set_value("user", "name", "Test")
+        config.set_value("user", "email", "test@test.com")
+    return clone
+
+
+class TestInitFailure:
+    """Test GitManager.init() failure mapping."""
+
+    def test_init_on_existing_file_raises(self, tmp_path):
+        """init should raise GitOperationError when path is a file."""
+        blocker = tmp_path / "blocker"
+        blocker.write_text("x")
+        gm = GitManager(blocker)
+        with pytest.raises(GitOperationError, match="Failed to initialize"):
+            gm.init()
+
+
+class TestCurrentBranchDetached:
+    """Test current_branch in detached HEAD state."""
+
+    def test_detached_head_returns_head(self, tmp_path):
+        """current_branch should return HEAD when detached."""
+        repo_path = _init_repo(tmp_path)
+        gm = GitManager(repo_path)
+        sha = next(gm.get_commits())["sha"]
+        gm.checkout_commit(sha)
+        assert gm.current_branch() == "HEAD"
+
+
+class TestCreateBranchFailure:
+    """Test create_branch failure mapping."""
+
+    def test_create_branch_empty_name_raises(self, tmp_path):
+        """create_branch should raise GitOperationError for empty name."""
+        repo_path = _init_repo(tmp_path)
+        gm = GitManager(repo_path)
+        with pytest.raises(GitOperationError, match="Failed to create branch"):
+            gm.create_branch("")
+
+
+class TestCheckoutOverwriteConflict:
+    """Test checkout failure mapping."""
+
+    def test_checkout_overwriting_untracked_raises(self, tmp_path):
+        """checkout should raise GitOperationError when untracked files clash."""
+        repo_path = _init_repo(tmp_path)
+        gm = GitManager(repo_path)
+        repo = Repo(repo_path)
+        repo.create_head("other")
+        repo.heads["other"].checkout()
+        (repo_path / "clash.txt").write_text("tracked version")
+        repo.index.add(["clash.txt"])
+        repo.index.commit("tracked clash file")
+        repo.heads["master"].checkout()
+        (repo_path / "clash.txt").write_text("untracked version")
+        with pytest.raises(GitOperationError, match="Failed to checkout"):
+            gm.checkout("other")
+
+
+class TestCheckoutCommitBlob:
+    """Test checkout_commit failure mapping."""
+
+    def test_checkout_commit_blob_sha_raises(self, tmp_path):
+        """checkout_commit should raise GitOperationError for a blob SHA."""
+        repo_path = _init_repo(tmp_path)
+        gm = GitManager(repo_path)
+        blob_sha = gm.repo.git.rev_parse("HEAD:README.md").strip()
+        with pytest.raises(GitOperationError, match="Failed to checkout commit"):
+            gm.checkout_commit(blob_sha)
+
+
+class TestCreateTagFailure:
+    """Test create_tag failure mapping."""
+
+    def test_create_tag_bad_ref_raises(self, tmp_path):
+        """create_tag should raise GitOperationError for unknown ref."""
+        repo_path = _init_repo(tmp_path)
+        gm = GitManager(repo_path)
+        with pytest.raises(GitOperationError, match="Failed to create tag"):
+            gm.create_tag("v-bad", ref="no-such-ref")
+
+
+class TestDeleteTagFailure:
+    """Test delete_tag failure mapping."""
+
+    def test_delete_tag_readonly_refs_raises(self, tmp_path):
+        """delete_tag should raise GitOperationError when git cannot delete."""
+        import os
+
+        repo_path = _init_repo(tmp_path)
+        gm = GitManager(repo_path)
+        gm.create_tag("v1.0")
+        tags_dir = repo_path / ".git" / "refs" / "tags"
+        os.chmod(tags_dir, 0o555)
+        try:
+            with pytest.raises(GitOperationError, match="Failed to delete tag"):
+                gm.delete_tag("v1.0")
+        finally:
+            os.chmod(tags_dir, 0o755)
+        assert "v1.0" in gm.list_tags()
+
+
+class TestGetStatusChangeTypes:
+    """Test get_status modified/deleted classification."""
+
+    def test_modified_files_listed(self, tmp_path):
+        """get_status should list edited tracked files as modified."""
+        repo_path = _init_repo(tmp_path)
+        gm = GitManager(repo_path)
+        (repo_path / "README.md").write_text("# changed")
+        status = gm.get_status()
+        assert "README.md" in status["modified"]
+        assert status["deleted"] == []
+
+    def test_deleted_files_listed(self, tmp_path):
+        """get_status should list removed tracked files as deleted."""
+        repo_path = _init_repo(tmp_path)
+        gm = GitManager(repo_path)
+        (repo_path / "README.md").unlink()
+        status = gm.get_status()
+        assert "README.md" in status["deleted"]
+        assert status["modified"] == []
+
+
+class TestAddAllFailure:
+    """Test add_all failure mapping."""
+
+    def test_add_all_after_git_removed_raises(self, tmp_path):
+        """add_all should raise GitOperationError when .git is gone."""
+        repo_path = _init_repo(tmp_path)
+        gm = GitManager(repo_path)
+        _ = gm.repo
+        shutil.rmtree(repo_path / ".git")
+        with pytest.raises(GitOperationError, match="Failed to stage"):
+            gm.add_all()
+
+
+class TestCommitFailure:
+    """Test commit failure mapping."""
+
+    def test_commit_corrupt_ref_raises(self, tmp_path):
+        """commit should raise GitOperationError when HEAD ref is corrupt."""
+        repo_path = _init_repo(tmp_path)
+        gm = GitManager(repo_path)
+        (repo_path / "extra.txt").write_text("x")
+        ref = repo_path / ".git" / "refs" / "heads" / "master"
+        ref.write_text("garbage-not-a-sha\n")
+        with pytest.raises(GitOperationError, match="Failed to commit"):
+            gm.commit("boom")
+
+
+class TestEmptyRepoCommits:
+    """Test commit listing on repos without commits."""
+
+    def test_get_commits_empty_repo(self, tmp_path):
+        """get_commits should yield nothing when the repo has no commits."""
+        repo_path = tmp_path / "empty"
+        repo_path.mkdir()
+        Repo.init(repo_path)
+        gm = GitManager(repo_path)
+        assert list(gm.get_commits()) == []
+
+    def test_get_commits_detailed_empty_repo(self, tmp_path):
+        """get_commits_detailed should return [] when repo has no commits."""
+        repo_path = tmp_path / "empty"
+        repo_path.mkdir()
+        Repo.init(repo_path)
+        gm = GitManager(repo_path)
+        assert gm.get_commits_detailed() == []
+
+
+class TestDeleteBranchFailures:
+    """Test delete_branch error mapping."""
+
+    def test_delete_unmerged_branch_raises(self, tmp_path):
+        """delete_branch should raise BranchNotMergedError for unmerged work."""
+        from dot_man.exceptions import BranchNotMergedError
+
+        repo_path = _init_repo(tmp_path)
+        gm = GitManager(repo_path)
+        gm.create_branch("unmerged")
+        gm.checkout("unmerged")
+        (repo_path / "unique.txt").write_text("diverged")
+        gm.add_all()
+        gm.commit("diverged commit")
+        gm.checkout("master")
+        with pytest.raises(BranchNotMergedError, match="not fully merged"):
+            gm.delete_branch("unmerged")
+
+    def test_delete_branch_oserror_raises(self, tmp_path):
+        """delete_branch should map OSError to GitOperationError."""
+        from unittest.mock import patch
+
+        repo_path = _init_repo(tmp_path)
+        gm = GitManager(repo_path)
+        gm.create_branch("victim")
+        with patch.object(gm.repo, "delete_head", side_effect=OSError("disk full")):
+            with pytest.raises(GitOperationError, match="Failed to delete branch"):
+                gm.delete_branch("victim")
+
+    def test_delete_branch_git_failure_raises(self, tmp_path):
+        """delete_branch should map unexpected git failures."""
+        from unittest.mock import patch
+
+        repo_path = _init_repo(tmp_path)
+        gm = GitManager(repo_path)
+        gm.create_branch("victim")
+        with patch.object(
+            gm.repo, "delete_head", side_effect=GitCommandError("delete", 1)
+        ):
+            with pytest.raises(GitOperationError, match="Failed to delete branch"):
+                gm.delete_branch("victim")
+
+
+class TestSetRemoteFailure:
+    """Test set_remote failure mapping."""
+
+    def test_set_remote_backend_failure_raises(self, tmp_path):
+        """set_remote should raise GitOperationError when git fails."""
+        from unittest.mock import patch
+
+        repo_path = _init_repo(tmp_path)
+        gm = GitManager(repo_path)
+        with patch.object(
+            Repo, "create_remote", side_effect=GitCommandError("remote", 128)
+        ):
+            with pytest.raises(GitOperationError, match="Failed to set remote"):
+                gm.set_remote("https://example.com/repo.git")
+
+
+class TestFetchFailure:
+    """Test fetch failure mapping."""
+
+    def test_fetch_unreachable_remote_raises(self, tmp_path):
+        """fetch should raise GitOperationError for a dead remote URL."""
+        repo_path = _init_repo(tmp_path)
+        gm = GitManager(repo_path)
+        gm.set_remote(str(tmp_path / "does-not-exist.git"))
+        with pytest.raises(GitOperationError, match="Failed to fetch"):
+            gm.fetch()
+
+
+class TestPullFlows:
+    """Test pull() remote flows against real local bare origins."""
+
+    def test_pull_missing_remote_branch(self, tmp_path):
+        """pull should report when the remote branch does not exist."""
+        repo_path = _init_repo(tmp_path)
+        gm = GitManager(repo_path)
+        empty_bare = tmp_path / "empty.git"
+        Repo.init(empty_bare, bare=True)
+        gm.set_remote(str(empty_bare))
+        current = gm.current_branch()
+        result = gm.pull()
+        assert result == f"Remote branch '{current}' not found. Nothing to pull."
+
+    def test_pull_fast_forward_rebase(self, tmp_path):
+        """pull should fast-forward to newly pushed origin commits."""
+        bare, branch = _seed_bare_origin(tmp_path)
+        work_dir = tmp_path / "work"
+        _clone_from(bare, work_dir)
+        other = _clone_from(bare, tmp_path / "other")
+        (tmp_path / "other" / "new.txt").write_text("from origin\n")
+        other.index.add(["new.txt"])
+        other.index.commit("origin advance")
+        other.git.push("origin", branch)
+
+        gm = GitManager(work_dir)
+        result = gm.pull()
+        assert isinstance(result, str) and len(result) > 0
+        assert (work_dir / "new.txt").read_text() == "from origin\n"
+
+    def test_pull_stashes_dirty_work(self, tmp_path):
+        """pull should stash uncommitted changes and restore them."""
+        bare, branch = _seed_bare_origin(tmp_path)
+        work_dir = tmp_path / "work"
+        _clone_from(bare, work_dir)
+        other = _clone_from(bare, tmp_path / "other")
+        (tmp_path / "other" / "new.txt").write_text("from origin\n")
+        other.index.add(["new.txt"])
+        other.index.commit("origin advance")
+        other.git.push("origin", branch)
+
+        (work_dir / "f.txt").write_text("line1\nline2\nlocal edit\n")
+        gm = GitManager(work_dir)
+        result = gm.pull()
+        assert isinstance(result, str) and len(result) > 0
+        assert (work_dir / "new.txt").read_text() == "from origin\n"
+        assert "local edit" in (work_dir / "f.txt").read_text()
+
+    def test_pull_merge_mode(self, tmp_path):
+        """pull with rebase=False should merge origin commits."""
+        bare, branch = _seed_bare_origin(tmp_path)
+        work_dir = tmp_path / "work"
+        _clone_from(bare, work_dir)
+        other = _clone_from(bare, tmp_path / "other")
+        (tmp_path / "other" / "new.txt").write_text("from origin\n")
+        other.index.add(["new.txt"])
+        other.index.commit("origin advance")
+        other.git.push("origin", branch)
+
+        gm = GitManager(work_dir)
+        result = gm.pull(rebase=False)
+        assert isinstance(result, str) and len(result) > 0
+        assert (work_dir / "new.txt").read_text() == "from origin\n"
+
+    def test_pull_conflict_raises(self, tmp_path):
+        """pull should raise GitOperationError on rebase conflicts."""
+        bare, branch = _seed_bare_origin(tmp_path)
+        work_dir = tmp_path / "work"
+        _clone_from(bare, work_dir)
+        other = _clone_from(bare, tmp_path / "other")
+        (tmp_path / "other" / "f.txt").write_text("OTHER\nline2\n")
+        other.index.add(["f.txt"])
+        other.index.commit("origin conflicting change")
+        other.git.push("origin", branch)
+
+        gm = GitManager(work_dir)
+        (work_dir / "f.txt").write_text("LOCAL\nline2\n")
+        gm.add_all()
+        gm.commit("local conflicting change")
+        with pytest.raises(GitOperationError, match="Merge conflict"):
+            gm.pull()
+
+    def test_pull_stash_pop_conflict_warns(self, tmp_path):
+        """pull should warn when stashed changes clash with pulled commits."""
+        bare, branch = _seed_bare_origin(tmp_path)
+        work_dir = tmp_path / "work"
+        _clone_from(bare, work_dir)
+        other = _clone_from(bare, tmp_path / "other")
+        (tmp_path / "other" / "f.txt").write_text("OTHER\nline2\n")
+        other.index.add(["f.txt"])
+        other.index.commit("origin change")
+        other.git.push("origin", branch)
+
+        gm = GitManager(work_dir)
+        (work_dir / "f.txt").write_text("WORKDIRTY\nline2\n")
+        result = gm.pull()
+        assert "Stash pop failed" in result
+
+    def test_pull_deleted_origin_raises_and_restores_stash(self, tmp_path):
+        """pull should restore the stash when the origin vanished."""
+        bare, branch = _seed_bare_origin(tmp_path)
+        work_dir = tmp_path / "work"
+        _clone_from(bare, work_dir)
+        (work_dir / "f.txt").write_text("line1\nline2\nprecious edit\n")
+        shutil.rmtree(bare)
+        gm = GitManager(work_dir)
+        with pytest.raises(GitOperationError, match="Failed to pull"):
+            gm.pull()
+        assert "precious edit" in (work_dir / "f.txt").read_text()
+
+    def test_pull_oserror_raises(self, tmp_path):
+        """pull should map OSError to GitOperationError."""
+        from unittest.mock import patch
+
+        bare, _ = _seed_bare_origin(tmp_path)
+        work_dir = tmp_path / "work"
+        _clone_from(bare, work_dir)
+        gm = GitManager(work_dir)
+        with patch("git.cmd.Git.execute", side_effect=OSError("disk full")):
+            with pytest.raises(GitOperationError, match="Failed to pull"):
+                gm.pull()
+
+    def test_pull_oserror_restores_stash(self, tmp_path):
+        """pull should restore stashed changes when disk operations fail."""
+        from unittest.mock import patch
+
+        from git.cmd import Git
+
+        bare, _ = _seed_bare_origin(tmp_path)
+        work_dir = tmp_path / "work"
+        _clone_from(bare, work_dir)
+        (work_dir / "f.txt").write_text("line1\nline2\nprecious edit\n")
+        gm = GitManager(work_dir)
+        real_execute = Git.execute
+
+        def fail_on_pull(execute_self, *args, **kwargs):
+            cmd = args[0] if args else kwargs.get("command", "")
+            if "pull" in str(cmd):
+                raise OSError("disk full")
+            return real_execute(execute_self, *args, **kwargs)
+
+        with patch("git.cmd.Git.execute", autospec=True, side_effect=fail_on_pull):
+            with pytest.raises(GitOperationError, match="Failed to pull"):
+                gm.pull()
+        assert "precious edit" in (work_dir / "f.txt").read_text()
+
+
+class TestPushFlows:
+    """Test push() flows against real local bare origins."""
+
+    def test_push_new_commit(self, tmp_path):
+        """push should publish local commits to the origin."""
+        bare, branch = _seed_bare_origin(tmp_path)
+        work_dir = tmp_path / "work"
+        _clone_from(bare, work_dir)
+        gm = GitManager(work_dir)
+        (work_dir / "pushed.txt").write_text("hello\n")
+        gm.add_all()
+        gm.commit("push me")
+        result = gm.push()
+        assert isinstance(result, str) and len(result) > 0
+        assert Repo(str(bare)).heads[branch].commit.message.strip() == "push me"
+
+    def test_push_without_upstream_flag(self, tmp_path):
+        """push without set_upstream should still publish commits."""
+        bare, branch = _seed_bare_origin(tmp_path)
+        work_dir = tmp_path / "work"
+        _clone_from(bare, work_dir)
+        gm = GitManager(work_dir)
+        (work_dir / "pushed.txt").write_text("hello\n")
+        gm.add_all()
+        gm.commit("push me flat")
+        result = gm.push(set_upstream=False)
+        assert isinstance(result, str) and len(result) > 0
+        assert Repo(str(bare)).heads[branch].commit.message.strip() == "push me flat"
+
+    def test_push_rejected_raises(self, tmp_path):
+        """push should raise GitOperationError when the remote moved first."""
+        bare, branch = _seed_bare_origin(tmp_path)
+        work_dir = tmp_path / "work"
+        _clone_from(bare, work_dir)
+        other = _clone_from(bare, tmp_path / "other")
+        (tmp_path / "other" / "new.txt").write_text("origin wins\n")
+        other.index.add(["new.txt"])
+        other.index.commit("origin wins")
+        other.git.push("origin", branch)
+
+        gm = GitManager(work_dir)
+        (work_dir / "stale.txt").write_text("stale work\n")
+        gm.add_all()
+        gm.commit("stale commit")
+        with pytest.raises(GitOperationError, match="Push rejected"):
+            gm.push()
+
+    def test_push_deleted_origin_raises(self, tmp_path):
+        """push should raise GitOperationError when the origin vanished."""
+        bare, _ = _seed_bare_origin(tmp_path)
+        work_dir = tmp_path / "work"
+        _clone_from(bare, work_dir)
+        gm = GitManager(work_dir)
+        (work_dir / "stale.txt").write_text("stale work\n")
+        gm.add_all()
+        gm.commit("stale commit")
+        shutil.rmtree(bare)
+        with pytest.raises(GitOperationError, match="Failed to push"):
+            gm.push()
+
+    def test_push_oserror_raises(self, tmp_path):
+        """push should map OSError to GitOperationError."""
+        from unittest.mock import patch
+
+        bare, _ = _seed_bare_origin(tmp_path)
+        work_dir = tmp_path / "work"
+        _clone_from(bare, work_dir)
+        gm = GitManager(work_dir)
+        (work_dir / "pushed.txt").write_text("hello\n")
+        gm.add_all()
+        gm.commit("push me")
+        with patch("git.cmd.Git.execute", side_effect=OSError("disk full")):
+            with pytest.raises(GitOperationError, match="Failed to push"):
+                gm.push()
+
+
+class TestGetAllBranchStatsEdgeCases:
+    """Test get_all_branch_stats empty and malformed output paths."""
+
+    def test_empty_repo_returns_empty(self, tmp_path):
+        """get_all_branch_stats should return [] with no branches."""
+        repo_path = tmp_path / "empty"
+        repo_path.mkdir()
+        Repo.init(repo_path)
+        gm = GitManager(repo_path)
+        assert gm.get_all_branch_stats() == []
+
+    def test_git_failure_returns_empty(self, tmp_path):
+        """get_all_branch_stats should return [] when git fails."""
+        repo_path = _init_repo(tmp_path)
+        gm = GitManager(repo_path)
+        _ = gm.repo
+        shutil.rmtree(repo_path / ".git")
+        assert gm.get_all_branch_stats() == []
+
+    def test_blank_and_malformed_lines_skipped(self, tmp_path):
+        """get_all_branch_stats should skip blank and malformed lines."""
+        from unittest.mock import patch
+
+        repo_path = _init_repo(tmp_path)
+        gm = GitManager(repo_path)
+        _ = gm.repo
+        payload = "main|2025-01-02|subject here\n\nnot-enough-parts"
+        with patch("git.cmd.Git.execute", return_value=payload):
+            stats = gm.get_all_branch_stats()
+        assert stats == [
+            {
+                "name": "main",
+                "last_commit_date": "2025-01-02",
+                "last_commit_msg": "subject here",
+                "file_count": None,
+            }
+        ]
+
+
+class TestGetSyncStatusFlows:
+    """Test get_sync_status against real local bare origins."""
+
+    def test_ahead_and_behind_counts(self, tmp_path):
+        """get_sync_status should count diverged commits both ways."""
+        bare, branch = _seed_bare_origin(tmp_path)
+        work_dir = tmp_path / "work"
+        _clone_from(bare, work_dir)
+        other = _clone_from(bare, tmp_path / "other")
+        (tmp_path / "other" / "new.txt").write_text("origin\n")
+        other.index.add(["new.txt"])
+        other.index.commit("origin advance")
+        other.git.push("origin", branch)
+
+        gm = GitManager(work_dir)
+        (work_dir / "local.txt").write_text("local\n")
+        gm.add_all()
+        gm.commit("local advance")
+        status = gm.get_sync_status()
+        assert status["ahead"] == 1
+        assert status["behind"] == 1
+        assert status["remote_configured"] is True
+        assert status["remote_branch_exists"] is True
+
+    def test_missing_remote_branch(self, tmp_path):
+        """get_sync_status should flag a remote without the branch."""
+        repo_path = _init_repo(tmp_path)
+        gm = GitManager(repo_path)
+        empty_bare = tmp_path / "empty.git"
+        Repo.init(empty_bare, bare=True)
+        gm.set_remote(str(empty_bare))
+        status = gm.get_sync_status()
+        assert status["remote_configured"] is True
+        assert status["remote_branch_exists"] is False
+        assert status["ahead"] == 0
+        assert status["behind"] == 0
+
+    def test_fetch_failure_returns_error(self, tmp_path):
+        """get_sync_status should return an error dict when fetch fails."""
+        from unittest.mock import patch
+
+        repo_path = _init_repo(tmp_path)
+        gm = GitManager(repo_path)
+        gm.set_remote(str(tmp_path / "does-not-exist.git"))
+        with patch.object(gm, "fetch", side_effect=GitCommandError("fetch", 128)):
+            status = gm.get_sync_status()
+        assert status == {
+            "ahead": 0,
+            "behind": 0,
+            "remote_configured": True,
+            "error": True,
+        }
