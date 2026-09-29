@@ -31,12 +31,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Navigate to tags** — `navigate <tag>` died with `BranchNotFoundError` (`checkout` only resolves branch heads); now checks out the tag's commit
+- **Swallowed error details** — save/deploy error lists printed after `ui.error()` raised, so details never showed; now printed before exiting (abort semantics unchanged)
 - **Eliminated all bare `sys.exit()` calls** — `ui.error()`, `init` abort, `onboarding` interrupt, and `--complete` dispatch now use `raise SystemExit(...)` with `ExitCode` values
 - **`navigate` error handling deduplicated** — `_navigate_impl` delegates to `handle_exception(e, "Navigate")` instead of an inline duplicate renderer
 - **`bootstrap` / `config get` / `doctor` error paths** — route through `common.error()`; `doctor` failure summary is a single `error(..., exit_code=1)` instead of `error(..., exit_code=0)` + separate `raise SystemExit(1)`
 - **`save_cmd.py`** — fixed `_sync_shared_sections` → `sync_shared_sections` name mismatch that caused `NameError` on `--commit` flag
 - **`shared_sync.py`** — `_sync_branch` now records overridden sections in `report.skipped` even when other shared sections are still wanted (partial overrides)
-- **Tests** — all 1832 tests passing (up from 1700), 1 skipped; coverage 84% → 86%
+- **Tests** — all 1954 tests passing (up from 1700), 1 skipped; coverage 84% → 90%
 - **`test_shared_sync.py`** — fixed test expectations for `test_edits_reach_non_overriding_branches` (work overrides fish, so only server gets propagated), `test_unparsable_target_config_is_skipped_safely` (fixed `run_git()` call to use `subprocess.run` with `input=`), `test_source_branch_never_modified` (fixed log assertion to use `-1` flag)
 
 ### Changed

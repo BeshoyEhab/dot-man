@@ -1,6 +1,6 @@
 # TODO
 
-**Status:** v1.4.0 · 1832 tests passing · coverage 86% · docs site live
+**Status:** v1.4.0 · 1954 tests passing · coverage 90% · docs site live
 
 ---
 
@@ -36,20 +36,20 @@
 
 ---
 
-## 🧪 Coverage Focus (overall 86%, target: raise the floor)
+## 🧪 Coverage Focus (overall 90%, target: raise the floor)
 
-Lowest-covered modules (regenerated 2026-09-27):
+Lowest-covered modules (regenerated 2026-09-29):
 
 | Module | Coverage |
 |--------|----------|
-| `cli/completions.py` | 62% |
-| `cli/watch_cmd.py` | 65% |
-| `core.py` | 66% |
-| `cli/navigate_cmd.py` | 68% |
-| `cli/navigate_preview.py` | 69% |
 | `backups.py` | 71% |
-| `cli/init_cmd.py` | 71% |
 | `cli/backup_cmd.py` | 72% |
+| `lock.py` | 79% |
+| `merge.py` | 80% |
+| `ui.py` | 81% |
+| `utils.py` | 81% |
+| `dotman_config.py` | 82% |
+| `operations.py` | 83% |
 
 ---
 
@@ -76,6 +76,8 @@ Lowest-covered modules (regenerated 2026-09-27):
 ## ✅ Recently Completed
 
 ### Unreleased
+
+- [x] **Coverage floor 86% → 90%** — completions 62%→99%, watch 65%→99%, core 66%→96%, navigate 67%→99% (+122 strong tests); fixed `navigate <tag>` (now checks out the tag commit) and swallowed save/deploy error details found along the way
 
 - [x] **Happy path guidance** — `next_steps` in `add`/`deploy`/dirty `status`/wizard; fixed `add` test isolation leak (`add_cmd.REPO_DIR` now patched)
 - [x] **Sensible defaults surface** — slim default template, curated `config list`
