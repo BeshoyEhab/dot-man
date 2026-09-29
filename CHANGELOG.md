@@ -39,6 +39,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`save_cmd.py`** — fixed `_sync_shared_sections` → `sync_shared_sections` name mismatch that caused `NameError` on `--commit` flag
 - **`shared_sync.py`** — `_sync_branch` now records overridden sections in `report.skipped` even when other shared sections are still wanted (partial overrides)
 - **Tests** — all 1954 tests passing (up from 1700), 1 skipped; coverage 84% → 90%
+- **Refactoring batch** — long functions split into phase helpers (`navigate` 233→51 lines, `files.py` copy/save splits, deploy closure hoisted to a method); `type: ignore` count 13 → 3 via truthful types (Literal encryption chain, `BaseException` diagnostics, None-guard, `dict[str, Any]` manifest); fixed test isolation leaks (`add` copies and completion cache no longer touch the real repo)
 - **`test_shared_sync.py`** — fixed test expectations for `test_edits_reach_non_overriding_branches` (work overrides fish, so only server gets propagated), `test_unparsable_target_config_is_skipped_safely` (fixed `run_git()` call to use `subprocess.run` with `input=`), `test_source_branch_never_modified` (fixed log assertion to use `-1` flag)
 
 ### Changed

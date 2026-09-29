@@ -55,11 +55,12 @@ Lowest-covered modules (regenerated 2026-09-29):
 
 ## 🏗️ Refactoring & Architecture
 
-- [ ] **Break up `_handle_branch_navigate`** (`navigate_cmd.py`, 233 lines)
-- [ ] **Split long functions in `files.py`** — `copy_directory` (95 lines), `smart_save_file` (90 lines)
-- [ ] **Reduce nesting in `save_deploy_ops.py`** — `deploy_section`/`deploy_item` at 7 levels each
+- [x] **Break up `_handle_branch_navigate`** (`navigate_cmd.py`, 233 → 51 lines; phase helpers, all ≤76)
+- [x] **Split long functions in `files.py`** — `copy_directory` (95 → 56), `smart_save_file` (90 → 50)
+- [x] **Reduce nesting in `save_deploy_ops.py`** — hoisted `deploy_item` closure to a method (`deploy_section` was already flat)
+- [x] **Reduce `type: ignore` count** — 13 → 3 (Literal encryption chain, `BaseException` diagnostics, None-guard, `dict[str, Any]`; kept 3 legitimate third-party ones)
+- [x] **Test isolation fixes** — `add` and completion tests no longer write into the real repo (`add_cmd.REPO_DIR`, completion cache redirects)
 - [ ] **Remove deprecated `switch` + `checkout` shims** (`switch_cmd.py`, `log_cmd.py`) in v2.0 — policy: majors remove/change APIs, minors only add deprecation notices; `navigate` is canonical
-- [ ] **Reduce `type: ignore` count** — some mask real typing issues
 
 ---
 
@@ -78,6 +79,7 @@ Lowest-covered modules (regenerated 2026-09-29):
 ### Unreleased
 
 - [x] **Coverage floor 86% → 90%** — completions 62%→99%, watch 65%→99%, core 66%→96%, navigate 67%→99% (+122 strong tests); fixed `navigate <tag>` (now checks out the tag commit) and swallowed save/deploy error details found along the way
+- [x] **Refactoring batch** — navigate/files/save_deploy splits, 13→3 type-ignores, test isolation fixes
 
 - [x] **Happy path guidance** — `next_steps` in `add`/`deploy`/dirty `status`/wizard; fixed `add` test isolation leak (`add_cmd.REPO_DIR` now patched)
 - [x] **Sensible defaults surface** — slim default template, curated `config list`
