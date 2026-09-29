@@ -592,3 +592,53 @@ class TestDeployNextSteps:
         assert result.exit_code == 0, result.output
         assert "Next Steps" in result.output
         assert "dot-man status" in result.output
+
+
+def _write_hook_script(hooks_dir, name: str, body: str):
+    """Write an executable hook script; return its path."""
+    from pathlib import Path
+
+    script = Path(hooks_dir) / name
+    script.write_text(f"#!/bin/sh\n{body}\n")
+    script.chmod(0o755)
+    return script
+
+
+class TestDeployGlobalHooks:
+    """Global pre_deploy/post_deploy scripts wrap real deployments."""
+
+    def test_pre_post_deploy_fire(self, clean_env, tmp_path):
+        runner, dot_man_dir, repo_dir, global_toml, home = clean_env
+        _init_repo(repo_dir)
+        _setup_global_toml(global_toml)
+        _setup_bashrc_section(repo_dir, content='alias ll="ls -la"\n')
+
+        hooks_dir = tmp_path / "hooks"
+        hooks_dir.mkdir()
+        marker = tmp_path / "markers.log"
+        _write_hook_script(hooks_dir, "pre_deploy", f"echo pre >> {marker}")
+        _write_hook_script(
+            hooks_dir, "post_deploy", 'echo "post $DOTMAN_BRANCH" >> ' + str(marker)
+        )
+        with patch("dot_man.hooks.HOOKS_DIR", hooks_dir):
+            result = runner.invoke(cli, ["deploy", "main", "--force"])
+
+        assert result.exit_code == 0, result.output
+        fired = marker.read_text()
+        assert "pre" in fired
+        assert "post main" in fired
+
+    def test_failing_hook_warns_and_continues(self, clean_env, tmp_path):
+        runner, dot_man_dir, repo_dir, global_toml, home = clean_env
+        _init_repo(repo_dir)
+        _setup_global_toml(global_toml)
+        _setup_bashrc_section(repo_dir, content='alias ll="ls -la"\n')
+
+        hooks_dir = tmp_path / "hooks"
+        hooks_dir.mkdir()
+        _write_hook_script(hooks_dir, "pre_deploy", "exit 1")
+        with patch("dot_man.hooks.HOOKS_DIR", hooks_dir):
+            result = runner.invoke(cli, ["deploy", "main", "--force"])
+
+        assert result.exit_code == 0, result.output
+        assert "continuing" in result.output

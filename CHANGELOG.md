@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Happy path guidance** — `add`, `deploy`, and `status` (only with pending changes) end with shared `next_steps` pointing forward along `init` → `add` → `status` → `navigate`; wizard finale renders through the same block; stale `switch` teaching removed from `add`
 - **Sensible defaults surface** — default `dot-man.toml` slimmed to a short header + 2 examples (teaches `navigate`, links docs site); `config list` hides machine internals and points at `config defaults`
 - **5-minute guide** — new `getting-started/five-minutes.md` first in the docs nav (install → init → add → status → navigate with expected outputs)
+- **Global hooks fire in save/deploy/add** — `pre_<cmd>`/`post_<cmd>` scripts run around real work (skipped on dry-run/abort/no-op) with per-command env; failures warn and continue, never block
+- **Auto-install on detection** — `add` applies detected section hooks like the wizard does; detection expanded (foot, bspwm, qtile, eww, mako with real reloads; helix, zed, yazi, ghostty, river, niri for tracking)
 - **15 new tests** in `tests/test_exit_codes.py` — exit-code preservation, `handle_exception` routing (`navigate`, `bootstrap`, `config get`, `doctor`), central group handling, `DotManError` code propagation
 
 - **Shell completions for `add` command** — file/directory path completion using `@completes("add", param="path")` decorator
@@ -34,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`bootstrap` / `config get` / `doctor` error paths** — route through `common.error()`; `doctor` failure summary is a single `error(..., exit_code=1)` instead of `error(..., exit_code=0)` + separate `raise SystemExit(1)`
 - **`save_cmd.py`** — fixed `_sync_shared_sections` → `sync_shared_sections` name mismatch that caused `NameError` on `--commit` flag
 - **`shared_sync.py`** — `_sync_branch` now records overridden sections in `report.skipped` even when other shared sections are still wanted (partial overrides)
-- **Tests** — all 1820 tests passing (up from 1700), 1 skipped; coverage 84% → 86%
+- **Tests** — all 1832 tests passing (up from 1700), 1 skipped; coverage 84% → 86%
 - **`test_shared_sync.py`** — fixed test expectations for `test_edits_reach_non_overriding_branches` (work overrides fish, so only server gets propagated), `test_unparsable_target_config_is_skipped_safely` (fixed `run_git()` call to use `subprocess.run` with `input=`), `test_source_branch_never_modified` (fixed log assertion to use `-1` flag)
 
 ### Changed

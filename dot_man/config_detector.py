@@ -195,6 +195,72 @@ class ConfigDetector:
             "paths": ["~/.fzf"],
             "default_hook": "fzf_reload",
         },
+        "foot": {
+            "display_name": "Foot terminal",
+            "section_name": "foot",
+            "paths": ["~/.config/foot"],
+            "default_hook": "foot_reload",
+        },
+        "bspwm": {
+            "display_name": "bspwm WM",
+            "section_name": "bspwm",
+            "paths": ["~/.config/bspwm"],
+            "default_hook": "bspwm_reload",
+        },
+        "qtile": {
+            "display_name": "Qtile WM",
+            "section_name": "qtile",
+            "paths": ["~/.config/qtile"],
+            "default_hook": "qtile_reload",
+        },
+        "eww": {
+            "display_name": "EWW widgets",
+            "section_name": "eww",
+            "paths": ["~/.config/eww"],
+            "default_hook": "eww_reload",
+        },
+        "mako": {
+            "display_name": "Mako notifications",
+            "section_name": "mako",
+            "paths": ["~/.config/mako"],
+            "default_hook": "mako_reload",
+        },
+        "helix": {
+            "display_name": "Helix editor",
+            "section_name": "helix",
+            "paths": ["~/.config/helix"],
+            "default_hook": None,
+        },
+        "zed": {
+            "display_name": "Zed editor",
+            "section_name": "zed",
+            "paths": ["~/.config/zed"],
+            "default_hook": None,
+        },
+        "yazi": {
+            "display_name": "Yazi file manager",
+            "section_name": "yazi",
+            "paths": ["~/.config/yazi"],
+            "default_hook": None,
+        },
+        "ghostty": {
+            "display_name": "Ghostty terminal",
+            "section_name": "ghostty",
+            "paths": ["~/.config/ghostty"],
+            "default_hook": None,
+        },
+        "river": {
+            "display_name": "River WM",
+            "section_name": "river",
+            "paths": ["~/.config/river"],
+            "default_hook": None,
+        },
+        "niri": {
+            "display_name": "Niri WM",
+            "section_name": "niri",
+            "paths": ["~/.config/niri"],
+            "default_hook": None,
+        },
     }
 
     EXTENDED_CONFIGS: dict[str, _PopularConfigEntry] = {

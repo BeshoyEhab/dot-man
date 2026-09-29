@@ -593,5 +593,5 @@ class TestFILE_TO_HOOK_MAP:
         assert FILE_TO_HOOK_MAP[".config/kitty"] == "kitty_reload"
 
     def test_key_count(self):
-        """All 26 entries should be mapped."""
-        assert len(FILE_TO_HOOK_MAP) == 26
+        """All 31 entries should be mapped."""
+        assert len(FILE_TO_HOOK_MAP) == 31

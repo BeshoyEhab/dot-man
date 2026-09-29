@@ -26,9 +26,11 @@ post_deploy = "systemctl --user start neovim"
 on_activate = "source ~/.config/work/env.sh"
 ```
 
-Global `pre_<cmd>` / `post_<cmd>` scripts currently fire for
-`switch`/`checkout` only — firing them in more commands
-(`deploy`, `save`, `add`, …) is a tracked follow-up.
+Global `pre_<cmd>` / `post_<cmd>` scripts fire for
+`switch`/`checkout` (via navigate) plus `save`, `deploy`, and `add`.
+Failures warn and continue — they never block the command. When a
+popular tool is detected while adding files, its section hooks are
+applied automatically (same as the init wizard).
 
 ## Resolution pipeline
 

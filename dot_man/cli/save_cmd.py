@@ -6,6 +6,7 @@ from .. import ui
 from ..constants import REPO_DIR
 from ..exceptions import DotManError
 from ..files import compare_files
+from ..hooks import run_hook
 from .common import (
     AliasedCommand,
     complete_sections,
@@ -129,6 +130,9 @@ def save(
         ui.console.print()
         ui.console.print("[bold]Phase 1:[/bold] Saving files...")
 
+        if not run_hook("save", "pre", env={"DOTMAN_BRANCH": branch}):
+            warn("pre_save hook failed (continuing)")
+
         secret_handler = get_secret_handler()
         save_result = ops.save_all(secret_handler)
         _warn_symlinks(save_result)
@@ -181,6 +185,9 @@ def save(
 
         ui.console.print()
         success(f"Saved {saved_count} files on branch '{branch}'")
+
+        if not run_hook("save", "post", env={"DOTMAN_BRANCH": branch}):
+            warn("post_save hook failed (continuing)")
 
     except DotManError as e:
         error(str(e), e.exit_code)

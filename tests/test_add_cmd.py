@@ -240,3 +240,86 @@ class TestAddNextSteps:
         assert "dot-man status" in result.output
         assert "dot-man navigate" in result.output
         assert "dot-man switch" not in result.output
+
+
+def _write_hook_script(hooks_dir, name: str, body: str):
+    """Write an executable hook script; return its path."""
+    from pathlib import Path
+
+    script = Path(hooks_dir) / name
+    script.write_text(f"#!/bin/sh\n{body}\n")
+    script.chmod(0o755)
+    return script
+
+
+def _init_minimal_repo(dot_man_dir, repo_dir, global_toml):
+    """Create init structure + git repo + default global config."""
+    from git import Repo
+
+    dot_man_dir.mkdir(parents=True, exist_ok=True)
+    global_toml.write_text("[defaults]\n")
+    repo = Repo.init(repo_dir)
+    with repo.config_writer() as cw:
+        cw.set_value("user", "name", "Test")
+        cw.set_value("user", "email", "test@test.com")
+    (repo_dir / "test.txt").write_text("test")
+    repo.index.add(["test.txt"])
+    repo.index.commit("Initial")
+
+
+class TestAddGlobalHooks:
+    """Global pre_add/post_add scripts wrap real adds."""
+
+    def test_pre_post_add_fire(self, clean_env, tmp_path):
+        runner, dot_man_dir, repo_dir, global_toml, home = clean_env
+        _init_minimal_repo(dot_man_dir, repo_dir, global_toml)
+        test_file = home / ".bashrc"
+        test_file.write_text("# bashrc\n")
+
+        hooks_dir = tmp_path / "hooks"
+        hooks_dir.mkdir()
+        marker = tmp_path / "markers.log"
+        _write_hook_script(hooks_dir, "pre_add", f"echo pre >> {marker}")
+        _write_hook_script(
+            hooks_dir, "post_add", 'echo "post $DOTMAN_SECTION" >> ' + str(marker)
+        )
+        with patch("dot_man.hooks.HOOKS_DIR", hooks_dir):
+            result = runner.invoke(cli, ["add", str(test_file), "--section", "bash"])
+
+        assert result.exit_code == 0, result.output
+        fired = marker.read_text()
+        assert "pre" in fired
+        assert "post bash" in fired
+
+    def test_failing_hook_warns_and_continues(self, clean_env, tmp_path):
+        runner, dot_man_dir, repo_dir, global_toml, home = clean_env
+        _init_minimal_repo(dot_man_dir, repo_dir, global_toml)
+        test_file = home / ".bashrc"
+        test_file.write_text("# bashrc\n")
+
+        hooks_dir = tmp_path / "hooks"
+        hooks_dir.mkdir()
+        _write_hook_script(hooks_dir, "pre_add", "exit 1")
+        with patch("dot_man.hooks.HOOKS_DIR", hooks_dir):
+            result = runner.invoke(cli, ["add", str(test_file), "--section", "bash"])
+
+        assert result.exit_code == 0, result.output
+        assert "continuing" in result.output
+
+
+class TestAddAutoHooks:
+    """Adding a known tool auto-applies its hooks like the wizard does."""
+
+    def test_add_applies_detected_hooks(self, clean_env):
+        runner, dot_man_dir, repo_dir, global_toml, home = clean_env
+        _init_minimal_repo(dot_man_dir, repo_dir, global_toml)
+        kitty_dir = home / ".config" / "kitty"
+        kitty_dir.mkdir(parents=True)
+        (kitty_dir / "kitty.conf").write_text("font_size 12\n")
+
+        result = runner.invoke(cli, ["add", str(kitty_dir), "--section", "kitty"])
+
+        assert result.exit_code == 0, result.output
+        assert "post_deploy" in result.output
+        saved = (repo_dir / "dot-man.toml").read_text()
+        assert "SIGUSR1 kitty" in saved

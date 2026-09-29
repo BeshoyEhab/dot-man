@@ -325,11 +325,19 @@ HOOK_CATEGORIES = {
         "sway_reload",
         "i3_reload",
         "awesome_reload",
+        "bspwm_reload",
+        "qtile_reload",
     ],
-    "terminals": ["kitty_reload", "alacritty_reload", "wezterm_reload"],
-    "bars": ["polybar_reload", "waybar_reload"],
+    "terminals": ["kitty_reload", "alacritty_reload", "wezterm_reload", "foot_reload"],
+    "bars": ["polybar_reload", "waybar_reload", "eww_reload"],
     "editors": ["nvim_sync", "vim_reload", "emacs_reload", "doom_reload"],
-    "tools": ["tmux_reload", "starship_reload", "fzf_reload", "git_reload"],
+    "tools": [
+        "tmux_reload",
+        "starship_reload",
+        "fzf_reload",
+        "git_reload",
+        "mako_reload",
+    ],
 }
 
 
@@ -369,6 +377,11 @@ def get_hook_for_config(config_name: str) -> str | None:
         "xresources": UNIVERSAL_HOOKS["xreload"],
         "ssh": UNIVERSAL_HOOKS["ssh_reload"],
         "git": UNIVERSAL_HOOKS["git_reload"],
+        "foot": UNIVERSAL_HOOKS["foot_reload"],
+        "bspwm": UNIVERSAL_HOOKS["bspwm_reload"],
+        "qtile": UNIVERSAL_HOOKS["qtile_reload"],
+        "eww": UNIVERSAL_HOOKS["eww_reload"],
+        "mako": UNIVERSAL_HOOKS["mako_reload"],
         "quickshell": None,
         "qs": None,
     }

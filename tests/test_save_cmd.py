@@ -287,3 +287,64 @@ class TestWarnSymlinks:
         with patch("dot_man.cli.save_cmd.ui") as mock_ui:
             _warn_symlinks({})
             mock_ui.console.print.assert_not_called()
+
+
+def _write_hook_script(hooks_dir, name: str, body: str):
+    """Write an executable hook script; return its path."""
+    from pathlib import Path
+
+    script = Path(hooks_dir) / name
+    script.write_text(f"#!/bin/sh\n{body}\n")
+    script.chmod(0o755)
+    return script
+
+
+class TestSaveGlobalHooks:
+    """Global pre_save/post_save scripts fire around real saves."""
+
+    def test_pre_post_save_fire(self, runner, mock_ops, tmp_path):
+        hooks_dir = tmp_path / "hooks"
+        hooks_dir.mkdir()
+        marker = tmp_path / "markers.log"
+        _write_hook_script(hooks_dir, "pre_save", f"echo pre >> {marker}")
+        _write_hook_script(
+            hooks_dir, "post_save", 'echo "post $DOTMAN_BRANCH" >> ' + str(marker)
+        )
+        with (
+            patch("dot_man.operations.get_operations", return_value=mock_ops),
+            patch("dot_man.hooks.HOOKS_DIR", hooks_dir),
+        ):
+            result = runner.invoke(cli, ["save", "--force"])
+
+        assert result.exit_code == 0, result.output
+        fired = marker.read_text()
+        assert "pre" in fired
+        assert "post main" in fired
+
+    def test_failing_hook_warns_and_continues(self, runner, mock_ops, tmp_path):
+        hooks_dir = tmp_path / "hooks"
+        hooks_dir.mkdir()
+        _write_hook_script(hooks_dir, "post_save", "exit 1")
+        with (
+            patch("dot_man.operations.get_operations", return_value=mock_ops),
+            patch("dot_man.hooks.HOOKS_DIR", hooks_dir),
+        ):
+            result = runner.invoke(cli, ["save", "--force"])
+
+        assert result.exit_code == 0, result.output
+        assert "continuing" in result.output
+
+    def test_dry_run_skips_hooks(self, runner, mock_ops, tmp_path):
+        hooks_dir = tmp_path / "hooks"
+        hooks_dir.mkdir()
+        marker = tmp_path / "markers.log"
+        _write_hook_script(hooks_dir, "pre_save", f"echo pre >> {marker}")
+        with (
+            patch("dot_man.operations.get_operations", return_value=mock_ops),
+            patch("dot_man.hooks.HOOKS_DIR", hooks_dir),
+            patch("dot_man.cli.save_cmd.compare_files", return_value=False),
+        ):
+            result = runner.invoke(cli, ["save", "--dry-run"])
+
+        assert result.exit_code == 0, result.output
+        assert not marker.exists()

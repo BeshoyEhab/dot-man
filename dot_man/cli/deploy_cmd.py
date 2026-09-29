@@ -6,6 +6,7 @@ from rich.panel import Panel
 from .. import ui
 from ..exceptions import DotManError
 from ..hook_engine import HookContext, run_hooks
+from ..hooks import run_hook
 from .common import (
     AliasedCommand,
     complete_branches,
@@ -119,7 +120,9 @@ def deploy(branch: str, force: bool, dry_run: bool):
                 ui.info("Aborted.")
                 return
 
-        # Execute Pre-Hooks
+        # Execute Pre-Hooks (global scripts wrap section hooks)
+        if not run_hook("deploy", "pre", env={"DOTMAN_BRANCH": branch}):
+            warn("pre_deploy hook failed (continuing)")
         if pre_hooks:
             run_hooks(pre_hooks, "Running pre-deploy hooks", HookContext())
 
@@ -142,6 +145,9 @@ def deploy(branch: str, force: bool, dry_run: bool):
         # Execute Post-Hooks
         if post_hooks:
             run_hooks(post_hooks, "Running post-deploy hooks", HookContext())
+
+        if not run_hook("deploy", "post", env={"DOTMAN_BRANCH": branch}):
+            warn("post_deploy hook failed (continuing)")
 
         # Update global config
         ops.global_config.current_branch = branch

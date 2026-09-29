@@ -1,6 +1,6 @@
 # TODO
 
-**Status:** v1.4.0 · 1820 tests passing · coverage 86% · docs site live
+**Status:** v1.4.0 · 1832 tests passing · coverage 86% · docs site live
 
 ---
 
@@ -67,7 +67,7 @@ Lowest-covered modules (regenerated 2026-09-27):
 
 - [x] **Full docs site** — mkdocs Material hosted on GitHub Pages
 - [x] **Global hook schema first** — one engine (`dot_man/hook_engine.py`) unifying section hooks, `file:` scripts, global `pre_<cmd>`/`post_<cmd>` scripts, aliases, and placeholders; docs rewritten from it
-- [ ] **Fire global hook scripts in more commands** — `pre_<cmd>`/`post_<cmd>` scripts currently fire for `switch`/`checkout` only; extend to `deploy`, `save`, `add`, …
+- [x] **Fire global hook scripts in more commands** — `pre_<cmd>`/`post_<cmd>` now fire for `deploy`, `save`, and `add` (warn-and-continue; skipped when idle)
 - [ ] **Migration guides** — detailed chezmoi/yadm/stow import walkthroughs
 - [ ] **Architecture deep-dive** — how mixins work, how config loading works
 

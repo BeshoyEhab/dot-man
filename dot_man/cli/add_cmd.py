@@ -6,9 +6,11 @@ import click
 
 from .. import ui
 from ..config import DotManConfig, GlobalConfig
+from ..config_detector import get_auto_hooks_for_config
 from ..constants import REPO_DIR
 from ..exceptions import DotManError
 from ..files import copy_directory, copy_file
+from ..hooks import run_hook
 from .common import (
     AliasedCommand,
     error,
@@ -119,6 +121,10 @@ def add(
             path_str = path_str.replace(home, "~", 1)
 
         # Add section to config
+        if not run_hook(
+            "add", "pre", env={"DOTMAN_SECTION": section, "DOTMAN_PATH": path_str}
+        ):
+            warn("pre_add hook failed (continuing)")
         dotman_config.add_section(
             name=section,
             paths=[path_str],
@@ -129,6 +135,22 @@ def add(
             post_deploy=post_deploy,
             pre_deploy=pre_deploy,
         )
+        # Auto-apply detected hooks for gaps the user didn't specify,
+        # mirroring the init wizard.
+        auto_hooks = get_auto_hooks_for_config(section, [path_str])
+        if auto_hooks:
+            user_hooks = {"post_deploy": post_deploy, "pre_deploy": pre_deploy}
+            detected = {
+                kind: cmd
+                for kind, cmd in auto_hooks.items()
+                if cmd and not user_hooks.get(kind)
+            }
+            if detected:
+                for hook_type, hook_cmd in detected.items():
+                    ui.console.print(
+                        f"  [dim]Auto-detected {hook_type} hook: {hook_cmd}[/dim]"
+                    )
+                dotman_config.update_section(section, **detected)
         dotman_config.save()
 
         # Copy content to repo
@@ -175,6 +197,11 @@ def add(
 
         if inherits:
             ui.console.print(f"  Inherits: {', '.join(inherits)}")
+
+        if not run_hook(
+            "add", "post", env={"DOTMAN_SECTION": section, "DOTMAN_PATH": path_str}
+        ):
+            warn("post_add hook failed (continuing)")
 
         ui.next_steps(
             [

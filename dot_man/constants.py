@@ -92,17 +92,22 @@ HOOK_ALIASES = {
     "hyprland_reload": "hyprctl reload 2>/dev/null || true",
     "sway_reload": "swaymsg reload 2>/dev/null || true",
     "i3_reload": "i3-msg reload 2>/dev/null || true",
+    "bspwm_reload": "bspc wm -r 2>/dev/null || true",
+    "qtile_reload": "qtile cmd-obj -o cmd -f reload_config 2>/dev/null || true",
     "awesome_reload": "awesome-client 'awesome.restart()' 2>/dev/null || true",
     # Terminals
     "kitty_reload": "killall -SIGUSR1 kitty 2>/dev/null || true",
+    "foot_reload": "killall -SIGUSR1 foot 2>/dev/null || true",
     "alacritty_reload": "killall -SIGUSR1 alacritty 2>/dev/null || true",
     "wezterm_reload": "wezterm inject-term-change 'reload' 2>/dev/null || true",
     # Status bars
     "polybar_reload": "pkill polybar 2>/dev/null; sleep 0.2; polybar -c ~/.config/polybar/config.ini top 2>/dev/null &",
     "waybar_reload": "waybar-control reload 2>/dev/null || pkill waybar 2>/dev/null; sleep 0.2; waybar 2>/dev/null &",
+    "eww_reload": "eww reload 2>/dev/null || true",
     # Misc tools
     "tmux_reload": "tmux source-file ~/.tmux.conf 2>/dev/null || true",
     "dunst_reload": "pkill dunst 2>/dev/null; sleep 0.2; dunst 2>/dev/null &",
+    "mako_reload": "makoctl reload 2>/dev/null || true",
     "picom_reload": "pkill picom 2>/dev/null; sleep 0.2; picom -b 2>/dev/null &",
     "xreload": "xrdb -load ~/.Xresources 2>/dev/null || true",
     "gnome_reload": "gsettings reset-recursively org.gnome.shell 2>/dev/null || true",
