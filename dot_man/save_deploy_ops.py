@@ -420,7 +420,7 @@ class SaveDeployMixin:
         """Deploy one planned item; returns (deployed_count, errors)."""
         section, local_path, repo_path = item_tuple
         deployed_count = 0
-        item_errors = []
+        item_errors: list[str] = []
 
         if section.update_strategy == "rename_old" and local_path.exists():
             backup_file(local_path)
