@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 from dot_man.cli.navigate_cmd import (
+    _prompt_for_symlinks,
     _warn_symlinks,
     generate_commit_message,
     get_changed_sections,
@@ -50,6 +51,37 @@ class TestGenerateCommitMessage:
     def test_timestamp_present(self):
         msg = generate_commit_message("main", "work", "branch")
         assert "[202" in msg  # year in timestamp
+
+    def test_changed_files_listed(self, tmp_path):
+        real_repo = tmp_path / "repo"
+        real_repo.mkdir()
+        from git import Repo
+
+        repo = Repo.init(real_repo)
+        with repo.config_writer() as config:
+            config.set_value("user", "name", "Test")
+            config.set_value("user", "email", "test@test.com")
+        (real_repo / "a.txt").write_text("x")
+        repo.index.add(["a.txt"])
+        repo.index.commit("init")
+        (real_repo / "a.txt").write_text("changed")
+        with patch("dot_man.cli.navigate_cmd.GitManager") as mock_git_cls:
+            from dot_man.core import GitManager as RealGitManager
+
+            mock_git_cls.return_value = RealGitManager(real_repo)
+            msg = generate_commit_message("main", "work", "branch")
+        assert "files: a.txt" in msg
+
+    def test_git_failure_still_builds_message(self):
+        with patch("dot_man.cli.navigate_cmd.GitManager") as mock_git_cls:
+            mock_git_cls.return_value.is_dirty.side_effect = RuntimeError("git down")
+            msg = generate_commit_message(
+                "main", "work", "branch", saved_count=2, sections=["shell"]
+            )
+        assert "[dot-man] Save before switch to branch 'work'" in msg
+        assert "2 files" in msg
+        assert "sections: shell" in msg
+        assert "files:" not in msg
 
 
 class TestGetChangedSections:
@@ -195,3 +227,73 @@ class TestRunBranchHooks:
                 run_branch_hooks(ops, "on_activate")
         # Should only run once due to dedup
         assert mock_sub.run.call_count == 1
+
+
+def _make_symlink_ops(tmp_path, count=3):
+    """Build MagicMock ops with `count` real symlinked paths in one section."""
+    target = tmp_path / "real.txt"
+    target.write_text("real\n")
+    links = []
+    for i in range(count):
+        link = tmp_path / f"link{i}.txt"
+        if not link.is_symlink():
+            link.symlink_to(target)
+        links.append(link)
+    section = MagicMock()
+    section.paths = links
+    ops = MagicMock()
+    ops.get_sections.return_value = ["s1"]
+    ops.get_section.return_value = section
+    return ops, links
+
+
+class TestPromptForSymlinks:
+    """Test _prompt_for_symlinks ignore/all-ignore handling."""
+
+    def test_ignore_all_skips_rest(self, tmp_path):
+        ops, links = _make_symlink_ops(tmp_path, count=3)
+        with patch(
+            "dot_man.interactive.prompt_symlink_action",
+            side_effect=["ignore", "all_ignore"],
+        ) as mock_prompt:
+            result = _prompt_for_symlinks(ops)
+        assert result == set(links)
+        assert mock_prompt.call_count == 2
+
+    def test_follow_keeps_path(self, tmp_path):
+        ops, links = _make_symlink_ops(tmp_path, count=1)
+        with patch("dot_man.interactive.prompt_symlink_action", return_value="follow"):
+            result = _prompt_for_symlinks(ops)
+        assert result == set()
+
+    def test_no_symlinks_no_prompts(self, tmp_path):
+        plain = tmp_path / "plain.txt"
+        plain.write_text("x")
+        section = MagicMock()
+        section.paths = [plain]
+        ops = MagicMock()
+        ops.get_sections.return_value = ["s1"]
+        ops.get_section.return_value = section
+        with patch("dot_man.interactive.prompt_symlink_action") as mock_prompt:
+            result = _prompt_for_symlinks(ops)
+        assert result == set()
+        mock_prompt.assert_not_called()
+
+    def test_duplicate_symlink_asked_once(self, tmp_path):
+        target = tmp_path / "real.txt"
+        target.write_text("real\n")
+        link = tmp_path / "shared.txt"
+        link.symlink_to(target)
+        s1 = MagicMock()
+        s1.paths = [link]
+        s2 = MagicMock()
+        s2.paths = [link]
+        ops = MagicMock()
+        ops.get_sections.return_value = ["s1", "s2"]
+        ops.get_section.side_effect = lambda name: {"s1": s1, "s2": s2}[name]
+        with patch(
+            "dot_man.interactive.prompt_symlink_action", return_value="ignore"
+        ) as mock_prompt:
+            result = _prompt_for_symlinks(ops)
+        assert result == {link}
+        mock_prompt.assert_called_once_with(link)

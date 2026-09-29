@@ -414,7 +414,9 @@ def _handle_tag_navigate(
 
     run_switch_hooks("pre", ops, current_branch, tag_name)
 
-    ops.git.checkout(tag_name)
+    # NOTE: tags are not branches — GitManager.checkout() only resolves
+    # local branch heads, so checkout the tag's commit (detached HEAD).
+    ops.git.checkout_commit(tag_commit)
     ui.console.print(f"  Checked out tag: [dim]{tag_name}[/dim]")
 
     success(f"Switched to tag '{tag_name}'")
@@ -543,9 +545,9 @@ def _handle_branch_navigate(
             warn(f"{len(secrets)} secrets were redacted during save")
 
         if errors:
-            ui.error(f"Encountered {len(errors)} errors during save:")
             for err in errors:
                 ui.console.print(f"  [red]• {err}[/red]")
+            ui.error(f"Encountered {len(errors)} errors during save:")
 
         if commit_message and commit_message.lower() != "none":
             if commit_message.lower() == "auto":
@@ -628,9 +630,9 @@ def _handle_branch_navigate(
     errors = [e for e in deploy_result["errors"] if e and str(e).strip()]
 
     if errors:
-        ui.error(f"Encountered {len(errors)} errors during deploy:")
         for err in errors:
             ui.console.print(f"  [red]• {err}[/red]")
+        ui.error(f"Encountered {len(errors)} errors during deploy:")
 
     ui.console.print(f"  Deployed {deployed_count} files")
 
