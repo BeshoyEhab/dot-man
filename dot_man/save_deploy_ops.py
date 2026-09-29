@@ -416,6 +416,21 @@ class SaveDeployMixin:
 
         return plan
 
+    def _deploy_plan_item(self, item_tuple) -> tuple[int, list[str]]:
+        """Deploy one planned item; returns (deployed_count, errors)."""
+        section, local_path, repo_path = item_tuple
+        deployed_count = 0
+        item_errors = []
+
+        if section.update_strategy == "rename_old" and local_path.exists():
+            backup_file(local_path)
+
+        final_excludes = self._build_final_excludes(section)
+        deployed_count = self._deploy_repo_path(
+            repo_path, local_path, section, final_excludes, item_errors
+        )
+        return deployed_count, item_errors
+
     def execute_deployment_plan(self, plan: dict) -> dict:
         """
         Phase 2: Execute the deployment plan.
@@ -431,23 +446,9 @@ class SaveDeployMixin:
 
         if sections_to_deploy:
             with ThreadPoolExecutor() as executor:
-
-                def deploy_item(item_tuple):
-                    section, local_path, repo_path = item_tuple
-                    deployed_count = 0
-                    item_errors = []
-
-                    if section.update_strategy == "rename_old" and local_path.exists():
-                        backup_file(local_path)
-
-                    final_excludes = self._build_final_excludes(section)
-                    deployed_count = self._deploy_repo_path(
-                        repo_path, local_path, section, final_excludes, item_errors
-                    )
-                    return deployed_count, item_errors
-
                 futures = [
-                    executor.submit(deploy_item, item) for item in sections_to_deploy
+                    executor.submit(self._deploy_plan_item, item)
+                    for item in sections_to_deploy
                 ]
 
                 for future in as_completed(futures):
