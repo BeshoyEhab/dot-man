@@ -1,7 +1,30 @@
 import subprocess
+import sys
+
+import pytest
 
 from dot_man.cli import complete_branches
 from dot_man.cli.common import _clear_all_caches, _set_git_runner
+
+
+@pytest.fixture(autouse=True)
+def _isolated_completion_cache(tmp_path, monkeypatch):
+    """Redirect the completion cache file away from the real repo.
+
+    NOTE: `dot_man.cli.completions` as an attribute is the `completions`
+    *command* (it shadows the module), so patch targets must go through
+    sys.modules to reach the real module.
+    """
+    import dot_man.cli.completions  # noqa: F401 — ensures sys.modules entry
+
+    mod = sys.modules["dot_man.cli.completions"]
+    monkeypatch.setattr(
+        mod, "COMPLETION_CACHE_FILE", tmp_path / "completion_cache.json"
+    )
+    monkeypatch.setattr(mod, "REPO_DIR", tmp_path)
+    _clear_all_caches()
+    yield
+    _clear_all_caches()
 
 
 def make_mock_result(stdout="", returncode=0):

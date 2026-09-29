@@ -1,9 +1,32 @@
 """Tests for switch command enhancements."""
 
+import sys
+
 import pytest
 from click.testing import CliRunner
 
 from dot_man.cli.interface import cli
+
+
+@pytest.fixture(autouse=True)
+def _isolated_completion_cache(tmp_path, monkeypatch):
+    """Redirect the completion cache file away from the real repo.
+
+    NOTE: `dot_man.cli.completions` as an attribute is the `completions`
+    *command* (it shadows the module) — patch via sys.modules.
+    """
+    import dot_man.cli.completions  # noqa: F401 — ensures sys.modules entry
+
+    mod = sys.modules["dot_man.cli.completions"]
+    monkeypatch.setattr(
+        mod, "COMPLETION_CACHE_FILE", tmp_path / "completion_cache.json"
+    )
+    monkeypatch.setattr(mod, "REPO_DIR", tmp_path)
+    from dot_man.cli.common import _clear_all_caches
+
+    _clear_all_caches()
+    yield
+    _clear_all_caches()
 
 
 @pytest.fixture

@@ -11,6 +11,22 @@ from dot_man.cli.common import _clear_all_caches, _set_git_runner, complete_sect
 comp = importlib.import_module("dot_man.cli.completions")
 
 
+@pytest.fixture(autouse=True)
+def _isolated_completion_cache(tmp_path, monkeypatch):
+    """Redirect the completion cache file away from the real repo.
+
+    NOTE: patch("dot_man.cli.completions.*") silently targets the
+    `completions` command (it shadows the module) — patch `comp` instead.
+    """
+    monkeypatch.setattr(
+        comp, "COMPLETION_CACHE_FILE", tmp_path / "completion_cache.json"
+    )
+    monkeypatch.setattr(comp, "REPO_DIR", tmp_path)
+    _clear_all_caches()
+    yield
+    _clear_all_caches()
+
+
 def make_mock_result(stdout="", returncode=0):
     """Create a mock subprocess result."""
     return subprocess.CompletedProcess(
