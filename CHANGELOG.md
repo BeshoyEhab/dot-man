@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Template variables in config values** — `{{section_name}}`, `{{config_name}}`, `{{branch}}`, `{{paths}}` (plus machine vars and conditionals) render in section settings at load via the existing template engine; unknowns pass through literally; validation runs after rendering
 - **Happy path guidance** — `add`, `deploy`, and `status` (only with pending changes) end with shared `next_steps` pointing forward along `init` → `add` → `status` → `navigate`; wizard finale renders through the same block; stale `switch` teaching removed from `add`
 - **Sensible defaults surface** — default `dot-man.toml` slimmed to a short header + 2 examples (teaches `navigate`, links docs site); `config list` hides machine internals and points at `config defaults`
+- **5-minute guide** — new `getting-started/five-minutes.md` first in the docs nav (install → init → add → status → navigate with expected outputs)
 - **15 new tests** in `tests/test_exit_codes.py` — exit-code preservation, `handle_exception` routing (`navigate`, `bootstrap`, `config get`, `doctor`), central group handling, `DotManError` code propagation
 
 - **Shell completions for `add` command** — file/directory path completion using `@completes("add", param="path")` decorator

@@ -16,7 +16,7 @@
 - [x] **Sensible defaults over configuration** — minimal config already works; default `dot-man.toml` slimmed to header + 2 examples, `config list` hides internals and points at `config defaults`
 - [x] **One guided onboarding** — a single `init` wizard path that ends with a working tracked file (no tutorial-vs-wizard-vs-manual confusion); suggests `post_deploy`/`on_activate` hooks when popular tools are detected and shows a hook example with the first section
 - [x] **Every command teaches the next step** — shared `ui.next_steps()` after `init`/`add`/`deploy` and dirty `status` (silent when clean or `--json`); no dead ends
-- [ ] **Docs: real-world-first** — a "Start in 5 minutes" guide at the top of the docs site; exhaustive reference moves below; each page opens with a normal-user example
+- [x] **Docs: real-world-first** — "Start in 5 minutes" guide first in Getting Started nav; per-page example rewrite deferred as a separate pass
 
 ### Shell Completions
 

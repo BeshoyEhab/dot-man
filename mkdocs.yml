@@ -30,6 +30,7 @@ theme:
 nav:
   - Home: index.md
   - Getting Started:
+    - 5 Minutes: getting-started/five-minutes.md
     - Installation: getting-started/installation.md
     - Quick Start: getting-started/quickstart.md
     - Configuration: getting-started/configuration.md
