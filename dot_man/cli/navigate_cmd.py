@@ -424,185 +424,8 @@ def _handle_tag_navigate(
     run_switch_hooks("post", ops, current_branch, tag_name)
 
 
-def _handle_branch_navigate(
-    ops,
-    current_branch,
-    target_branch,
-    save_mode,
-    dry_run,
-    force,
-    preview,
-    show_diff,
-    files_only,
-    commit_message=None,
-):
-    """Handle navigating to a branch."""
-    if current_branch == target_branch and not dry_run:
-        ui.console.print(f"Already on branch '[bold]{target_branch}[/bold]'")
-
-        if preview:
-            show_commits_list(ops, target_branch, files_only)
-        return
-
-    if preview:
-        ui.console.print("[bold]Preview mode - showing branch info[/bold]")
-        show_branch_diff_preview(ops, current_branch, target_branch, show_diff)
-        show_commits_list(ops, target_branch, files_only)
-        ui.console.print("Run again without --preview to switch to this branch.")
-        return
-
-    if dry_run:
-        ui.console.print(
-            f"[bold]Dry Run:[/bold] Navigate [cyan]{current_branch}[/cyan] → [cyan]{target_branch}[/cyan]"
-        )
-        ui.console.print()
-
-        # Phase 1: What would be saved
-        sections = get_changed_sections(ops)
-        if sections:
-            ui.console.print(
-                f"[bold]Phase 1:[/bold] Would save {len(sections)} section(s): {', '.join(sections)}"
-            )
-        else:
-            ui.console.print("[bold]Phase 1:[/bold] No changes to save")
-        ui.console.print()
-
-        # Phase 2: Branch switch
-        branch_exists = ops.git.branch_exists(target_branch)
-        if branch_exists:
-            ui.console.print(
-                f"[bold]Phase 2:[/bold] Would checkout existing branch: [cyan]{target_branch}[/cyan]"
-            )
-        else:
-            ui.console.print(
-                f"[bold]Phase 2:[/bold] Would create and checkout new branch: [cyan]{target_branch}[/cyan]"
-            )
-        ui.console.print()
-
-        # Phase 3: What would be deployed
-        ui.console.print("[bold]Phase 3:[/bold] Would deploy configuration...")
-        pre_hooks, post_hooks = [], []
-        deploy_items = []
-        for section_name in ops.get_sections():
-            section = ops.get_section(section_name)
-            if section.pre_deploy:
-                pre_hooks.append(section.pre_deploy)
-            if section.post_deploy:
-                post_hooks.append(section.post_deploy)
-            for local_path in section.paths:
-                repo_path = section.get_repo_path(local_path, REPO_DIR)
-                if repo_path.exists():
-                    if not local_path.exists() or not compare_files(
-                        repo_path, local_path
-                    ):
-                        method = (
-                            f" [dim]({section.deploy_method})[/dim]"
-                            if section.deploy_method == "symlink"
-                            else ""
-                        )
-                        deploy_items.append((local_path, method))
-
-        pre_hooks = list(dict.fromkeys(pre_hooks))
-        post_hooks = list(dict.fromkeys(post_hooks))
-
-        if deploy_items:
-            for local, method in deploy_items:
-                ui.console.print(f"  [yellow]{local}[/yellow]{method}")
-        else:
-            ui.console.print("  [dim]No files would change[/dim]")
-
-        if pre_hooks:
-            ui.console.print(f"  pre_deploy: {', '.join(pre_hooks)}")
-        if post_hooks:
-            ui.console.print(f"  post_deploy: {', '.join(post_hooks)}")
-
-        ui.console.print()
-        ui.console.print(
-            f"[bold]Phase 4:[/bold] Would update current_branch → {target_branch}"
-        )
-        return
-
-    ui.console.print(
-        f"[bold]Navigating to branch[/bold] [cyan]{target_branch}[/cyan]..."
-    )
-
-    ui.console.print()
-    ui.console.print(
-        f"[bold]Phase 1:[/bold] {'Saving' if save_mode == 'save' else 'Discarding'} branch '{current_branch}'..."
-    )
-
-    if save_mode == "save":
-        secret_handler = get_secret_handler()
-        symlink_ignore = _prompt_for_symlinks(ops)
-        save_result = ops.save_all(secret_handler, symlink_ignore=symlink_ignore)
-        _warn_symlinks(save_result)
-        saved_count = save_result["saved"]
-        secrets = save_result["secrets"]
-        errors = save_result["errors"]
-        sections = get_changed_sections(ops)
-
-        if secrets:
-            warn(f"{len(secrets)} secrets were redacted during save")
-
-        if errors:
-            for err in errors:
-                ui.console.print(f"  [red]• {err}[/red]")
-            ui.error(f"Encountered {len(errors)} errors during save:")
-
-        if commit_message and commit_message.lower() != "none":
-            if commit_message.lower() == "auto":
-                commit_msg = generate_commit_message(
-                    current_branch, target_branch, "branch", saved_count, sections
-                )
-            else:
-                commit_msg = commit_message
-
-            commit_sha = ops.git.commit(commit_msg)
-            if commit_sha:
-                ui.console.print(f"  Committed: [dim]{commit_sha[:7]}[/dim]")
-                if commit_message.lower() != "auto":
-                    ui.console.print(f"  [dim]Commit: {commit_msg}[/dim]")
-                sync_shared_sections(ops)
-        else:
-            commit_sha = None
-
-        ui.console.print(f"  Saved {saved_count} files")
-        if not commit_sha and saved_count > 0:
-            ui.console.print("  [dim](no commit created)[/dim]")
-    else:
-        ui.console.print("  [dim]Discarded uncommitted changes[/dim]")
-
-    ui.console.print()
-    ui.console.print(f"[bold]Phase 2:[/bold] Switching to branch '{target_branch}'...")
-
-    run_branch_hooks(ops, "on_deactivate")
-
-    run_switch_hooks("pre", ops, current_branch, target_branch)
-
-    branch_exists = ops.git.branch_exists(target_branch)
-    if not branch_exists:
-        if not force and not ui.confirm(
-            f"Branch '{target_branch}' doesn't exist. Create it?"
-        ):
-            ui.console.print("[dim]Aborted.[/dim]")
-            return
-        ui.console.print(f"  Creating new branch: [cyan]{target_branch}[/cyan]")
-
-    ops.git.checkout(target_branch, create=not branch_exists)
-    if branch_exists:
-        ui.console.print(f"  Switched to existing branch: [cyan]{target_branch}[/cyan]")
-    else:
-        ui.console.print(
-            f"  Created and switched to new branch: [cyan]{target_branch}[/cyan]"
-        )
-    ops.reload_config()
-
-    ui.console.print()
-    ui.console.print(
-        f"[bold]Phase 3:[/bold] Deploying '{target_branch}' configuration..."
-    )
-
-    deployed_count = 0
+def _collect_deploy_hooks(ops):
+    """Collect deduplicated pre/post deploy hooks for changed files."""
     pre_hooks = []
     post_hooks = []
 
@@ -620,8 +443,17 @@ def _handle_branch_navigate(
                     if section.post_deploy:
                         post_hooks.append(section.post_deploy)
 
-    pre_hooks = list(dict.fromkeys(pre_hooks))
-    post_hooks = list(dict.fromkeys(post_hooks))
+    return list(dict.fromkeys(pre_hooks)), list(dict.fromkeys(post_hooks))
+
+
+def _deploy_target_config(ops, current_branch, target_branch):
+    """Deploy the target branch configuration; return deployed count."""
+    ui.console.print()
+    ui.console.print(
+        f"[bold]Phase 3:[/bold] Deploying '{target_branch}' configuration..."
+    )
+
+    pre_hooks, post_hooks = _collect_deploy_hooks(ops)
 
     _run_shell_hooks(pre_hooks, "Running pre-deploy hooks")
 
@@ -644,6 +476,265 @@ def _handle_branch_navigate(
     run_switch_hooks("post", ops, current_branch, target_branch)
 
     run_branch_hooks(ops, "on_activate")
+    return deployed_count
+
+
+def _show_navigate_preview(ops, target_branch, show_diff, files_only):
+    """Display preview info for a branch switch."""
+    ui.console.print("[bold]Preview mode - showing branch info[/bold]")
+    show_branch_diff_preview(ops, target_branch, show_diff)
+    show_commits_list(ops, target_branch, files_only)
+    ui.console.print("Run again without --preview to switch to this branch.")
+
+
+def _collect_dry_run_deploy_items(ops):
+    """Collect deploy preview items and hooks without changing anything."""
+    pre_hooks, post_hooks = [], []
+    deploy_items = []
+    for section_name in ops.get_sections():
+        section = ops.get_section(section_name)
+        if section.pre_deploy:
+            pre_hooks.append(section.pre_deploy)
+        if section.post_deploy:
+            post_hooks.append(section.post_deploy)
+        for local_path in section.paths:
+            repo_path = section.get_repo_path(local_path, REPO_DIR)
+            if repo_path.exists():
+                if not local_path.exists() or not compare_files(repo_path, local_path):
+                    method = (
+                        f" [dim]({section.deploy_method})[/dim]"
+                        if section.deploy_method == "symlink"
+                        else ""
+                    )
+                    deploy_items.append((local_path, method))
+
+    return deploy_items, list(dict.fromkeys(pre_hooks)), list(dict.fromkeys(post_hooks))
+
+
+def _show_navigate_dry_run(ops, current_branch, target_branch):
+    """Display what a branch switch would do, changing nothing."""
+    ui.console.print(
+        f"[bold]Dry Run:[/bold] Navigate [cyan]{current_branch}[/cyan] → [cyan]{target_branch}[/cyan]"
+    )
+    ui.console.print()
+
+    # Phase 1: What would be saved
+    sections = get_changed_sections(ops)
+    if sections:
+        ui.console.print(
+            f"[bold]Phase 1:[/bold] Would save {len(sections)} section(s): {', '.join(sections)}"
+        )
+    else:
+        ui.console.print("[bold]Phase 1:[/bold] No changes to save")
+    ui.console.print()
+
+    # Phase 2: Branch switch
+    branch_exists = ops.git.branch_exists(target_branch)
+    if branch_exists:
+        ui.console.print(
+            f"[bold]Phase 2:[/bold] Would checkout existing branch: [cyan]{target_branch}[/cyan]"
+        )
+    else:
+        ui.console.print(
+            f"[bold]Phase 2:[/bold] Would create and checkout new branch: [cyan]{target_branch}[/cyan]"
+        )
+    ui.console.print()
+
+    # Phase 3: What would be deployed
+    ui.console.print("[bold]Phase 3:[/bold] Would deploy configuration...")
+    deploy_items, pre_hooks, post_hooks = _collect_dry_run_deploy_items(ops)
+
+    if deploy_items:
+        for local, method in deploy_items:
+            ui.console.print(f"  [yellow]{local}[/yellow]{method}")
+    else:
+        ui.console.print("  [dim]No files would change[/dim]")
+
+    if pre_hooks:
+        ui.console.print(f"  pre_deploy: {', '.join(pre_hooks)}")
+    if post_hooks:
+        ui.console.print(f"  post_deploy: {', '.join(post_hooks)}")
+
+    ui.console.print()
+    ui.console.print(
+        f"[bold]Phase 4:[/bold] Would update current_branch → {target_branch}"
+    )
+
+
+def _build_save_commit_message(
+    commit_message, ops, current_branch, target_branch, saved_count
+):
+    """Resolve the save commit message, or None when disabled."""
+    if not commit_message or commit_message.lower() == "none":
+        return None
+    if commit_message.lower() == "auto":
+        sections = get_changed_sections(ops)
+        return generate_commit_message(
+            current_branch, target_branch, "branch", saved_count, sections
+        )
+    return commit_message
+
+
+def _save_before_navigate(
+    ops, current_branch, target_branch, save_mode, commit_message
+):
+    """Save or discard current-branch changes before switching."""
+    ui.console.print()
+    ui.console.print(
+        f"[bold]Phase 1:[/bold] {'Saving' if save_mode == 'save' else 'Discarding'} branch '{current_branch}'..."
+    )
+
+    if save_mode != "save":
+        ui.console.print("  [dim]Discarded uncommitted changes[/dim]")
+        return
+
+    secret_handler = get_secret_handler()
+    symlink_ignore = _prompt_for_symlinks(ops)
+    save_result = ops.save_all(secret_handler, symlink_ignore=symlink_ignore)
+    _warn_symlinks(save_result)
+    saved_count = save_result["saved"]
+    secrets = save_result["secrets"]
+    errors = save_result["errors"]
+
+    if secrets:
+        warn(f"{len(secrets)} secrets were redacted during save")
+
+    if errors:
+        for err in errors:
+            ui.console.print(f"  [red]• {err}[/red]")
+        ui.error(f"Encountered {len(errors)} errors during save:")
+
+    commit_msg = _build_save_commit_message(
+        commit_message, ops, current_branch, target_branch, saved_count
+    )
+    commit_sha = None
+    if commit_msg is not None:
+        commit_sha = ops.git.commit(commit_msg)
+        if commit_sha:
+            ui.console.print(f"  Committed: [dim]{commit_sha[:7]}[/dim]")
+            if commit_message.lower() != "auto":
+                ui.console.print(f"  [dim]Commit: {commit_msg}[/dim]")
+            sync_shared_sections(ops)
+
+    ui.console.print(f"  Saved {saved_count} files")
+    if not commit_sha and saved_count > 0:
+        ui.console.print("  [dim](no commit created)[/dim]")
+
+
+def _switch_to_branch(ops, current_branch, target_branch, force):
+    """Run deactivate hooks and switch to the target branch."""
+    ui.console.print()
+    ui.console.print(f"[bold]Phase 2:[/bold] Switching to branch '{target_branch}'...")
+
+    run_branch_hooks(ops, "on_deactivate")
+
+    run_switch_hooks("pre", ops, current_branch, target_branch)
+
+    branch_exists = ops.git.branch_exists(target_branch)
+    if not branch_exists:
+        if not force and not ui.confirm(
+            f"Branch '{target_branch}' doesn't exist. Create it?"
+        ):
+            ui.console.print("[dim]Aborted.[/dim]")
+            return False
+        ui.console.print(f"  Creating new branch: [cyan]{target_branch}[/cyan]")
+
+    ops.git.checkout(target_branch, create=not branch_exists)
+    if branch_exists:
+        ui.console.print(f"  Switched to existing branch: [cyan]{target_branch}[/cyan]")
+    else:
+        ui.console.print(
+            f"  Created and switched to new branch: [cyan]{target_branch}[/cyan]"
+        )
+    ops.reload_config()
+    return True
+    """Display what a branch switch would do, changing nothing."""
+    ui.console.print(
+        f"[bold]Dry Run:[/bold] Navigate [cyan]{current_branch}[/cyan] → [cyan]{target_branch}[/cyan]"
+    )
+    ui.console.print()
+
+    # Phase 1: What would be saved
+    sections = get_changed_sections(ops)
+    if sections:
+        ui.console.print(
+            f"[bold]Phase 1:[/bold] Would save {len(sections)} section(s): {', '.join(sections)}"
+        )
+    else:
+        ui.console.print("[bold]Phase 1:[/bold] No changes to save")
+    ui.console.print()
+
+    # Phase 2: Branch switch
+    branch_exists = ops.git.branch_exists(target_branch)
+    if branch_exists:
+        ui.console.print(
+            f"[bold]Phase 2:[/bold] Would checkout existing branch: [cyan]{target_branch}[/cyan]"
+        )
+    else:
+        ui.console.print(
+            f"[bold]Phase 2:[/bold] Would create and checkout new branch: [cyan]{target_branch}[/cyan]"
+        )
+    ui.console.print()
+
+    # Phase 3: What would be deployed
+    ui.console.print("[bold]Phase 3:[/bold] Would deploy configuration...")
+    deploy_items, pre_hooks, post_hooks = _collect_dry_run_deploy_items(ops)
+
+    if deploy_items:
+        for local, method in deploy_items:
+            ui.console.print(f"  [yellow]{local}[/yellow]{method}")
+    else:
+        ui.console.print("  [dim]No files would change[/dim]")
+
+    if pre_hooks:
+        ui.console.print(f"  pre_deploy: {', '.join(pre_hooks)}")
+    if post_hooks:
+        ui.console.print(f"  post_deploy: {', '.join(post_hooks)}")
+
+    ui.console.print()
+    ui.console.print(
+        f"[bold]Phase 4:[/bold] Would update current_branch → {target_branch}"
+    )
+
+
+def _handle_branch_navigate(
+    ops,
+    current_branch,
+    target_branch,
+    save_mode,
+    dry_run,
+    force,
+    preview,
+    show_diff,
+    files_only,
+    commit_message=None,
+):
+    """Handle navigating to a branch."""
+    if current_branch == target_branch and not dry_run:
+        ui.console.print(f"Already on branch '[bold]{target_branch}[/bold]'")
+
+        if preview:
+            show_commits_list(ops, target_branch, files_only)
+        return
+
+    if preview:
+        _show_navigate_preview(ops, target_branch, show_diff, files_only)
+        return
+
+    if dry_run:
+        _show_navigate_dry_run(ops, current_branch, target_branch)
+        return
+
+    ui.console.print(
+        f"[bold]Navigating to branch[/bold] [cyan]{target_branch}[/cyan]..."
+    )
+
+    _save_before_navigate(ops, current_branch, target_branch, save_mode, commit_message)
+
+    if not _switch_to_branch(ops, current_branch, target_branch, force):
+        return
+
+    deployed_count = _deploy_target_config(ops, current_branch, target_branch)
 
     ui.console.print()
     success(f"Switched to '{target_branch}'")
