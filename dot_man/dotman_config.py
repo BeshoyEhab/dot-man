@@ -122,115 +122,20 @@ class DotManConfig:
         self._dirty = True
         self.save(force=True)
 
-        # Append helpful comments and documentation with example sections
+        # Append a short pointer: two examples, current commands, docs link.
+        # (Smart defaults cover everything else — see `dot-man config defaults`.)
         with open(self._path, "a") as f:
             f.write("""
-# ============================================================================
-# dot-man Configuration Examples
-# ============================================================================
+# dot-man — track files with `dot-man add <path>`, switch with `dot-man navigate <branch>`.
+# Uncomment an example to start; smart defaults cover the rest.
 #
-# Welcome! This config file helps you track your dotfiles across machines.
-# Uncomment and modify the example sections below for your setup.
-#
-# Quick Start:
-#   1. Uncomment sections below that match your dotfiles
-#   2. Run: dot-man switch main
-#   3. That's it! Your configs are now tracked and can be deployed anywhere
-#
-# Smart defaults apply automatically - you only need to override them when needed.
-
-# ============================================================================
-# Common Dotfile Examples (uncomment and modify as needed)
-# ============================================================================
-
-# Basic bash configuration
 # [bashrc]
 # paths = ["~/.bashrc"]
-# post_deploy = "shell_reload"
-
-# Git configuration (secrets are auto-filtered)
-# [gitconfig]
-# paths = ["~/.gitconfig"]
-
-# Neovim configuration with plugin exclusions
+#
 # [nvim]
 # paths = ["~/.config/nvim"]
-# exclude = ["*.log", "plugin/packer_compiled.lua"]
-# post_deploy = "nvim_sync"
-
-# SSH client configuration (be careful with secrets!)
-# [ssh-config]
-# paths = ["~/.ssh/config"]
-# secrets_filter = true
-# update_strategy = "rename_old"
-
-# Multiple shell configurations in one section
-# [shell-configs]
-# paths = ["~/.bashrc", "~/.zshrc", "~/.profile"]
-# post_deploy = "shell_reload"
-
-# Kitty terminal configuration
-# [kitty]
-# paths = ["~/.config/kitty"]
-# post_deploy = "kitty_reload"
-
-# Tmux configuration
-# [tmux]
-# paths = ["~/.tmux.conf"]
-# post_deploy = "tmux_reload"
-
-# Fish shell configuration
-# [fish]
-# paths = ["~/.config/fish"]
-# post_deploy = "fish_reload"
-
-# ============================================================================
-# How to Add Your Own Files
-# ============================================================================
 #
-# Basic format for custom files:
-# [my-custom-config]
-# paths = ["~/.some-config-file", "~/another-file"]
-# # Optional: repo_base = "custom-repo-name"
-# # Optional: post_deploy = "some-command-to-run-after-deploy"
-
-# ============================================================================
-# Available Hook Aliases (use these instead of full commands)
-# ============================================================================
-#
-# shell_reload    → source ~/.bashrc || source ~/.zshrc
-# nvim_sync       → nvim --headless +PackerSync +qa
-# hyprland_reload → hyprctl reload
-# fish_reload     → source ~/.config/fish/config.fish
-# tmux_reload     → tmux source-file ~/.tmux.conf
-# kitty_reload    → killall -SIGUSR1 kitty
-#
-# Custom commands work too:
-# post_deploy = "systemctl --user restart some-service"
-# post_deploy = "notify-send 'Config updated!'"
-
-# ============================================================================
-# Advanced Features
-# ============================================================================
-#
-# Templates for shared settings:
-# [templates.linux-desktop]
-# post_deploy = "notify-send 'Config updated'"
-#
-# [hyprland]
-# paths = ["~/.config/hypr"]
-# inherits = ["linux-desktop"]
-#
-# Include/exclude patterns:
-# include = ["*.conf", "*.lua"]  # Only track these patterns
-# exclude = ["*.log", "cache/"]  # Skip these files/directories
-#
-# Update strategies:
-# update_strategy = "replace"      # Overwrite (default)
-# update_strategy = "rename_old"   # Backup before overwrite
-# update_strategy = "ignore"       # Skip if file exists
-#
-# Full documentation: https://github.com/BeshoyEhab/dot-man#configuration
+# Full reference: https://beshoyehab.github.io/dot-man/
 """)
 
     def get_section_names(self) -> list[str]:

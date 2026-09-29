@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Two-level help** — `dot-man help` and bare `--help` show the 6 happy-path commands (`init`, `add`, `status`, `navigate`, `deploy`, `doctor`) with a pointer to `dot-man help-all` (full listing incl. aliases and deprecated shims); static man page at `docs/man/dot-man.1`, installed via `dot-man help --install-man`
 - **Template variables in config values** — `{{section_name}}`, `{{config_name}}`, `{{branch}}`, `{{paths}}` (plus machine vars and conditionals) render in section settings at load via the existing template engine; unknowns pass through literally; validation runs after rendering
 - **Happy path guidance** — `add`, `deploy`, and `status` (only with pending changes) end with shared `next_steps` pointing forward along `init` → `add` → `status` → `navigate`; wizard finale renders through the same block; stale `switch` teaching removed from `add`
+- **Sensible defaults surface** — default `dot-man.toml` slimmed to a short header + 2 examples (teaches `navigate`, links docs site); `config list` hides machine internals and points at `config defaults`
 - **15 new tests** in `tests/test_exit_codes.py` — exit-code preservation, `handle_exception` routing (`navigate`, `bootstrap`, `config get`, `doctor`), central group handling, `DotManError` code propagation
 
 - **Shell completions for `add` command** — file/directory path completion using `@completes("add", param="path")` decorator
@@ -32,7 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`bootstrap` / `config get` / `doctor` error paths** — route through `common.error()`; `doctor` failure summary is a single `error(..., exit_code=1)` instead of `error(..., exit_code=0)` + separate `raise SystemExit(1)`
 - **`save_cmd.py`** — fixed `_sync_shared_sections` → `sync_shared_sections` name mismatch that caused `NameError` on `--commit` flag
 - **`shared_sync.py`** — `_sync_branch` now records overridden sections in `report.skipped` even when other shared sections are still wanted (partial overrides)
-- **Tests** — all 1815 tests passing (up from 1700), 1 skipped; coverage 84% → 86%
+- **Tests** — all 1820 tests passing (up from 1700), 1 skipped; coverage 84% → 86%
 - **`test_shared_sync.py`** — fixed test expectations for `test_edits_reach_non_overriding_branches` (work overrides fish, so only server gets propagated), `test_unparsable_target_config_is_skipped_safely` (fixed `run_git()` call to use `subprocess.run` with `input=`), `test_source_branch_never_modified` (fixed log assertion to use `-1` flag)
 
 ### Changed

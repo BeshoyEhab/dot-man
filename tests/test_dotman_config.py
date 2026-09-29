@@ -76,3 +76,27 @@ class TestConfigConstants:
         from dot_man.dotman_config import VALID_UPDATE_STRATEGIES
 
         assert isinstance(VALID_UPDATE_STRATEGIES, (list, tuple))
+
+
+class TestDefaultTemplateSlim:
+    """Default dot-man.toml is short and teaches current commands."""
+
+    def _default_content(self, tmp_path):
+        from dot_man.dotman_config import DotManConfig
+
+        DotManConfig(tmp_path).create_default()
+        return (tmp_path / "dot-man.toml").read_text()
+
+    def test_default_template_is_short(self, tmp_path):
+        assert len(self._default_content(tmp_path).splitlines()) < 40
+
+    def test_default_template_has_two_examples(self, tmp_path):
+        content = self._default_content(tmp_path)
+        assert "[bashrc]" in content
+        assert "[nvim]" in content
+
+    def test_default_template_teaches_current_commands(self, tmp_path):
+        content = self._default_content(tmp_path)
+        assert "dot-man switch" not in content
+        assert "navigate" in content
+        assert "github.com" not in content

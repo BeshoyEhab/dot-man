@@ -103,10 +103,18 @@ def config_list():
         table.add_column("Key", style="cyan")
         table.add_column("Value")
 
+        # Machine internals are readable via `config get` but hidden here;
+        # this listing is for values users actually change.
+        hidden_keys = {"dot-man.initialized_date", "dot-man.version"}
         for k, v in sorted(flat_data.items()):
+            if k in hidden_keys:
+                continue
             table.add_row(k, str(v))
 
         ui.console.print(table)
+        ui.console.print(
+            "[dim]Run 'dot-man config defaults' to see what each key means.[/dim]"
+        )
 
     except Exception as e:
         error(f"Failed to list config: {e}")

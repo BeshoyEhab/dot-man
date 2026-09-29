@@ -1,6 +1,6 @@
 # TODO
 
-**Status:** v1.4.0 · 1815 tests passing · coverage 86% · docs site live
+**Status:** v1.4.0 · 1820 tests passing · coverage 86% · docs site live
 
 ---
 
@@ -13,7 +13,7 @@
 
 - [x] **Define the 5-minute happy path** — `init` → `add` → `status` → `navigate`; stated in quickstart intro, encoded in every command's hints
 - [x] **Trim the command surface** — two-level help: `help` shows happy-path commands only, `help-all` shows everything, plus a man page (`docs/man/dot-man.1`, `help --install-man`); `switch`/`checkout` shims stay until v2.0 (`navigate` is canonical)
-- [ ] **Sensible defaults over configuration** — a minimal `dot-man.toml` works with zero optional keys; advanced keys (`deploy_method`, hooks, templates) surface only when needed
+- [x] **Sensible defaults over configuration** — minimal config already works; default `dot-man.toml` slimmed to header + 2 examples, `config list` hides internals and points at `config defaults`
 - [x] **One guided onboarding** — a single `init` wizard path that ends with a working tracked file (no tutorial-vs-wizard-vs-manual confusion); suggests `post_deploy`/`on_activate` hooks when popular tools are detected and shows a hook example with the first section
 - [x] **Every command teaches the next step** — shared `ui.next_steps()` after `init`/`add`/`deploy` and dirty `status` (silent when clean or `--json`); no dead ends
 - [ ] **Docs: real-world-first** — a "Start in 5 minutes" guide at the top of the docs site; exhaustive reference moves below; each page opens with a normal-user example
@@ -78,6 +78,7 @@ Lowest-covered modules (regenerated 2026-09-27):
 ### Unreleased
 
 - [x] **Happy path guidance** — `next_steps` in `add`/`deploy`/dirty `status`/wizard; fixed `add` test isolation leak (`add_cmd.REPO_DIR` now patched)
+- [x] **Sensible defaults surface** — slim default template, curated `config list`
 - [x] **Template variables in config values** — section + machine vars + conditionals render at load
 - [x] **Hook scripts directory** — `file:` tokens in section hooks, repo `hooks/` + global fallback
 - [x] **Consistent exit codes** — `ExitCode` enum; zero `sys.exit()` calls left in `dot_man/`

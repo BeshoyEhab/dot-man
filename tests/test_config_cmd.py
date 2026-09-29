@@ -402,3 +402,19 @@ class TestRunInteractiveTutorial:
         assert "Step 5" in full
         assert "Step 6" in full
         assert "Tutorial Complete" in full
+
+
+class TestConfigListCurated:
+    """`config list` hides machine internals and points at defaults."""
+
+    def test_config_list_hides_internal_keys(self, integration_runner):
+        result = integration_runner.invoke(cli, ["config", "list"])
+        assert result.exit_code == 0
+        assert "initialized_date" not in result.output
+        assert "dot-man.version" not in result.output
+        assert "remote.url" in result.output
+
+    def test_config_list_points_to_defaults(self, integration_runner):
+        result = integration_runner.invoke(cli, ["config", "list"])
+        assert result.exit_code == 0
+        assert "config defaults" in result.output
