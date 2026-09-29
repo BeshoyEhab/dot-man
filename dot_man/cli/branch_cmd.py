@@ -87,7 +87,7 @@ def branch_delete(name: str, force: bool):
         if isinstance(e, BranchNotMergedError):
             if ui.confirm(f"Branch '{name}' is not fully merged. Force delete?"):
                 try:
-                    git.delete_branch(name, force=True)  # type: ignore
+                    git.delete_branch(name, force=True)
                     success(f"Deleted branch '{name}'")
                     return
                 except Exception as e2:

@@ -79,7 +79,10 @@ def init(
                 cloned_path = _clone_github_repo(github_url)
                 if cloned_path is None:
                     error("Failed to clone GitHub repository.", exit_code=1)
-                source_path = cloned_path  # type: ignore[assignment]
+                cloned_path = _clone_github_repo(github_url)
+                if cloned_path is None:
+                    error("Failed to clone GitHub repository.", exit_code=1)
+                source_path = cloned_path if cloned_path is not None else REPO_DIR
             else:
                 # It's a local path
                 source_path = Path(import_path).expanduser().resolve()

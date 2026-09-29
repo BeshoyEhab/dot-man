@@ -39,7 +39,7 @@ class ErrorDiagnostic:
     suggestion: str
 
     @classmethod
-    def from_exception(cls, exc: Exception) -> "ErrorDiagnostic":
+    def from_exception(cls, exc: BaseException) -> "ErrorDiagnostic":
         """Factory to create diagnostics from common exceptions."""
         import builtins
 

@@ -129,9 +129,7 @@ def rollback(
 
         # Show which files would change
         try:
-            diff_output = git.repo.git.diff(
-                "--name-status", f"{resolved_sha}...HEAD"  # type: ignore[arg-type]
-            )
+            diff_output = git.repo.git.diff("--name-status", f"{resolved_sha}...HEAD")
             if diff_output.strip():
                 ui.console.print("[bold]Files that will change:[/bold]")
                 for line in diff_output.strip().splitlines()[:15]:

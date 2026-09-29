@@ -38,7 +38,12 @@ from .interface import cli as main
     help="Encryption recipient (GPG key ID or AGE recipient)",
 )
 @require_init
-def encrypt_cmd(action: str, section: str | None, method: str, recipient: str | None):
+def encrypt_cmd(
+    action: str,
+    section: str | None,
+    method: Literal["gpg", "age"],
+    recipient: str | None,
+):
     """Encrypt or decrypt sensitive dotfile sections.
 
     Actions:
@@ -63,14 +68,14 @@ def encrypt_cmd(action: str, section: str | None, method: str, recipient: str | 
 
     if method not in available:
         warn(f"{method} not available. Using {available[0]} instead.")
-        method = available[0]  # type: ignore[assignment]
+        method = available[0]
 
     if action == "status":
         _show_encryption_status()
     elif action == "encrypt":
-        _encrypt_section(section, method, recipient)  # type: ignore[arg-type]
+        _encrypt_section(section, method, recipient)
     elif action == "decrypt":
-        _decrypt_section(section, method, recipient)  # type: ignore[arg-type]
+        _decrypt_section(section, method, recipient)
 
 
 def _show_encryption_status():

@@ -177,8 +177,13 @@ def status(verbose: bool, secrets: bool, json_output: bool):
 
                 # Check for secrets
                 secret_indicator = ""
-                if secrets and local_path.exists() and local_path.is_file():
-                    matches = list(scanner.scan_file(local_path))  # type: ignore
+                if (
+                    secrets
+                    and scanner is not None
+                    and local_path.exists()
+                    and local_path.is_file()
+                ):
+                    matches = list(scanner.scan_file(local_path))
                     if matches:
                         secret_indicator = " [red]🔒[/red]"
                         secrets_found.extend(matches)

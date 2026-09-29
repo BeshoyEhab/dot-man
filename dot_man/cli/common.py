@@ -49,7 +49,8 @@ listed in the short view."""
 
 
 def error(message: str, exit_code: int = 1) -> None:
-    """Print error message and exit."""
+    """Print error message and exit (callers must not rely on a return,
+    except the exit_code=0 print-only path)."""
     ui.error(message, exit_code)
 
 
@@ -76,7 +77,7 @@ def handle_exception(exc: BaseException, context: str = "Operation") -> None:
         warn("Operation cancelled by user")
         raise SystemExit(ExitCode.INTERRUPTED)
 
-    diagnostic = ErrorDiagnostic.from_exception(exc)  # type: ignore[arg-type]
+    diagnostic = ErrorDiagnostic.from_exception(exc)
     ui.console.print()
     ui.console.print(f"[red bold]{diagnostic.title}[/red bold]")
     ui.console.print(f"[red]{diagnostic.details}[/red]")

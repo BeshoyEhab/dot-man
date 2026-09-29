@@ -5,6 +5,7 @@ import os
 import tarfile
 import zipfile
 from pathlib import Path
+from typing import Any
 
 import click
 
@@ -117,11 +118,11 @@ def _export_json(output: str, branch: str, include_secrets: bool):
     from ..operations import get_operations
 
     ops = get_operations()
-    manifest: dict = {
+    manifest: dict[str, Any] = {
         "version": "1.0",
         "branch": branch,
         "exported_at": str(Path().home()),
-        "files": [],  # type: ignore[list-item]
+        "files": [],
     }
 
     for section_name in ops.get_sections():

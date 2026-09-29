@@ -503,7 +503,10 @@ class GitManager:
 
             # Count files in branch
             tree = branch.commit.tree
-            file_count = sum(1 for _ in tree.traverse() if _.type == "blob")  # type: ignore
+            file_count = 0
+            for _ in tree.traverse():
+                if getattr(_, "type", None) == "blob":
+                    file_count += 1
 
             return {
                 "commit_count": len(commits),

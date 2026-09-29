@@ -163,9 +163,9 @@ def is_age_available() -> bool:
         return False
 
 
-def detect_available_encryption() -> list[str]:
+def detect_available_encryption() -> list[Literal["gpg", "age"]]:
     """Detect available encryption methods."""
-    methods = []
+    methods: list[Literal["gpg", "age"]] = []
     if is_gpg_available():
         methods.append("gpg")
     if is_age_available():
