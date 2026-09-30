@@ -1,5 +1,6 @@
 """Comprehensive tests for import command — detection, import functions, and CLI."""
 
+import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -174,7 +175,7 @@ class TestImportChezmoi:
     """Tests for _import_chezmoi()."""
 
     def test_imports_dot_prefixed_files_to_home(self, tmp_path):
-        """Files with dot prefix go to ~/..<name> (code behaviour)."""
+        """Files with dot prefix go to ~/<name> (no doubled dot)."""
         from dot_man.cli.import_cmd import _import_chezmoi
 
         home = tmp_path / "home"
@@ -188,8 +189,8 @@ class TestImportChezmoi:
         with patch("dot_man.cli.import_cmd.Path.home", return_value=home):
             _import_chezmoi(str(source), False, git_mock)
 
-        assert (home / "..bashrc").read_text() == "alias ll='ls -la'"
-        assert (home / "..gitconfig").read_text() == "[user]\n\tname = Test"
+        assert (home / ".bashrc").read_text() == "alias ll='ls -la'"
+        assert (home / ".gitconfig").read_text() == "[user]\n\tname = Test"
         git_mock.add_all.assert_called_once()
         git_mock.commit.assert_called_once_with("Import dotfiles from chezmoi")
 
@@ -912,3 +913,88 @@ class TestImportCLIIntegration:
 
         assert result.exit_code == 1
         assert "does not exist" in result.output
+
+
+class TestChezmoiNameMapping:
+    """Chezmoi `dot_` prefixes map to dotfiles; no double dots."""
+
+    def test_dot_prefix_maps_to_dotfile(self, tmp_path, integration_runner):
+        runner = integration_runner
+        source = tmp_path / "chezmoi"
+        source.mkdir()
+        (source / "dot_bashrc").write_text("alias ll='ls -la'")
+
+        result = runner.invoke(
+            cli, ["import", "chezmoi", "--path", str(source), "--dry-run"]
+        )
+
+        assert result.exit_code == 0, result.output
+        assert f"{os.sep}.bashrc" in result.output
+        assert "..bashrc" not in result.output
+        assert ".config/dot_bashrc" not in result.output
+
+    def test_literal_dotfile_has_single_dot(self, tmp_path, integration_runner):
+        runner = integration_runner
+        source = tmp_path / "chezmoi"
+        source.mkdir()
+        (source / ".bashrc").write_text("alias ll='ls -la'")
+
+        result = runner.invoke(
+            cli, ["import", "chezmoi", "--path", str(source), "--dry-run"]
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "..bashrc" not in result.output
+
+
+class TestDryRunCounts:
+    """Dry-run summaries report the files they list."""
+
+    def _two_file_source(self, tmp_path, name):
+        source = tmp_path / name
+        source.mkdir()
+        (source / "a.txt").write_text("a")
+        (source / "b.txt").write_text("b")
+        return source
+
+    def test_chezmoi_dry_run_counts(self, tmp_path, integration_runner):
+        source = self._two_file_source(tmp_path, "chezmoi")
+        result = integration_runner.invoke(
+            cli, ["import", "chezmoi", "--path", str(source), "--dry-run"]
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "Would import 2 files" in result.output
+
+    def test_yadm_dry_run_counts(self, tmp_path, integration_runner):
+        source = self._two_file_source(tmp_path, "yadm")
+        result = integration_runner.invoke(
+            cli, ["import", "yadm", "--path", str(source), "--dry-run"]
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "Would import 2 files" in result.output
+
+    def test_stow_dry_run_counts(self, tmp_path, integration_runner):
+        pkg = tmp_path / "stow" / "pkg"
+        pkg.mkdir(parents=True)
+        (pkg / "a.txt").write_text("a")
+        (pkg / "b.txt").write_text("b")
+        result = integration_runner.invoke(
+            cli,
+            ["import", "stow", "--path", str(tmp_path / "stow"), "--dry-run"],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "Would import 2 files" in result.output
+
+    def test_singular_file_grammar(self, tmp_path, integration_runner):
+        source = tmp_path / "chezmoi"
+        source.mkdir()
+        (source / "a.txt").write_text("a")
+        result = integration_runner.invoke(
+            cli, ["import", "chezmoi", "--path", str(source), "--dry-run"]
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "Would import 1 file from" in result.output

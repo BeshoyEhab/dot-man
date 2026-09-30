@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **5-minute guide** — new `getting-started/five-minutes.md` first in the docs nav (install → init → add → status → navigate with expected outputs)
 - **Global hooks fire in save/deploy/add** — `pre_<cmd>`/`post_<cmd>` scripts run around real work (skipped on dry-run/abort/no-op) with per-command env; failures warn and continue, never block
 - **Auto-install on detection** — `add` applies detected section hooks like the wizard does; detection expanded (foot, bspwm, qtile, eww, mako with real reloads; helix, zed, yazi, ghostty, river, niri for tracking)
+- **Import fixes** — chezmoi `dot_` prefixes map to dotfiles (no more `..double-dot` destinations); dry-run summaries count the files they list (with singular grammar); migration walkthroughs for chezmoi/yadm/stow in `commands/import.md`
 - **15 new tests** in `tests/test_exit_codes.py` — exit-code preservation, `handle_exception` routing (`navigate`, `bootstrap`, `config get`, `doctor`), central group handling, `DotManError` code propagation
 
 - **Shell completions for `add` command** — file/directory path completion using `@completes("add", param="path")` decorator

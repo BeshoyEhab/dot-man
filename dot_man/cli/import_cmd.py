@@ -11,6 +11,22 @@ from .common import AliasedCommand, error, require_init, warn
 from .interface import cli as main
 
 
+def _files_word(count: int) -> str:
+    """Singular/plural 'file' for summary messages."""
+    return "file" if count == 1 else "files"
+
+
+def _chezmoi_target(rel_path: Path) -> Path:
+    """Map a chezmoi source path to its destination (`dot_` → dot)."""
+    parts = [
+        ("." + part[len("dot_") :]) if part.startswith("dot_") else part
+        for part in rel_path.parts
+    ]
+    if parts[0].startswith("."):
+        return Path.home() / Path(*parts)
+    return Path.home() / ".config" / Path(*parts)
+
+
 @main.command("import", cls=AliasedCommand, aliases=["imp"])
 @click.argument("source", type=click.Choice(["chezmoi", "yadm", "stow", "all"]))
 @click.option(
@@ -173,11 +189,7 @@ def _import_chezmoi(source_path: str | None, dry_run: bool, git: GitManager):
     for item in source.rglob("*"):
         if item.is_file():
             rel_path = item.relative_to(source)
-
-            if rel_path.name.startswith("."):
-                dest_path = Path.home() / f".{rel_path.name}"
-            else:
-                dest_path = Path.home() / ".config" / str(rel_path)
+            dest_path = _chezmoi_target(rel_path)
 
             if source.name == "chezmoi":
                 src_path = item
@@ -186,6 +198,7 @@ def _import_chezmoi(source_path: str | None, dry_run: bool, git: GitManager):
 
             if dry_run:
                 ui.console.print(f"  [dim]Would import: {src_path} → {dest_path}[/dim]")
+                files_imported += 1
             else:
                 try:
                     dest_path.parent.mkdir(parents=True, exist_ok=True)
@@ -195,7 +208,9 @@ def _import_chezmoi(source_path: str | None, dry_run: bool, git: GitManager):
                     warn(f"Failed to import {src_path}: {e}")
 
     if dry_run:
-        ui.success(f"Would import {files_imported} files from chezmoi")
+        ui.success(
+            f"Would import {files_imported} {_files_word(files_imported)} from chezmoi"
+        )
     else:
         ui.success(f"Imported {files_imported} files from chezmoi")
 
@@ -235,6 +250,7 @@ def _import_yadm(source_path: str | None, dry_run: bool, git: GitManager):
 
             if dry_run:
                 ui.console.print(f"  [dim]Would import: {item} → {dest_path}[/dim]")
+                files_imported += 1
             else:
                 try:
                     dest_path.parent.mkdir(parents=True, exist_ok=True)
@@ -244,7 +260,9 @@ def _import_yadm(source_path: str | None, dry_run: bool, git: GitManager):
                     warn(f"Failed to import {item}: {e}")
 
     if dry_run:
-        ui.success(f"Would import {files_imported} files from yadm")
+        ui.success(
+            f"Would import {files_imported} {_files_word(files_imported)} from yadm"
+        )
     else:
         ui.success(f"Imported {files_imported} files from yadm")
 
@@ -299,6 +317,7 @@ def _import_stow(source_path: str | None, dry_run: bool, git: GitManager):
 
                 if dry_run:
                     ui.console.print(f"  [dim]Would import: {item} → {dest_path}[/dim]")
+                    files_imported += 1
                 else:
                     try:
                         dest_path.parent.mkdir(parents=True, exist_ok=True)
@@ -309,7 +328,8 @@ def _import_stow(source_path: str | None, dry_run: bool, git: GitManager):
 
     if dry_run:
         ui.success(
-            f"Would import {files_imported} files from {len(packages)} Stow packages"
+            f"Would import {files_imported} {_files_word(files_imported)}"
+            f" from {len(packages)} Stow packages"
         )
     else:
         ui.success(
