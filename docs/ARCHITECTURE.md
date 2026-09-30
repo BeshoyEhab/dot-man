@@ -1,5 +1,10 @@
 # dot-man Architecture & Design Documentation
 
+> **Note:** the maintained deep-dive lives at
+> `docs/development/architecture.md` (mixins, config loading, current
+> module map). This file is kept for history; its principles below are
+> corrected where the project has moved on.
+
 ## Table of Contents
 1. [Project Overview](#project-overview)
 2. [Directory Structure](#directory-structure)
@@ -16,9 +21,9 @@
 **dot-man** is a dotfile manager that uses Git branches to manage different configurations (work, personal, server, etc.). Instead of managing dotfiles directly on your system, you store them in a Git repository and deploy them using branch switching.
 
 ### Guiding Principles
-1. **No Symlinks**: Symlinking `~/.bashrc` to a git repo breaks when you switch branches if the branch structure changes. dot-man strictly uses **physical, atomic file copies** during save and deploy phases.
+1. **Atomic copies by default, symlinks opt-in**: Deploy uses physical, atomic file copies (safe across branch switches); per-section `deploy_method = "symlink"` enables edit-in-place workflows.
 2. **Secrets Never Enter Git**: Before a file enters the repository, secrets are stripped out and replaced with a cryptographic hash. The actual string is encrypted locally in a vault.
-3. **No Hidden State**: The git repository is a standard bare repository. The configuration file `dot-man.toml` lives inside it, allowing tracking rules to change based on the branch.
+3. **No Hidden State**: The git repository is a standard working-copy repository. The configuration file `dot-man.toml` lives inside it, allowing tracking rules to change based on the branch.
 4. **Resiliency**: If a shell hook fails, or a file copy errors out, dot-man collects all errors and continues. File writes use POSIX-atomic `os.replace` to prevent corrupted dotfiles during a system crash.
 
 ### Core Concept

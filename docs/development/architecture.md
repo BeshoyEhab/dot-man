@@ -1,70 +1,66 @@
-# Architecture
+# Architecture Deep-Dive
 
-dot-man is a Python CLI tool built with Click.
+How dot-man fits together: entry, CLI, mixin operations, config loading.
 
-## Module Structure
+## Entry
 
-```
-dot_man/
-├── cli/                    # CLI commands
-│   ├── interface.py       # CLI group definition
-│   ├── main.py            # Entry point
-│   ├── common.py          # Shared utilities, completions
-│   ├── completions.py     # Shell completion logic
-│   ├── navigate_cmd.py    # navigate command
-│   ├── navigate_preview.py # Diff/preview display
-│   ├── config_cmd.py      # config command
-│   ├── config_tutorial.py # Interactive tutorial
-│   ├── status_cmd.py      # status command
-│   ├── save_cmd.py        # save command
-│   ├── bootstrap_cmd.py   # bootstrap command
-│   ├── hooks_cmd.py       # hooks command
-│   └── vault_cmd.py       # vault command
-├── core.py                # GitManager (branch, commit, diff)
-├── global_config.py       # Config parsing, template substitution
-├── operations.py          # Business logic (save, deploy, status)
-├── section.py             # Section class (config sections)
-├── files.py               # File operations (copy, symlink, deploy)
-├── secrets.py             # Secret detection patterns
-├── vault.py               # Fernet encryption vault
-├── branch_ops.py          # Branch operations (diff, merge)
-├── tag_ops.py             # Tag management
-├── save_deploy_ops.py     # Save/deploy operations
-└── remote_ops.py          # Remote sync operations
-```
+`main()` (`cli/main.py`) runs three gates in order: `--complete`
+dispatch (shell completions, no side effects), first-run onboarding,
+background completions install — then `cli()` (the `DotManGroup` in
+`cli/interface.py`). All command errors funnel through
+`DotManGroup.invoke()` → `handle_exception()`, exiting via `ExitCode`.
 
-## Data Flow
+## CLI layer
 
-```
-User runs: dot-man navigate work
-         │
-         ▼
-┌─────────────────┐
-│  navigate_cmd   │ ← CLI parsing, flags
-└────────┬────────┘
-         │
-         ▼
-┌─────────────────┐
-│   operations    │ ← Business logic
-└────────┬────────┘
-    ┌────┴────┐
-    ▼         ▼
-┌────────┐ ┌────────┐
-│ files  │ │  core  │
-└────────┘ └────────┘
-  copy/     git ops
-  symlink   commit
-            branch
-```
+One file per command (`cli/*_cmd.py`), registered by import in
+`cli/__init__.py`. Completions come from the Click tree itself via the
+`@completes` decorator (`completion_engine.py`); dynamic providers live
+in `completions.py` and never raise. User output goes through `ui.py`
+(Rich helpers + `next_steps`); commands never call `sys.exit()`.
 
-## Key Design Decisions
+## Operations: mixin composition
 
-1. **Copy over symlink** — Default deploy method uses physical copies. Prevents broken symlinks when branch structure changes.
+All business logic hangs off `DotManOperations`
+(`operations.py`), which inherits three mixins and adds shared accessors
+(`git`, `global_config`, `dotman_config`, `backups`, `vault`) plus
+`get_operations()` (cached singleton) / `reset_operations()`:
 
-2. **Secrets never enter git** — Fernet encryption with local vault. API keys replaced with vault tokens before commit.
+- `SaveDeployMixin` (`save_deploy_ops.py`) — two-phase deploy
+  (`scan_deployable_changes` → `execute_deployment_plan`, thread-pooled)
+  and `save_all`; per-section work in `deploy_section`.
+- `BranchMixin` (`branch_ops.py`) — switching, revert, tag/commit
+  resolution, auto-detected hooks (`detect_hooks_for_changed_files`).
+- `StatusMixin` (`status_ops.py`) — `get_detailed_status`,
+  audits, orphans.
 
-3. **POSIX atomic writes** — `os.replace()` prevents dotfile corruption during system crashes.
+Mixins declare the surface they need as abstract stubs (see the top of
+each `*_ops.py`) so each file is understandable alone; `operations.py`
+is the only composition root.
 
-4. **Resilient hooks** — Hook failures are collected and reported, never abort the main operation.
+## Config loading
 
-5. **No external dependencies** — Only stdlib + click + cryptography. No Jinja2 for templates (custom regex parser).
+`~/.config/dot-man/repo/dot-man.toml` wins over `.yaml`/`.yml`
+(`CONFIG_FILE_PRIORITY`); `global.toml` holds machine state. Per
+section, `DotManConfig.get_section()` merges in order — global
+defaults → inherited `templates` → section values — then renders
+`{{ }}` template variables (two passes, so `config_name` follows
+rendered paths), constructs the `Section` (alias → `{x}` placeholders
+→ `file:` scripts via the hook engine), and validates
+(`update_strategy`, non-empty `paths`) against rendered values.
+
+## Storage and hooks
+
+The repo is a normal working-copy git repository (not bare); each
+branch holds a complete configuration. Files deploy by atomic copy
+(`os.replace`), with per-section `symlink` mode for edit-in-place
+workflows. Secrets are redacted to the local vault before commit.
+Hook shell runs through one runner (`hook_engine.run`,
+warn-and-continue); global `pre_<cmd>`/`post_<cmd>` scripts run via
+`run_hook` with hook env vars.
+
+## Design principles
+
+Schema first (one vocabulary: `navigate`, `{{ }}`/`{x}`, `ExitCode`);
+happy path before options (`init` → `add` → `status` → `navigate`);
+centralized errors; stdlib over dependencies (custom regex template
+parser, no Jinja2).
