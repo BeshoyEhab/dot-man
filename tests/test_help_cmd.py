@@ -4,6 +4,7 @@ Bare `--help` follows the short listing; aliases and deprecated shims
 only appear in `help-all`.
 """
 
+import importlib
 import re
 from pathlib import Path
 from unittest.mock import patch
@@ -13,6 +14,12 @@ from click.testing import CliRunner
 
 from dot_man.cli.common import HAPPY_PATH_COMMANDS
 from dot_man.cli.interface import cli
+
+# NOTE: dot_man.cli.help_cmd shadows the help_cmd module (it is the
+# `help` Command) — resolve the module via importlib so patch targets
+# work on all Python versions (mock uses pkgutil.resolve_name on 3.12+
+# but getattr-chain on <=3.11, which hits the Command).
+help_mod = importlib.import_module("dot_man.cli.help_cmd")
 
 HAPPY_PATH = list(HAPPY_PATH_COMMANDS)
 ADVANCED = ["encrypt", "template", "watch"]
@@ -85,7 +92,7 @@ class TestInstallMan:
     def test_install_man_missing_source_errors(self, runner, tmp_path):
         with (
             patch.object(Path, "home", return_value=tmp_path),
-            patch("dot_man.cli.help_cmd.MAN_SOURCE", tmp_path / "missing.1"),
+            patch.object(help_mod, "MAN_SOURCE", tmp_path / "missing.1"),
         ):
             result = runner.invoke(cli, ["help", "--install-man"])
         assert result.exit_code != 0

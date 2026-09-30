@@ -46,6 +46,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Tests** — all 1966 tests passing (up from 1700), 1 skipped; coverage 84% → 90%
 - **Refactoring batch** — long functions split into phase helpers (`navigate` 233→51 lines, `files.py` copy/save splits, deploy closure hoisted to a method); `type: ignore` count 13 → 3 via truthful types (Literal encryption chain, `BaseException` diagnostics, None-guard, `dict[str, Any]` manifest); fixed test isolation leaks (`add` copies and completion cache no longer touch the real repo)
 - **`test_shared_sync.py`** — fixed test expectations for `test_edits_reach_non_overriding_branches` (work overrides fish, so only server gets propagated), `test_unparsable_target_config_is_skipped_safely` (fixed `run_git()` call to use `subprocess.run` with `input=`), `test_source_branch_never_modified` (fixed log assertion to use `-1` flag)
+- **CI on Python 3.10/3.11** — `patch("dot_man.cli.completions.*")` and `patch("dot_man.cli.help_cmd.*")` resolved to the `completions`/`help` Commands (they shadow the modules) on `unittest.mock`'s getattr-chain resolver (≤3.11; 3.12+ uses `pkgutil.resolve_name` via `sys.modules`); all 31 string patches now use `patch.object()` on the `importlib.import_module()` handle, so they work on every version
 
 ### Changed
 
