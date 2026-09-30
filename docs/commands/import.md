@@ -2,6 +2,13 @@
 
 Import dotfiles from other dotfile managers.
 
+## Example
+
+```bash
+dot-man import stow --path ~/dotfiles --dry-run   # preview first
+dot-man import stow --path ~/dotfiles             # then import
+```
+
 ## Usage
 
 ```bash

@@ -2,6 +2,13 @@
 
 Track a file or directory with dot-man.
 
+## Example
+
+```bash
+dot-man add ~/.bashrc
+dot-man status   # verify it is tracked
+```
+
 ## Usage
 
 ```bash

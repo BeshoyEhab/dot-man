@@ -2,6 +2,12 @@
 
 Check system health and dot-man configuration.
 
+## Example
+
+```bash
+dot-man doctor   # warnings are fine, failures need action
+```
+
 ## Usage
 
 ```bash

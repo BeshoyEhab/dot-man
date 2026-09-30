@@ -2,6 +2,13 @@
 
 View and edit the dot-man configuration file.
 
+## Example
+
+```bash
+dot-man config get dot-man.editor   # read one value
+dot-man config list                 # read everything
+```
+
 ## Usage
 
 ```bash

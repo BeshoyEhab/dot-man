@@ -2,6 +2,13 @@
 
 Switch between branch profiles. This is the primary command for managing different configurations.
 
+## Example
+
+```bash
+dot-man navigate work --preview   # see what would change first
+dot-man navigate work             # save, switch, deploy
+```
+
 ## Usage
 
 ```bash

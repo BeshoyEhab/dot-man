@@ -2,6 +2,13 @@
 
 Manage machine profiles for auto-switching branches.
 
+## Example
+
+```bash
+dot-man profile detect   # match this machine to a profile
+dot-man profile list     # see all profiles
+```
+
 ## Usage
 
 ```bash

@@ -2,6 +2,13 @@
 
 Validate repository integrity and configuration.
 
+## Example
+
+```bash
+dot-man verify         # report problems
+dot-man verify --fix   # repair what can be repaired
+```
+
 ## Usage
 
 ```bash

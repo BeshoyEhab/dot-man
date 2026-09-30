@@ -2,6 +2,12 @@
 
 Export dotfiles to portable formats for backup or transfer.
 
+## Example
+
+```bash
+dot-man export tar backup.tar.gz   # whole repo as an archive
+```
+
 ## Usage
 
 ```bash

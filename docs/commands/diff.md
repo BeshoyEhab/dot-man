@@ -2,13 +2,18 @@
 
 Show changes in tracked files.
 
+## Example
+
+```bash
+dot-man diff --branch work   # what would change if you switched
+```
+
 ## Usage
 
 ```bash
 dot-man diff
 dot-man diff --branch work
-dot-man diff --rich
-dot-man diff --section nvim
+dot-man diff --staged
 ```
 
 ## Options

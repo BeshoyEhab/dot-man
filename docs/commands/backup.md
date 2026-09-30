@@ -2,6 +2,13 @@
 
 Create and restore manual backups.
 
+## Example
+
+```bash
+dot-man backup create    # snapshot before risky changes
+dot-man backup list      # find the snapshot id
+```
+
 ## Usage
 
 ```bash

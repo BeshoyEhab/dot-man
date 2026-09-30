@@ -2,13 +2,19 @@
 
 Show commit history for the current branch.
 
+## Example
+
+```bash
+dot-man log -n 10   # last ten commits
+```
+
 ## Usage
 
 ```bash
 dot-man log
-dot-man log --limit 10
+dot-man log -n 10
 dot-man log --diff
-dot-man log --oneline
+dot-man log --stat
 ```
 
 ## Options

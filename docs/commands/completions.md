@@ -2,12 +2,17 @@
 
 Install and manage shell completions.
 
+## Example
+
+```bash
+dot-man completions --shell fish   # install fish completions
+```
+
 ## Usage
 
 ```bash
-dot-man completions install
-dot-man completions install --shell fish
-dot-man completions status
+dot-man completions --shell <bash|zsh|fish>
+dot-man completions --source-only
 ```
 
 ## Options

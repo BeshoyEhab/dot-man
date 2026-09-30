@@ -14,9 +14,8 @@ dot-man diff --branch work    # Compare with another branch
 Show commit history for the current branch.
 
 ```bash
-dot-man log
-dot-man log --limit 10
-dot-man log --oneline
+dot-man log          # recent commits
+dot-man log -n 10    # last ten
 ```
 
 ## tag
@@ -24,10 +23,9 @@ dot-man log --oneline
 Create and manage tag snapshots for rollback.
 
 ```bash
-dot-man tag create v1.0         # Tag current state
-dot-man tag list                # List all tags
-dot-man tag delete v1.0         # Delete a tag
-dot-man navigate main --tag v1.0  # Deploy a tag snapshot
+dot-man tag create v1.0   # snapshot before risky changes
+dot-man tag list          # see restore points
+dot-man tag delete v1.0   # drop one
 ```
 
 ## remote
@@ -35,8 +33,8 @@ dot-man navigate main --tag v1.0  # Deploy a tag snapshot
 Configure remote sync.
 
 ```bash
-dot-man remote add origin https://github.com/user/dotfiles.git
-dot-man remote list
+dot-man remote get   # show configured URL
+dot-man sync         # push and pull
 ```
 
 ## sync
@@ -44,8 +42,8 @@ dot-man remote list
 Push/pull to remote.
 
 ```bash
-dot-man sync push
-dot-man sync pull
+dot-man sync               # both directions
+dot-man sync --push-only   # push without pulling
 ```
 
 ## discover
@@ -53,8 +51,8 @@ dot-man sync pull
 Auto-discover common dotfile locations.
 
 ```bash
-dot-man discover
-dot-man discover --preview     # Show without adding
+dot-man discover         # list what it finds
+dot-man discover --add   # track everything found
 ```
 
 ## hooks
@@ -62,8 +60,8 @@ dot-man discover --preview     # Show without adding
 Manage deploy hooks.
 
 ```bash
-dot-man hooks list
-dot-man hooks run pre-deploy
+dot-man hooks list               # see all hook slots
+dot-man hooks create post deploy # scaffold a script
 ```
 
 ## template
@@ -71,8 +69,8 @@ dot-man hooks run pre-deploy
 Show template variable values.
 
 ```bash
-dot-man template              # All variables
-dot-man template MACHINE     # Specific variable
+dot-man template list         # all variables
+dot-man template get HOSTNAME # one value
 ```
 
 ## completions
@@ -80,8 +78,7 @@ dot-man template MACHINE     # Specific variable
 Install shell completions.
 
 ```bash
-dot-man completions install
-dot-man completions status
+dot-man completions --shell fish
 ```
 
 ## watch
@@ -89,27 +86,8 @@ dot-man completions status
 Watch for file changes and auto-save.
 
 ```bash
-dot-man watch
-dot-man watch --interval 30
-```
-
-## interface
-
-Manage CLI interface mode (standard vs enhanced).
-
-```bash
-dot-man interface
-dot-man interface standard
-```
-
-## migrate
-
-Migrate from other dotfile managers.
-
-```bash
-dot-man migrate chezmoi
-dot-man migrate yadm
-dot-man migrate stow
+dot-man watch                     # auto-save on change
+dot-man watch --interval 30       # poll every 30s
 ```
 
 ## help

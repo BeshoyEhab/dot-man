@@ -2,12 +2,18 @@
 
 Restore files from the repository to your local system.
 
+## Example
+
+```bash
+dot-man revert ~/.bashrc   # discard local edits, restore repo copy
+```
+
 ## Usage
 
 ```bash
 dot-man revert <file>
 dot-man revert <file> --commit abc1234
-dot-man revert --all
+dot-man revert <file> --force
 ```
 
 ## Options

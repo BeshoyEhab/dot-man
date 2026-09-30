@@ -2,6 +2,13 @@
 
 Encrypt and decrypt sensitive files using GPG or AGE.
 
+## Example
+
+```bash
+dot-man encrypt status              # what is encrypted
+dot-man encrypt encrypt ssh-config  # encrypt one section
+```
+
 ## Usage
 
 ```bash

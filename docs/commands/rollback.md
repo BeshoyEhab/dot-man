@@ -2,13 +2,21 @@
 
 Roll back to a previous commit, tag, or N commits back.
 
+## Example
+
+```bash
+dot-man rollback --list   # pick a restore point
+dot-man rollback -n 3     # go back three commits
+```
+
 ## Usage
 
 ```bash
 dot-man rollback
 dot-man rollback -n 3
-dot-man rollback --to v1.0
+dot-man rollback <target>
 dot-man rollback --list
+dot-man rollback --dry-run
 ```
 
 ## Options

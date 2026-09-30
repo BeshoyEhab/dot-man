@@ -2,12 +2,19 @@
 
 Manage pre/post deploy hooks.
 
+## Example
+
+```bash
+dot-man hooks list                  # see all hook slots and scripts
+dot-man hooks create post deploy    # scaffold a post_deploy script
+```
+
 ## Usage
 
 ```bash
 dot-man hooks list
-dot-man hooks run <hook-name>
-dot-man hooks test
+dot-man hooks create <pre|post> <command>
+dot-man hooks delete <pre|post> <command>
 ```
 
 ## Available Hook Aliases

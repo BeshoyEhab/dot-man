@@ -2,6 +2,13 @@
 
 Install system packages on a new machine using your system's package manager.
 
+## Example
+
+```bash
+dot-man bootstrap --list   # preview packages from config, install nothing
+dot-man bootstrap git tmux # install packages explicitly
+```
+
 ## Usage
 
 ```bash

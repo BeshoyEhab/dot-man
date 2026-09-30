@@ -2,6 +2,12 @@
 
 Manage template variables for cross-machine configs.
 
+## Example
+
+```bash
+dot-man template list   # see available variables
+```
+
 ## Usage
 
 ```bash

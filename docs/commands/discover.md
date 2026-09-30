@@ -2,6 +2,12 @@
 
 Auto-detect existing dotfiles on your system.
 
+## Example
+
+```bash
+dot-man discover --add   # detect and track everything found
+```
+
 ## Usage
 
 ```bash

@@ -2,6 +2,13 @@
 
 Scan tracked files for secrets, API keys, tokens, and passwords.
 
+## Example
+
+```bash
+dot-man audit              # review findings
+dot-man audit --fix        # redact them in the repo copy
+```
+
 ## Usage
 
 ```bash

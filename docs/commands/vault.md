@@ -2,6 +2,12 @@
 
 Manage the encrypted secret vault.
 
+## Example
+
+```bash
+dot-man vault status   # what is encrypted
+```
+
 ## Usage
 
 ```bash

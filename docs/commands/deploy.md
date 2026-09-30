@@ -2,13 +2,19 @@
 
 Deploy files from a branch to your system.
 
+## Example
+
+```bash
+dot-man deploy main --dry-run   # preview, change nothing
+dot-man deploy main --force     # deploy without confirming
+```
+
 ## Usage
 
 ```bash
-dot-man deploy
-dot-man deploy --branch work
-dot-man deploy --dry-run
-dot-man deploy --force
+dot-man deploy <branch>
+dot-man deploy <branch> --dry-run
+dot-man deploy <branch> --force
 ```
 
 ## What It Does

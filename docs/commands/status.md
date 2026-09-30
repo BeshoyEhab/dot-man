@@ -2,6 +2,12 @@
 
 Show current state: active branch, modified files, and summary.
 
+## Example
+
+```bash
+dot-man status   # changed files end with next-step suggestions
+```
+
 ## Usage
 
 ```bash

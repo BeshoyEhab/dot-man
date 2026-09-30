@@ -2,11 +2,16 @@
 
 Watch tracked files for changes and auto-save.
 
+## Example
+
+```bash
+dot-man watch --interval 30 --dry-run   # preview what would auto-save
+```
+
 ## Usage
 
 ```bash
 dot-man watch
-dot-man watch --no-commit
 dot-man watch --interval 30
 dot-man watch --dry-run
 ```

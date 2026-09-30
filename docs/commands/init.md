@@ -2,6 +2,12 @@
 
 Initialize a dot-man repository with interactive setup wizard.
 
+## Example
+
+```bash
+dot-man init   # detects your dotfiles, tracks what you confirm
+```
+
 ## Usage
 
 ```bash

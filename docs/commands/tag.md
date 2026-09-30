@@ -2,13 +2,19 @@
 
 Create and manage tag snapshots for fast rollback.
 
+## Example
+
+```bash
+dot-man tag create v1.0   # snapshot before risky changes
+dot-man tag list          # see restore points
+```
+
 ## Usage
 
 ```bash
 dot-man tag create <name>
 dot-man tag list
 dot-man tag delete <name>
-dot-man tag show <name>
 ```
 
 ## Subcommands
