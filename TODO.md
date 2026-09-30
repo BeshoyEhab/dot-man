@@ -1,6 +1,6 @@
 # TODO
 
-**Status:** v1.4.0 · 1954 tests passing · coverage 90% · docs site live
+**Status:** v1.4.0 · 1966 tests passing · coverage 90% · docs site live
 
 ---
 

@@ -243,7 +243,7 @@ def _checkout_commit(ops, current_branch: str, commit_sha: str):
     ui.console.print(f"  Message: {commit_obj.message.strip().split(chr(10))[0][:60]}")
     ui.console.print()
     ui.console.print("To return to a branch, run:")
-    ui.console.print("  [cyan]dot-man switch <branch-name>[/cyan]")
+    ui.console.print("  [cyan]dot-man navigate <branch-name>[/cyan]")
 
 
 def _checkout_tag(ops, current_branch: str, tag_name: str):
@@ -263,8 +263,8 @@ def _checkout_tag(ops, current_branch: str, tag_name: str):
         logging.debug("Failed to get tag message for %s", tag_name)
         message = ""
 
-    # Checkout the tag
-    ops.git.checkout(tag_name)
+    # Checkout the tag's commit (tags are not branch heads)
+    ops.git.checkout_commit(tag_commit)
 
     success(f"Checked out tag '{tag_name}'")
     if message:
@@ -272,7 +272,7 @@ def _checkout_tag(ops, current_branch: str, tag_name: str):
     ui.console.print(f"  Commit: [cyan]{tag_commit}[/cyan]")
     ui.console.print()
     ui.console.print("To return to a branch, run:")
-    ui.console.print("  [cyan]dot-man switch <branch-name>[/cyan]")
+    ui.console.print("  [cyan]dot-man navigate <branch-name>[/cyan]")
 
 
 def _show_rich_diff(file: Path | None, branch: str | None, staged: bool):

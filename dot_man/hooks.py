@@ -22,7 +22,6 @@ HOOK_COMMANDS = [
     "deploy",
     "save",
     "add",
-    "remove",
     "audit",
     "sync",
     "backup",

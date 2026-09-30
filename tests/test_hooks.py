@@ -162,3 +162,26 @@ def test_deploy_runs_hooks(integration_runner):
     assert result.exit_code == 0
     assert "DEPLOY-HOOK-RUN" in result.output
     assert local_file.read_text() == "v1"
+
+
+class TestHookConsistency:
+    """Cross-system hook invariants (lock the whole flaw class)."""
+
+    def test_all_default_hooks_resolve(self):
+        """Every POPULAR_CONFIGS default_hook names a real alias."""
+        from dot_man.config_detector import ConfigDetector
+        from dot_man.constants import HOOK_ALIASES
+
+        for tool, entry in ConfigDetector.POPULAR_CONFIGS.items():
+            hook = entry.get("default_hook")
+            if hook is not None:
+                assert hook in HOOK_ALIASES, tool
+
+    def test_hook_commands_are_real_commands(self):
+        """Every HOOK_COMMANDS entry names a registered command."""
+        from dot_man.cli.interface import cli
+        from dot_man.hooks import HOOK_COMMANDS
+
+        registered = set(cli.commands)
+        for command in HOOK_COMMANDS:
+            assert command in registered, command

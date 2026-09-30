@@ -638,24 +638,26 @@ class TestCheckoutHelpers:
                     _checkout_commit(ops, "master", "badsha")
 
     def test_checkout_tag_valid(self, repo_with_commits):
-        """_checkout_tag checks out a valid tag."""
+        """_checkout_tag checks out a valid tag's commit (not a branch head)."""
         runner, _, repo_dir, _ = repo_with_commits
 
         from git import Repo
 
         repo = Repo(repo_dir)
         repo.create_tag("test-tag", message="Test tag message")
+        expected_sha = repo.tags["test-tag"].commit.hexsha
 
         from dot_man.cli.log_cmd import _checkout_tag
         from dot_man.operations import get_operations
 
         ops = get_operations()
 
-        with patch.object(ops.git, "checkout") as mock_checkout:
+        with patch.object(ops.git, "checkout_commit") as mock_checkout:
             with patch("dot_man.cli.log_cmd.ui.console.print"):
                 with patch("dot_man.cli.log_cmd.success"):
                     _checkout_tag(ops, "master", "test-tag")
-                    mock_checkout.assert_called_once_with("test-tag")
+                    called_sha = mock_checkout.call_args[0][0]
+                    assert repo.commit(called_sha).hexsha == expected_sha
 
     def test_checkout_tag_not_found(self, repo_with_commits):
         """_checkout_tag with non-existent tag shows error."""

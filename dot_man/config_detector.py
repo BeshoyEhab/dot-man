@@ -79,7 +79,7 @@ class ConfigDetector:
             "display_name": "Awesome WM",
             "section_name": "awesome",
             "paths": ["~/.config/awesome"],
-            "default_hook": "awesome_restart",
+            "default_hook": "awesome_reload",
         },
         "kitty": {
             "display_name": "Kitty terminal",
@@ -169,7 +169,7 @@ class ConfigDetector:
             "display_name": "Rofi launcher",
             "section_name": "rofi",
             "paths": ["~/.config/rofi"],
-            "default_hook": "rofi_reload",
+            "default_hook": None,
         },
         "ssh": {
             "display_name": "SSH config",

@@ -203,3 +203,37 @@ class TestTagSwitch:
             result = runner.invoke(tag, ["switch", "v1"])
 
             assert result.exit_code == 1
+
+    def test_switch_checks_out_tag_commit(self):
+        """Tag switch resolves the tag to its commit, not a branch head."""
+        with (
+            patch("dot_man.cli.common.DOT_MAN_DIR") as mock_dir,
+            patch("dot_man.operations.get_operations") as mock_ops,
+        ):
+            mock_dir.exists.return_value = True
+            ops = mock_ops.return_value
+            ops.git.get_tag_commit.return_value = "abc1234"
+
+            runner = CliRunner()
+            result = runner.invoke(tag, ["switch", "v1.0"])
+
+            assert result.exit_code == 0, result.output
+            ops.git.checkout_commit.assert_called_once_with("abc1234")
+            ops.git.checkout.assert_not_called()
+
+    def test_switch_shows_deprecation(self):
+        """Tag switch points at navigate until v2.0 removal."""
+        with (
+            patch("dot_man.cli.common.DOT_MAN_DIR") as mock_dir,
+            patch("dot_man.operations.get_operations") as mock_ops,
+        ):
+            mock_dir.exists.return_value = True
+            ops = mock_ops.return_value
+            ops.git.get_tag_commit.return_value = "abc1234"
+
+            runner = CliRunner()
+            result = runner.invoke(tag, ["switch", "v1.0"])
+
+            assert result.exit_code == 0, result.output
+            assert "deprecated" in result.output.lower()
+            assert "navigate" in result.output

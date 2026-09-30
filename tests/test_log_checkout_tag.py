@@ -69,3 +69,47 @@ class TestTagCommand:
         """Tag should handle uninitialized state."""
         result = runner.invoke(cli, ["tag", "list"])
         assert result.exit_code in [0, 1]
+
+
+class TestCheckoutReturnWording:
+    """Detached-HEAD helpers point at navigate, never switch."""
+
+    def _printed(self, mock_ui):
+        parts = []
+        for call in mock_ui.console.print.call_args_list:
+            for arg in call.args:
+                parts.append(str(getattr(arg, "renderable", arg)))
+        return " ".join(parts)
+
+    def test_checkout_tag_return_wording(self):
+        from unittest.mock import MagicMock, patch
+
+        from dot_man.cli import log_cmd
+
+        ops = MagicMock()
+        ops.git.get_tag_commit.return_value = "abc1234"
+        with (
+            patch.object(log_cmd, "ui") as mock_ui,
+            patch.object(log_cmd, "success"),
+        ):
+            log_cmd._checkout_tag(ops, "main", "v1")
+
+        printed = self._printed(mock_ui)
+        assert "dot-man navigate" in printed
+        assert "dot-man switch" not in printed
+
+    def test_checkout_commit_return_wording(self):
+        from unittest.mock import MagicMock, patch
+
+        from dot_man.cli import log_cmd
+
+        ops = MagicMock()
+        with (
+            patch.object(log_cmd, "ui") as mock_ui,
+            patch.object(log_cmd, "success"),
+        ):
+            log_cmd._checkout_commit(ops, "main", "abc1234")
+
+        printed = self._printed(mock_ui)
+        assert "dot-man navigate" in printed
+        assert "dot-man switch" not in printed

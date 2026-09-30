@@ -3,7 +3,7 @@
 import click
 
 from .. import ui
-from .common import complete_tags, error, require_init, success, warn
+from .common import ExitCode, complete_tags, error, require_init, success, warn
 from .interface import cli as main
 
 
@@ -130,17 +130,21 @@ def tag_delete(name: str, force: bool):
         error(str(e))
 
 
-@tag.command("switch")
+@tag.command("switch", deprecated=True)
 @click.argument("name", shell_complete=complete_tags)
 def tag_switch(name: str):
     """Switch to a tag (checkout the tag).
 
-    This is equivalent to: dot-man checkout <tag>
+    ⚠️ DEPRECATED: Use 'dot-man navigate' instead (removed in v2.0).
 
     Examples:
         dot-man tag switch my-setup
         dot-man tag switch v1
     """
+    ui.console.print(
+        "[yellow bold]⚠️ WARNING:[/yellow bold] [yellow]'tag switch' is deprecated.[/yellow]\n"
+        "  Use [cyan]dot-man navigate[/cyan] instead.\n"
+    )
     try:
         from ..operations import get_operations
 
@@ -150,15 +154,16 @@ def tag_switch(name: str):
         tag_commit = ops.git.get_tag_commit(name)
         if not tag_commit:
             error(f"Tag not found: {name}", exit_code=1)
+            raise SystemExit(ExitCode.ERROR)
 
-        # Checkout the tag
-        ops.git.checkout(name)
+        # Checkout the tag's commit (tags are not branch heads)
+        ops.git.checkout_commit(tag_commit)
 
         success(f"Switched to tag '{name}'")
         ui.console.print(f"  Commit: [cyan]{tag_commit}[/cyan]")
         ui.console.print()
         ui.console.print("To return to a branch, run:")
-        ui.console.print("  [cyan]dot-man switch <branch-name>[/cyan]")
+        ui.console.print("  [cyan]dot-man navigate <branch-name>[/cyan]")
 
     except Exception as e:
         error(str(e))
