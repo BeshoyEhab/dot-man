@@ -13,7 +13,7 @@ or priorities shift (see "AI Autonomy" at the bottom).
 (work, personal, minimal, server).
 
 - **Language**: Python 3.10+ · **CLI**: Click · **Tests**: pytest · **Packages**: `uv`
-- **Version**: 1.4.0 · **Tests**: 2019 passing · **Coverage**: 92% · **Docs**: mkdocs Material on GitHub Pages
+- **Version**: 1.4.0 · **Tests**: 2036 passing · **Coverage**: 92% · **Docs**: mkdocs Material on GitHub Pages
 - **CI**: GitHub Actions with `uv` (`uv.lock` committed); pre-commit runs Black, ruff, mypy; `uv build` in the publish workflow
 
 Canonical command vocabulary: **`navigate`** (alias `nav`) switches

@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Merge coverage** — `merge.py` 80%→100% (+13 strong tests: marker parsing, missing-file paths, idempotent inject, replace position, content extraction, direct-file listing, merge/dedup strategies); total suite 2003 passing
 - **Utils coverage** — `utils.py` 80%→100% (+6 strong tests: editor fallback chain, `open_in_editor` paths, stat-error tolerance); total suite 2009 passing, coverage 91%→92%
 - **UI coverage** — `ui.py` 81%→100% (7 weak existence checks replaced with 17 real output/behavior assertions); total suite 2019 passing
+- **Config coverage** — `dotman_config.py` 82%→100% (+17 strong tests: TOML priority, template inheritance, section validation, `validate()`); total suite 2036 passing
 
 - **Unified hook engine** — new `dot_man/hook_engine.py`: one resolve path (alias → placeholders → `file:`) and one shell runner for all hook shell; auto-detected hooks now resolve `{config_name}`; deploy hook failures warn instead of vanishing
 - **Canonical `ExitCode` enum** (`dot_man/cli/common.py`) — `OK=0`, `ERROR=1`, `USAGE=2`, `CONFIG=7`, `INTERRUPTED=130`; single vocabulary for every exit path

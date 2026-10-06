@@ -9,7 +9,7 @@
 - ✅ Quickshell hook aliases
 - ✅ Template substitution & conditionals
 - ✅ Vault key rotation
-- ✅ 2019 tests, 92% coverage
+- ✅ 2036 tests, 92% coverage
 - ✅ Full documentation site (mkdocs Material)
 
 ---
@@ -43,7 +43,6 @@ Lowest-covered modules (source of truth: `TODO.md`, regenerated 2026-10-06):
 
 | Module | Coverage |
 |--------|----------|
-| `dotman_config.py` | 82% |
 | `operations.py` | 83% |
 
 ---
@@ -114,7 +113,7 @@ Lowest-covered modules (source of truth: `TODO.md`, regenerated 2026-10-06):
 
 | Metric | Current | Target |
 |--------|---------|--------|
-| Test Coverage | 92% (2019 tests) | 90%+ |
+| Test Coverage | 92% (2036 tests) | 90%+ |
 | Core Commands | 30+ commands | All stable |
 | Lint Errors | 0 (ruff + mypy) | 0 |
 | Documentation | Full docs site | Keep updated |

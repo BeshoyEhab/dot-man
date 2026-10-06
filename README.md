@@ -426,7 +426,7 @@ System variables (`{{HOSTNAME}}`, `{{USER}}`, `{{SHELL}}`, etc.) are auto-popula
 | Version | `1.4.0` |
 | Python | `3.10 · 3.11 · 3.12 · 3.13` |
 | Platforms | Linux, macOS |
-| Test Coverage | 84% (1682 tests) |
+| Test Coverage | 92% (2036 tests) |
 | Commands | 30+ |
 | PyPI | [`dotman-git`](https://pypi.org/project/dotman-git/) |
 
