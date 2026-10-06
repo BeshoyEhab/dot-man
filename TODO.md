@@ -1,6 +1,6 @@
 # TODO
 
-**Status:** v1.4.0 · 2036 tests passing · coverage 92% · docs site live
+**Status:** v1.4.0 · 2042 tests passing · coverage 92% · docs site live
 
 ---
 
@@ -40,9 +40,18 @@
 
 Lowest-covered modules (regenerated 2026-10-06):
 
+Lowest-covered modules (regenerated 2026-10-06):
+
 | Module | Coverage |
 |--------|----------|
-| `operations.py` | 83% |
+| `cli/navigate_preview.py` | 69% |
+| `cli/init_cmd.py` | 70% |
+| `cli/edit_cmd.py` | 73% |
+| `cli/log_cmd.py` | 80% |
+| `cli/revert_cmd.py` | 80% |
+| `cli/clean_cmd.py` | 81% |
+| `cli/restore_cmd.py` | 82% |
+| `cli/hooks_cmd.py` | 83% |
 
 ---
 
@@ -77,6 +86,7 @@ Lowest-covered modules (regenerated 2026-10-06):
 - [x] **`utils.py` 80%→100%** (+6 strong tests: `which` fallback chain, `open_in_editor` exit/spawn paths, stat-error tolerance); total coverage 91%→92%
 - [x] **`ui.py` 81%→100%** (replaced 7 weak existence checks with 17 real output/behavior assertions: banner, message helpers, error exits, confirm/ask wiring, suggestions, next-steps, sections)
 - [x] **`dotman_config.py` 82%→100%** (+17 strong tests: TOML priority, template inheritance, section validation, add/update errors, full `validate()` coverage)
+- [x] **`operations.py` 83%→100%** (+6 strong tests: exclude/include/dir-prune filters, path-pattern matching, DELETED reporting, outside-tree tolerance)
 
 - [x] **Coverage floor 86% → 90%** — completions 62%→99%, watch 65%→99%, core 66%→96%, navigate 67%→99% (+122 strong tests); fixed `navigate <tag>` (now checks out the tag commit) and swallowed save/deploy error details found along the way
 - [x] **Refactoring batch** — navigate/files/save_deploy splits, 13→3 type-ignores, test isolation fixes
