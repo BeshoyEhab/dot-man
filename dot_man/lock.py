@@ -43,12 +43,14 @@ class FileLock:
             # Lock is held by another process
             if self._fd:
                 self._fd.close()
+                self._fd = None
             raise LockError(
                 f"Could not acquire lock on {self.lock_file}. Is another dot-man process running?"
             )
         except OSError as e:
             if self._fd:
                 self._fd.close()
+                self._fd = None
             raise LockError(f"Failed to lock {self.lock_file}: {e}")
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:
