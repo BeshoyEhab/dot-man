@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Backup coverage floor** — `backups.py` 71%→100%, `cli/backup_cmd.py` 72%→95% (+16 strong tests: missing-path skips, OSError cleanup, manifest roundtrips, CLI create/list/restore flows); total suite 1985 passing, coverage 90%→91%
+- **Lock coverage + cleanup fix** — `lock.py` 79%→100% (+5 strong tests: missing parents, real fcntl contention, open/flock OSError, unlock tolerance); failed lock acquisition now resets `_fd` to `None` instead of holding a closed fd
+- **Merge coverage** — `merge.py` 80%→100% (+13 strong tests: marker parsing, missing-file paths, idempotent inject, replace position, content extraction, direct-file listing, merge/dedup strategies); total suite 2003 passing
+- **Utils coverage** — `utils.py` 80%→100% (+6 strong tests: editor fallback chain, `open_in_editor` paths, stat-error tolerance); total suite 2009 passing, coverage 91%→92%
+- **UI coverage** — `ui.py` 81%→100% (7 weak existence checks replaced with 17 real output/behavior assertions); total suite 2019 passing
+
 - **Unified hook engine** — new `dot_man/hook_engine.py`: one resolve path (alias → placeholders → `file:`) and one shell runner for all hook shell; auto-detected hooks now resolve `{config_name}`; deploy hook failures warn instead of vanishing
 - **Canonical `ExitCode` enum** (`dot_man/cli/common.py`) — `OK=0`, `ERROR=1`, `USAGE=2`, `CONFIG=7`, `INTERRUPTED=130`; single vocabulary for every exit path
 - **Centralized error handling** — `DotManGroup.invoke()` routes unexpected failures from *every* command through `handle_exception()`; `ClickException`/`Abort`/`Exit`/`SystemExit` pass through untouched so `--help`, usage errors (exit 2), and deliberate exits keep working

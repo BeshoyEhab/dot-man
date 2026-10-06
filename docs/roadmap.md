@@ -9,7 +9,7 @@
 - ✅ Quickshell hook aliases
 - ✅ Template substitution & conditionals
 - ✅ Vault key rotation
-- ✅ 1700+ tests, 84% coverage
+- ✅ 2019 tests, 92% coverage
 - ✅ Full documentation site (mkdocs Material)
 
 ---
@@ -39,18 +39,12 @@
 
 ## Coverage Focus
 
-Lowest-covered modules:
+Lowest-covered modules (source of truth: `TODO.md`, regenerated 2026-10-06):
 
 | Module | Coverage |
 |--------|----------|
-| `cli/bootstrap_cmd.py` | 15% |
-| `cli/export_cmd.py` | 25% |
-| `cli/completions.py` | 62% |
-| `cli/watch_cmd.py` | 65% |
-| `core.py` | 66% |
-| `cli/audit_cmd.py` | 68% |
-| `cli/navigate_cmd.py` | 68% |
-| `cli/revert_cmd.py` | 68% |
+| `dotman_config.py` | 82% |
+| `operations.py` | 83% |
 
 ---
 
@@ -120,7 +114,7 @@ Lowest-covered modules:
 
 | Metric | Current | Target |
 |--------|---------|--------|
-| Test Coverage | 84% (1700+ tests) | 90%+ |
+| Test Coverage | 92% (2019 tests) | 90%+ |
 | Core Commands | 30+ commands | All stable |
 | Lint Errors | 0 (ruff + mypy) | 0 |
 | Documentation | Full docs site | Keep updated |

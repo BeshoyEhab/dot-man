@@ -1,6 +1,6 @@
 # TODO
 
-**Status:** v1.4.0 · 1966 tests passing · coverage 90% · docs site live
+**Status:** v1.4.0 · 2019 tests passing · coverage 92% · docs site live
 
 ---
 
@@ -38,16 +38,10 @@
 
 ## 🧪 Coverage Focus (overall 90%, target: raise the floor)
 
-Lowest-covered modules (regenerated 2026-09-29):
+Lowest-covered modules (regenerated 2026-10-06):
 
 | Module | Coverage |
 |--------|----------|
-| `backups.py` | 71% |
-| `cli/backup_cmd.py` | 72% |
-| `lock.py` | 79% |
-| `merge.py` | 80% |
-| `ui.py` | 81% |
-| `utils.py` | 81% |
 | `dotman_config.py` | 82% |
 | `operations.py` | 83% |
 
@@ -77,6 +71,12 @@ Lowest-covered modules (regenerated 2026-09-29):
 ## ✅ Recently Completed
 
 ### Unreleased
+
+- [x] **Coverage floor 90% → 91%** — `backups.py` 71%→100%, `cli/backup_cmd.py` 72%→95% (+16 strong tests: skip-missing/all-missing/OSError-cleanup, missing-dir/manifest roundtrips, delete-failure, CLI create/list/restore flows incl. confirm-abort); also fixed `backup` CLI tests leaking into the real `~/.config/dot-man` (`dot_man.backups.BACKUPS_DIR` now patched in test isolation)
+- [x] **`lock.py` 79%→100%** (+5 strong tests: missing parent dirs, real fcntl contention, open/flock OSError paths, unlock-failure tolerance; upgraded weak `hasattr` test to real acquire/release assertions) — exposed and fixed failed-acquire leaving a closed fd referenced instead of `None`
+- [x] **`merge.py` 80%→100%** (+13 strong tests: marker-name parsing, missing-file paths, existing-block no-op, replace position, managed-content extraction, direct-file listing, `get_universal_additions`, merge/dedup/unknown strategies)
+- [x] **`utils.py` 80%→100%** (+6 strong tests: `which` fallback chain, `open_in_editor` exit/spawn paths, stat-error tolerance); total coverage 91%→92%
+- [x] **`ui.py` 81%→100%** (replaced 7 weak existence checks with 17 real output/behavior assertions: banner, message helpers, error exits, confirm/ask wiring, suggestions, next-steps, sections)
 
 - [x] **Coverage floor 86% → 90%** — completions 62%→99%, watch 65%→99%, core 66%→96%, navigate 67%→99% (+122 strong tests); fixed `navigate <tag>` (now checks out the tag commit) and swallowed save/deploy error details found along the way
 - [x] **Refactoring batch** — navigate/files/save_deploy splits, 13→3 type-ignores, test isolation fixes
