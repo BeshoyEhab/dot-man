@@ -143,6 +143,19 @@ def update_config_doc(doc: Any, data: dict) -> None:
             doc[k] = v
 
 
+def _to_plain(value: Any) -> Any:
+    """Recursively convert a ruamel CommentedMap/Seq to plain dicts/lists.
+
+    Keeps ``_data`` independent from ``_doc`` so mutating loaded data
+    never mutates the comment-preserving document used on save.
+    """
+    if isinstance(value, dict):
+        return {k: _to_plain(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_to_plain(v) for v in value]
+    return value
+
+
 def load_config_file(path: Path, label: str = "Config") -> tuple[dict, Any]:
     """Load a TOML/YAML configuration file.
 
@@ -167,9 +180,7 @@ def load_config_file(path: Path, label: str = "Config") -> tuple[dict, Any]:
             )
         yaml = YAML()
         doc = yaml.load(content)
-        import yaml as pyyaml  # type: ignore[import-untyped]
-
-        data = pyyaml.safe_load(content) or {}
+        data = _to_plain(doc) if doc is not None else {}
     else:
         data = tomllib.loads(content)
         doc = tomlkit.parse(content)

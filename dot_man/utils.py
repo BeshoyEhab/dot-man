@@ -16,6 +16,7 @@ import hashlib
 import os
 import shutil
 import subprocess
+from collections.abc import Iterator
 from pathlib import Path
 
 
@@ -81,36 +82,32 @@ def human_size(size_bytes: int) -> str:
     return f"{size_num:.1f} PB"
 
 
-def get_directory_size(path: Path) -> int:
-    """Get the total size of a directory in bytes."""
+def _iter_files(path: Path) -> Iterator[Path]:
+    """Yield every file under *path* (or *path* itself if a file)."""
     if not path.exists():
-        return 0
-
+        return
     if path.is_file():
-        return path.stat().st_size
-
-    total = 0
+        yield path
+        return
     for item in path.rglob("*"):
         if item.is_file():
-            try:
-                total += item.stat().st_size
-            except (OSError, PermissionError):
-                pass
+            yield item
+
+
+def get_directory_size(path: Path) -> int:
+    """Get the total size of a directory in bytes."""
+    total = 0
+    for item in _iter_files(path):
+        try:
+            total += item.stat().st_size
+        except (OSError, PermissionError):
+            pass
     return total
 
 
 def count_files(path: Path) -> int:
     """Count files in a directory (recursively)."""
-    if not path.exists():
-        return 0
-    if path.is_file():
-        return 1
-
-    count = 0
-    for item in path.rglob("*"):
-        if item.is_file():
-            count += 1
-    return count
+    return sum(1 for _ in _iter_files(path))
 
 
 def is_git_installed() -> bool:
