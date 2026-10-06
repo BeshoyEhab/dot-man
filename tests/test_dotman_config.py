@@ -100,3 +100,209 @@ class TestDefaultTemplateSlim:
         assert "dot-man switch" not in content
         assert "navigate" in content
         assert "github.com" not in content
+
+
+def _load(tmp_path, text):
+    """Write dot-man.toml and return a loaded DotManConfig."""
+    from dot_man.dotman_config import DotManConfig
+
+    (tmp_path / "dot-man.toml").write_text(text)
+    cfg = DotManConfig(tmp_path)
+    cfg.load()
+    return cfg
+
+
+class TestConfigDiscovery:
+    """Multiple config files resolve by TOML-over-YAML priority."""
+
+    def test_toml_wins_over_yaml(self, tmp_path):
+        from dot_man.dotman_config import DotManConfig
+
+        (tmp_path / "dot-man.toml").write_text('[a]\npaths = ["~/a"]\n')
+        (tmp_path / "dot-man.yaml").write_text("b:\n  paths: ['~/b']\n")
+
+        cfg = DotManConfig(tmp_path)
+
+        assert cfg._path.name == "dot-man.toml"
+
+
+class TestTemplateInheritance:
+    """Local and global templates resolve into sections."""
+
+    def test_inherits_single_string(self, tmp_path):
+        """A bare `inherits = \"base\"` string behaves like a one-list."""
+        cfg = _load(
+            tmp_path,
+            "[bashrc]\npaths = ['~/.bashrc']\ninherits = 'base'\n"
+            "[templates.base]\nupdate_strategy = 'rename_old'\n",
+        )
+
+        section = cfg.get_section("bashrc")
+
+        assert section.update_strategy == "rename_old"
+
+    def test_resolve_template_from_global(self, tmp_path):
+        """Templates missing locally fall back to the global config."""
+        from dot_man.dotman_config import DotManConfig
+        from dot_man.global_config import GlobalConfig
+
+        (tmp_path / "dot-man.toml").write_text(
+            "[bashrc]\npaths = ['~/.bashrc']\ninherits = ['base']\n"
+        )
+        gc = GlobalConfig()
+        gc._data = {"templates": {"base": {"update_strategy": "rename_old"}}}
+
+        cfg = DotManConfig(tmp_path, global_config=gc)
+        cfg.load()
+
+        assert cfg.get_section("bashrc").update_strategy == "rename_old"
+
+
+class TestGetSectionValidation:
+    """get_section coerces inputs and rejects bad strategies."""
+
+    def test_paths_single_string(self, tmp_path):
+        """A bare `paths = \"...\"` string behaves like a one-list."""
+        cfg = _load(tmp_path, "[bashrc]\npaths = '~/.bashrc'\n")
+
+        section = cfg.get_section("bashrc")
+
+        assert len(section.paths) == 1
+        assert section.paths[0].name == ".bashrc"
+
+    def test_invalid_deploy_method(self, tmp_path):
+        import pytest
+
+        from dot_man.exceptions import ConfigValidationError
+
+        cfg = _load(
+            tmp_path, "[bashrc]\npaths = ['~/.bashrc']\ndeploy_method = 'teleport'\n"
+        )
+
+        with pytest.raises(ConfigValidationError, match="teleport"):
+            cfg.get_section("bashrc")
+
+    def test_missing_section_raises(self, tmp_path):
+        import pytest
+
+        from dot_man.exceptions import ConfigurationError
+
+        cfg = _load(tmp_path, "[bashrc]\npaths = ['~/.bashrc']\n")
+
+        with pytest.raises(ConfigurationError, match="ghost"):
+            cfg.get_section("ghost")
+
+
+class TestAddSectionErrors:
+    """add_section rejects empty, blank, and reserved inputs."""
+
+    def test_no_paths_rejected(self, tmp_path):
+        import pytest
+
+        from dot_man.dotman_config import DotManConfig
+        from dot_man.exceptions import ConfigurationError
+
+        cfg = DotManConfig(tmp_path)
+
+        with pytest.raises(ConfigurationError, match="at least one path"):
+            cfg.add_section("empty", [])
+
+    def test_blank_path_rejected(self, tmp_path):
+        import pytest
+
+        from dot_man.dotman_config import DotManConfig
+        from dot_man.exceptions import ConfigurationError
+
+        cfg = DotManConfig(tmp_path)
+
+        with pytest.raises(ConfigurationError, match="non-empty strings"):
+            cfg.add_section("bad", ["   "])
+
+    def test_templates_name_reserved(self, tmp_path):
+        import pytest
+
+        from dot_man.dotman_config import DotManConfig
+        from dot_man.exceptions import ConfigurationError
+
+        cfg = DotManConfig(tmp_path)
+
+        with pytest.raises(ConfigurationError, match="reserved"):
+            cfg.add_section("templates", ["~/x"])
+
+
+class TestUpdateSection:
+    """update_section edits keys and removes them on None."""
+
+    def test_missing_section_rejected(self, tmp_path):
+        import pytest
+
+        from dot_man.exceptions import ConfigurationError
+
+        cfg = _load(tmp_path, "[bashrc]\npaths = ['~/.bashrc']\n")
+
+        with pytest.raises(ConfigurationError, match="ghost"):
+            cfg.update_section("ghost", update_strategy="rename_old")
+
+    def test_unknown_key_rejected(self, tmp_path):
+        import pytest
+
+        from dot_man.exceptions import ConfigurationError
+
+        cfg = _load(tmp_path, "[bashrc]\npaths = ['~/.bashrc']\n")
+
+        with pytest.raises(ConfigurationError, match="Unknown key"):
+            cfg.update_section("bashrc", bogus_key="x")
+
+    def test_none_removes_key(self, tmp_path):
+        cfg = _load(
+            tmp_path,
+            "[bashrc]\npaths = ['~/.bashrc']\nupdate_strategy = 'rename_old'\n",
+        )
+
+        cfg.update_section("bashrc", update_strategy=None)
+
+        assert "update_strategy" not in cfg._data["bashrc"]
+        assert cfg.get_section("bashrc").update_strategy == "replace"
+
+
+class TestValidate:
+    """validate() reports problems instead of raising."""
+
+    def test_missing_path_warns(self, tmp_path):
+        cfg = _load(tmp_path, "[bashrc]\npaths = ['~/definitely-not-here-xyz']\n")
+
+        warnings = cfg.validate()
+
+        assert any("does not exist" in w for w in warnings)
+
+    def test_unresolved_template_warns(self, tmp_path):
+        cfg = _load(
+            tmp_path,
+            "[bashrc]\npaths = ['~/.bashrc']\ninherits = ['ghost-template']\n",
+        )
+
+        warnings = cfg.validate()
+
+        assert any("Template not found" in w for w in warnings)
+
+    def test_unknown_key_warns(self, tmp_path):
+        cfg = _load(tmp_path, "[bashrc]\npaths = ['~/.bashrc']\nbogus = 1\n")
+
+        warnings = cfg.validate()
+
+        assert any("Unknown key" in w for w in warnings)
+
+    def test_broken_section_warns(self, tmp_path):
+        """A section that cannot resolve becomes a warning, not an error."""
+        cfg = _load(tmp_path, "[empty]\nupdate_strategy = 'replace'\n")
+
+        warnings = cfg.validate()
+
+        assert any("empty" in w for w in warnings)
+
+    def test_clean_config_is_quiet(self, tmp_path):
+        real = tmp_path / ".bashrc"
+        real.write_text("x")
+        cfg = _load(tmp_path, f"[bashrc]\npaths = ['{real}']\n")
+
+        assert cfg.validate() == []
