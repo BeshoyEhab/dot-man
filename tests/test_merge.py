@@ -4,6 +4,7 @@ from dot_man.merge import (
     UniversalMergeManager,
     get_hook_command,
     get_hook_for_config,
+    get_universal_additions,
     list_all_hooks,
     merge_files,
     reload_all_dots,
@@ -146,6 +147,117 @@ export A=1
         assert any("bashrc" in r for r in results)
         assert not any("shell" in r for r in results)
 
+    def test_extract_marker_name(self, tmp_path):
+        """Marker names parse out; plain lines yield empty string."""
+        manager = UniversalMergeManager()
+
+        assert (
+            manager._extract_marker_name("# >>> dot-man:start <<< aliases") == "aliases"
+        )
+        assert manager._extract_marker_name("# >>> dot-man:start <<<") == ""
+        assert manager._extract_marker_name("export A=1") == ""
+
+    def test_get_regions_missing_file(self, tmp_path):
+        """Missing file has no regions."""
+        manager = UniversalMergeManager()
+
+        assert manager.get_regions(tmp_path / "ghost.txt") == []
+
+    def test_inject_existing_block_unchanged(self, tmp_path):
+        """Injecting into a file that already has the block is a no-op."""
+        file_path = tmp_path / "test.txt"
+        existing = (
+            "before\n# >>> dot-man:start <<< aliases\nexport A=1\n"
+            "# >>> dot-man:end <<<\nafter\n"
+        )
+        file_path.write_text(existing)
+
+        manager = UniversalMergeManager()
+        result = manager.inject_content(file_path, "export A=1", marker="aliases")
+
+        assert result == existing
+
+    def test_inject_content_replace_position(self, tmp_path):
+        """Unknown position returns only the new managed block."""
+        file_path = tmp_path / "test.txt"
+        file_path.write_text("existing content\n")
+
+        manager = UniversalMergeManager()
+        result = manager.inject_content(file_path, "# fresh", position="replace")
+
+        assert result.startswith("# >>> dot-man:start <<<")
+        assert "existing content" not in result
+
+    def test_extract_managed_content(self, tmp_path):
+        """Managed blocks map to names; unnamed blocks use 'default'."""
+        file_path = tmp_path / "test.txt"
+        file_path.write_text(
+            "# >>> dot-man:start <<< aliases\nexport A=1\n# >>> dot-man:end <<<\n"
+        )
+
+        manager = UniversalMergeManager()
+        result = manager.extract_managed_content(file_path)
+
+        assert result == {"default": "export A=1"}
+
+    def test_extract_managed_content_start_like_line(self, tmp_path):
+        """A content line mentioning ':start' still maps to 'default'."""
+        file_path = tmp_path / "test.txt"
+        file_path.write_text(
+            "# >>> dot-man:start <<< aliases\necho :start\ndata\n"
+            "# >>> dot-man:end <<<\n"
+        )
+
+        manager = UniversalMergeManager()
+        result = manager.extract_managed_content(file_path)
+
+        assert result == {"default": "echo :start\ndata"}
+
+    def test_remove_content_missing_file(self, tmp_path):
+        """Removing from a missing file yields empty string."""
+        manager = UniversalMergeManager()
+
+        assert manager.remove_content(tmp_path / "ghost.txt") == ""
+
+    def test_list_universal_direct_files(self, tmp_path):
+        """Direct file paths (not dirs) are filtered by marker presence."""
+        marked = tmp_path / "marked.sh"
+        marked.write_text("# >>> dot-man:start <<<\nx=1\n# >>> dot-man:end <<<\n")
+        plain = tmp_path / "plain.sh"
+        plain.write_text("x=1\n")
+        missing = tmp_path / "ghost.sh"
+
+        manager = UniversalMergeManager()
+        results = manager.list_universal_files([str(marked), str(plain), str(missing)])
+
+        assert results == [str(marked)]
+
+
+class TestGetUniversalAdditions:
+    """Tests for the get_universal_additions convenience function."""
+
+    def test_adds_managed_block(self, tmp_path):
+        """Content lands inside default markers after existing text."""
+        file_path = tmp_path / "test.txt"
+        file_path.write_text("existing\n")
+
+        result = get_universal_additions(str(file_path), "export A=1")
+
+        assert "existing" in result
+        assert "# >>> dot-man:start <<<" in result
+        assert "export A=1" in result
+        assert "# >>> dot-man:end <<<" in result
+
+    def test_missing_file_starts_fresh(self, tmp_path):
+        """Missing file yields just the new managed block."""
+        file_path = tmp_path / "fresh.txt"
+
+        result = get_universal_additions(str(file_path), "export A=1")
+
+        assert "# >>> dot-man:start <<<" in result
+        assert "export A=1" in result
+        assert "# >>> dot-man:end <<<" in result
+
 
 class TestHooks:
     """Tests for hook-related functions."""
@@ -246,3 +358,43 @@ class TestMergeFiles:
         result = merge_files("/nonexistent", str(target))
 
         assert result == ""
+
+    def test_merge_strategy_merges_blocks(self, tmp_path):
+        """Merge strategy keeps target text and appends missing blocks."""
+        source = tmp_path / "source.txt"
+        target = tmp_path / "target.txt"
+
+        source.write_text(
+            "# >>> dot-man:start <<< aliases\nexport A=1\n# >>> dot-man:end <<<\n"
+        )
+        target.write_text("my stuff\n")
+
+        result = merge_files(str(source), str(target), strategy="merge")
+
+        assert "my stuff" in result
+        assert "export A=1" in result
+
+    def test_merge_strategy_skips_duplicate_blocks(self, tmp_path):
+        """Blocks already present in target are not appended twice."""
+        block = "# >>> dot-man:start <<< aliases\nexport A=1\n# >>> dot-man:end <<<\n"
+        source = tmp_path / "source.txt"
+        target = tmp_path / "target.txt"
+
+        source.write_text(block)
+        target.write_text(block)
+
+        result = merge_files(str(source), str(target), strategy="merge")
+
+        assert result.count("export A=1") == 1
+
+    def test_merge_unknown_strategy_keeps_target(self, tmp_path):
+        """Unknown strategy falls through to target content."""
+        source = tmp_path / "source.txt"
+        target = tmp_path / "target.txt"
+
+        source.write_text("new content")
+        target.write_text("old content")
+
+        result = merge_files(str(source), str(target), strategy="prompt")
+
+        assert result == "old content"

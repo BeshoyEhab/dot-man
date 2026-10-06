@@ -65,6 +65,51 @@ class TestBackupManagerCreate:
         result = bm.create_backup([], note="test")
         assert result == ""
 
+    def test_create_backup_skips_missing_paths(self, tmp_backups_dir, tmp_path):
+        """Missing paths are skipped; real files still back up."""
+        import json
+
+        from dot_man.backups import BackupManager
+
+        real_file = tmp_path / "real.txt"
+        real_file.write_text("real content")
+        missing = tmp_path / "ghost.txt"
+
+        bm = BackupManager(backups_dir=tmp_backups_dir)
+        result = bm.create_backup([real_file, missing], note="mixed")
+
+        assert result != ""
+        manifest = json.loads(
+            (tmp_backups_dir / result / "manifest.json").read_text(encoding="utf-8")
+        )
+        assert len(manifest) == 1
+        assert list(manifest.values()) == [str(real_file)]
+
+    def test_create_backup_all_missing_returns_empty(self, tmp_backups_dir, tmp_path):
+        """All-missing paths leave no empty backup directory behind."""
+        from dot_man.backups import BackupManager
+
+        bm = BackupManager(backups_dir=tmp_backups_dir)
+        result = bm.create_backup([tmp_path / "ghost.txt"], note="empty")
+
+        assert result == ""
+        assert list(tmp_backups_dir.iterdir()) == []
+
+    def test_create_backup_failure_cleans_up(self, tmp_backups_dir, tmp_path):
+        """OSError mid-backup raises BackupError with no leftover directory."""
+        from dot_man.backups import BackupManager
+        from dot_man.exceptions import BackupError
+
+        real_file = tmp_path / "real.txt"
+        real_file.write_text("real content")
+
+        bm = BackupManager(backups_dir=tmp_backups_dir)
+        with patch("shutil.copy2", side_effect=OSError("disk full")):
+            with pytest.raises(BackupError):
+                bm.create_backup([real_file], note="boom")
+
+        assert list(tmp_backups_dir.iterdir()) == []
+
     def test_create_backup_single_file(self, tmp_backups_dir, tmp_path):
         """Test create_backup with a single file."""
         from dot_man.backups import BackupManager
@@ -101,6 +146,17 @@ class TestBackupManagerList:
         backups = bm.list_backups()
         assert backups == []
 
+    def test_list_backups_missing_dir(self, tmp_backups_dir):
+        """list_backups returns [] when the backups dir itself is gone."""
+        import shutil
+
+        from dot_man.backups import BackupManager
+
+        bm = BackupManager(backups_dir=tmp_backups_dir)
+        shutil.rmtree(tmp_backups_dir)
+
+        assert bm.list_backups() == []
+
     def test_list_backups_with_data(self, tmp_backups_dir, tmp_path):
         """Test list_backups with some backups."""
         from dot_man.backups import BackupManager
@@ -126,6 +182,63 @@ class TestBackupManagerRestore:
         with pytest.raises(Exception):
             bm.restore_backup("nonexistent_backup_id")
 
+    def test_restore_missing_manifest(self, tmp_backups_dir):
+        """Backup dir without manifest.json raises corrupt-backup error."""
+        from dot_man.backups import BackupManager
+        from dot_man.exceptions import BackupError
+
+        bm = BackupManager(backups_dir=tmp_backups_dir)
+        (tmp_backups_dir / "20240101_120000_manual").mkdir(parents=True)
+
+        with pytest.raises(BackupError, match="corrupt"):
+            bm.restore_backup("20240101_120000_manual")
+
+    def test_restore_invalid_manifest(self, tmp_backups_dir):
+        """Backup with unparseable manifest raises BackupError."""
+        from dot_man.backups import BackupManager
+        from dot_man.exceptions import BackupError
+
+        bm = BackupManager(backups_dir=tmp_backups_dir)
+        broken = tmp_backups_dir / "20240101_120000_broken"
+        broken.mkdir(parents=True)
+        (broken / "manifest.json").write_text("not json {{{")
+
+        with pytest.raises(BackupError):
+            bm.restore_backup("20240101_120000_broken")
+
+    def test_restore_file_roundtrip(self, tmp_backups_dir, tmp_path):
+        """Modified file is restored to backed-up content."""
+        from dot_man.backups import BackupManager
+
+        target = tmp_path / "settings.conf"
+        target.write_text("original")
+
+        bm = BackupManager(backups_dir=tmp_backups_dir)
+        backup_id = bm.create_backup([target], note="snap")
+        assert backup_id != ""
+
+        target.write_text("modified")
+        assert bm.restore_backup(backup_id) is True
+        assert target.read_text() == "original"
+
+    def test_restore_directory_roundtrip(self, tmp_backups_dir, tmp_path):
+        """Directory restored over a modified copy regains its files."""
+        from dot_man.backups import BackupManager
+
+        target_dir = tmp_path / "confdir"
+        target_dir.mkdir()
+        (target_dir / "inner.txt").write_text("inner content")
+
+        bm = BackupManager(backups_dir=tmp_backups_dir)
+        backup_id = bm.create_backup([target_dir], note="snap")
+        assert backup_id != ""
+
+        (target_dir / "inner.txt").write_text("changed")
+        (target_dir / "extra.txt").write_text("extra")
+        assert bm.restore_backup(backup_id) is True
+        assert (target_dir / "inner.txt").read_text() == "inner content"
+        assert not (target_dir / "extra.txt").exists()
+
 
 class TestBackupManagerDelete:
     def test_delete_nonexistent(self, tmp_backups_dir):
@@ -135,6 +248,20 @@ class TestBackupManagerDelete:
         bm = BackupManager(backups_dir=tmp_backups_dir)
         result = bm.delete_backup("nonexistent_backup_id")
         assert result is False or result is None
+
+    def test_delete_failure_returns_false(self, tmp_backups_dir, tmp_path):
+        """OSError during delete returns False instead of raising."""
+        from dot_man.backups import BackupManager
+
+        target = tmp_path / "f.txt"
+        target.write_text("x")
+
+        bm = BackupManager(backups_dir=tmp_backups_dir)
+        backup_id = bm.create_backup([target], note="snap")
+        assert backup_id != ""
+
+        with patch("shutil.rmtree", side_effect=OSError("locked")):
+            assert bm.delete_backup(backup_id) is False
 
 
 class TestBackupManagerCleanup:
