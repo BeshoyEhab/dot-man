@@ -3,6 +3,8 @@
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 
 class TestSectionInit:
     """Test Section initialization."""
@@ -53,6 +55,7 @@ class TestSectionInit:
 
     def test_section_init_hooks_resolved(self):
         """Test hooks are resolved via _resolve_hook."""
+        from dot_man.constants import HOOK_ALIASES
         from dot_man.section import Section
 
         section = Section(
@@ -63,9 +66,72 @@ class TestSectionInit:
             post_deploy="quickshell_reload",
         )
         assert section.pre_deploy == "echo hello"
-        # quickshell_reload is resolved via HOOK_ALIASES
+        # The alias name must be gone — only the command survives.
+        assert "quickshell_reload" not in (section.post_deploy or "")
+        assert section.post_deploy == HOOK_ALIASES["quickshell_reload"]
+        # ...and the command keeps {config_name} for a later pass,
+        # because this section has no paths to substitute yet.
         assert "killall qs" in (section.post_deploy or "")
         assert "{config_name}" in (section.post_deploy or "")
+
+    def test_section_init_hook_alias_substitutes_config_name(self):
+        """With paths present, quickshell_reload's {config_name} fills in.
+
+        Pins the full command so both the alias lookup and the placeholder
+        pass are verified in one shot.
+        """
+        from dot_man.section import Section
+
+        section = Section(
+            name="test",
+            paths=[Path("~/.config/quickshell/ii")],
+            repo_base="/test",
+            post_deploy="quickshell_reload",
+        )
+        assert section.post_deploy == "killall qs 2>/dev/null; sleep 0.3; qs -c ii &"
+
+    def test_section_init_duplicate_paths_kept_in_order(self):
+        """Duplicate paths are kept verbatim (no dedup), order preserved.
+
+        Guards against a future dedup silently changing stored config and
+        to_dict() output.
+        """
+        from dot_man.section import Section
+
+        section = Section(name="dup", paths=["a/b", "a/b", Path("a/b")])
+        assert section.paths == [Path("a/b"), Path("a/b"), Path("a/b")]
+        assert section.to_dict()["paths"] == ["a/b", "a/b", "a/b"]
+
+    def test_section_init_invalid_values_rejected(self):
+        """Invalid deploy_method/update_strategy fail fast at construction.
+
+        Section used to store garbage verbatim (e.g. deploy_method="rsync"),
+        which then silently behaved like 'copy' at deploy time; reject with
+        the same ConfigValidationError the config loader raises.
+        """
+        from dot_man.exceptions import ConfigValidationError
+        from dot_man.section import Section
+
+        with pytest.raises(
+            ConfigValidationError, match=r"Invalid deploy_method 'rsync' in \[test\]"
+        ):
+            Section(
+                name="test",
+                paths=[],
+                repo_base="/test",
+                deploy_method="rsync",
+            )
+
+        with pytest.raises(
+            ConfigValidationError,
+            match=r"Invalid update_strategy 'rollback' in \[test\]",
+        ):
+            Section(
+                name="test",
+                paths=[],
+                repo_base="/test",
+                update_strategy="rollback",
+            )
 
     def test_section_init_ignored_directories_custom(self):
         """Test Section with custom ignored_directories."""
@@ -159,6 +225,26 @@ class TestGenerateRepoBase:
         result = section._generate_repo_base()
         assert result == "nvim"
 
+    @pytest.mark.parametrize(
+        "raw_path,expected",
+        [
+            pytest.param(Path("~/.config/My Configs"), "My Configs", id="spaces"),
+            pytest.param(Path("~/設定"), "設定", id="cjk"),
+            pytest.param(Path("~/файл"), "файл", id="cyrillic"),
+        ],
+    )
+    def test_generate_repo_base_unusual_last_segment(self, raw_path, expected):
+        """repo_base comes from the last path segment, whatever it contains.
+
+        Spaces and non-ASCII names are real-world config directory names;
+        stripping or mangling them would corrupt the repo layout.
+        """
+        from dot_man.section import Section
+
+        section = Section(name="fallback", paths=[raw_path])
+        assert section._generate_repo_base() == expected
+        assert section.repo_base == expected
+
 
 class TestResolveHook:
     """Test _resolve_hook method."""
@@ -208,7 +294,11 @@ class TestResolveHook:
         assert result == "echo ii"
 
     def test_resolve_config_root_placeholder(self):
-        """{config_root} should be replaced with parent directory."""
+        """{config_root} should be replaced with parent directory.
+
+        Asserts the exact expanded value AND that no placeholder text
+        survives — a leftover brace would break the hook at runtime.
+        """
         from dot_man.section import Section
 
         section = Section(
@@ -216,11 +306,16 @@ class TestResolveHook:
             paths=[Path("~/.config/quickshell/ii")],
         )
         result = section._resolve_hook("echo {config_root}")
-        expected = f"echo {Path.home()}/.config/quickshell"
-        assert result == expected
+        assert result == f"echo {Path.home()}/.config/quickshell"
+        assert "{config_root}" not in result
 
     def test_resolve_paths_placeholder(self):
-        """{paths} should be replaced with space-separated paths."""
+        """{paths} must render the exact space-joined path list.
+
+        Pinning the full string (not substrings) catches separator or
+        expansion regressions. Path inputs are stored verbatim, so the
+        assertion is hermetic — no home-directory coupling.
+        """
         from dot_man.section import Section
 
         section = Section(
@@ -228,9 +323,7 @@ class TestResolveHook:
             paths=[Path("~/.config/nvim"), Path("~/.vimrc")],
         )
         result = section._resolve_hook("echo {paths}")
-        assert result is not None
-        assert ".config/nvim" in result
-        assert ".vimrc" in result
+        assert result == "echo ~/.config/nvim ~/.vimrc"
 
     def test_resolve_qs_config_backward_compat(self):
         """{qs_config} should still work as alias for {config_name}."""
@@ -259,6 +352,44 @@ class TestResolveHook:
             result = section._resolve_hook("echo {branch}")
             assert result == "echo work"
 
+    def test_branch_placeholder_reads_recorded_branch_not_git(self, tmp_path):
+        """{branch} comes from global.toml, never from raw git state.
+
+        The old implementation opened REPO_DIR with
+        search_parent_directories=True, so an unpatched (or not yet
+        created) REPO_DIR leaked whatever repository happened to sit at or
+        above it — observed as a mysterious personal branch named
+        "custom" — and disagreed with operations.current_branch, the
+        source deploy-time hook contexts use.
+        """
+        from git import Repo
+
+        from dot_man.section import Section
+
+        # A real git repo whose checked-out branch differs from the
+        # recorded one: raw-git reads would return "git-branch".
+        repo_dir = tmp_path / "nearby"
+        repo_dir.mkdir()
+        repo = Repo.init(repo_dir)
+        with repo.config_writer() as config:
+            config.set_value("user", "name", "T")
+            config.set_value("user", "email", "t@t.c")
+        (repo_dir / "f.txt").write_text("x")
+        repo.index.add(["f.txt"])
+        repo.index.commit("Initial")
+        repo.create_head("git-branch").checkout()
+
+        global_toml = tmp_path / "global.toml"
+        global_toml.write_text('[dot-man]\ncurrent_branch = "work"\n')
+
+        with (
+            patch("dot_man.constants.REPO_DIR", repo_dir),
+            patch("dot_man.global_config.GLOBAL_TOML", global_toml),
+        ):
+            section = Section(name="test", paths=[], repo_base="/test")
+            assert Section._get_current_branch() == "work"
+            assert section._resolve_hook("echo {branch}") == "echo work"
+
     def test_resolve_alias(self):
         """Hook aliases should be resolved to their command."""
         from dot_man.section import Section
@@ -272,6 +403,99 @@ class TestResolveHook:
         assert result == (
             "source ~/.bashrc 2>/dev/null || source ~/.zshrc 2>/dev/null || true"
         )
+
+    def test_resolve_multiple_placeholders_in_one_hook(self):
+        """Every placeholder in a single hook string must resolve.
+
+        Hooks routinely mix values (name + root); a partial resolution
+        would ship a broken command to the shell.
+        """
+        from dot_man.section import Section
+
+        section = Section(
+            name="quickshell-ii",
+            paths=[Path("~/.config/quickshell/ii")],
+        )
+        result = section._resolve_hook("echo {section_name} @ {config_root}")
+        assert result == f"echo quickshell-ii @ {Path.home()}/.config/quickshell"
+        assert "{section_name}" not in result
+        assert "{config_root}" not in result
+
+    def test_resolve_multiple_placeholder_kinds_together(self):
+        """section_name, config_name and branch resolve in one string.
+
+        Hermetic variant: uses a fake branch so no real git repo is needed.
+        """
+        from dot_man.section import Section
+
+        section = Section(
+            name="qs-main",
+            paths=[Path("~/.config/quickshell/ii")],
+        )
+        with patch(
+            "dot_man.section.Section._get_current_branch",
+            return_value="work",
+        ):
+            result = section._resolve_hook(
+                "{section_name}/{config_name}:{branch}",
+            )
+        assert result == "qs-main/ii:work"
+
+    def test_resolve_unknown_placeholder_stays_literal(self):
+        """Unknown {bogus_var} must survive untouched.
+
+        Silently blanking an unknown name would hide a typo in a hook;
+        keeping the literal makes the typo visible in output.
+        """
+        from dot_man.section import Section
+
+        section = Section(name="test", paths=[], repo_base="/test")
+        result = section._resolve_hook("echo {bogus_var}")
+        assert result == "echo {bogus_var}"
+
+    def test_resolve_unknown_placeholder_does_not_mask_known_one(self):
+        """A known placeholder still resolves next to an unknown one."""
+        from dot_man.section import Section
+
+        section = Section(name="test", paths=[], repo_base="/test")
+        result = section._resolve_hook("{section_name} {bogus_var}")
+        assert result == "test {bogus_var}"
+
+    @pytest.mark.parametrize(
+        "template",
+        [
+            pytest.param("echo {config_name}", id="config-name"),
+            pytest.param("echo {config_root}", id="config-root"),
+            pytest.param("echo {paths}", id="paths"),
+        ],
+    )
+    def test_resolve_placeholder_without_data_stays_literal(self, template):
+        """Placeholders with no backing paths must stay literal, not vanish.
+
+        An empty substitution would yield a silently wrong shell command
+        (e.g. `qs -c  &`); the literal keeps the failure loud.
+        """
+        from dot_man.section import Section
+
+        section = Section(name="test", paths=[], repo_base="/test")
+        assert section._resolve_hook(template) == template
+
+    def test_resolve_alias_quickshell_substitutes_config_name(self):
+        """quickshell_reload must expand to the full command for this path.
+
+        Pins the whole command so both the alias lookup and the
+        placeholder pass are verified in one shot.
+        """
+        from dot_man.section import Section
+
+        section = Section(
+            name="test",
+            paths=[Path("~/.config/quickshell/ii")],
+            repo_base="/test",
+        )
+        result = section._resolve_hook("quickshell_reload")
+        assert result == "killall qs 2>/dev/null; sleep 0.3; qs -c ii &"
+        assert "quickshell_reload" not in result
 
     def test_resolve_with_existing_path(self, tmp_path):
         """_resolve_hook should handle existing directories."""
@@ -350,6 +574,47 @@ class TestSectionMethods:
             Path("/home/user/.dot-man/repo"),
         )
         assert str(result) == "/home/user/.dot-man/repo/bash/bashrc"
+
+    def test_get_repo_path_nested_source_lands_under_repo_base(self, tmp_path):
+        """A source deeper than the tracked root preserves its subdirectories.
+
+        `~/.config/nvim/lua/mod.lua` tracked under `~/.config/nvim` must map
+        to `repo/nvim/lua/mod.lua` — dropping intermediate directories would
+        make same-basename files collide in the repo (silent data loss).
+        """
+        from dot_man.section import Section
+
+        tracked = tmp_path / ".config" / "nvim"
+        (tracked / "lua").mkdir(parents=True)
+        source = tracked / "lua" / "mod.lua"
+        source.write_text("--")
+        section = Section(name="nvim", paths=[str(tracked)], repo_base="nvim")
+
+        result = section.get_repo_path(source, tmp_path / "repo")
+
+        assert str(result) == str(tmp_path / "repo" / "nvim" / "lua" / "mod.lua")
+
+    def test_get_repo_path_same_basename_different_dirs_do_not_collide(self, tmp_path):
+        """Two files with the same basename in different subdirectories must
+        map to distinct repo paths — the collision that basename-only
+        mapping caused."""
+        from dot_man.section import Section
+
+        tracked = tmp_path / ".config" / "nvim"
+        (tracked / "lua" / "a").mkdir(parents=True)
+        (tracked / "lua" / "b").mkdir(parents=True)
+        file_a = tracked / "lua" / "a" / "mod.lua"
+        file_b = tracked / "lua" / "b" / "mod.lua"
+        file_a.write_text("return a")
+        file_b.write_text("return b")
+        section = Section(name="nvim", paths=[str(tracked)], repo_base="nvim")
+
+        repo_a = section.get_repo_path(file_a, tmp_path / "repo")
+        repo_b = section.get_repo_path(file_b, tmp_path / "repo")
+
+        assert repo_a != repo_b
+        assert str(repo_a).endswith("nvim/lua/a/mod.lua")
+        assert str(repo_b).endswith("nvim/lua/b/mod.lua")
 
 
 class TestToDict:
@@ -502,3 +767,102 @@ class TestToDict:
         result = section.to_dict()
         assert result["include"] == ["*.lua"]
         assert result["exclude"] == ["*.bak"]
+
+    def test_to_dict_round_trip_maximal_section(self):
+        """Rebuilding from to_dict() must reproduce every non-default field.
+
+        to_dict() output is what gets persisted; a lossy round trip would
+        silently drop settings on the next save.
+        """
+        from dot_man.section import Section
+
+        original = Section(
+            name="max",
+            paths=["~/.config/nvim", "~/.vimrc"],
+            repo_base="maxbase",
+            secrets_filter=False,
+            update_strategy="rename_old",
+            include=["*.lua"],
+            exclude=["*.bak"],
+            inherits=["base"],
+            pre_deploy="echo before",
+            post_deploy="echo after",
+            on_activate="echo on",
+            on_deactivate="echo off",
+            ignored_directories=["node_modules", ".git"],
+            follow_symlinks=True,
+            deploy_method="symlink",
+            encrypted=True,
+            encryption_method="age",
+            encryption_recipient="age1xyz",
+            shared=True,
+        )
+        data = original.to_dict()
+
+        assert sorted(data) == [
+            "deploy_method",
+            "encrypted",
+            "encryption_method",
+            "encryption_recipient",
+            "exclude",
+            "follow_symlinks",
+            "ignored_directories",
+            "include",
+            "inherits",
+            "on_activate",
+            "on_deactivate",
+            "paths",
+            "post_deploy",
+            "pre_deploy",
+            "repo_base",
+            "secrets_filter",
+            "shared",
+            "update_strategy",
+        ]
+        assert "name" not in data  # name is the TOML key, not a field
+
+        payload = dict(data)
+        rebuilt = Section(
+            name="max",
+            repo_base=payload.pop("repo_base", "max"),
+            **payload,
+        )
+
+        assert rebuilt.to_dict() == data
+        assert rebuilt.name == "max"
+        assert rebuilt.repo_base == "maxbase"
+        assert rebuilt.paths == original.paths
+        assert rebuilt.shared is True
+        assert rebuilt.encryption_recipient == "age1xyz"
+
+    def test_to_dict_round_trip_with_repo_path(self):
+        """repo_path is serialized and makes repo_base redundant.
+
+        The rebuilt section must produce the identical dict even though
+        repo_base is absent from it (repo_path wins).
+        """
+        from dot_man.section import Section
+
+        original = Section(
+            name="nvim",
+            paths=["~/.config/nvim"],
+            repo_base="custom-base",
+            repo_path="cfg/nvim",
+            secrets_filter=False,
+            deploy_method="symlink",
+        )
+        data = original.to_dict()
+
+        assert "repo_base" not in data  # repo_path overrides it
+
+        payload = dict(data)
+        rebuilt = Section(
+            name="nvim",
+            repo_base=payload.pop("repo_base", "nvim"),
+            **payload,
+        )
+
+        assert rebuilt.to_dict() == data
+        assert rebuilt.repo_path == "cfg/nvim"
+        assert rebuilt.secrets_filter is False
+        assert rebuilt.deploy_method == "symlink"

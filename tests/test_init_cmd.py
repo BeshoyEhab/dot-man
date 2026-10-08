@@ -1,6 +1,24 @@
-"""Tests for cli/init_cmd.py — init command, show_quick_start, run_setup_wizard."""
+"""Tests for cli/init_cmd.py — init command, show_quick_start, run_setup_wizard.
 
-import os
+Conventions this file demonstrates (copy them when rewriting other CLI tests):
+
+* Hermetic env: ``clean_env`` layers init-specific extras on top of
+  conftest's ``_dot_man_patches`` registry, so ``HOME`` and every
+  import-bound path constant point at a fresh temp dir. Never depend on
+  the real ``$HOME``.
+* Exact exit codes: every invoke asserts a literal (0, 1 or 2), never a
+  range or an ``in (0, 1)`` fallback.
+* Exact output: assertions pin phrases observed from real runs
+  ("Git not found", "Setup Complete", "dot-man status") — no ``or``-
+  weakened fallbacks, no bare existence / isinstance-only checks.
+* One behavior per test; sweep a family of options with parametrized ids
+  instead of near-duplicate tests (see ``TestInitHelp``).
+* Shared arrangement (building a source repo for ``--import``) lives in a
+  module-level helper instead of copy-pasted Repo.init/config/commit
+  blocks.
+"""
+
+import sys
 from contextlib import ExitStack
 from unittest.mock import patch
 
@@ -8,6 +26,17 @@ import pytest
 from click.testing import CliRunner
 
 from dot_man.cli.interface import cli
+from dot_man.constants import DEFAULT_BRANCH
+from tests.conftest import _dot_man_patches
+
+
+def _load_toml(text):
+    """Parse TOML with stdlib tomllib (3.11+) or the tomli backport."""
+    if sys.version_info >= (3, 11):
+        import tomllib
+    else:
+        import tomli as tomllib
+    return tomllib.loads(text)
 
 
 @pytest.fixture
@@ -17,7 +46,17 @@ def runner():
 
 @pytest.fixture
 def clean_env(tmp_path):
-    """Isolated home with patched dot-man constants — no repo yet."""
+    """Hermetic, UN-initialized dot-man environment (runner + temp paths).
+
+    CLI tests needing an un-initialized env: reuse ``_dot_man_patches`` +
+    extras (this fixture); for an initialized env use ``integration_runner``.
+
+    The shared registry supplies every import-bound path constant plus the
+    patched ``HOME``; extras below cover bindings the registry lacks:
+      * ``dot_man.cli.init_cmd.BACKUPS_DIR`` — init-only consumer that
+        appeared solely in the old local patch list, so it is kept here
+        (and noted in the comment) instead of being silently dropped.
+    """
     home = tmp_path / "home"
     home.mkdir()
     dot_man_dir = home / ".config" / "dot-man"
@@ -25,35 +64,14 @@ def clean_env(tmp_path):
     backups_dir = dot_man_dir / "backups"
     global_toml = dot_man_dir / "global.toml"
 
-    patches = [
-        patch("dot_man.constants.DOT_MAN_DIR", dot_man_dir),
-        patch("dot_man.constants.REPO_DIR", repo_dir),
-        patch("dot_man.constants.BACKUPS_DIR", backups_dir),
-        patch("dot_man.constants.GLOBAL_TOML", global_toml),
-        patch("dot_man.core.REPO_DIR", repo_dir),
-        patch("dot_man.config.REPO_DIR", repo_dir),
-        patch("dot_man.config.GLOBAL_TOML", global_toml),
-        patch("dot_man.global_config.GLOBAL_TOML", global_toml),
-        patch("dot_man.dotman_config.REPO_DIR", repo_dir),
-        patch("dot_man.operations.REPO_DIR", repo_dir),
-        patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir),
-        patch("dot_man.branch_ops.REPO_DIR", repo_dir),
-        patch("dot_man.status_ops.REPO_DIR", repo_dir),
-        patch("dot_man.cli.interface.DOT_MAN_DIR", dot_man_dir),
-        patch("dot_man.cli.init_cmd.REPO_DIR", repo_dir),
-        patch("dot_man.cli.init_cmd.DOT_MAN_DIR", dot_man_dir),
-        patch("dot_man.cli.init_cmd.BACKUPS_DIR", backups_dir),
-        patch("dot_man.cli.add_cmd.REPO_DIR", repo_dir),
-        patch("dot_man.backups.BACKUPS_DIR", backups_dir),
-        patch("dot_man.constants.DOT_MAN_DIR", dot_man_dir),
-        patch("dot_man.cli.navigate_cmd.REPO_DIR", repo_dir),
-        patch("dot_man.cli.common.DOT_MAN_DIR", dot_man_dir),
-        patch("dot_man.cli.common.REPO_DIR", repo_dir),
-        patch.dict(os.environ, {"HOME": str(home)}),
-    ]
+    # Init-specific extras not present in the shared registry.
+    extras = [patch("dot_man.cli.init_cmd.BACKUPS_DIR", backups_dir)]
 
     with ExitStack() as stack:
-        for p in patches:
+        for p in (
+            _dot_man_patches(dot_man_dir, repo_dir, backups_dir, global_toml, home)
+            + extras
+        ):
             stack.enter_context(p)
 
         from dot_man.operations import reset_operations
@@ -63,21 +81,74 @@ def clean_env(tmp_path):
         yield CliRunner(), dot_man_dir, repo_dir, backups_dir, global_toml
 
 
+def _make_source_repo(tmp_path, commits=(), branches=(), dirname="source_repo"):
+    """Build a real git source repo for the ``--import`` tests.
+
+    Replaces the Repo.init/config/commit boilerplate that was triplicated
+    across the import tests.
+
+    ``commits``: sequence of ``(message, {filename: content})`` applied in
+    order on the default branch (an empty ``{}`` commits an empty tree).
+    ``branches``: sequence of ``(branch_name, commits)`` — each branch is
+    created off the default head, checked out, its commits applied, then
+    the default branch is checked back out.
+
+    Returns ``(source_dir, repo)``. The default branch name comes from the
+    host's git configuration (``master`` vs ``main``): callers must read
+    ``repo.active_branch.name`` instead of assuming ``"master"``.
+    """
+    from git import Repo
+
+    source_dir = tmp_path / dirname
+    source_dir.mkdir()
+    repo = Repo.init(source_dir)
+    with repo.config_writer() as config:
+        config.set_value("user", "name", "Test User")
+        config.set_value("user", "email", "test@test.com")
+
+    def apply_commit(message, files):
+        for name, content in files.items():
+            (source_dir / name).write_text(content)
+        if files:
+            repo.index.add(sorted(files))
+        repo.index.commit(message)
+
+    for message, files in commits:
+        apply_commit(message, files)
+
+    if branches:
+        default_branch = repo.active_branch.name
+        for branch_name, branch_commits in branches:
+            repo.create_head(branch_name).checkout()
+            for message, files in branch_commits:
+                apply_commit(message, files)
+        repo.heads[default_branch].checkout()
+
+    return source_dir, repo
+
+
 # ---------------------------------------------------------------------------
 # Help
 # ---------------------------------------------------------------------------
 
 
 class TestInitHelp:
-    def test_init_help_shows_force(self, runner):
-        result = runner.invoke(cli, ["init", "--help"])
-        assert result.exit_code == 0
-        assert "--force" in result.output
+    @pytest.mark.parametrize(
+        "option",
+        ["--force", "--no-wizard", "--import"],
+        ids=["force", "no-wizard", "import"],
+    )
+    def test_init_help_documents_option(self, runner, option):
+        """Help lists each setup-control option and states the purpose.
 
-    def test_init_help_shows_no_wizard(self, runner):
+        Consolidates the three copy-pasted help tests; the parametrized ids
+        keep a failure readable per option, and the purpose keyword guards
+        against a help page that lists flags but forgets what init does.
+        """
         result = runner.invoke(cli, ["init", "--help"])
         assert result.exit_code == 0
-        assert "--no-wizard" in result.output
+        assert option in result.output
+        assert "Initialize" in result.output
 
 
 # ---------------------------------------------------------------------------
@@ -121,12 +192,19 @@ class TestInitCommand:
         assert (repo_dir / ".git").exists()
 
     def test_init_success_message(self, clean_env):
-        """init should print a success banner."""
+        """Success banner pins two stable phrases: the result and the follow-up.
+
+        A single substring ("initialized") is too easy to satisfy by
+        accident; pairing it with the quick-start heading proves the full
+        no-wizard flow rendered.
+        """
         runner, *_ = clean_env
 
         result = runner.invoke(cli, ["init", "--force", "--no-wizard"])
         assert result.exit_code == 0, result.output
-        assert "initialized" in result.output.lower()
+        out = result.output.lower()
+        assert "initialized successfully" in out
+        assert "quick start guide" in out
 
     def test_init_force_reinitializes(self, clean_env):
         """--force skips the confirmation prompt and re-initializes successfully."""
@@ -143,30 +221,125 @@ class TestInitCommand:
         # Repo dir still exists and git is valid
         assert (repo_dir / ".git").exists()
 
+    def test_init_twice_without_force_decline_aborts(self, clean_env):
+        """Re-running without --force and declining must abort untouched.
+
+        The no-force path asks for confirmation before wiping; declining has
+        to exit 1 with the abort message instead of proceeding. The old suite
+        only exercised the --force route around this branch.
+        """
+        runner, _, repo_dir, *_ = clean_env
+
+        first = runner.invoke(cli, ["init", "--force", "--no-wizard"])
+        assert first.exit_code == 0, first.output
+
+        with patch("dot_man.ui.confirm", return_value=False):
+            second = runner.invoke(cli, ["init", "--no-wizard"])
+
+        assert second.exit_code == 1
+        assert "Aborted" in second.output
+        assert (repo_dir / ".git").exists()
+
+    def test_init_twice_without_force_accept_reinitializes(self, clean_env):
+        """Confirming the no-force re-init wipes and rebuilds successfully.
+
+        The flip side of the decline test: a 'yes' must reach exit 0 with the
+        success banner and a valid repo, proving the prompt gates (rather than
+        blocks) re-initialization.
+        """
+        runner, _, repo_dir, *_ = clean_env
+
+        first = runner.invoke(cli, ["init", "--force", "--no-wizard"])
+        assert first.exit_code == 0, first.output
+
+        with patch("dot_man.ui.confirm", return_value=True):
+            second = runner.invoke(cli, ["init", "--no-wizard"])
+
+        assert second.exit_code == 0, second.output
+        assert "initialized successfully" in second.output.lower()
+        assert (repo_dir / ".git").exists()
+
+    def test_init_without_force_on_fresh_env_succeeds_silently(self, clean_env):
+        """A first ``init`` without --force must NOT warn about reinitializing.
+
+        The CLI group creates DOT_MAN_DIR on every invocation (for logs), so
+        checking the directory's existence is not evidence of an initialized
+        repo — the scary DELETE-all-data prompt must be reserved for repos
+        that actually contain a .git.
+        """
+        runner, _, repo_dir, *_ = clean_env
+
+        result = runner.invoke(cli, ["init", "--no-wizard"])
+
+        assert result.exit_code == 0, result.output
+        assert "already initialized" not in result.output.lower()
+        assert "DELETE" not in result.output
+        assert (repo_dir / ".git").exists()
+
     def test_init_git_not_installed_exits_with_code(self, clean_env):
-        """init should exit with code 2 when git is unavailable."""
+        """Missing git exits 2 (dependency error) and names the missing tool.
+
+        The bare exit code would also match an unrelated failure; the pinned
+        message proves init failed for the right reason.
+        """
         runner, *_ = clean_env
 
         with patch("dot_man.cli.init_cmd.is_git_installed", return_value=False):
             result = runner.invoke(cli, ["init", "--force", "--no-wizard"])
 
         assert result.exit_code == 2
+        assert "Git not found" in result.output
 
     def test_init_dotman_toml_content(self, clean_env):
-        """dot-man.toml created by init should contain valid TOML."""
-        import sys
+        """Default dot-man.toml is a fully commented template, exactly.
 
-        if sys.version_info >= (3, 11):
-            import tomllib
-        else:
-            import tomli as tomllib
-        runner, _, repo_dir, _, _ = clean_env
-        runner.invoke(cli, ["init", "--force", "--no-wizard"])
+        Pinning the exact structure (zero live sections; the two documented
+        examples present once each) catches accidental "helpful" sections
+        leaking into the scaffolded config. The old test only asserted the
+        file parsed to some dict.
+        """
+        runner, _, repo_dir, *_ = clean_env
 
-        toml_path = repo_dir / "dot-man.toml"
-        content = toml_path.read_bytes()
-        parsed = tomllib.loads(content.decode())
-        assert isinstance(parsed, dict)
+        result = runner.invoke(cli, ["init", "--force", "--no-wizard"])
+        assert result.exit_code == 0, result.output
+
+        content = (repo_dir / "dot-man.toml").read_text()
+        assert _load_toml(content) == {}
+        assert content.count("# [") == 2
+        assert '# [bashrc]\n# paths = ["~/.bashrc"]' in content
+        assert '# [nvim]\n# paths = ["~/.config/nvim"]' in content
+        assert (
+            "# dot-man — track files with `dot-man add <path>`, "
+            "switch with `dot-man navigate <branch>`."
+        ) in content
+
+    def test_init_global_toml_matches_default_branch(self, clean_env):
+        """global.toml must record DEFAULT_BRANCH as the current_branch.
+
+        status and navigate read ``[dot-man].current_branch`` as the active
+        configuration, so a mismatch with the constant would report a branch
+        that was never created. The exact key sets pin the whole schema.
+        """
+        runner, _, _, _, global_toml = clean_env
+
+        result = runner.invoke(cli, ["init", "--force", "--no-wizard"])
+        assert result.exit_code == 0, result.output
+
+        parsed = _load_toml(global_toml.read_text())
+        assert sorted(parsed) == [
+            "defaults",
+            "dot-man",
+            "remote",
+            "security",
+            "switch",
+            "templates",
+        ]
+        assert sorted(parsed["dot-man"]) == [
+            "current_branch",
+            "initialized_date",
+            "version",
+        ]
+        assert parsed["dot-man"]["current_branch"] == DEFAULT_BRANCH
 
 
 # ---------------------------------------------------------------------------
@@ -183,18 +356,24 @@ class TestShowQuickStart:
         assert "dot-man add" in result.output
 
     def test_quick_start_shows_status_command(self, clean_env):
+        """The status hint must render as a command, not the bare word.
+
+        A bare "status" would also match prose elsewhere in the output; the
+        two-word command phrase is what the guide actually prints.
+        """
         runner, *_ = clean_env
 
         result = runner.invoke(cli, ["init", "--force", "--no-wizard"])
         assert result.exit_code == 0, result.output
-        assert "status" in result.output
+        assert "dot-man status" in result.output
 
     def test_quick_start_shows_navigate_command(self, clean_env):
+        """The navigate hint must render as a command, not the bare word."""
         runner, *_ = clean_env
 
         result = runner.invoke(cli, ["init", "--force", "--no-wizard"])
         assert result.exit_code == 0, result.output
-        assert "navigate" in result.output
+        assert "dot-man navigate" in result.output
 
     def test_quick_start_shows_config_hint(self, clean_env):
         """Quick-start should show where the config file lives."""
@@ -225,7 +404,11 @@ class TestSetupWizard:
         assert result.exit_code == 0, result.output
 
     def test_wizard_output_contains_setup_complete(self, clean_env):
-        """Wizard should announce 'Setup Complete' at the end."""
+        """Wizard must end with the exact 'Setup Complete' banner.
+
+        The old test's ``or "complete"`` fallback accepted nearly any output;
+        this phrase is what the finale actually renders.
+        """
         runner, *_ = clean_env
 
         with (
@@ -235,10 +418,7 @@ class TestSetupWizard:
             result = runner.invoke(cli, ["init", "--force"])
 
         assert result.exit_code == 0, result.output
-        assert (
-            "setup complete" in result.output.lower()
-            or "complete" in result.output.lower()
-        )
+        assert "Setup Complete" in result.output
 
     def test_wizard_adds_found_file(self, clean_env, tmp_path):
         """When a dotfile exists and user confirms, it should be added."""
@@ -365,20 +545,16 @@ class TestSetupWizard:
 
 
 class TestInitImport:
-    def test_init_help_shows_import_option(self, runner):
-        """init --help should show the --import option."""
-        result = runner.invoke(cli, ["init", "--help"])
-        assert result.exit_code == 0
-        assert "--import" in result.output
-
     def test_import_nonexistent_path_fails(self, clean_env, tmp_path):
-        """Import from non-existent path should fail."""
+        """Import from non-existent path is rejected by click with exit 2."""
         runner, dot_man_dir, repo_dir, _, _ = clean_env
 
         nonexistent = tmp_path / "nonexistent"
         result = runner.invoke(cli, ["init", "--import", str(nonexistent)])
 
         assert result.exit_code == 2
+        assert "Invalid value for '--import'" in result.output
+        assert "does not exist" in result.output
 
     def test_import_non_git_repo_fails(self, clean_env, tmp_path):
         """Import from non-git directory should fail."""
@@ -394,25 +570,22 @@ class TestInitImport:
         assert "git repository" in result.output.lower()
 
     def test_import_existing_git_repo(self, clean_env, tmp_path):
-        """Import from existing git repo should copy files."""
+        """Import from existing git repo should copy files and branches."""
         runner, dot_man_dir, repo_dir, backups_dir, global_toml = clean_env
 
-        source_dir = tmp_path / "source_repo"
-        source_dir.mkdir()
-        from git import Repo
-
-        source_repo = Repo.init(source_dir)
-        config_writer = source_repo.config_writer()
-        config_writer.set_value("user", "name", "Test User")
-        config_writer.set_value("user", "email", "test@test.com")
-        config_writer.release()
-
-        (source_dir / ".bashrc").write_text("export PATH=$PATH:/usr/local/bin")
-        (source_dir / ".vimrc").write_text("set nu")
-        source_repo.index.add([".bashrc", ".vimrc"])
-        source_repo.index.commit("Initial commit")
-
-        source_repo.create_head("work")
+        source_dir, _source_repo = _make_source_repo(
+            tmp_path,
+            commits=[
+                (
+                    "Initial commit",
+                    {
+                        ".bashrc": "export PATH=$PATH:/usr/local/bin",
+                        ".vimrc": "set nu",
+                    },
+                )
+            ],
+            branches=[("work", [])],
+        )
 
         result = runner.invoke(
             cli, ["init", "--import", str(source_dir), "--force", "--no-wizard"]
@@ -424,33 +597,29 @@ class TestInitImport:
         assert (repo_dir / ".vimrc").exists()
         assert (repo_dir / ".git").exists()
 
+        from dot_man.core import GitManager
+
+        branches = GitManager(repo_dir).list_branches()
+        assert "work" in branches
+
     def test_import_preserves_git_history(self, clean_env, tmp_path):
         """Import from existing git repo should preserve commit history."""
         runner, dot_man_dir, repo_dir, backups_dir, global_toml = clean_env
 
-        source_dir = tmp_path / "source_repo"
-        source_dir.mkdir()
-        from git import Repo
-
-        source_repo = Repo.init(source_dir)
-        config_writer = source_repo.config_writer()
-        config_writer.set_value("user", "name", "Test User")
-        config_writer.set_value("user", "email", "test@test.com")
-        config_writer.release()
-
-        (source_dir / "test.txt").write_text("content1")
-        source_repo.index.add(["test.txt"])
-        source_repo.index.commit("First commit")
-
-        (source_dir / "test.txt").write_text("content2")
-        source_repo.index.add(["test.txt"])
-        source_repo.index.commit("Second commit")
+        source_dir, _source_repo = _make_source_repo(
+            tmp_path,
+            commits=[
+                ("First commit", {"test.txt": "content1"}),
+                ("Second commit", {"test.txt": "content2"}),
+            ],
+        )
 
         result = runner.invoke(
             cli, ["init", "--import", str(source_dir), "--force", "--no-wizard"]
         )
 
-        assert result.exit_code == 0
+        assert result.exit_code == 0, result.output
+        assert "Imported dotfiles" in result.output
 
         from dot_man.core import GitManager
 
@@ -462,44 +631,101 @@ class TestInitImport:
         assert any("Second commit" in msg for msg in commit_messages)
 
     def test_import_with_branches(self, clean_env, tmp_path):
-        """Import from existing git repo should preserve branches."""
+        """Import preserves every branch, including the host's default name.
+
+        git names the initial branch after host config (master vs main), so
+        capture ``active_branch.name`` instead of hardcoding "master" — the
+        old test silently depended on the machine's init.defaultBranch.
+        """
         runner, dot_man_dir, repo_dir, backups_dir, global_toml = clean_env
 
-        source_dir = tmp_path / "source_repo"
-        source_dir.mkdir()
-        from git import Repo
-
-        source_repo = Repo.init(source_dir)
-        config_writer = source_repo.config_writer()
-        config_writer.set_value("user", "name", "Test User")
-        config_writer.set_value("user", "email", "test@test.com")
-        config_writer.release()
-
-        (source_dir / "test.txt").write_text("main")
-        source_repo.index.add(["test.txt"])
-        source_repo.index.commit("Initial")
-
-        work_branch = source_repo.create_head("work")
-        work_branch.checkout()
-        (source_dir / "test.txt").write_text("work")
-        source_repo.index.add(["test.txt"])
-        source_repo.index.commit("Work commit")
-
-        source_repo.heads["master"].checkout()
+        source_dir, source_repo = _make_source_repo(
+            tmp_path,
+            commits=[("Initial", {"test.txt": "main"})],
+            branches=[("work", [("Work commit", {"test.txt": "work"})])],
+        )
+        default_branch = source_repo.active_branch.name
 
         result = runner.invoke(
             cli, ["init", "--import", str(source_dir), "--force", "--no-wizard"]
         )
 
-        assert result.exit_code == 0
+        assert result.exit_code == 0, result.output
 
         from dot_man.core import GitManager
 
-        git = GitManager(repo_dir)
-        branches = git.list_branches()
+        branches = GitManager(repo_dir).list_branches()
 
-        assert "master" in branches
+        assert default_branch in branches
         assert "work" in branches
+
+    def test_import_unicode_filename_lands_in_repo(self, clean_env, tmp_path):
+        """Non-ASCII filenames must survive the import copy byte-for-byte.
+
+        Filesystem round-trips are where encodings break; a lost unicode name
+        would silently drop the user's file from tracking.
+        """
+        runner, _, repo_dir, *_ = clean_env
+
+        source_dir, _source_repo = _make_source_repo(
+            tmp_path,
+            commits=[("Unicode commit", {"héllo wörld.txt": "unicode content"})],
+        )
+
+        result = runner.invoke(
+            cli, ["init", "--import", str(source_dir), "--force", "--no-wizard"]
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "Imported dotfiles" in result.output
+
+        imported = repo_dir / "héllo wörld.txt"
+        assert imported.exists()
+        assert imported.read_text() == "unicode content"
+
+    def test_import_repo_without_commits_succeeds(self, clean_env, tmp_path):
+        """A freshly git-inited repo (zero commits) imports without crashing.
+
+        There is no history to copy, so the target must fall back to
+        dot-man's own scaffold — an empty repo is a legal import source.
+        """
+        runner, _, repo_dir, _, global_toml = clean_env
+
+        source_dir, _source_repo = _make_source_repo(tmp_path)
+
+        result = runner.invoke(
+            cli, ["init", "--import", str(source_dir), "--force", "--no-wizard"]
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "Imported dotfiles" in result.output
+        assert (repo_dir / ".git").exists()
+        assert (repo_dir / "dot-man.toml").exists()
+        assert global_toml.exists()
+
+    def test_import_empty_tree_repo_preserves_commit(self, clean_env, tmp_path):
+        """A source repo whose only commit has no files still imports cleanly.
+
+        Guards the copy path against an empty-tree crash and proves history
+        survives even when the commit carries zero entries.
+        """
+        runner, _, repo_dir, *_ = clean_env
+
+        source_dir, _source_repo = _make_source_repo(
+            tmp_path, commits=[("Empty commit", {})]
+        )
+
+        result = runner.invoke(
+            cli, ["init", "--import", str(source_dir), "--force", "--no-wizard"]
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "Imported dotfiles" in result.output
+
+        from dot_man.core import GitManager
+
+        messages = [c.message.strip() for c in GitManager(repo_dir).repo.iter_commits()]
+        assert "Empty commit" in messages
 
 
 class TestGitHubImport:
@@ -539,6 +765,46 @@ class TestGitHubImport:
 
         result = _parse_github_url("https://github.com")
         assert result is None
+
+    def test_parse_github_url_trailing_slash_normalized(self):
+        """A trailing slash (browser copy/paste) still parses to a clone URL.
+
+        Returning None sent the URL down the *local path* branch, where
+        ``dot-man import https://github.com/user/dots/`` failed with
+        "Path does not exist". The slash must be stripped before appending
+        .git so the result is ``dots.git``, never the mangled ``dots/.git``.
+        """
+        from dot_man.cli.init_cmd import _parse_github_url
+
+        assert (
+            _parse_github_url("https://github.com/user/dots/")
+            == "https://github.com/user/dots.git"
+        )
+        assert (
+            _parse_github_url("github.com/user/dots/")
+            == "https://github.com/user/dots.git"
+        )
+        assert (
+            _parse_github_url("https://github.com/user/dots/ ")
+            == "https://github.com/user/dots.git"
+        )
+
+    def test_parse_github_url_tolerates_surrounding_whitespace(self):
+        """Leading/trailing whitespace from copy/paste is stripped, not fatal."""
+        from dot_man.cli.init_cmd import _parse_github_url
+
+        assert (
+            _parse_github_url(" https://github.com/user/dots")
+            == "https://github.com/user/dots.git"
+        )
+        assert (
+            _parse_github_url("https://github.com/user/dots.git ")
+            == "https://github.com/user/dots.git"
+        )
+        assert (
+            _parse_github_url("git@github.com:user/dots ")
+            == "git@github.com:user/dots.git"
+        )
 
 
 def test_hook_suggestion_shown(tmp_path):
@@ -591,6 +857,17 @@ def test_format_hook_example():
     line = _format_hook_example("bash", "echo reloaded")
     assert "bash" in line
     assert "echo reloaded" in line
+
+
+def test_format_hook_example_empty_string_returns_none():
+    """An empty hook must behave like None — no blank 'Example:' line.
+
+    Empty strings are what an unset config value collapses to after
+    stripping, so treating them differently would render a dangling line.
+    """
+    from dot_man.cli.init_cmd import _format_hook_example
+
+    assert _format_hook_example("bash", "") is None
 
 
 def test_show_next_steps_mentions_navigate():

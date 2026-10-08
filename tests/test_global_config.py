@@ -311,7 +311,9 @@ line2
         result = substitute_templates(text)
         import platform
 
-        if platform.system() == "linux":
+        # Conditionals compare case-insensitively: the lowercase "linux"
+        # literal matches platform.system()'s "Linux" spelling too.
+        if platform.system().lower() == "linux":
             assert "line1" in result
             assert "line2" in result
         else:

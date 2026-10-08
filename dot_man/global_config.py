@@ -92,9 +92,11 @@ def _process_conditionals(text: str, vars_dict: dict[str, str]) -> str:
         body = str(match.group(4))
 
         actual = vars_dict.get(var_name, "")
-        if op == "==" and actual == expected:
+        # Case-insensitive: machine facts like OS are commonly written in
+        # lowercase ("darwin") while platform.system() returns "Darwin".
+        if op == "==" and actual.lower() == expected.lower():
             return body
-        if op == "!=" and actual != expected:
+        if op == "!=" and actual.lower() != expected.lower():
             return body
         return ""
 

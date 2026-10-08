@@ -8,7 +8,6 @@ from .interface import cli as main
 
 
 @main.group("tag")
-@require_init
 def tag():
     """Manage tags for fast navigation.
 
@@ -26,6 +25,7 @@ def tag():
 
 
 @tag.command("list")
+@require_init
 def tag_list():
     """List all tags."""
     try:
@@ -52,6 +52,7 @@ def tag_list():
 @click.argument("name")
 @click.argument("commit", required=False)
 @click.option("-m", "--message", help="Tag message (for annotated tags)")
+@require_init
 def tag_create(name: str, commit: str | None, message: str | None):
     """Create a tag at the current commit or a specific commit.
 
@@ -95,6 +96,7 @@ def tag_create(name: str, commit: str | None, message: str | None):
 @tag.command("delete")
 @click.argument("name", shell_complete=complete_tags)
 @click.option("-f", "--force", is_flag=True, help="Force delete without confirmation")
+@require_init
 def tag_delete(name: str, force: bool):
     """Delete a tag.
 
@@ -132,6 +134,7 @@ def tag_delete(name: str, force: bool):
 
 @tag.command("switch", deprecated=True)
 @click.argument("name", shell_complete=complete_tags)
+@require_init
 def tag_switch(name: str):
     """Switch to a tag (checkout the tag).
 

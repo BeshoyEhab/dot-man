@@ -1,6 +1,26 @@
-"""Pytest configuration and fixtures."""
+"""Pytest configuration and shared fixtures for dot-man tests.
+
+Fixture contract (names are used by many test files — keep them stable):
+- ``temp_home`` / ``mock_dot_man_dir``: directory scaffolding
+- ``git_repo`` (+ ``_with_branches`` / ``_with_tags`` / ``_with_commits``):
+  real git repositories via GitPython
+- ``integration_runner``: fully initialized dot-man environment + CliRunner
+
+All constant-patch targets live in ``_dot_man_patches`` so that wiring a
+new module that binds dot-man path constants at import time is a one-line
+change in one place.
+"""
+
+import os
+from contextlib import ExitStack
+from unittest.mock import patch
 
 import pytest
+from click.testing import CliRunner
+
+# =============================================================================
+# Directory scaffolding
+# =============================================================================
 
 
 @pytest.fixture
@@ -28,15 +48,56 @@ def mock_dot_man_dir(tmp_path):
     return dot_man
 
 
+# =============================================================================
+# Integration environment
+# =============================================================================
+
+
+def _dot_man_patches(dot_man_dir, repo_dir, backups_dir, global_toml, home):
+    """Return every patch that redirects dot-man's global paths to a temp env.
+
+    Modules that do ``from dot_man.constants import REPO_DIR`` (or similar)
+    bind the value at import time, so each consumer's namespace must be
+    patched here. Adding a new consumer = one line in this list.
+    """
+    return [
+        # Constants (the single source all other modules should read from)
+        patch("dot_man.constants.DOT_MAN_DIR", dot_man_dir),
+        patch("dot_man.constants.REPO_DIR", repo_dir),
+        patch("dot_man.constants.BACKUPS_DIR", backups_dir),
+        patch("dot_man.constants.GLOBAL_TOML", global_toml),
+        # Core / config / global config
+        patch("dot_man.core.REPO_DIR", repo_dir),
+        patch("dot_man.config.REPO_DIR", repo_dir),
+        patch("dot_man.config.GLOBAL_TOML", global_toml),
+        patch("dot_man.global_config.GLOBAL_TOML", global_toml),
+        patch("dot_man.dotman_config.REPO_DIR", repo_dir),
+        # Operation mixins
+        patch("dot_man.operations.REPO_DIR", repo_dir),
+        patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir),
+        patch("dot_man.branch_ops.REPO_DIR", repo_dir),
+        patch("dot_man.status_ops.REPO_DIR", repo_dir),
+        patch("dot_man.backups.BACKUPS_DIR", backups_dir),
+        # CLI command modules
+        patch("dot_man.cli.interface.DOT_MAN_DIR", dot_man_dir),
+        patch("dot_man.cli.init_cmd.REPO_DIR", repo_dir),
+        patch("dot_man.cli.init_cmd.DOT_MAN_DIR", dot_man_dir),
+        patch("dot_man.cli.add_cmd.REPO_DIR", repo_dir),
+        patch("dot_man.cli.navigate_cmd.REPO_DIR", repo_dir),
+        patch("dot_man.cli.common.DOT_MAN_DIR", dot_man_dir),
+        patch("dot_man.cli.common.REPO_DIR", repo_dir),
+        # Environment
+        patch.dict(os.environ, {"HOME": str(home)}),
+        patch(
+            "dot_man.config_detector.ConfigDetector.QUICKSHELL_BASE_PATHS",
+            [str(home / ".config/quickshell")],
+        ),
+    ]
+
+
 @pytest.fixture
 def integration_runner(tmp_path):
     """Setup runner with initialized repo context."""
-    import os
-    from contextlib import ExitStack
-    from unittest.mock import patch
-
-    from click.testing import CliRunner
-
     from dot_man.cli.interface import cli
 
     runner = CliRunner()
@@ -49,40 +110,10 @@ def integration_runner(tmp_path):
     backups_dir = dot_man_dir / "backups"
     global_toml = dot_man_dir / "global.toml"
 
-    # Patch constants everywhere they are used
-    patches = [
-        patch("dot_man.constants.DOT_MAN_DIR", dot_man_dir),
-        patch("dot_man.constants.REPO_DIR", repo_dir),
-        patch("dot_man.constants.BACKUPS_DIR", backups_dir),
-        patch("dot_man.constants.GLOBAL_TOML", global_toml),
-        patch("dot_man.core.REPO_DIR", repo_dir),
-        patch("dot_man.config.REPO_DIR", repo_dir),
-        patch("dot_man.config.GLOBAL_TOML", global_toml),
-        patch("dot_man.global_config.GLOBAL_TOML", global_toml),
-        patch("dot_man.dotman_config.REPO_DIR", repo_dir),
-        patch("dot_man.operations.REPO_DIR", repo_dir),
-        patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir),
-        patch("dot_man.branch_ops.REPO_DIR", repo_dir),
-        patch("dot_man.status_ops.REPO_DIR", repo_dir),
-        patch("dot_man.cli.interface.DOT_MAN_DIR", dot_man_dir),
-        patch("dot_man.cli.init_cmd.REPO_DIR", repo_dir),
-        patch("dot_man.cli.init_cmd.DOT_MAN_DIR", dot_man_dir),
-        patch("dot_man.cli.add_cmd.REPO_DIR", repo_dir),
-        patch("dot_man.backups.BACKUPS_DIR", backups_dir),
-        patch("dot_man.constants.BACKUPS_DIR", backups_dir),
-        patch("dot_man.constants.DOT_MAN_DIR", dot_man_dir),
-        patch("dot_man.cli.navigate_cmd.REPO_DIR", repo_dir),
-        patch("dot_man.cli.common.DOT_MAN_DIR", dot_man_dir),
-        patch("dot_man.cli.common.REPO_DIR", repo_dir),
-        patch.dict(os.environ, {"HOME": str(home)}),
-        patch(
-            "dot_man.config_detector.ConfigDetector.QUICKSHELL_BASE_PATHS",
-            [str(home / ".config/quickshell")],
-        ),
-    ]
-
     with ExitStack() as stack:
-        for p in patches:
+        for p in _dot_man_patches(
+            dot_man_dir, repo_dir, backups_dir, global_toml, home
+        ):
             stack.enter_context(p)
 
         # We need to manually reset operations singleton to ensure it picks up new config
@@ -106,6 +137,11 @@ def integration_runner(tmp_path):
             config.set_value("user", "email", "test@example.com")
 
         yield runner
+
+
+# =============================================================================
+# Git repositories
+# =============================================================================
 
 
 @pytest.fixture

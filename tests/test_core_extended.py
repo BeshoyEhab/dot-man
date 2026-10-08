@@ -1,11 +1,13 @@
 """Extended tests for GitManager (init, checkout_commit, delete_branch, etc.)."""
 
 import shutil
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
 from git import GitCommandError, Repo
 
+from dot_man.constants import GIT_IGNORE_PATTERNS
 from dot_man.core import GitManager
 from dot_man.exceptions import (
     BranchNotFoundError,
@@ -57,23 +59,65 @@ class TestInit:
         assert repo.config_reader().get_value("user", "name") == "dot-man"
 
     def test_init_existing_repo_does_not_reinit(self, tmp_path):
-        """init on existing repo should not overwrite .gitignore."""
+        """init on an existing repo must not clobber user files.
+
+        First-time setup (git identity, initial history) must not re-run on a
+        repo that already exists — and a user-customized .gitignore must keep
+        its content: init may only APPEND dot-man's ignore patterns that are
+        missing, never overwrite the file.
+        """
+        repo_path = tmp_path / "existing"
+        repo_path.mkdir(parents=True)
+        repo = Repo.init(repo_path)
+        with repo.config_writer() as config:
+            config.set_value("user", "name", "Existing")
+            config.set_value("user", "email", "existing@test.com")
+        (repo_path / "keep.txt").write_text("keep")
+        repo.index.add(["keep.txt"])
+        repo.index.commit("keep me")
+        (repo_path / ".gitignore").write_text("# my own ignores\n*.local\n")
+        gm = GitManager(repo_path)
+        gm.init()
+        reopened = Repo(repo_path)
+        assert reopened.config_reader().get_value("user", "name") == "Existing"
+        assert [c.message.strip() for c in reopened.iter_commits()] == ["keep me"]
+        gitignore = (repo_path / ".gitignore").read_text()
+        # User content survives...
+        assert "# my own ignores" in gitignore
+        assert "*.local" in gitignore
+        # ...and dot-man's missing patterns are merged in, not lost.
+        assert ".DS_Store" in gitignore
+        assert "*.pyc" in gitignore
+
+    def test_init_existing_repo_gitignore_not_duplicated(self, tmp_path):
+        """Re-running init on a repo whose .gitignore already contains
+        dot-man's patterns must not append duplicates."""
         repo_path = tmp_path / "existing"
         repo_path.mkdir(parents=True)
         Repo.init(repo_path)
+        full = "\n".join(GIT_IGNORE_PATTERNS) + "\n"
+        (repo_path / ".gitignore").write_text(full)
         gm = GitManager(repo_path)
         gm.init()
-        # Should not raise
+        gm.init()
+        content = (repo_path / ".gitignore").read_text()
+        assert content.count(".DS_Store") == 1
+        assert content == full  # byte-identical: nothing appended
 
 
 class TestCurrentBranch:
     """Test current_branch method."""
 
     def test_current_branch_normal(self, tmp_path):
-        """current_branch should return branch name."""
+        """current_branch should return the repo's actual initial branch name.
+
+        Git's default branch depends on the host's init.defaultBranch config,
+        so the name must come from the repo, never a hardcoded guess.
+        """
         repo_path = _init_repo(tmp_path)
+        initial = Repo(repo_path).active_branch.name
         gm = GitManager(repo_path)
-        assert gm.current_branch() == "master"
+        assert gm.current_branch() == initial
 
     def test_current_branch_after_checkout(self, tmp_path):
         """current_branch should reflect branch switches."""
@@ -148,13 +192,13 @@ class TestAddAllCommit:
     """Test add_all and commit methods."""
 
     def test_commit_with_changes(self, tmp_path):
-        """commit should create a commit with changes."""
+        """commit should return the full SHA of the commit it created."""
         repo_path = _init_repo(tmp_path)
         gm = GitManager(repo_path)
         (repo_path / "test.txt").write_text("hello")
         sha = gm.commit("Add test.txt")
-        assert sha is not None
-        assert len(sha) >= 7
+        assert sha == Repo(repo_path).head.commit.hexsha
+        assert len(sha) == 40
 
     def test_commit_nothing_to_commit(self, tmp_path):
         """commit should return None when nothing to commit."""
@@ -193,9 +237,46 @@ class TestGetCommits:
     def test_get_commits_detailed_with_branch(self, tmp_path):
         """get_commits_detailed should accept branch param."""
         repo_path = _init_repo(tmp_path)
+        initial = Repo(repo_path).active_branch.name
         gm = GitManager(repo_path)
-        commits = gm.get_commits_detailed(count=5, branch="master")
+        commits = gm.get_commits_detailed(count=5, branch=initial)
         assert len(commits) == 1
+        assert commits[0]["message"] == "Initial commit"
+
+    def test_get_commits_zero_count(self, tmp_path):
+        """get_commits(count=0) should yield nothing, not the full history."""
+        repo_path = _init_repo(tmp_path)
+        gm = GitManager(repo_path)
+        assert list(gm.get_commits(count=0)) == []
+
+    def test_get_commits_count_exceeds_history(self, tmp_path):
+        """get_commits should cap at real history when count overshoots."""
+        repo_path = _init_repo(tmp_path)
+        gm = GitManager(repo_path)
+        for n in range(2):
+            (repo_path / f"file{n}.txt").write_text(str(n))
+            gm.add_all()
+            gm.commit(f"commit {n}")
+        commits = list(gm.get_commits(count=100))
+        assert [c["message"] for c in commits] == [
+            "commit 1",
+            "commit 0",
+            "Initial commit",
+        ]
+
+    def test_unicode_commit_message_round_trip(self, tmp_path):
+        """get_commits should return unicode commit messages unchanged.
+
+        Commit messages pass through git's object store, so a round trip
+        catches any encoding mangling of non-ASCII text.
+        """
+        repo_path = _init_repo(tmp_path)
+        gm = GitManager(repo_path)
+        (repo_path / "unicode.txt").write_text("content")
+        gm.add_all()
+        gm.commit("dôcument café — 日本語 ✓")
+        commits = list(gm.get_commits(count=5))
+        assert commits[0]["message"] == "dôcument café — 日本語 ✓"
 
 
 class TestDeleteBranch:
@@ -232,79 +313,44 @@ class TestDeleteBranch:
         gm.delete_branch("feature", force=True)
         assert "feature" not in gm.list_branches()
 
+    def test_branch_name_with_slash_lifecycle(self, tmp_path):
+        """create/checkout/delete should handle branch names containing slashes.
+
+        Slash names create nested ref directories (refs/heads/feature/), which
+        naive flat-path handling would break.
+        """
+        repo_path = _init_repo(tmp_path)
+        initial = Repo(repo_path).active_branch.name
+        gm = GitManager(repo_path)
+        gm.create_branch("feature/x")
+        assert "feature/x" in gm.list_branches()
+        gm.checkout("feature/x")
+        assert gm.current_branch() == "feature/x"
+        gm.checkout(initial)
+        gm.delete_branch("feature/x")
+        assert "feature/x" not in gm.list_branches()
+
 
 class TestRelativeDate:
     """Test _relative_date method."""
 
-    def test_just_now(self):
-        """_relative_date should show 'just now' for recent time."""
-        from datetime import datetime, timedelta, timezone
-
-        from dot_man.core import GitManager
-
+    @pytest.mark.parametrize(
+        "offset,expected",
+        [
+            pytest.param(timedelta(seconds=30), "just now", id="just-now"),
+            pytest.param(timedelta(minutes=5), "5 min ago", id="minutes"),
+            pytest.param(timedelta(hours=3), "3 hours ago", id="hours"),
+            pytest.param(timedelta(days=4), "4 days ago", id="days"),
+            pytest.param(timedelta(weeks=3), "3 weeks ago", id="weeks"),
+            pytest.param(timedelta(days=60), "2 months ago", id="months"),
+            pytest.param(timedelta(days=800), "2 years ago", id="years"),
+        ],
+    )
+    def test_relative_date_buckets(self, offset, expected):
+        """_relative_date should bucket ages from seconds through years."""
         gm = GitManager()
-        dt = datetime.now(timezone.utc) - timedelta(seconds=30)
-        assert gm._relative_date(dt) == "just now"
-
-    def test_minutes_ago(self):
-        """_relative_date should show minutes."""
-        from datetime import datetime, timedelta, timezone
-
-        from dot_man.core import GitManager
-
-        gm = GitManager()
-        dt = datetime.now(timezone.utc) - timedelta(minutes=5)
-        assert gm._relative_date(dt) == "5 min ago"
-
-    def test_hours_ago(self):
-        """_relative_date should show hours."""
-        from datetime import datetime, timedelta, timezone
-
-        from dot_man.core import GitManager
-
-        gm = GitManager()
-        dt = datetime.now(timezone.utc) - timedelta(hours=3)
-        assert gm._relative_date(dt) == "3 hours ago"
-
-    def test_days_ago(self):
-        """_relative_date should show days."""
-        from datetime import datetime, timedelta, timezone
-
-        from dot_man.core import GitManager
-
-        gm = GitManager()
-        dt = datetime.now(timezone.utc) - timedelta(days=4)
-        assert gm._relative_date(dt) == "4 days ago"
-
-    def test_weeks_ago(self):
-        """_relative_date should show weeks."""
-        from datetime import datetime, timedelta, timezone
-
-        from dot_man.core import GitManager
-
-        gm = GitManager()
-        dt = datetime.now(timezone.utc) - timedelta(weeks=3)
-        assert gm._relative_date(dt) == "3 weeks ago"
-
-    def test_months_ago(self):
-        """_relative_date should show months."""
-        from datetime import datetime, timedelta, timezone
-
-        from dot_man.core import GitManager
-
-        gm = GitManager()
-        dt = datetime.now(timezone.utc) - timedelta(days=60)
-        assert gm._relative_date(dt) == "2 months ago"
-
-    def test_years_ago(self):
-        """_relative_date should show years."""
-        from datetime import datetime, timedelta, timezone
-
-        from dot_man.core import GitManager
-
-        gm = GitManager()
-        dt = datetime.now(timezone.utc) - timedelta(days=800)
-        assert gm._relative_date(dt) == "2 years ago"
+        dt = datetime.now(timezone.utc) - offset
+        assert gm._relative_date(dt) == expected
 
 
 class TestGetTagsForCommit:
@@ -334,8 +380,9 @@ class TestGetBranchStats:
     def test_branch_stats_basic(self, tmp_path):
         """get_branch_stats should return stats for valid branch."""
         repo_path = _init_repo(tmp_path)
+        initial = Repo(repo_path).active_branch.name
         gm = GitManager(repo_path)
-        stats = gm.get_branch_stats("master")
+        stats = gm.get_branch_stats(initial)
         assert stats["commit_count"] == 1
         assert stats["file_count"] == 1
         assert stats["last_commit_msg"] == "Initial commit"
@@ -354,20 +401,22 @@ class TestGetAllBranchStats:
     def test_get_all_branch_stats(self, tmp_path):
         """get_all_branch_stats should return stats for all branches."""
         repo_path = _init_repo(tmp_path)
+        initial = Repo(repo_path).active_branch.name
         gm = GitManager(repo_path)
         gm.create_branch("feature")
         stats = gm.get_all_branch_stats()
         names = [s["name"] for s in stats]
-        assert "master" in names
+        assert initial in names
         assert "feature" in names
 
     def test_get_all_branch_stats_single(self, tmp_path):
         """get_all_branch_stats should work with single branch."""
         repo_path = _init_repo(tmp_path)
+        initial = Repo(repo_path).active_branch.name
         gm = GitManager(repo_path)
         stats = gm.get_all_branch_stats()
         assert len(stats) == 1
-        assert stats[0]["name"] == "master"
+        assert stats[0]["name"] == initial
 
 
 class TestSetRemote:
@@ -407,17 +456,34 @@ class TestGetFileFromBranch:
     def test_get_file_from_branch_existing(self, tmp_path):
         """get_file_from_branch should read file content from branch."""
         repo_path = _init_repo(tmp_path)
+        initial = Repo(repo_path).active_branch.name
         gm = GitManager(repo_path)
-        content = gm.get_file_from_branch("master", "README.md")
+        content = gm.get_file_from_branch(initial, "README.md")
         assert content is not None
         assert "# dot-man" in content
 
     def test_get_file_from_branch_nonexistent(self, tmp_path):
         """get_file_from_branch should return None for missing file."""
         repo_path = _init_repo(tmp_path)
+        initial = Repo(repo_path).active_branch.name
         gm = GitManager(repo_path)
-        content = gm.get_file_from_branch("master", "nonexistent.txt")
+        content = gm.get_file_from_branch(initial, "nonexistent.txt")
         assert content is None
+
+    def test_get_file_from_branch_nested_unicode(self, tmp_path):
+        """get_file_from_branch should read a nested path with unicode content.
+
+        Exercises directory separators inside the ref path and UTF-8 decoding
+        of blob bytes in one round trip.
+        """
+        repo_path = _init_repo(tmp_path)
+        gm = GitManager(repo_path)
+        (repo_path / "nested").mkdir()
+        (repo_path / "nested" / "settings.ini").write_text("naïve = wörld ✓")
+        gm.add_all()
+        gm.commit("add nested unicode file")
+        content = gm.get_file_from_branch(gm.current_branch(), "nested/settings.ini")
+        assert content == "naïve = wörld ✓"
 
 
 class TestErrorHandling:
@@ -540,10 +606,10 @@ class TestCreateBranchFailure:
     """Test create_branch failure mapping."""
 
     def test_create_branch_empty_name_raises(self, tmp_path):
-        """create_branch should raise GitOperationError for empty name."""
+        """An empty name fails git's ref validation before any write."""
         repo_path = _init_repo(tmp_path)
         gm = GitManager(repo_path)
-        with pytest.raises(GitOperationError, match="Failed to create branch"):
+        with pytest.raises(GitOperationError, match="Invalid branch name"):
             gm.create_branch("")
 
 
@@ -555,12 +621,13 @@ class TestCheckoutOverwriteConflict:
         repo_path = _init_repo(tmp_path)
         gm = GitManager(repo_path)
         repo = Repo(repo_path)
+        initial = repo.active_branch.name
         repo.create_head("other")
         repo.heads["other"].checkout()
         (repo_path / "clash.txt").write_text("tracked version")
         repo.index.add(["clash.txt"])
         repo.index.commit("tracked clash file")
-        repo.heads["master"].checkout()
+        repo.heads[initial].checkout()
         (repo_path / "clash.txt").write_text("untracked version")
         with pytest.raises(GitOperationError, match="Failed to checkout"):
             gm.checkout("other")
@@ -630,6 +697,25 @@ class TestGetStatusChangeTypes:
         assert "README.md" in status["deleted"]
         assert status["modified"] == []
 
+    def test_modified_deleted_and_untracked_together(self, tmp_path):
+        """get_status should classify all three change buckets at once.
+
+        Mixing the change types catches classification code that only works
+        when a single bucket is non-empty.
+        """
+        repo_path = _init_repo(tmp_path)
+        gm = GitManager(repo_path)
+        (repo_path / "extra.txt").write_text("tracked later")
+        gm.add_all()
+        gm.commit("add extra tracked file")
+        (repo_path / "README.md").write_text("# modified")
+        (repo_path / "extra.txt").unlink()
+        (repo_path / "fresh.txt").write_text("untracked")
+        status = gm.get_status()
+        assert status["modified"] == ["README.md"]
+        assert status["deleted"] == ["extra.txt"]
+        assert status["untracked"] == ["fresh.txt"]
+
 
 class TestAddAllFailure:
     """Test add_all failure mapping."""
@@ -650,9 +736,10 @@ class TestCommitFailure:
     def test_commit_corrupt_ref_raises(self, tmp_path):
         """commit should raise GitOperationError when HEAD ref is corrupt."""
         repo_path = _init_repo(tmp_path)
+        initial = Repo(repo_path).active_branch.name
         gm = GitManager(repo_path)
         (repo_path / "extra.txt").write_text("x")
-        ref = repo_path / ".git" / "refs" / "heads" / "master"
+        ref = repo_path / ".git" / "refs" / "heads" / initial
         ref.write_text("garbage-not-a-sha\n")
         with pytest.raises(GitOperationError, match="Failed to commit"):
             gm.commit("boom")
@@ -686,13 +773,14 @@ class TestDeleteBranchFailures:
         from dot_man.exceptions import BranchNotMergedError
 
         repo_path = _init_repo(tmp_path)
+        initial = Repo(repo_path).active_branch.name
         gm = GitManager(repo_path)
         gm.create_branch("unmerged")
         gm.checkout("unmerged")
         (repo_path / "unique.txt").write_text("diverged")
         gm.add_all()
         gm.commit("diverged commit")
-        gm.checkout("master")
+        gm.checkout(initial)
         with pytest.raises(BranchNotMergedError, match="not fully merged"):
             gm.delete_branch("unmerged")
 
@@ -774,10 +862,14 @@ class TestPullFlows:
         other.index.commit("origin advance")
         other.git.push("origin", branch)
 
+        head_before = Repo(str(work_dir)).head.commit.hexsha
         gm = GitManager(work_dir)
         result = gm.pull()
         assert isinstance(result, str) and len(result) > 0
         assert (work_dir / "new.txt").read_text() == "from origin\n"
+        work_head = Repo(str(work_dir)).head.commit
+        assert work_head.hexsha != head_before
+        assert work_head.message.strip() == "origin advance"
 
     def test_pull_stashes_dirty_work(self, tmp_path):
         """pull should stash uncommitted changes and restore them."""
@@ -791,11 +883,15 @@ class TestPullFlows:
         other.git.push("origin", branch)
 
         (work_dir / "f.txt").write_text("line1\nline2\nlocal edit\n")
+        head_before = Repo(str(work_dir)).head.commit.hexsha
         gm = GitManager(work_dir)
         result = gm.pull()
         assert isinstance(result, str) and len(result) > 0
         assert (work_dir / "new.txt").read_text() == "from origin\n"
         assert "local edit" in (work_dir / "f.txt").read_text()
+        work_head = Repo(str(work_dir)).head.commit
+        assert work_head.hexsha != head_before
+        assert work_head.message.strip() == "origin advance"
 
     def test_pull_merge_mode(self, tmp_path):
         """pull with rebase=False should merge origin commits."""
@@ -808,10 +904,14 @@ class TestPullFlows:
         other.index.commit("origin advance")
         other.git.push("origin", branch)
 
+        head_before = Repo(str(work_dir)).head.commit.hexsha
         gm = GitManager(work_dir)
         result = gm.pull(rebase=False)
         assert isinstance(result, str) and len(result) > 0
         assert (work_dir / "new.txt").read_text() == "from origin\n"
+        work_head = Repo(str(work_dir)).head.commit
+        assert work_head.hexsha != head_before
+        assert work_head.message.strip() == "origin advance"
 
     def test_pull_conflict_raises(self, tmp_path):
         """pull should raise GitOperationError on rebase conflicts."""

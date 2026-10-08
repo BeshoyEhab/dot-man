@@ -72,10 +72,10 @@ class TestConfigConstants:
         assert len(CONFIG_FILE_PRIORITY) > 0
 
     def test_valid_update_strategies(self):
-        """Test VALID_UPDATE_STRATEGIES exists."""
-        from dot_man.dotman_config import VALID_UPDATE_STRATEGIES
+        """VALID_UPDATE_STRATEGIES is canonical in constants (used by Section)."""
+        from dot_man.constants import VALID_UPDATE_STRATEGIES
 
-        assert isinstance(VALID_UPDATE_STRATEGIES, (list, tuple))
+        assert VALID_UPDATE_STRATEGIES == ["replace", "rename_old", "ignore"]
 
 
 class TestDefaultTemplateSlim:
@@ -159,16 +159,22 @@ class TestTemplateInheritance:
 
 
 class TestGetSectionValidation:
-    """get_section coerces inputs and rejects bad strategies."""
+    """get_section rejects bad shapes and bad values."""
 
     def test_paths_single_string(self, tmp_path):
-        """A bare `paths = \"...\"` string behaves like a one-list."""
+        """A bare `paths = \"...\"` string is a schema error, not a one-list.
+
+        Silently wrapping it hides a typo (`paths = \"~/a ~/b\"` becomes one
+        bogus path) behind a confusing not-found later; reject it loudly.
+        """
+        import pytest
+
+        from dot_man.exceptions import ConfigValidationError
+
         cfg = _load(tmp_path, "[bashrc]\npaths = '~/.bashrc'\n")
 
-        section = cfg.get_section("bashrc")
-
-        assert len(section.paths) == 1
-        assert section.paths[0].name == ".bashrc"
+        with pytest.raises(ConfigValidationError, match=r"\[bashrc\].*paths"):
+            cfg.get_section("bashrc")
 
     def test_invalid_deploy_method(self, tmp_path):
         import pytest

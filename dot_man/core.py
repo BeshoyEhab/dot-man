@@ -48,9 +48,19 @@ class GitManager:
             self._repo_path.mkdir(parents=True, exist_ok=True)
             self._repo = Repo.init(self._repo_path)
 
-            # Create .gitignore
+            # Ensure .gitignore exists with dot-man's patterns; never
+            # overwrite a user-customized file — append only what's missing.
             gitignore_path = self._repo_path / ".gitignore"
-            gitignore_path.write_text("\n".join(GIT_IGNORE_PATTERNS) + "\n")
+            existing = (
+                gitignore_path.read_text().splitlines()
+                if gitignore_path.exists()
+                else []
+            )
+            existing_set = {line.strip() for line in existing}
+            missing = [p for p in GIT_IGNORE_PATTERNS if p not in existing_set]
+            if missing:
+                new_lines = [ln for ln in existing if ln.strip()] + missing
+                gitignore_path.write_text("\n".join(new_lines) + "\n")
 
             # Configure git
             with self._repo.config_writer() as config:
@@ -83,7 +93,23 @@ class GitManager:
         return name in self.list_branches()
 
     def create_branch(self, name: str) -> None:
-        """Create a new branch."""
+        """Create a new branch.
+
+        Args:
+            name: Branch name; must satisfy git's ref-name rules.
+
+        Raises:
+            GitOperationError: If the name is not a valid git branch name
+                or the ref could not be created.
+        """
+        # git would silently ignore a broken ref name (e.g. containing a
+        # space) while GitPython happily writes the ref file — validate
+        # with git's own rules first so both views always agree.
+        try:
+            self.repo.git.check_ref_format("--branch", name)
+        except GitCommandError as e:
+            raise GitOperationError(f"Invalid branch name '{name}'") from e
+
         try:
             self.repo.create_head(name)
         except (GitCommandError, OSError, ValueError) as e:
@@ -171,6 +197,11 @@ class GitManager:
     def get_status(self) -> dict[str, list[str]]:
         """Get the repository status.
 
+        Buckets relative to HEAD, the index, and the working tree:
+        'new' = staged additions, 'modified'/'deleted' = staged or
+        unstaged changes (counted once), 'untracked' = in the worktree
+        but not in the index.
+
         Returns:
             Dictionary with keys: 'modified', 'new', 'deleted', 'untracked'
         """
@@ -181,17 +212,28 @@ class GitManager:
             "untracked": [],
         }
 
-        # Get diff from index
+        # Staged changes: HEAD vs index. 'new' only ever comes from here —
+        # the index-vs-worktree diff below cannot see additions. Parsed
+        # from git directly because GitPython's index.diff("HEAD")
+        # reports the change types reversed (staged adds come back as D).
+        staged = self.repo.git.diff("--cached", "--name-status")
+        for line in staged.splitlines():
+            if "\t" not in line:
+                continue
+            change, path = line.split("\t", 1)
+            bucket = {"A": "new", "M": "modified", "D": "deleted"}.get(change[0])
+            if bucket and path not in status[bucket]:
+                status[bucket].append(path)
+
+        # Unstaged changes: index vs working tree
         for diff in self.repo.index.diff(None):
             if diff.a_path:
-                if diff.change_type == "M":
+                if diff.change_type == "M" and diff.a_path not in status["modified"]:
                     status["modified"].append(diff.a_path)
-                elif diff.change_type == "D":
+                elif diff.change_type == "D" and diff.a_path not in status["deleted"]:
                     status["deleted"].append(diff.a_path)
-                elif diff.change_type == "A":
-                    status["new"].append(diff.a_path)
 
-        # Get untracked files
+        # Untracked files
         status["untracked"] = self.repo.untracked_files
 
         return status

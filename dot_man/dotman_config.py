@@ -6,11 +6,11 @@ import logging
 from pathlib import Path
 from typing import Any, cast
 
+from . import ui
 from .constants import (
     CONFIG_FILE_PRIORITY,
     DOT_MAN_TOML,
     REPO_DIR,
-    VALID_UPDATE_STRATEGIES,
 )
 from .exceptions import ConfigurationError, ConfigValidationError
 from .global_config import (
@@ -87,9 +87,11 @@ class DotManConfig:
         self._dirty = False
 
         warnings = self._validate_schema()
-        if warnings:
-            for w in warnings:
-                logging.warning(f"Config warning: {w}")
+        for w in warnings:
+            logging.warning(f"Config warning: {w}")
+            # Surface on the console too: nothing reads the log file during
+            # normal runs, so a logging-only warning stays invisible.
+            ui.warn(f"Config warning: {w}")
 
     def _validate_schema(self) -> list[str]:
         """Validate config structure on load."""
@@ -250,28 +252,17 @@ class DotManConfig:
 
         paths_raw = settings.get("paths", [])
         if isinstance(paths_raw, str):
-            paths_raw = [paths_raw]
+            raise ConfigValidationError(
+                f"Section [{name}] paths must be a list of strings, not a "
+                f'bare string: set paths = ["{paths_raw}"]'
+            )
         paths = [Path(os.path.expandvars(os.path.expanduser(p))) for p in paths_raw]
 
         if not paths:
             raise ConfigValidationError(f"Section [{name}] must have at least one path")
 
-        # Validate update_strategy
-        strategy = settings.get("update_strategy", "replace")
-        if strategy not in VALID_UPDATE_STRATEGIES:
-            raise ConfigValidationError(
-                f"Invalid update_strategy '{strategy}' in [{name}]. "
-                f"Valid options: {VALID_UPDATE_STRATEGIES}"
-            )
-
-        # Validate deploy_method
-        deploy_method = settings.get("deploy_method", "copy")
-        valid_methods = ["copy", "symlink"]
-        if deploy_method not in valid_methods:
-            raise ConfigValidationError(
-                f"Invalid deploy_method '{deploy_method}' in [{name}]. "
-                f"Valid options: {valid_methods}"
-            )
+        # update_strategy and deploy_method are validated by Section itself,
+        # so invalid values fail with ConfigValidationError either way.
 
         # Build Section object
         return Section(
@@ -280,7 +271,7 @@ class DotManConfig:
             repo_base=settings.get("repo_base", name),
             repo_path=settings.get("repo_path"),
             secrets_filter=settings.get("secrets_filter", True),
-            update_strategy=strategy,
+            update_strategy=settings.get("update_strategy", "replace"),
             include=settings.get("include", []),
             exclude=settings.get("exclude", []),
             pre_deploy=settings.get("pre_deploy"),

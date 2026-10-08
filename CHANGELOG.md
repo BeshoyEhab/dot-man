@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **UI coverage** — `ui.py` 81%→100% (7 weak existence checks replaced with 17 real output/behavior assertions); total suite 2019 passing
 - **Config coverage** — `dotman_config.py` 82%→100% (+17 strong tests: TOML priority, template inheritance, section validation, `validate()`); total suite 2036 passing
 - **Operations coverage** — `operations.py` 83%→100% (+6 strong tests: traversal filters, DELETED reporting, outside-tree tolerance); total suite 2042 passing
+- **Black-box test rewrite** — core/config/section/init suites rewritten against the CLI and public API only (real `git.Repo`s, hermetic `HOME`, registry-based patch fixtures in `tests/conftest.py`, dead `tests/utils.py` removed); the sweep exposed 14 suspected bugs, 13 fixed below and 1 rejected as intended behavior (duplicate section paths stay verbatim so saves never silently rewrite config); total suite 2117 passing, coverage 92%
 
 - **Unified hook engine** — new `dot_man/hook_engine.py`: one resolve path (alias → placeholders → `file:`) and one shell runner for all hook shell; auto-detected hooks now resolve `{config_name}`; deploy hook failures warn instead of vanishing
 - **Canonical `ExitCode` enum** (`dot_man/cli/common.py`) — `OK=0`, `ERROR=1`, `USAGE=2`, `CONFIG=7`, `INTERRUPTED=130`; single vocabulary for every exit path
@@ -41,6 +42,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Template conditionals case-insensitive** — `{{if eq branch "main"}}`-style conditionals compared exactly, so `Darwin` vs `darwin` (or any case variant) silently took the false branch; values now compare case-insensitively
+- **Same-basename files no longer collide** — `get_repo_path()` dropped intermediate directories, so `~/.config/a/x` and `~/.config/b/x` both landed on `repo_base/x`; paths under a tracked root keep their structure relative to that root
+- **`init` no longer overwrites `.gitignore`** — a re-run replaced the user's file with the default patterns; it now merges, appending only what's missing
+- **First `init` no longer offers to "DELETE all data"** — the CLI creates `DOT_MAN_DIR` on every run (for logs), so `init` read mere directory existence as "already initialized"; the reinitialize prompt now requires an actual repo (`.git` present)
+- **Invalid branch names rejected at creation** — `create_branch("has space")` wrote a ref git ignores (`warning: ignoring ref with broken name`), leaving `list_branches()` and branch stats disagreeing; names now pass `git check-ref-format --branch` before anything is written
+- **`get_status()` reports staged changes** — the `new` bucket was unreachable (the index-vs-worktree diff never reports additions) and staged edits/deletions were invisible; a HEAD-vs-index pass fills them, deduplicates files seen by both diffs, and works on an unborn HEAD
+- **`tag <sub> --help` works before init** — the init guard sat on the *group* callback, which Click runs after resolving the subcommand but before parsing its `--help`, so `tag list --help` printed the welcome banner (exit 1) while every other help worked; the guard moved to each subcommand, matching `branch`/`remote`
+- **`log checkout <tag>` warns on dirty worktrees** — shared `_warn_if_dirty()` with `_checkout_commit`, so uncommitted changes are never abandoned silently (the `current_branch` parameter was accepted but ignored)
+- **Bare-string `paths` rejected** — `paths = "~/a"` was silently coerced into one (possibly bogus) path, hiding typos behind confusing not-found errors later; it's now a `ConfigValidationError` like the other schema violations
+- **`deploy_method`/`update_strategy` validated at construction** — `Section()` stored garbage verbatim (e.g. `deploy_method = "rsync"` then silently behaved as `copy`); validation moved into `Section.__init__`, and the loader's duplicate checks were removed so there's one place that validates
+- **Schema warnings visible** — unknown-key warnings went only to the log file that nothing reads during normal runs; they now print to the console as well
+- **GitHub import URLs with a trailing slash** — `dot-man import https://github.com/user/dots/` missed every parse regex, fell through to the local-path branch, and failed with "Path does not exist"; the slash is stripped before `.git` is appended
+- **`{branch}` placeholder reads the recorded branch** — it resolved against raw git with `search_parent_directories=True`, leaking whatever repository sat at or above `REPO_DIR` (observed: a personal branch named `custom`) and disagreeing with `operations.current_branch`; it now reads `global.toml`, the same source deploy-time hook contexts use
 - **Tag checkout paths** — `tag switch` and log `checkout <tag>` died with `BranchNotFoundError`; both now check out the tag's commit, and `tag switch` carries a v2.0 deprecation notice pointing at `navigate`
 - **Dangling hook references** — `awesome`/`rofi` default hooks named nonexistent aliases; now `awesome_reload` / `None`
 - **Stale teachings** — `log` helpers and tag docs pointed at `switch`; now `navigate`

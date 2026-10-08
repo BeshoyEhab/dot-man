@@ -10,6 +10,7 @@ from . import constants as _constants
 from .constants import (
     DEFAULT_IGNORED_DIRECTORIES,
 )
+from .exceptions import ConfigValidationError
 from .hook_engine import HookContext, resolve_hook
 
 
@@ -61,7 +62,14 @@ class Section:
 
         # Use provided values or defaults (None means "use global default")
         self.secrets_filter = secrets_filter if secrets_filter is not None else True
-        self.update_strategy = update_strategy or "replace"
+        self.update_strategy = (
+            update_strategy if update_strategy is not None else "replace"
+        )
+        if self.update_strategy not in _constants.VALID_UPDATE_STRATEGIES:
+            raise ConfigValidationError(
+                f"Invalid update_strategy '{self.update_strategy}' in [{self.name}]. "
+                f"Valid options: {_constants.VALID_UPDATE_STRATEGIES}"
+            )
 
         self.include = include or []
         self.exclude = exclude or []
@@ -81,6 +89,11 @@ class Section:
         )
         self.follow_symlinks = follow_symlinks if follow_symlinks is not None else False
         self.deploy_method = deploy_method if deploy_method is not None else "copy"
+        if self.deploy_method not in VALID_DEPLOY_METHODS:
+            raise ConfigValidationError(
+                f"Invalid deploy_method '{self.deploy_method}' in [{self.name}]. "
+                f"Valid options: {VALID_DEPLOY_METHODS}"
+            )
 
         # Encryption options
         self.encrypted = encrypted if encrypted is not None else False
@@ -176,23 +189,44 @@ class Section:
 
     @staticmethod
     def _get_current_branch() -> str:
-        """Get current branch name via git."""
+        """Current configuration branch as recorded in global.toml.
+
+        Same source as operations.current_branch, so {branch} and
+        {{branch}} always agree with navigate (and with deploy-time hook
+        contexts). Reading raw git instead opened REPO_DIR with
+        search_parent_directories=True, leaking whatever repository sat
+        at or above it — e.g. a personal branch named "custom".
+        """
+        from .global_config import GlobalConfig
+
         try:
-            import git as _git
-
-            from .constants import REPO_DIR
-
-            repo = _git.Repo(REPO_DIR, search_parent_directories=True)
-            return repo.active_branch.name
+            global_config = GlobalConfig()
+            global_config.load()
+            return global_config.current_branch
         except Exception:
             return "unknown"
 
     def get_repo_path(self, local_path: Path, repo_dir: Path) -> Path:
-        """Get the repository path for a local path."""
+        """Get the repository path for a local path.
+
+        Files that live inside one of the section's tracked paths keep their
+        subdirectory structure relative to that root, so same-basename files
+        in different directories never collide in the repo. Anything else
+        (a tracked path itself, or a path outside every tracked root) falls
+        back to the basename under ``repo_base``.
+        """
         if self.repo_path:
             # Explicit repo_path for single files
             return repo_dir / self.repo_path
-        # Use repo_base + filename
+        for tracked in self.paths:
+            for root in (tracked, Path(tracked.expanduser())):
+                try:
+                    rel = local_path.relative_to(root)
+                except ValueError:
+                    continue
+                if str(rel) == ".":
+                    break  # local_path IS this tracked root — fall through to name
+                return repo_dir / self.repo_base / rel
         return repo_dir / self.repo_base / local_path.name
 
     def to_dict(self) -> dict[str, Any]:

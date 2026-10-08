@@ -53,7 +53,9 @@ def init(
     if not is_git_installed():
         error("Git not found. Please install git first.", exit_code=2)
 
-    if DOT_MAN_DIR.exists() and not force:
+    # "Already initialized" means an actual repo, not just the config dir —
+    # the CLI group creates DOT_MAN_DIR on every run for logging.
+    if REPO_DIR.exists() and (REPO_DIR / ".git").exists() and not force:
         if not ui.confirm(
             "Repository already initialized. Reinitialize? (This will DELETE all data)"
         ):
@@ -515,7 +517,10 @@ def _parse_github_url(url: str) -> str | None:
     """
     import re
 
-    url = url.strip()
+    # Whitespace and trailing slashes are copy/paste artifacts; without
+    # the slash strip the URL missed every regex, fell through to the
+    # local-path branch, and died with "Path does not exist".
+    url = url.strip().rstrip("/")
 
     # https://github.com/user/repo or https://github.com/user/repo.git
     match = re.match(r"^https?://github\.com/([^/]+)/([^/]+?)(?:\.git)?$", url)
