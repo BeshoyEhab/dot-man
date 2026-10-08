@@ -31,9 +31,9 @@ from .interface import cli as main
 @click.option(
     "--import",
     "import_path",
-    type=click.Path(exists=True),
+    type=str,
     default=None,
-    help="Import from an existing git repository",
+    help="Import from an existing git repository or GitHub URL",
 )
 def init(
     force: bool, no_wizard: bool, sandbox_dir: str | None, import_path: str | None
@@ -80,9 +80,9 @@ def init(
             if github_url:
                 cloned_path = _clone_github_repo(github_url)
                 if cloned_path is None:
-                    error("Failed to clone GitHub repository.", exit_code=1)
-                cloned_path = _clone_github_repo(github_url)
-                if cloned_path is None:
+                    # error() raises at runtime; the explicit SystemExit
+                    # is unreachable but keeps mypy's narrowing (error
+                    # isn't annotated NoReturn — it can return for 0).
                     error("Failed to clone GitHub repository.", exit_code=1)
                     raise SystemExit(ExitCode.ERROR)
                 source_path = cloned_path
@@ -153,6 +153,12 @@ def init(
         # Create global configuration
         global_config = GlobalConfig()
         global_config.create_default()
+        # Record the branch git actually created: DEFAULT_BRANCH is only
+        # a default — init.defaultBranch (or an imported repo's branch)
+        # may differ, and status/{branch}/navigate read this key as
+        # reality. Safe on unborn HEAD: active_branch reads the symref.
+        global_config.current_branch = git.current_branch()
+        global_config.save()
 
         # Create minimal dot-man.toml
         dotman_config = DotManConfig()

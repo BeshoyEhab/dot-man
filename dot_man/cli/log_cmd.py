@@ -13,6 +13,7 @@ from .common import (
     error,
     require_init,
     success,
+    warn_if_dirty,
 )
 from .interface import cli as main
 
@@ -216,17 +217,6 @@ def checkout(target: str):
         error(str(e))
 
 
-def _warn_if_dirty(ops, current_branch: str):
-    """Warn that uncommitted changes will be left behind by a checkout."""
-    if ops.git.is_dirty():
-        ui.console.print(
-            f"[yellow]Warning:[/yellow] You have uncommitted changes on branch "
-            f"[bold]{current_branch}[/bold]"
-        )
-        ui.console.print("  These changes will NOT be saved.")
-        ui.console.print()
-
-
 def _checkout_commit(ops, current_branch: str, commit_sha: str):
     """Checkout a specific commit."""
 
@@ -238,7 +228,7 @@ def _checkout_commit(ops, current_branch: str, commit_sha: str):
         error(f"Invalid commit SHA: {commit_sha}", exit_code=1)
 
     # Save current changes if dirty
-    _warn_if_dirty(ops, current_branch)
+    warn_if_dirty(ops, current_branch)
 
     # Checkout the commit
     ops.git.checkout_commit(commit_sha)
@@ -269,7 +259,7 @@ def _checkout_tag(ops, current_branch: str, tag_name: str):
         message = ""
 
     # Same guard as _checkout_commit: warn before moving HEAD
-    _warn_if_dirty(ops, current_branch)
+    warn_if_dirty(ops, current_branch)
 
     # Checkout the tag's commit (tags are not branch heads)
     ops.git.checkout_commit(tag_commit)

@@ -75,12 +75,19 @@ class TestConfigCommand:
         assert len(result.output) > 0
 
     def test_config_get_branch(self, integration_runner):
-        """Test getting current branch from config."""
+        """``config get`` must echo the branch git is actually on.
+
+        Pinned to git rather than a hardcoded name: init records the
+        branch git created (host's init.defaultBranch), so "main" is
+        only one possible answer.
+        """
+        from dot_man.core import GitManager
+
         result = integration_runner.invoke(
             cli, ["config", "get", "dot-man.current_branch"]
         )
         assert result.exit_code == 0
-        assert "main" in result.output
+        assert result.output.strip() == GitManager().current_branch()
 
     def test_config_get_nonexistent(self, integration_runner):
         """Test getting a non-existent key."""

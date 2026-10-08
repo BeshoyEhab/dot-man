@@ -64,6 +64,21 @@ def warn(message: str) -> None:
     ui.warn(message)
 
 
+def warn_if_dirty(ops, current_branch: str) -> None:
+    """Warn that uncommitted changes will be left behind by a checkout.
+
+    Shared by every command that moves HEAD (log checkout, tag switch),
+    so uncommitted work is never abandoned silently.
+    """
+    if ops.git.is_dirty():
+        ui.console.print(
+            f"[yellow]Warning:[/yellow] You have uncommitted changes on branch "
+            f"[bold]{current_branch}[/bold]"
+        )
+        ui.console.print("  These changes will NOT be saved.")
+        ui.console.print()
+
+
 def handle_exception(exc: BaseException, context: str = "Operation") -> None:
     """Handle exceptions with user-friendly diagnostics."""
     from ..exceptions import DotManError, ErrorDiagnostic

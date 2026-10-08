@@ -221,6 +221,35 @@ class TestTagSwitch:
             ops.git.checkout_commit.assert_called_once_with("abc1234")
             ops.git.checkout.assert_not_called()
 
+    def test_switch_warns_before_leaving_dirty_worktree(self):
+        """tag switch warns on uncommitted changes — same guard as log checkout.
+
+        Both move HEAD to a tag's commit; silently abandoning local edits
+        is the exact hazard ``log checkout <tag>` warns about, so the
+        deprecated alias must not regress it.
+        """
+        with (
+            patch("dot_man.cli.common.DOT_MAN_DIR") as mock_dir,
+            patch("dot_man.operations.get_operations") as mock_ops,
+        ):
+            mock_dir.exists.return_value = True
+            ops = mock_ops.return_value
+            ops.git.get_tag_commit.return_value = "abc1234"
+            ops.git.is_dirty.return_value = True
+            ops.current_branch = "master"
+
+            runner = CliRunner()
+            result = runner.invoke(tag, ["switch", "v1.0"])
+
+        assert result.exit_code == 0, result.output
+        printed = result.output
+        assert "You have uncommitted changes on branch" in printed
+        assert "These changes will NOT be saved." in printed
+        # Guard fires BEFORE HEAD moves
+        assert printed.index("uncommitted changes") < printed.index("Switched to tag")
+        ops.git.is_dirty.assert_called_once()
+        ops.git.checkout_commit.assert_called_once_with("abc1234")
+
     def test_switch_shows_deprecation(self):
         """Tag switch points at navigate until v2.0 removal."""
         with (

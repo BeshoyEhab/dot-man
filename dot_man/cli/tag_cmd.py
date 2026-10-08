@@ -3,7 +3,15 @@
 import click
 
 from .. import ui
-from .common import ExitCode, complete_tags, error, require_init, success, warn
+from .common import (
+    ExitCode,
+    complete_tags,
+    error,
+    require_init,
+    success,
+    warn,
+    warn_if_dirty,
+)
 from .interface import cli as main
 
 
@@ -158,6 +166,10 @@ def tag_switch(name: str):
         if not tag_commit:
             error(f"Tag not found: {name}", exit_code=1)
             raise SystemExit(ExitCode.ERROR)
+
+        # Same guard as log checkout: warn before moving HEAD so
+        # uncommitted changes aren't abandoned silently.
+        warn_if_dirty(ops, ops.current_branch)
 
         # Checkout the tag's commit (tags are not branch heads)
         ops.git.checkout_commit(tag_commit)

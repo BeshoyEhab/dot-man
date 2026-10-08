@@ -226,22 +226,25 @@ class TestCheckoutReturnWording:
     def test_checkout_tag_return_wording(self):
         from unittest.mock import MagicMock, call, patch
 
-        from dot_man.cli import log_cmd
+        from dot_man.cli import common, log_cmd
 
         ops = MagicMock()
         ops.git.get_tag_commit.return_value = "abc1234"
         with (
             patch.object(log_cmd, "ui") as mock_ui,
+            patch.object(common, "ui") as mock_common_ui,
             patch.object(log_cmd, "success"),
         ):
             log_cmd._checkout_tag(ops, "main", "v1")
 
-        printed = self._printed(mock_ui)
+        printed = " ".join((self._printed(mock_ui), self._printed(mock_common_ui)))
         assert "dot-man navigate" in printed
         assert "dot-man switch" not in printed
         # Same dirty check as _checkout_commit: warn (naming the branch)
         # before moving HEAD, so uncommitted changes aren't abandoned
-        # silently. get_tag_commit first — no warning for a missing tag.
+        # silently. The guard moved to common.warn_if_dirty so tag switch
+        # shares it — its output lands in common.ui. get_tag_commit
+        # first — no warning for a missing tag.
         assert "You have uncommitted changes on branch [bold]main[/bold]" in printed
         assert ops.method_calls == [
             call.git.get_tag_commit("v1"),

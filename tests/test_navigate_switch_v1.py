@@ -25,15 +25,30 @@ class TestNavigateCreateBranch:
         assert result.exit_code in (0, 1)
 
     def test_navigate_switch_existing(self, integration_runner, tmp_path):
+        """Switching away and back to the initial branch really works.
+
+        The initial branch is whatever git created at init (not
+        necessarily "main"), and the create-branch prompt needs an
+        explicit "y" — answering it is what makes this a real switch
+        instead of a vacuous same-branch no-op.
+        """
+        from dot_man.core import GitManager
+
         test_file = tmp_path / "home" / ".switchrc"
         test_file.parent.mkdir(parents=True, exist_ok=True)
         test_file.write_text("switch test")
         integration_runner.invoke(
             cli, ["add", str(test_file), "--section", "switch-test"]
         )
-        integration_runner.invoke(cli, ["navigate", "work"])
-        result = integration_runner.invoke(cli, ["navigate", "main"])
-        assert result.exit_code == 0
+        initial = GitManager().current_branch()
+
+        created = integration_runner.invoke(cli, ["navigate", "work"], input="y\n")
+        assert created.exit_code == 0, created.output
+        assert GitManager().current_branch() == "work"
+
+        result = integration_runner.invoke(cli, ["navigate", initial])
+        assert result.exit_code == 0, result.output
+        assert GitManager().current_branch() == initial
 
 
 class TestNavigateDryRun:
@@ -67,5 +82,14 @@ class TestSwitchDeprecated:
         assert result.exit_code == 0
 
     def test_switch_same_branch(self, integration_runner):
-        result = integration_runner.invoke(cli, ["switch", "main"])
-        assert result.exit_code == 0
+        """Same-branch switch is a no-op shortcut — target the real branch.
+
+        The initial branch is whatever git created at init; targeting a
+        hardcoded name that doesn't exist would exercise the create-
+        branch prompt instead of the shortcut.
+        """
+        from dot_man.core import GitManager
+
+        current = GitManager().current_branch()
+        result = integration_runner.invoke(cli, ["switch", current])
+        assert result.exit_code == 0, result.output

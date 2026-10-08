@@ -18,6 +18,8 @@ Conventions this file demonstrates (copy them when rewriting other CLI tests):
   blocks.
 """
 
+import os
+import subprocess
 import sys
 from contextlib import ExitStack
 from unittest.mock import patch
@@ -26,7 +28,6 @@ import pytest
 from click.testing import CliRunner
 
 from dot_man.cli.interface import cli
-from dot_man.constants import DEFAULT_BRANCH
 from tests.conftest import _dot_man_patches
 
 
@@ -37,6 +38,17 @@ def _load_toml(text):
     else:
         import tomli as tomllib
     return tomllib.loads(text)
+
+
+def _actual_branch(repo_dir):
+    """The branch git reports for ``repo_dir`` (via the git binary)."""
+    result = subprocess.run(
+        ["git", "-C", str(repo_dir), "branch", "--show-current"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.strip()
 
 
 @pytest.fixture
@@ -314,13 +326,16 @@ class TestInitCommand:
         ) in content
 
     def test_init_global_toml_matches_default_branch(self, clean_env):
-        """global.toml must record DEFAULT_BRANCH as the current_branch.
+        """global.toml must record the branch git actually created.
 
-        status and navigate read ``[dot-man].current_branch`` as the active
-        configuration, so a mismatch with the constant would report a branch
-        that was never created. The exact key sets pin the whole schema.
+        status, navigate and ``{branch}`` read ``[dot-man].current_branch``
+        as the active configuration, so it must equal the branch in the
+        repo — recording anything else (e.g. the DEFAULT_BRANCH constant
+        while ``init.defaultBranch`` made git create a different name)
+        reports a branch that was never created. The exact key sets pin
+        the whole schema.
         """
-        runner, _, _, _, global_toml = clean_env
+        runner, _, repo_dir, _, global_toml = clean_env
 
         result = runner.invoke(cli, ["init", "--force", "--no-wizard"])
         assert result.exit_code == 0, result.output
@@ -339,7 +354,61 @@ class TestInitCommand:
             "initialized_date",
             "version",
         ]
-        assert parsed["dot-man"]["current_branch"] == DEFAULT_BRANCH
+        assert parsed["dot-man"]["current_branch"] == _actual_branch(repo_dir)
+
+
+# ---------------------------------------------------------------------------
+# [dot-man].current_branch must match reality after init
+# ---------------------------------------------------------------------------
+
+
+class TestInitRecordsActualBranch:
+    """global.toml records the branch git created, not a constant.
+
+    Git picks the initial branch from ``init.defaultBranch`` (host
+    config; built-in default ``master``); an ``--import`` keeps the
+    source repo's branch. Writing DEFAULT_BRANCH unconditionally leaves
+    global.toml claiming ``main`` while the repo sits elsewhere, so
+    status, ``{branch}`` and hooks disagree with git.
+    """
+
+    def test_fresh_init_records_git_created_branch(self, tmp_path, clean_env):
+        """A virgin init records git's init.defaultBranch, not DEFAULT_BRANCH.
+
+        Forcing ``init.defaultBranch = master`` pins the divergence
+        deterministically regardless of the test host's git config.
+        """
+        runner, _, repo_dir, _, global_toml = clean_env
+        gitconfig = tmp_path / "gitconfig"
+        gitconfig.write_text("[init]\n\tdefaultBranch = master\n")
+
+        with patch.dict(
+            os.environ,
+            {"GIT_CONFIG_GLOBAL": str(gitconfig), "GIT_CONFIG_NOSYSTEM": "1"},
+        ):
+            result = runner.invoke(cli, ["init", "--force", "--no-wizard"])
+        assert result.exit_code == 0, result.output
+
+        assert _actual_branch(repo_dir) == "master"
+        parsed = _load_toml(global_toml.read_text())
+        assert parsed["dot-man"]["current_branch"] == "master"
+
+    def test_import_init_records_source_branch(self, tmp_path, clean_env):
+        """``--import`` records the source repo's branch, not DEFAULT_BRANCH."""
+        runner, _, repo_dir, _, global_toml = clean_env
+        source_dir, source_repo = _make_source_repo(
+            tmp_path, commits=[("Initial", {"a.txt": "1"})]
+        )
+        source_branch = source_repo.active_branch.name
+
+        result = runner.invoke(
+            cli, ["init", "--import", str(source_dir), "--force", "--no-wizard"]
+        )
+        assert result.exit_code == 0, result.output
+
+        assert _actual_branch(repo_dir) == source_branch
+        parsed = _load_toml(global_toml.read_text())
+        assert parsed["dot-man"]["current_branch"] == source_branch
 
 
 # ---------------------------------------------------------------------------
@@ -546,15 +615,23 @@ class TestSetupWizard:
 
 class TestInitImport:
     def test_import_nonexistent_path_fails(self, clean_env, tmp_path):
-        """Import from non-existent path is rejected by click with exit 2."""
+        """A non-existent local path fails with the CLI's own error, exit 1.
+
+        The exists-check used to live in ``click.Path(exists=True)``,
+        which also rejected GitHub URLs at parse time (usage error 2)
+        before ``_parse_github_url`` could ever run — validation is in
+        the import code itself now, so local and URL sources fail the
+        same way.
+        """
         runner, dot_man_dir, repo_dir, _, _ = clean_env
 
         nonexistent = tmp_path / "nonexistent"
         result = runner.invoke(cli, ["init", "--import", str(nonexistent)])
 
-        assert result.exit_code == 2
-        assert "Invalid value for '--import'" in result.output
-        assert "does not exist" in result.output
+        assert result.exit_code == 1
+        # Rich wraps long paths; compare whitespace-normalized output
+        normalized = " ".join(result.output.split())
+        assert f"Path '{nonexistent}' does not exist." in normalized
 
     def test_import_non_git_repo_fails(self, clean_env, tmp_path):
         """Import from non-git directory should fail."""
@@ -729,6 +806,35 @@ class TestInitImport:
 
 
 class TestGitHubImport:
+    def test_clone_failure_exits_once_with_message(self, clean_env):
+        """``init --import <github url>`` reaches the clone and fails cleanly.
+
+        ``click.Path(exists=True)`` on ``--import`` used to reject URLs
+        at parse time (exit 2) so this branch was unreachable; the URL
+        must now flow to ``_clone_github_repo``, which failing exits 1
+        and is ATTEMPTED EXACTLY ONCE (the duplicate retry that used to
+        sit after ``error()`` was unreachable — error() raises).
+        """
+        runner, *_ = clean_env
+
+        with patch(
+            "dot_man.cli.init_cmd._clone_github_repo", return_value=None
+        ) as mock_clone:
+            result = runner.invoke(
+                cli,
+                [
+                    "init",
+                    "--import",
+                    "https://github.com/user/dotfiles.git",
+                    "--force",
+                    "--no-wizard",
+                ],
+            )
+
+        assert result.exit_code == 1, result.output
+        assert "Failed to clone GitHub repository." in result.output
+        assert mock_clone.call_count == 1
+
     def test_parse_github_https_url(self):
         """Parse HTTPS GitHub URL."""
         from dot_man.cli.init_cmd import _parse_github_url
