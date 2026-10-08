@@ -9,7 +9,7 @@
 - ✅ Quickshell hook aliases
 - ✅ Template substitution & conditionals
 - ✅ Vault key rotation
-- ✅ 2117 tests, 92% coverage
+- ✅ 2212 tests, 92% coverage
 - ✅ Full documentation site (mkdocs Material)
 
 ---
@@ -122,7 +122,7 @@ Lowest-covered modules (source of truth: `TODO.md`, regenerated 2026-10-06):
 
 | Metric | Current | Target |
 |--------|---------|--------|
-| Test Coverage | 92% (2117 tests) | 90%+ |
+| Test Coverage | 92% (2212 tests) | 90%+ |
 | Core Commands | 30+ commands | All stable |
 | Lint Errors | 0 (ruff + mypy) | 0 |
 | Documentation | Full docs site | Keep updated |
