@@ -47,10 +47,26 @@ def revert(path: Path, force: bool, commit: str | None):
 
             # Find the file in git history
             try:
+                # Resolve the in-repo path the same way diff/log/show do:
+                # the old relative_to(REPO_DIR.parent) produced
+                # DOT_MAN_DIR-relative paths that never matched anything
+                # inside the repo, so -c could never restore a real file.
+                repo_rel = None
+                for section_name in ops.get_sections():
+                    section = ops.get_section(section_name)
+                    for tracked_path in section.paths:
+                        if tracked_path.resolve() == target_path:
+                            repo_rel = section.get_repo_path(
+                                tracked_path, REPO_DIR
+                            ).relative_to(REPO_DIR)
+                            break
+                    if repo_rel is not None:
+                        break
+                if repo_rel is None:
+                    error(f"File not tracked: {target_path}")
+
                 # Get the file content from the commit
-                file_content = ops.git.repo.git.show(
-                    f"{commit}:{target_path.relative_to(REPO_DIR.parent)}"
-                )
+                file_content = ops.git.repo.git.show(f"{commit}:{repo_rel}")
 
                 if not force:
                     if not ui.confirm(
