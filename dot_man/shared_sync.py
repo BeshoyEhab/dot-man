@@ -167,7 +167,7 @@ class SharedSectionSync:
         """Graft shared-section blobs from HEAD onto every other branch."""
         report = SharedSyncReport()
         try:
-            current = self.git.current_branch
+            current = self.git.current_branch()
         except Exception as e:
             report.errors["<repo>"] = str(e)
             return report

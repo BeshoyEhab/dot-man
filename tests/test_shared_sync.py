@@ -328,3 +328,243 @@ class TestGitPlumbingUnit:
 
         blobs = GitPlumbing(repo).ls_tree_blobs("HEAD", "dir")
         assert set(blobs) == {"dir/a.txt"}
+
+
+# ── coverage floor: parser + sync error branches ────────────────
+
+
+class TestParseYamlFloor:
+    def test_valid_yaml_parses_to_dict(self):
+        from dot_man.shared_sync import _parse_yaml
+
+        assert _parse_yaml("shared: true\n") == {"shared": True}
+
+    def test_scalar_yaml_returns_none(self):
+        from dot_man.shared_sync import _parse_yaml
+
+        assert _parse_yaml("just a string") is None
+
+    def test_missing_yaml_module_returns_none(self):
+        import sys
+        from unittest.mock import patch as _patch
+
+        from dot_man.shared_sync import _parse_yaml
+
+        with _patch.dict(sys.modules, {"yaml": None}):
+            assert _parse_yaml("shared: true") is None
+
+
+class TestSyncErrorBranches:
+    def test_reload_config_failure_returns_no_sections(self, solo_repo):
+        _, ops = solo_repo
+        sync = SharedSectionSync(ops)
+
+        def boom():
+            raise RuntimeError("config unreadable")
+
+        ops.reload_config = boom  # type: ignore[method-assign]
+        assert sync.get_shared_section_names() == []
+
+    def test_unreadable_section_is_skipped(self, solo_repo):
+        _, ops = solo_repo
+        sync = SharedSectionSync(ops)
+        ops.reload_config = lambda: None  # type: ignore[method-assign]
+        cfg = ops.dotman_config
+
+        def raise_for(name):
+            raise KeyError(name)
+
+        cfg.get_section = raise_for  # type: ignore[method-assign]
+        assert sync.get_shared_section_names() == []
+
+    def test_current_branch_failure_recorded(self, solo_repo):
+        from unittest.mock import patch as _patch
+
+        _, ops = solo_repo
+
+        def raiser(self):
+            raise RuntimeError("no HEAD")
+
+        with _patch.object(GitManager, "current_branch", property(raiser)):
+            report = SharedSectionSync(ops).sync()
+
+        assert report.errors["<repo>"] == "no HEAD"
+        assert not report.ok
+
+    def test_plumbing_failure_recorded(self, multi_branch_repo):
+        repo_dir, ops = multi_branch_repo
+        commit_file(repo_dir, "fish/config.fish", "set -x VI 1\n", "edit fish")
+
+        sync = SharedSectionSync(ops)
+
+        def boom(*args, **kwargs):
+            raise RuntimeError("stage boom")
+
+        sync.plumbing.stage_blob = boom  # type: ignore[method-assign]
+        report = sync.sync()
+
+        assert not report.ok
+        assert any("stage boom" in msg for msg in report.errors.values())
+
+    def test_identical_tree_marks_unchanged(self, multi_branch_repo):
+        repo_dir, ops = multi_branch_repo
+        commit_file(repo_dir, "fish/config.fish", "set -x EDITOR vi\n", "edit fish")
+
+        sync = SharedSectionSync(ops)
+        captured: dict = {}
+        original_rev_parse = sync.plumbing.rev_parse
+
+        def capturing_rev_parse(ref):
+            out = original_rev_parse(ref)
+            captured["tree"] = out
+            return out
+
+        sync.plumbing.rev_parse = capturing_rev_parse  # type: ignore[method-assign]
+        sync.plumbing.write_tree = lambda index_file: captured["tree"]  # type: ignore[method-assign]
+
+        report = sync.sync()
+
+        assert not report.propagated
+        assert "server" in report.unchanged
+        assert report.ok
+
+
+class TestUnchangedAndNoBlobPaths:
+    def test_shared_section_without_files_is_noop(self, tmp_path):
+        repo_dir = tmp_path / "nofiles"
+        repo_dir.mkdir()
+        run_git(repo_dir, "init", "-b", "main")
+        run_git(repo_dir, "config", "user.name", "T")
+        run_git(repo_dir, "config", "user.email", "t@t.co")
+        commit_file(
+            repo_dir,
+            "dot-man.toml",
+            '[ghost]\npaths = ["~/.config/ghost"]\nshared = true\n',
+            "cfg",
+        )
+        run_git(repo_dir, "checkout", "-b", "other")
+        run_git(repo_dir, "checkout", "main")
+
+        report = SharedSectionSync(
+            OpsStub(git=GitManager(repo_dir), repo_dir=repo_dir)
+        ).sync()
+
+        assert report.shared_sections == ["ghost"]
+        assert not report.propagated
+        assert report.ok
+
+    def test_branch_without_config_fully_inherits(self, tmp_path):
+        repo_dir = tmp_path / "nocfg"
+        repo_dir.mkdir()
+        run_git(repo_dir, "init", "-b", "main")
+        run_git(repo_dir, "config", "user.name", "T")
+        run_git(repo_dir, "config", "user.email", "t@t.co")
+        commit_file(
+            repo_dir,
+            "dot-man.toml",
+            '[fish]\npaths = ["~/.config/fish"]\nshared = true\n',
+            "cfg",
+        )
+        # Branch created before the shared file exists, then drop its config.
+        run_git(repo_dir, "checkout", "-b", "bare")
+        run_git(repo_dir, "rm", "dot-man.toml")
+        run_git(repo_dir, "commit", "-m", "drop config")
+        run_git(repo_dir, "checkout", "main")
+        commit_file(repo_dir, "fish/config.fish", "set -x EDITOR nvim\n", "fish")
+
+        report = SharedSectionSync(
+            OpsStub(git=GitManager(repo_dir), repo_dir=repo_dir)
+        ).sync()
+
+        assert report.propagated["bare"] == ["fish"]
+
+    def test_overriding_only_section_with_no_files_is_unchanged(self, tmp_path):
+        """wanted sections exist but contribute no HEAD blobs -> unchanged."""
+        repo_dir = tmp_path / "partial"
+        repo_dir.mkdir()
+        run_git(repo_dir, "init", "-b", "main")
+        run_git(repo_dir, "config", "user.name", "T")
+        run_git(repo_dir, "config", "user.email", "t@t.co")
+        commit_file(
+            repo_dir,
+            "dot-man.toml",
+            '[fish]\npaths = ["~/.config/fish"]\nshared = true\n\n'
+            '[ghost]\npaths = ["~/.config/ghost"]\nshared = true\n',
+            "cfg",
+        )
+        commit_file(repo_dir, "fish/config.fish", "set -x EDITOR nvim\n", "fish")
+        run_git(repo_dir, "checkout", "-b", "work")
+        commit_file(
+            repo_dir,
+            "dot-man.toml",
+            '[fish]\npaths = ["~/.config/fish"]\nrepo_base = "fish-work"\n',
+            "work overrides fish",
+        )
+        run_git(repo_dir, "checkout", "main")
+
+        report = SharedSectionSync(
+            OpsStub(git=GitManager(repo_dir), repo_dir=repo_dir)
+        ).sync()
+
+        assert report.unchanged == ["work"]
+        assert not report.propagated
+        assert report.ok
+
+
+def test_current_branch_never_reported_as_target(multi_branch_repo):
+    """The branch being edited is not a propagation target (sync:170)."""
+    repo_dir, ops = multi_branch_repo
+    commit_file(repo_dir, "fish/config.fish", "set -x EDITOR helix\n", "edit fish")
+
+    report = SharedSectionSync(ops).sync()
+
+    assert "main" not in report.propagated
+    assert "main" not in report.skipped
+    assert "main" not in report.unchanged
+    assert report.propagated.get("server") == ["fish"]
+
+
+def test_section_repo_spec_unreadable_returns_none(solo_repo):
+    """Unreadable section config -> no repo spec (guards _head_blobs_for)."""
+    _, ops = solo_repo
+    sync = SharedSectionSync(ops)
+    cfg = ops.dotman_config
+
+    def boom(name):
+        raise KeyError(name)
+
+    cfg.get_section = boom  # type: ignore[method-assign]
+    assert sync._section_repo_spec("bashrc") is None
+
+
+def test_yaml_config_on_branch_is_parsed_as_override(tmp_path):
+    """A branch whose committed config is YAML overrides via _parse_yaml."""
+    repo_dir = tmp_path / "yamly"
+    repo_dir.mkdir()
+    run_git(repo_dir, "init", "-b", "main")
+    run_git(repo_dir, "config", "user.name", "T")
+    run_git(repo_dir, "config", "user.email", "t@t.co")
+    commit_file(
+        repo_dir,
+        "dot-man.toml",
+        '[fish]\npaths = ["~/.config/fish"]\nshared = true\n',
+        "cfg",
+    )
+    commit_file(repo_dir, "fish/config.fish", "set -x EDITOR nvim\n", "fish")
+    run_git(repo_dir, "checkout", "-b", "yamly")
+    run_git(repo_dir, "rm", "dot-man.toml")
+    commit_file(
+        repo_dir,
+        "dot-man.yaml",
+        "fish:\n  paths:\n    - ~/.config/fish\n  repo_base: fish-yaml\n",
+        "yaml override",
+    )
+    run_git(repo_dir, "checkout", "main")
+
+    report = SharedSectionSync(
+        OpsStub(git=GitManager(repo_dir), repo_dir=repo_dir)
+    ).sync()
+
+    assert report.skipped["yamly"] == ["fish"]
+    assert "yamly" not in report.propagated
+    assert report.ok
