@@ -1,7 +1,12 @@
 # Development Roadmap
 
-## v1.4.0 - Current Stable ✅
+## v1.5.0 - Current Stable ✅
 
+- ✅ Full coverage floor — every module ≥ 90% (2350 tests, 96% coverage)
+- ✅ Consistent exit codes — `ExitCode` enum, `sys.exit()` eliminated
+- ✅ Centralized error handling — `DotManGroup.invoke()` routes through `handle_exception()`
+- ✅ Two-level help — `help`/`--help` happy path, `help-all` everything, man page
+- ✅ Hook scripts directory — `file:<script> [args]` in section hooks
 - ✅ Decorator-driven completion engine
 - ✅ Shell completions for all commands (bash, zsh, fish)
 - ✅ Custom secret patterns
@@ -9,31 +14,15 @@
 - ✅ Quickshell hook aliases
 - ✅ Template substitution & conditionals
 - ✅ Vault key rotation
-- ✅ 2350 tests, 96% coverage
 - ✅ Full documentation site (mkdocs Material)
 
 ---
 
-## v1.5.0 - Next Release (Planned)
-
-### Shell Completions
-
-- [ ] Complete local file paths for `add` command ✅
-- [ ] Complete package manager names for `bootstrap` command ✅
-
-### User Experience
-
-- [x] Consistent exit codes — `ExitCode` enum, `sys.exit()` eliminated ✅
-- [x] Centralized error handling — `DotManGroup.invoke()` routes all commands through `handle_exception()` ✅
+## v1.6.0 - Next Release (Planned)
 
 ### Extensibility
 
-- [x] Hook scripts directory — `file:<script> [args]` in section hooks, repo `hooks/` + global fallback ✅
-- [ ] Plugin API — extension mechanism for third-party tools
-
-### Simplification
-
-- [x] Two-level help — `help`/`--help` show happy-path commands, `help-all` shows everything, man page ✅
+- [ ] Plugin API — extension mechanism for third-party tools (parked)
 
 ---
 
@@ -64,6 +53,15 @@ below 90%** — the floor sweep cleared every module (suite 2350 passing, 96% co
 ---
 
 ## Completed Milestones
+
+### v1.5.0 — Coverage Floor & UX Hardening (2026-10-09)
+- ✅ Full coverage floor — every module ≥ 90% (suite 2350 passing, 96% coverage)
+- ✅ Consistent exit codes — `ExitCode` enum, `sys.exit()` eliminated
+- ✅ Centralized error handling — `DotManGroup.invoke()` routes through `handle_exception()`
+- ✅ Two-level help — `help`/`--help` happy path, `help-all` everything, man page
+- ✅ Hook scripts directory — `file:<script> [args]` in section hooks, repo `hooks/` + global fallback
+- ✅ Path completions for `add`, package-manager completions for `bootstrap`
+- ✅ Bug fixes — `revert -c` section paths, `shared_sync` branch exclusion, `verify` broken symlinks
 
 ### v1.4.0 — Decorator-Driven Shell Completion Engine (2026-08-25)
 - ✅ `@completes(path, param=...)` decorator registry

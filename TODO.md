@@ -1,6 +1,6 @@
 # TODO
 
-**Status:** v1.4.0 · 2350 tests passing · coverage 96% · docs site live
+**Status:** v1.5.0 · 2350 tests passing · coverage 96% · docs site live
 
 ---
 
@@ -77,7 +77,7 @@ Lowest-covered modules (regenerated 2026-10-09): **none below 90%**.
 
 ## ✅ Recently Completed
 
-### Unreleased
+### v1.5.0
 
 - [x] **Coverage floor 90% → 91%** — `backups.py` 71%→100%, `cli/backup_cmd.py` 72%→95% (+16 strong tests: skip-missing/all-missing/OSError-cleanup, missing-dir/manifest roundtrips, delete-failure, CLI create/list/restore flows incl. confirm-abort); also fixed `backup` CLI tests leaking into the real `~/.config/dot-man` (`dot_man.backups.BACKUPS_DIR` now patched in test isolation)
 - [x] **`lock.py` 79%→100%** (+5 strong tests: missing parent dirs, real fcntl contention, open/flock OSError paths, unlock-failure tolerance; upgraded weak `hasattr` test to real acquire/release assertions) — exposed and fixed failed-acquire leaving a closed fd referenced instead of `None`

@@ -13,7 +13,7 @@ or priorities shift (see "AI Autonomy" at the bottom).
 (work, personal, minimal, server).
 
 - **Language**: Python 3.10+ · **CLI**: Click · **Tests**: pytest · **Packages**: `uv`
-- **Version**: 1.4.0 · **Tests**: 2350 passing · **Coverage**: 96% · **Docs**: mkdocs Material on GitHub Pages
+- **Version**: 1.5.0 · **Tests**: 2350 passing · **Coverage**: 96% · **Docs**: mkdocs Material on GitHub Pages
 - **CI**: GitHub Actions with `uv` (`uv.lock` committed); pre-commit runs Black, ruff, mypy; `uv build` in the publish workflow
 
 Canonical command vocabulary: **`navigate`** (alias `nav`) switches
@@ -284,7 +284,7 @@ on_activate = "qs -c ii &"
 
 ## Version Bump Checklist
 
-1. Bump `pyproject.toml` **and** `dot_man/__init__.py` (e.g., 1.4.0 → 1.5.0)
+1. Bump `pyproject.toml` **and** `dot_man/__init__.py` (e.g., 1.5.0 → 1.6.0)
 2. Move `CHANGELOG.md` "Unreleased" to the version date
 3. Check off `TODO.md`; update `README.md` (Features, metrics, coverage); update `docs/roadmap.md`; refresh this file's snapshot (version, tests, coverage)
 4. Run the full quality gate (`black --check`, `ruff`, `mypy`, `pytest -v`, coverage)
@@ -296,11 +296,14 @@ on_activate = "qs -c ii &"
 
 ## Active Priorities (detail in TODO.md)
 
-1. **Simplification & real-world usability** — happy path, two-level help (`help`/`help-all` + man page), defaults over options, one onboarding, `next_steps` everywhere, docs real-world-first
-2. **Coverage floor** — raise the lowest modules (current table in TODO.md; regenerate before trusting)
-3. **Global hook schema + template vars in config values** — schema first, then deduplicate and document from it
-4. **v2.0 removals** — `switch`/`checkout` shims (kept with warnings until then)
-5. **Parked** — Plugin API (too big; revisit after simplification)
+1. **Coverage polish (optional)** — floor is met (every module ≥90%); push the 90% tail
+   (`secrets`, `exceptions`, `global_config`, `template_cmd`, `rollback_cmd`,
+   `completion_engine`) toward 95% if asked
+2. **v2.0 removals** — `switch`/`checkout` shims (kept with warnings until then)
+3. **Parked** — Plugin API (too big; revisit on request)
+
+Completed in v1.5.0 (see TODO.md): simplification & real-world usability track,
+full coverage floor, global hook schema + template vars in config values.
 
 ---
 
