@@ -307,3 +307,140 @@ class TestEditCommand:
         ):
             result = runner.invoke(cli, ["edit"])
             assert result.exit_code == 1
+
+
+class TestEditInteractiveMenu:
+    """The interactive menu loop: sections, interrupt, raw fallback."""
+
+    def test_build_menu_lists_real_sections(self, integration_runner, tmp_path):
+        """Configured sections appear as selectable menu entries."""
+        import questionary
+
+        from dot_man.cli.edit_cmd import _edit_build_menu
+        from dot_man.operations import get_operations
+
+        rc = tmp_path / "home" / ".menurc"
+        rc.write_text("menu test")
+        result = integration_runner.invoke(
+            cli, ["add", str(rc), "--section", "menusec"]
+        )
+        assert result.exit_code == 0, result.output
+
+        choices = _edit_build_menu(get_operations())
+
+        values = [getattr(c, "value", None) for c in choices]
+        assert "section:menusec" in values
+        assert "global" in values
+        assert "quit" in values
+        separators = [c.title for c in choices if isinstance(c, questionary.Separator)]
+        assert "--- Sections ---" in separators
+
+    def test_keyboard_interrupt_returns_quietly(self, integration_runner):
+        """Ctrl-C at the menu exits edit with 0, no traceback."""
+        with patch("questionary.select") as mock_select:
+            mock_select.return_value.ask.side_effect = KeyboardInterrupt
+            result = integration_runner.invoke(cli, ["edit"])
+
+        assert result.exit_code == 0, result.output
+        assert "Traceback" not in result.output
+
+    def test_menu_error_falls_back_to_raw_editor(self, integration_runner):
+        """A blown-up menu warns and opens the raw editor instead."""
+        with (
+            patch("questionary.select") as mock_select,
+            patch("dot_man.utils.open_in_editor", return_value=True),
+        ):
+            mock_select.return_value.ask.side_effect = RuntimeError("menu boom")
+            result = integration_runner.invoke(cli, ["edit"])
+
+        assert result.exit_code == 0, result.output
+        assert "Interactive menu error: menu boom" in result.output
+        assert "Falling back to raw editor..." in result.output
+        assert "Edited dot-man.toml" in result.output
+
+
+class TestEditAddNewFlow:
+    """The 'Add New Section' menu action end-to-end."""
+
+    def test_add_new_creates_section(self, integration_runner, tmp_path):
+        """Picking add_new prompts, invokes add, and lands the section."""
+        from dot_man.constants import DOT_MAN_TOML, REPO_DIR
+
+        rc = tmp_path / "home" / ".newrc"
+        rc.write_text("new section file")
+        with (
+            patch("questionary.select") as mock_select,
+            patch("questionary.path") as mock_path,
+            patch("questionary.text") as mock_text,
+            patch("builtins.input", return_value=""),
+        ):
+            mock_select.return_value.ask.side_effect = ["add_new", "quit"]
+            mock_path.return_value.ask.return_value = str(rc)
+            mock_text.return_value.ask.return_value = "newsec"
+            result = integration_runner.invoke(cli, ["edit"])
+
+        assert result.exit_code == 0, result.output
+        assert "Press Enter to continue..." in result.output
+        assert "[newsec]" in (REPO_DIR / DOT_MAN_TOML).read_text()
+
+    def test_add_new_missing_path_warns(self, integration_runner, tmp_path):
+        """A non-existent path is rejected with a warning, then quit."""
+        with (
+            patch("questionary.select") as mock_select,
+            patch("questionary.path") as mock_path,
+        ):
+            mock_select.return_value.ask.side_effect = ["add_new", "quit"]
+            mock_path.return_value.ask.return_value = str(tmp_path / "ghost.txt")
+            result = integration_runner.invoke(cli, ["edit"])
+
+        assert result.exit_code == 0, result.output
+        assert "Path does not exist:" in result.output
+
+    def test_add_new_path_prompt_cancelled(self, integration_runner):
+        """Empty path prompt aborts the flow silently."""
+        with (
+            patch("questionary.select") as mock_select,
+            patch("questionary.path") as mock_path,
+        ):
+            mock_select.return_value.ask.side_effect = ["add_new", "quit"]
+            mock_path.return_value.ask.return_value = None
+            result = integration_runner.invoke(cli, ["edit"])
+
+        assert result.exit_code == 0, result.output
+        assert "Path does not exist:" not in result.output
+        assert "Press Enter to continue..." not in result.output
+
+    def test_add_new_name_prompt_cancelled(self, integration_runner, tmp_path):
+        """Empty section-name prompt aborts before invoking add."""
+        rc = tmp_path / "home" / ".newrc"
+        rc.write_text("file")
+        with (
+            patch("questionary.select") as mock_select,
+            patch("questionary.path") as mock_path,
+            patch("questionary.text") as mock_text,
+        ):
+            mock_select.return_value.ask.side_effect = ["add_new", "quit"]
+            mock_path.return_value.ask.return_value = str(rc)
+            mock_text.return_value.ask.return_value = None
+            result = integration_runner.invoke(cli, ["edit"])
+
+        assert result.exit_code == 0, result.output
+        assert "Press Enter to continue..." not in result.output
+
+    def test_add_new_error_warned_not_crashed(self, integration_runner, tmp_path):
+        """A failing add is reported through the flow's warning, not a crash."""
+        rc = tmp_path / "home" / ".newrc"
+        rc.write_text("file")
+        with (
+            patch("questionary.select") as mock_select,
+            patch("questionary.path") as mock_path,
+            patch("questionary.text") as mock_text,
+            patch("dot_man.cli.add_cmd.add", side_effect=RuntimeError("add exploded")),
+        ):
+            mock_select.return_value.ask.side_effect = ["add_new", "quit"]
+            mock_path.return_value.ask.return_value = str(rc)
+            mock_text.return_value.ask.return_value = "errsec"
+            result = integration_runner.invoke(cli, ["edit"])
+
+        assert result.exit_code == 0, result.output
+        assert "Error adding section: add exploded" in result.output

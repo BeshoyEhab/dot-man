@@ -1002,3 +1002,373 @@ def test_show_next_steps_uses_next_steps_block():
             init_cmd._wizard_show_next_steps([])
     steps = mock_ui.next_steps.call_args[0][0]
     assert any("dot-man add" in step for step in steps)
+
+
+# ---------------------------------------------------------------------------
+# Coverage floor: failure handlers, import edges, wizard helpers, clone
+# ---------------------------------------------------------------------------
+
+
+class TestInitFailureHandlers:
+    """The two exception handlers wrapping the whole init body."""
+
+    def test_keyboard_interrupt_during_wizard_exits_130(self, clean_env):
+        from dot_man.cli.common import ExitCode
+
+        runner, *_ = clean_env
+        with patch(
+            "dot_man.cli.init_cmd.run_setup_wizard",
+            side_effect=KeyboardInterrupt,
+        ):
+            result = runner.invoke(cli, ["init", "--force"])
+
+        assert result.exit_code == ExitCode.INTERRUPTED, result.output
+        assert "Operation cancelled by user" in result.output
+
+    def test_copytree_failure_reports_diagnostic(self, clean_env, tmp_path):
+        """A dangling symlink in the source makes copytree raise -> exit 1."""
+        from dot_man.cli.common import ExitCode
+
+        runner, *_ = clean_env
+        source_dir, _source_repo = _make_source_repo(
+            tmp_path, commits=[("Initial", {".bashrc": "x"})]
+        )
+        (source_dir / "dangling").symlink_to(source_dir / "does-not-exist")
+
+        result = runner.invoke(
+            cli,
+            ["init", "--import", str(source_dir), "--force", "--no-wizard"],
+        )
+
+        assert result.exit_code == ExitCode.ERROR, result.output
+        # copytree collects failures into shutil.Error -> generic diagnostic
+        assert "Unexpected error" in result.output
+        assert "dangling" in result.output
+        assert "💡" in result.output
+
+
+class TestInitImportEdges:
+    """Import paths that only fire on unusual source repositories."""
+
+    def test_revparse_timeout_continues_import(self, clean_env, tmp_path):
+        """A hanging rev-parse is swallowed; import still completes."""
+        runner, *_ = clean_env
+        source_dir, _source_repo = _make_source_repo(
+            tmp_path, commits=[("Initial", {".bashrc": "x"})]
+        )
+        with patch(
+            "dot_man.cli.init_cmd.subprocess.run",
+            side_effect=subprocess.TimeoutExpired(cmd="git", timeout=5),
+        ):
+            result = runner.invoke(
+                cli,
+                ["init", "--import", str(source_dir), "--force", "--no-wizard"],
+            )
+
+        assert result.exit_code == 0, result.output
+        assert "Imported dotfiles" in result.output
+
+    def test_failing_post_checkout_hook_logged_not_fatal(self, clean_env, tmp_path):
+        """A source repo whose post-checkout hook fails: the import logs the
+        checkout failure (except branch) and completes instead of crashing."""
+        runner, *_ = clean_env
+        source_dir, _source_repo = _make_source_repo(
+            tmp_path, commits=[("Initial", {".bashrc": "x"})]
+        )
+        hook = source_dir / ".git" / "hooks" / "post-checkout"
+        hook.write_text("#!/bin/sh\nexit 1\n")
+        hook.chmod(0o755)
+
+        result = runner.invoke(
+            cli,
+            ["init", "--import", str(source_dir), "--force", "--no-wizard"],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "Imported dotfiles" in result.output
+
+    def test_source_without_user_config_gets_defaults(self, clean_env, tmp_path):
+        """Importing a repo with no user.name/user.email sets the defaults."""
+        from dot_man.core import GitManager
+
+        runner, _, repo_dir, *_ = clean_env
+        source_dir, source_repo = _make_source_repo(
+            tmp_path, commits=[("Initial", {".bashrc": "x"})]
+        )
+        with source_repo.config_writer() as config:
+            config.remove_section("user")
+
+        result = runner.invoke(
+            cli,
+            ["init", "--import", str(source_dir), "--force", "--no-wizard"],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "Git user configuration not found" in result.output
+        assert "Configured default git user." in result.output
+        git = GitManager(repo_dir)
+        assert git.repo.config_reader().get_value("user", "name") == "dot-man-user"
+        assert (
+            git.repo.config_reader().get_value("user", "email") == "dot-man@localhost"
+        )
+
+
+class TestCloneGithubRepo:
+    """``_clone_github_repo`` — local paths only, no network."""
+
+    def test_local_repo_clones_to_working_copy(self, tmp_path):
+        from dot_man.cli.init_cmd import _clone_github_repo
+
+        source_dir, _source_repo = _make_source_repo(
+            tmp_path, commits=[("Initial", {"a.txt": "payload"})]
+        )
+
+        work = _clone_github_repo(str(source_dir))
+
+        assert work is not None
+        assert (work / ".git").exists()
+        assert (work / "a.txt").read_text() == "payload"
+
+    def test_missing_repo_exits_1_with_error(self, tmp_path, capsys):
+        from dot_man.cli.init_cmd import _clone_github_repo
+
+        with pytest.raises(SystemExit) as exc_info:
+            _clone_github_repo(str(tmp_path / "no-such-repo"))
+
+        assert exc_info.value.code == 1
+        captured = capsys.readouterr()
+        assert "Failed to clone" in captured.out + captured.err
+
+    def test_timeout_reports_and_exits(self, tmp_path, capsys):
+        from dot_man.cli.init_cmd import _clone_github_repo
+
+        with patch(
+            "dot_man.cli.init_cmd.subprocess.run",
+            side_effect=subprocess.TimeoutExpired(cmd="git", timeout=60),
+        ):
+            with pytest.raises(SystemExit) as exc_info:
+                _clone_github_repo("https://github.com/user/repo.git")
+
+        assert exc_info.value.code == 1
+        captured = capsys.readouterr()
+        assert "Clone timed out" in captured.out + captured.err
+
+    def test_unexpected_error_reports_and_exits(self, tmp_path, capsys):
+        from dot_man.cli.init_cmd import _clone_github_repo
+
+        with patch(
+            "dot_man.cli.init_cmd.subprocess.run",
+            side_effect=OSError("disk on fire"),
+        ):
+            with pytest.raises(SystemExit) as exc_info:
+                _clone_github_repo("https://github.com/user/repo.git")
+
+        assert exc_info.value.code == 1
+        captured = capsys.readouterr()
+        assert "Clone failed: disk on fire" in captured.out + captured.err
+
+    def test_github_clone_failure_fails_fast_without_network(
+        self, clean_env, monkeypatch
+    ):
+        """End-to-end: an unreachable proxy makes git clone fail instantly."""
+        runner, *_ = clean_env
+        monkeypatch.setenv("https_proxy", "http://127.0.0.1:1")
+        monkeypatch.setenv("HTTPS_PROXY", "http://127.0.0.1:1")
+        monkeypatch.delenv("no_proxy", raising=False)
+        monkeypatch.delenv("NO_PROXY", raising=False)
+
+        result = runner.invoke(
+            cli,
+            [
+                "init",
+                "--import",
+                "https://github.com/dot-man-nope/no-such-repo.git",
+                "--force",
+                "--no-wizard",
+            ],
+        )
+
+        assert result.exit_code == 1, result.output
+        assert "Failed to clone" in result.output
+
+    def test_successful_clone_feeds_import_flow(self, clean_env, tmp_path):
+        """Patched clone success keeps the import flow running (network
+        boundary — the one mock in this class)."""
+        from pathlib import Path
+
+        runner, *_ = clean_env
+        source_dir, _source_repo = _make_source_repo(
+            tmp_path, commits=[("Initial", {".bashrc": "x"})]
+        )
+        with patch(
+            "dot_man.cli.init_cmd._clone_github_repo",
+            return_value=Path(source_dir),
+        ):
+            result = runner.invoke(
+                cli,
+                [
+                    "init",
+                    "--import",
+                    "https://github.com/user/dotfiles.git",
+                    "--force",
+                    "--no-wizard",
+                ],
+            )
+
+        assert result.exit_code == 0, result.output
+        assert "Imported dotfiles" in result.output
+
+
+class TestWizardQuickshellMultiChoice:
+    """The multi-config picker in ``_wizard_prompt_for_files``."""
+
+    @staticmethod
+    def _qs_root(tmp_path):
+        root = tmp_path / "quickshell"
+        (root / "ii").mkdir(parents=True)
+        (root / "default").mkdir()
+        return root
+
+    def test_invalid_and_nonnumeric_choices_then_subdir(self, tmp_path, capsys):
+        from dot_man.cli import init_cmd
+
+        root = self._qs_root(tmp_path)
+        files: list = []
+
+        with (
+            patch("dot_man.ui.ask", side_effect=["9", "abc", "2"]),
+            patch("dot_man.ui.confirm", return_value=True),
+        ):
+            init_cmd._wizard_prompt_for_files(
+                [(str(root), "Quickshell", "quickshell")], files
+            )
+
+        out = capsys.readouterr().out
+        assert "Invalid selection" in out
+        assert "Please enter a number" in out
+        assert files == [(f"{root}/ii", "ii")]
+
+    def test_root_option_declined_leaves_list_empty(self, tmp_path, capsys):
+        from dot_man.cli import init_cmd
+
+        root = self._qs_root(tmp_path)
+        files: list = []
+
+        with (
+            patch("dot_man.ui.ask", return_value="3"),
+            patch("dot_man.ui.confirm", return_value=False),
+        ):
+            init_cmd._wizard_prompt_for_files(
+                [(str(root), "Quickshell", "quickshell")], files
+            )
+
+        assert files == []
+        assert "Multiple configurations detected" in capsys.readouterr().out
+
+
+class TestWizardSaveSummaryEdges:
+    """Failure and size branches of ``_wizard_save_and_summarize``."""
+
+    @staticmethod
+    def _initialized(clean_env):
+        runner, dot_man_dir, repo_dir, backups_dir, global_toml = clean_env
+        result = runner.invoke(cli, ["init", "--force", "--no-wizard"])
+        assert result.exit_code == 0, result.output
+        return runner, repo_dir
+
+    def test_absolute_path_warns_and_overflow_listed(self, clean_env, tmp_path, capsys):
+        from dot_man.cli import init_cmd
+        from dot_man.config import DotManConfig
+        from dot_man.core import GitManager
+
+        runner, repo_dir = self._initialized(clean_env)
+        files = [(str(tmp_path / "abs1"), "abssec")] + [
+            (f"~/.cfg{i}", f"sec{i}") for i in range(1, 6)
+        ]
+
+        with patch("dot_man.ui.confirm", return_value=False):
+            init_cmd._wizard_save_and_summarize(files, DotManConfig(), GitManager())
+
+        out = capsys.readouterr().out
+        assert "Could not add" in out
+        assert "... and 1 more" in out
+        content = (repo_dir / "dot-man.toml").read_text()
+        assert "abssec" not in content
+        assert "[sec5]" in content
+
+    def test_pre_deploy_auto_hook_recorded(self, clean_env, capsys):
+        from dot_man.cli import init_cmd
+        from dot_man.config import DotManConfig
+        from dot_man.core import GitManager
+
+        runner, repo_dir = self._initialized(clean_env)
+
+        with (
+            patch(
+                "dot_man.cli.init_cmd.get_auto_hooks_for_config",
+                return_value={"pre_deploy": "echo pre"},
+            ),
+            patch("dot_man.ui.confirm", return_value=False),
+        ):
+            init_cmd._wizard_save_and_summarize(
+                [("~/.prehookrc", "presec")], DotManConfig(), GitManager()
+            )
+
+        out = capsys.readouterr().out
+        assert "Auto-detected pre_deploy hook" in out
+        content = (repo_dir / "dot-man.toml").read_text()
+        assert "pre_deploy" in content
+        assert "echo pre" in content
+
+
+class TestWizardCustomFilesNonDot:
+    def test_non_hidden_file_uses_stem_as_default_section(self, tmp_path):
+        from dot_man.cli import init_cmd
+
+        target = tmp_path / "xterm.conf"
+        target.write_text("x")
+
+        with (
+            patch("dot_man.ui.confirm", return_value=True),
+            patch("dot_man.ui.ask") as mock_ask,
+        ):
+            mock_ask.side_effect = [str(target), "custom-name", ""]
+            files = init_cmd._wizard_add_custom_files([])
+
+        assert files == [(str(target), "custom-name")]
+        section_call = mock_ask.call_args_list[1]
+        assert section_call.kwargs["default"] == "xterm"
+
+
+class TestWizardNextStepsClosing:
+    """The closing status display at the end of the wizard."""
+
+    def test_missing_callback_skips_display(self, caplog):
+        import logging
+
+        from dot_man.cli import init_cmd
+
+        with (
+            patch("dot_man.cli.init_cmd.status_cmd") as mock_status,
+            patch("dot_man.cli.init_cmd.ui"),
+            caplog.at_level(logging.DEBUG),
+        ):
+            mock_status.status.callback = None
+            init_cmd._wizard_show_next_steps([("~/.bashrc", "bashrc")])
+
+        assert "Status callback unavailable" in caplog.text
+
+    def test_callback_failure_is_logged_not_raised(self, caplog):
+        import logging
+
+        from dot_man.cli import init_cmd
+
+        with (
+            patch("dot_man.cli.init_cmd.status_cmd") as mock_status,
+            patch("dot_man.cli.init_cmd.ui"),
+            caplog.at_level(logging.DEBUG),
+        ):
+            mock_status.status.callback.side_effect = RuntimeError("status boom")
+            init_cmd._wizard_show_next_steps([])
+
+        assert "Closing status display skipped: status boom" in caplog.text
