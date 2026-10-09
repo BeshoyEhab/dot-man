@@ -51,16 +51,16 @@ def verify(fix: bool):
         for section_name in ops.get_sections():
             section = ops.get_section(section_name)
             for p in section.paths:
-                if not p.exists():
-                    issues.append(f"Missing path: {p} (section '{section_name}')")
-                    ui.console.print(
-                        f"  [warning]⚠[/warning] Missing: {p} "
-                        f"[dim](section '{section_name}')[/dim]"
-                    )
-                elif p.is_symlink() and not p.resolve().exists():
+                if p.is_symlink() and not p.resolve().exists():
                     issues.append(f"Broken symlink: {p} (section '{section_name}')")
                     ui.console.print(
                         f"  [error]✗[/error] Broken symlink: {p} "
+                        f"[dim](section '{section_name}')[/dim]"
+                    )
+                elif not p.exists():
+                    issues.append(f"Missing path: {p} (section '{section_name}')")
+                    ui.console.print(
+                        f"  [warning]⚠[/warning] Missing: {p} "
                         f"[dim](section '{section_name}')[/dim]"
                     )
                 elif not os.access(p, os.R_OK):

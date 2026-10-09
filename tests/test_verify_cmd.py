@@ -274,3 +274,176 @@ class TestVerify:
             result = runner.invoke(verify, [])
 
             assert result.exit_code == 0
+
+
+# ─── coverage floor: symlink order bug, permissions, orphan edge,
+#     git dirty details, fixed summary ──────────────────────────────
+
+
+def _verify_run(tmp_path, section, fix=False, orphans=None, repo_files=None):
+    """Common harness: patched ops + CliRunner invocation of verify."""
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir(exist_ok=True)
+    (repo_dir / "dot-man.toml").write_text("[main]\npaths = []\n")
+    if repo_files:
+        for rel in repo_files:
+            target = repo_dir / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text("x")
+
+    with (
+        patch("dot_man.cli.verify_cmd.REPO_DIR", repo_dir),
+        patch("dot_man.cli.verify_cmd.DOT_MAN_TOML", "dot-man.toml"),
+        patch("dot_man.operations.get_operations") as mock_ops,
+    ):
+        ops = mock_ops.return_value
+        ops.get_sections.return_value = ["main"]
+        ops.get_section.return_value = section
+        ops.git.repo.is_dirty.return_value = False
+        ops.get_orphaned_files.return_value = orphans or []
+
+        runner = CliRunner()
+        result = runner.invoke(verify, ["--fix"] if fix else [])
+        return result, repo_dir
+
+
+class TestVerifyCoverageFloor:
+    def test_broken_symlink_reported_as_broken(self, tmp_path):
+        """A broken symlink must say 'Broken symlink', not 'Missing'."""
+        broken_link = tmp_path / "broken_link"
+        broken_link.symlink_to(tmp_path / "does_not_exist")
+
+        section = MagicMock()
+        section.paths = [broken_link]
+        section.get_repo_path.return_value = tmp_path / "repo_path"
+
+        result, _ = _verify_run(tmp_path, section)
+
+        assert result.exit_code == 0
+        assert "Broken symlink" in result.output
+        assert "Missing:" not in result.output
+
+    def test_unreadable_path_reported(self, tmp_path):
+        guarded = tmp_path / "guarded.conf"
+        guarded.write_text("secret")
+        guarded.chmod(0o000)
+
+        section = MagicMock()
+        section.paths = [guarded]
+        section.get_repo_path.return_value = tmp_path / "repo_path"
+
+        try:
+            result, _ = _verify_run(tmp_path, section)
+        finally:
+            guarded.chmod(0o644)
+
+        assert "Cannot read:" in result.output
+
+    def test_readable_path_prints_success(self, tmp_path):
+        good = tmp_path / "good.conf"
+        good.write_text("ok")
+
+        section = MagicMock()
+        section.paths = [good]
+        section.get_repo_path.return_value = tmp_path / "repo_path"
+
+        result, _ = _verify_run(tmp_path, section)
+
+        assert "good.conf" in result.output
+        assert "section 'main'" in result.output
+
+    def test_orphan_outside_repo_prints_name(self, tmp_path):
+        section = MagicMock()
+        section.paths = []
+        section.get_repo_path.return_value = tmp_path / "repo_path"
+
+        result, _ = _verify_run(tmp_path, section, orphans=[tmp_path / "outside.txt"])
+
+        assert "outside.txt" in result.output
+
+    def test_no_orphaned_files_message(self, tmp_path):
+        section = MagicMock()
+        section.paths = []
+        section.get_repo_path.return_value = tmp_path / "repo_path"
+
+        result, _ = _verify_run(tmp_path, section)
+
+        assert "No orphaned files" in result.output
+
+    def test_dirty_repo_counts_uncommitted_and_untracked(self, tmp_path):
+        """Real git repo: modified tracked file + untracked file."""
+
+        from git import Repo
+
+        section = MagicMock()
+        section.paths = []
+        section.get_repo_path.return_value = tmp_path / "repo_path"
+
+        repo_dir = tmp_path / "repo"
+        repo_dir.mkdir(exist_ok=True)
+        (repo_dir / "dot-man.toml").write_text("[main]\npaths = []\n")
+        repo = Repo.init(repo_dir)
+        with repo.config_writer() as cw:
+            cw.set_value("user", "name", "Test")
+            cw.set_value("user", "email", "t@t.co")
+        (repo_dir / "tracked.txt").write_text("v1")
+        repo.index.add(["tracked.txt", "dot-man.toml"])
+        repo.index.commit("Initial")
+
+        (repo_dir / "tracked.txt").write_text("v2 modified")
+        (repo_dir / "untracked.txt").write_text("new")
+
+        with (
+            patch("dot_man.cli.verify_cmd.REPO_DIR", repo_dir),
+            patch("dot_man.cli.verify_cmd.DOT_MAN_TOML", "dot-man.toml"),
+            patch("dot_man.operations.get_operations") as mock_ops,
+        ):
+            ops = mock_ops.return_value
+            ops.get_sections.return_value = ["main"]
+            ops.get_section.return_value = section
+            ops.git.repo = repo
+            ops.get_orphaned_files.return_value = []
+
+            runner = CliRunner()
+            result = runner.invoke(verify, [])
+
+        assert result.exit_code == 0
+        assert "1 uncommitted" in result.output
+        assert "1 untracked" in result.output
+
+    def test_fix_summary_reports_fixed_count(self, tmp_path):
+        missing = tmp_path / "missing.conf"
+
+        section = MagicMock()
+        section.paths = [missing]
+        section.get_repo_path.return_value = tmp_path / "repo_path"
+
+        with (
+            patch("dot_man.cli.verify_cmd.REPO_DIR", tmp_path / "repo"),
+            patch("dot_man.cli.verify_cmd.DOT_MAN_TOML", "dot-man.toml"),
+            patch("dot_man.operations.get_operations") as mock_ops,
+        ):
+            repo_dir = tmp_path / "repo"
+            repo_dir.mkdir(exist_ok=True)
+            (repo_dir / "dot-man.toml").write_text("[main]\npaths = []\n")
+            orphan = repo_dir / "orphan.txt"
+            orphan.write_text("orphan")
+
+            ops = mock_ops.return_value
+            ops.get_sections.return_value = ["main"]
+            ops.get_section.return_value = section
+            ops.git.repo.is_dirty.return_value = False
+            ops.get_orphaned_files.return_value = [orphan]
+
+            def _clean(dry_run=False):
+                orphan.unlink()
+                return [orphan]
+
+            ops.clean_orphaned_files.side_effect = _clean
+
+            runner = CliRunner()
+            result = runner.invoke(verify, ["--fix"])
+
+        assert result.exit_code == 0
+        assert "Fixed 1 issue(s)" in result.output
+        assert not orphan.exists()
