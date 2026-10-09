@@ -712,3 +712,488 @@ class TestDeployAll:
             ops.deploy_all()
             mock_scan.assert_called_once()
             mock_exec.assert_called_once()
+
+
+# ─── coverage floor: decode edge, deploy failures, templates,
+#     wrapped_handler, directory save, plan scan/execute ───────────
+
+
+class TestRestoreDecodeEdge:
+    def test_restore_unicode_decode_error_real_bytes(self, tmp_path):
+        ops = FakeOps()
+        data_file = tmp_path / "data.conf"
+        data_file.write_bytes(b"\x80\x81\x82 not valid utf-8")
+
+        assert ops._restore_file_secrets(data_file, "data.conf", "main") is None
+
+
+class TestDeployRepoPathFailures:
+    def test_file_symlink_failure_appends_error(self, tmp_path):
+        ops = FakeOps()
+        repo_file = tmp_path / "repo" / "sec" / "f.txt"
+        repo_file.parent.mkdir(parents=True)
+        repo_file.write_text("x")
+        local = tmp_path / "local" / "f.txt"
+        section = Section(
+            name="sec",
+            paths=[local],
+            repo_base="sec",
+            deploy_method="symlink",
+            secrets_filter=False,
+        )
+
+        with patch(
+            "dot_man.save_deploy_ops.deploy_file_or_symlink",
+            return_value=(False, None),
+        ):
+            errors: list = []
+            count = ops._deploy_repo_path(repo_file, local, section, [], errors)
+
+        assert count == 0
+        assert errors == [f"Failed to symlink {repo_file} to {local}"]
+
+    def test_file_copy_failure_appends_error(self, tmp_path):
+        ops = FakeOps()
+        repo_file = tmp_path / "repo" / "sec" / "f.txt"
+        repo_file.parent.mkdir(parents=True)
+        repo_file.write_text("x")
+        local = tmp_path / "local" / "f.txt"
+        section = Section(
+            name="sec", paths=[local], repo_base="sec", secrets_filter=False
+        )
+
+        with patch("dot_man.save_deploy_ops.copy_file", return_value=(False, [])):
+            errors: list = []
+            count = ops._deploy_repo_path(repo_file, local, section, [], errors)
+
+        assert count == 0
+        assert errors == [f"Failed to copy {repo_file} to {local}"]
+
+    def test_source_missing_appends_error(self, tmp_path):
+        ops = FakeOps()
+        repo_file = tmp_path / "repo" / "sec" / "gone.txt"
+        local = tmp_path / "local" / "f.txt"
+        section = Section(
+            name="sec", paths=[local], repo_base="sec", secrets_filter=False
+        )
+
+        errors: list = []
+        count = ops._deploy_repo_path(repo_file, local, section, [], errors)
+
+        assert count == 0
+        assert errors == [f"Source not found in repo: {repo_file}"]
+
+    def test_file_not_found_during_deploy_appends(self, tmp_path):
+        ops = FakeOps()
+        repo_file = tmp_path / "repo" / "sec" / "f.txt"
+        repo_file.parent.mkdir(parents=True)
+        repo_file.write_text("x")
+        local = tmp_path / "local" / "f.txt"
+        section = Section(
+            name="sec", paths=[local], repo_base="sec", secrets_filter=False
+        )
+
+        with patch(
+            "dot_man.save_deploy_ops.copy_file",
+            side_effect=FileNotFoundError("gone"),
+        ):
+            errors: list = []
+            count = ops._deploy_repo_path(repo_file, local, section, [], errors)
+
+        assert count == 0
+        assert errors == [f"File not found during deployment: {repo_file}"]
+
+    def test_directory_symlink_deploy(self, tmp_path):
+        repo_dir = tmp_path / "repo"
+        repo_source = repo_dir / "nvim" / "nvim"
+        repo_source.mkdir(parents=True)
+        (repo_source / "init.lua").write_text("-- config")
+        (repo_source / "colors").mkdir()
+        (repo_source / "colors" / "theme.lua").write_text("-- theme")
+
+        local = tmp_path / "local" / ".config" / "nvim"
+        local.mkdir(parents=True)
+
+        section = Section(
+            name="nvim",
+            paths=[local],
+            repo_base="nvim",
+            deploy_method="symlink",
+            secrets_filter=False,
+        )
+        ops = FakeOps(current_branch="main")
+        with (
+            patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir),
+            patch("dot_man.save_deploy_ops.compare_files", return_value=False),
+        ):
+            deployed, had_changes, errors = ops.deploy_section(section)
+
+        assert deployed >= 2
+        assert errors == []
+        assert (local / "init.lua").is_symlink()
+        assert (local / "colors" / "theme.lua").is_symlink()
+
+    def test_directory_secrets_restored_per_file(self, tmp_path):
+        repo_dir = tmp_path / "repo"
+        repo_source = repo_dir / "app" / "app"
+        repo_source.mkdir(parents=True)
+        (repo_source / "one.conf").write_text("a = 1")
+        (repo_source / "two.conf").write_text("b = 2")
+
+        local = tmp_path / "local" / "app"
+        local.mkdir(parents=True)
+
+        vault = MagicMock(spec=SecretVault)
+        vault.restore_secrets_in_content.side_effect = lambda c, *a: c
+        section = Section(
+            name="app",
+            paths=[local],
+            repo_base="app",
+            secrets_filter=True,
+        )
+        ops = FakeOps(vault=vault, current_branch="main")
+        with (
+            patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir),
+            patch("dot_man.save_deploy_ops.compare_files", return_value=False),
+        ):
+            deployed, _, errors = ops.deploy_section(section)
+
+        assert deployed >= 2
+        assert errors == []
+        assert vault.restore_secrets_in_content.call_count >= 2
+
+    def test_directory_partial_failure_appends(self, tmp_path):
+        ops = FakeOps()
+        repo_source = tmp_path / "repo" / "app" / "app"
+        repo_source.mkdir(parents=True)
+        (repo_source / "one.conf").write_text("a = 1")
+        local = tmp_path / "local" / "app"
+        local.mkdir(parents=True)
+
+        section = Section(
+            name="app", paths=[local], repo_base="app", secrets_filter=False
+        )
+
+        with (
+            patch("dot_man.save_deploy_ops.REPO_DIR", tmp_path / "repo"),
+            patch(
+                "dot_man.save_deploy_ops.copy_directory",
+                return_value=(0, 3, []),
+            ),
+        ):
+            errors: list = []
+            count = ops._deploy_repo_path(repo_source, local, section, [], errors)
+
+        assert count == 0
+        assert errors == [f"Failed to deploy 3 files in {local}"]
+
+
+class TestTemplateRendering:
+    def test_render_writes_changes(self, tmp_path):
+        ops = FakeOps()
+        target = tmp_path / "out.conf"
+        target.write_text("{{GREETING}}")
+
+        with patch(
+            "dot_man.global_config.substitute_templates",
+            return_value="hello world",
+        ):
+            errors: list = []
+            ops._render_templates_inplace(target, errors)
+
+        assert errors == []
+        assert target.read_text() == "hello world"
+
+    def test_render_failure_appends_warning(self, tmp_path):
+        ops = FakeOps()
+        target = tmp_path / "out.conf"
+        target.write_text("{{GREETING}}")
+
+        with patch(
+            "dot_man.global_config.substitute_templates",
+            side_effect=RuntimeError("bad template"),
+        ):
+            errors: list = []
+            ops._render_templates_inplace(target, errors)
+
+        assert len(errors) == 1
+        assert "template rendering failed" in errors[0]
+        assert "bad template" in errors[0]
+
+
+class TestRestoreInplaceError:
+    def test_restore_inplace_appends_error(self, tmp_path):
+        ops = FakeOps()
+        target = tmp_path / "f.conf"
+        target.write_text("x")
+
+        with patch.object(
+            FakeOps,
+            "_restore_file_secrets",
+            return_value="Failed to restore secrets for x: boom",
+        ):
+            errors: list = []
+            ops._restore_file_secrets_inplace(target, str(target), errors)
+
+        assert errors == ["Failed to restore secrets for x: boom"]
+
+
+class TestWrappedHandlerFloor:
+    @staticmethod
+    def _secret_section_and_match(tmp_path):
+        from dot_man.secrets import SecretMatch, Severity
+
+        local = tmp_path / "local" / ".env"
+        local.parent.mkdir(parents=True)
+        local.write_text("API_KEY=sk-1234567890abcdef")
+        section = Section(name="env", paths=[local], secrets_filter=True)
+        match = SecretMatch(
+            file=local,
+            line_number=1,
+            matched_text="sk-1234567890abcdef",
+            pattern_name="api_key",
+            line_content="API_KEY=sk-1234567890abcdef",
+            severity=Severity.HIGH,
+        )
+        return section, match
+
+    @staticmethod
+    def _mock_copy(match):
+        def mock_copy_file(src, dst, filter_secrets_enabled, secret_handler, **_):
+            if filter_secrets_enabled and secret_handler:
+                action = secret_handler(match)
+                return (True, [match] if action == "REDACT" else [])
+            return (True, [])
+
+        return mock_copy_file
+
+    def test_custom_secret_handler_invoked(self, tmp_path):
+        section, match = self._secret_section_and_match(tmp_path)
+        vault = MagicMock(spec=SecretVault)
+        vault.stash_secret.return_value = "abc123"
+        ops = FakeOps(vault=vault, current_branch="main")
+        seen = []
+
+        def handler(m):
+            seen.append(m.pattern_name)
+            return "REDACT"
+
+        with (
+            patch(
+                "dot_man.save_deploy_ops.copy_file",
+                side_effect=self._mock_copy(match),
+            ),
+            patch("dot_man.save_deploy_ops.REPO_DIR", tmp_path / "repo"),
+        ):
+            saved, secrets, errors, _ = ops.save_section(
+                section, secret_handler=handler
+            )
+
+        assert seen == ["api_key"]
+        assert saved == 1
+        assert errors == []
+
+    def test_vault_stash_failure_falls_back(self, tmp_path):
+        from dot_man.constants import SECRET_REDACTION_TEXT
+
+        section, match = self._secret_section_and_match(tmp_path)
+        vault = MagicMock(spec=SecretVault)
+        vault.stash_secret.side_effect = OSError("vault locked")
+        ops = FakeOps(vault=vault, current_branch="main")
+        captured = {}
+
+        def recording_copy(src, dst, filter_secrets_enabled, secret_handler, **_):
+            if filter_secrets_enabled and secret_handler:
+                captured["action"] = secret_handler(match)
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                dst.write_text(captured["action"])
+            return (True, [])
+
+        with (
+            patch(
+                "dot_man.save_deploy_ops.copy_file",
+                side_effect=recording_copy,
+            ),
+            patch("dot_man.save_deploy_ops.REPO_DIR", tmp_path / "repo"),
+        ):
+            saved, _, errors, _ = ops.save_section(section)
+
+        assert saved == 1
+        assert any("Failed to stash secret in vault" in e for e in errors)
+        assert captured["action"] == SECRET_REDACTION_TEXT
+
+
+class TestSaveDirectorySection:
+    def test_save_directory_copies_tree(self, tmp_path):
+        local = tmp_path / "local" / "cfgdir"
+        local.mkdir(parents=True)
+        (local / "a.conf").write_text("a = 1")
+        (local / "sub").mkdir()
+        (local / "sub" / "b.conf").write_text("b = 2")
+
+        section = Section(
+            name="cfgdir", paths=[local], repo_base="cfgdir", secrets_filter=False
+        )
+        ops = FakeOps(current_branch="main")
+        with patch("dot_man.save_deploy_ops.REPO_DIR", tmp_path / "repo"):
+            saved, secrets, errors, _ = ops.save_section(section)
+
+        assert saved >= 2
+        assert errors == []
+        assert (
+            tmp_path / "repo" / "cfgdir" / "cfgdir" / "a.conf"
+        ).read_text() == "a = 1"
+
+    def test_save_directory_partial_failure_appends(self, tmp_path):
+        local = tmp_path / "local" / "cfgdir"
+        local.mkdir(parents=True)
+        (local / "a.conf").write_text("a = 1")
+
+        section = Section(
+            name="cfgdir", paths=[local], repo_base="cfgdir", secrets_filter=False
+        )
+        ops = FakeOps(current_branch="main")
+        with (
+            patch("dot_man.save_deploy_ops.REPO_DIR", tmp_path / "repo"),
+            patch(
+                "dot_man.save_deploy_ops.copy_directory",
+                return_value=(1, 2, []),
+            ),
+        ):
+            saved, _, errors, _ = ops.save_section(section)
+
+        assert saved == 1
+        assert any("Failed to copy 2 files" in e for e in errors)
+
+
+class TestPlanScanExecuteFloor:
+    def test_scan_oserror_recorded(self, tmp_path):
+        repo_dir = tmp_path / "repo"
+        repo_file = repo_dir / "sec" / "f.txt"
+        repo_file.parent.mkdir(parents=True)
+        repo_file.write_text("x")
+        local = tmp_path / "local" / "f.txt"
+        local.parent.mkdir(parents=True)
+        local.write_text("local copy")
+
+        section = Section(
+            name="sec", paths=[local], repo_base="sec", secrets_filter=False
+        )
+        ops = FakeOps(current_branch="main")
+        with (
+            patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir),
+            patch(
+                "dot_man.save_deploy_ops.compare_files",
+                side_effect=OSError("stat broken"),
+            ),
+        ):
+            plan = ops.scan_deployable_changes([section])
+
+        assert any("Error scanning" in e for e in plan["errors"])
+        assert plan["sections_to_deploy"] == []
+
+    def test_execute_rename_old_backs_up(self, tmp_path):
+        repo_file = tmp_path / "repo" / "sec" / "f.txt"
+        repo_file.parent.mkdir(parents=True)
+        repo_file.write_text("repo version")
+        local = tmp_path / "local" / "f.txt"
+        local.parent.mkdir(parents=True)
+        local.write_text("local version")
+
+        section = Section(
+            name="sec",
+            paths=[local],
+            repo_base="sec",
+            update_strategy="rename_old",
+            secrets_filter=False,
+        )
+        ops = FakeOps(current_branch="main")
+        plan = {
+            "sections_to_deploy": [(section, local, repo_file)],
+            "pre_hooks": [],
+            "post_hooks": [],
+            "errors": [],
+        }
+
+        with (
+            patch("dot_man.save_deploy_ops.REPO_DIR", tmp_path / "repo"),
+            patch("dot_man.save_deploy_ops.backup_file") as mock_backup,
+        ):
+            result = ops.execute_deployment_plan(plan)
+
+        mock_backup.assert_called_once_with(local)
+        assert result["deployed"] == 1
+        assert local.read_text() == "repo version"
+
+    def test_execute_future_failure_captured(self, tmp_path):
+        section = Section(
+            name="sec",
+            paths=[tmp_path / "f.txt"],
+            repo_base="sec",
+            secrets_filter=False,
+        )
+        ops = FakeOps(current_branch="main")
+        plan = {
+            "sections_to_deploy": [
+                (section, tmp_path / "f.txt", tmp_path / "repo" / "sec" / "f.txt")
+            ],
+            "pre_hooks": [],
+            "post_hooks": [],
+            "errors": [],
+        }
+
+        with patch.object(
+            FakeOps,
+            "_deploy_plan_item",
+            side_effect=RuntimeError("thread boom"),
+        ):
+            result = ops.execute_deployment_plan(plan)
+
+        assert any(
+            "Critical error in deployment thread" in e and "thread boom" in e
+            for e in result["errors"]
+        )
+
+    def test_ignored_action_returns_unchanged(self, tmp_path):
+        """A non-REDACT handler action flows straight through (line 284)."""
+        section, match = TestWrappedHandlerFloor._secret_section_and_match(tmp_path)
+        vault = MagicMock(spec=SecretVault)
+        ops = FakeOps(vault=vault, current_branch="main")
+
+        with (
+            patch(
+                "dot_man.save_deploy_ops.copy_file",
+                side_effect=TestWrappedHandlerFloor._mock_copy(match),
+            ),
+            patch("dot_man.save_deploy_ops.REPO_DIR", tmp_path / "repo"),
+        ):
+            saved, secrets, errors, _ = ops.save_section(
+                section, secret_handler=lambda m: "IGNORE"
+            )
+
+        assert saved == 1
+        assert errors == []
+        vault.stash_secret.assert_not_called()
+        assert secrets == []
+
+
+class TestDeployOSErrorFloor:
+    def test_os_error_during_file_deploy_appends(self, tmp_path):
+        ops = FakeOps()
+        repo_file = tmp_path / "repo" / "sec" / "f.txt"
+        repo_file.parent.mkdir(parents=True)
+        repo_file.write_text("x")
+        local = tmp_path / "local" / "f.txt"
+        section = Section(
+            name="sec", paths=[local], repo_base="sec", secrets_filter=False
+        )
+
+        with patch(
+            "dot_man.save_deploy_ops.copy_file",
+            side_effect=OSError("device error"),
+        ):
+            errors: list = []
+            count = ops._deploy_repo_path(repo_file, local, section, [], errors)
+
+        assert count == 0
+        assert errors == [f"Error deploying {local}: device error"]

@@ -78,12 +78,15 @@ def _dot_man_patches(dot_man_dir, repo_dir, backups_dir, global_toml, home):
         patch("dot_man.branch_ops.REPO_DIR", repo_dir),
         patch("dot_man.status_ops.REPO_DIR", repo_dir),
         patch("dot_man.backups.BACKUPS_DIR", backups_dir),
+        patch("dot_man.hooks.HOOKS_DIR", dot_man_dir / "hooks"),
+        patch("dot_man.hooks.DOT_MAN_DIR", dot_man_dir),
         # CLI command modules
         patch("dot_man.cli.interface.DOT_MAN_DIR", dot_man_dir),
         patch("dot_man.cli.init_cmd.REPO_DIR", repo_dir),
         patch("dot_man.cli.init_cmd.DOT_MAN_DIR", dot_man_dir),
         patch("dot_man.cli.add_cmd.REPO_DIR", repo_dir),
         patch("dot_man.cli.navigate_cmd.REPO_DIR", repo_dir),
+        patch("dot_man.cli.clean_cmd.REPO_DIR", repo_dir),
         patch("dot_man.cli.common.DOT_MAN_DIR", dot_man_dir),
         patch("dot_man.cli.common.REPO_DIR", repo_dir),
         # Environment

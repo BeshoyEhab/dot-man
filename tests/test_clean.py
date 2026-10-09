@@ -124,3 +124,77 @@ def test_clean_all(integration_runner):
     assert result.exit_code == 0
     assert "Deleted 1 old" in result.output
     assert "Deleted 1 orphaned" in result.output
+
+
+# ---------------------------------------------------------------------------
+# Coverage floor: dry-run previews, delete failures, error handler
+# ---------------------------------------------------------------------------
+
+
+def _make_backups(runner, ids):
+    """Tracked file + initial state + one backup per id (existing pattern)."""
+    from dot_man.operations import reset_operations
+
+    home = Path.home()
+    (home / "baketest").write_text("data")
+    res = runner.invoke(cli, ["add", str(home / "baketest"), "-s", "baketest"])
+    assert res.exit_code == 0, res.output
+    reset_operations()
+
+    res = runner.invoke(cli, ["switch", "main"])
+    reset_operations()
+
+    for backup_id in ids:
+        res = runner.invoke(cli, ["backup", "create", backup_id])
+        assert res.exit_code == 0, res.output
+        reset_operations()
+
+
+def test_clean_backups_dry_run_previews_and_keeps(integration_runner):
+    """Dry-run lists deletable backups and skips when nothing exceeds keep."""
+    _make_backups(integration_runner, ["b1", "b2", "b3"])
+
+    result = integration_runner.invoke(
+        cli, ["clean", "--backups", "--dry-run", "--keep", "1"]
+    )
+    assert result.exit_code == 0, result.output
+    assert "Backups to be deleted (2):" in result.output
+
+    # Nothing was actually deleted
+    listing = integration_runner.invoke(cli, ["backup", "list"])
+    assert "b1" in listing.output
+
+    result = integration_runner.invoke(
+        cli, ["clean", "--backups", "--dry-run", "--keep", "5"]
+    )
+    assert result.exit_code == 0, result.output
+    assert "No backups to clean." in result.output
+
+
+def test_clean_backups_delete_failure_reports_none(integration_runner, tmp_path):
+    """clean_backups returning 0 despite eligible backups -> info message."""
+    from unittest.mock import patch as _patch
+
+    _make_backups(integration_runner, ["b1", "b2"])
+
+    with _patch("dot_man.backups.shutil.rmtree", side_effect=OSError("backups locked")):
+        result = integration_runner.invoke(
+            cli, ["clean", "--backups", "--keep", "1", "--force"]
+        )
+
+    assert result.exit_code == 0, result.output
+    assert "No backups cleaned." in result.output
+    listing = integration_runner.invoke(cli, ["backup", "list"])
+    assert "b1" in listing.output
+
+
+def test_clean_exception_reported(integration_runner):
+    from unittest.mock import patch as _patch
+
+    with _patch(
+        "dot_man.operations.get_operations", side_effect=Exception("clean boom")
+    ):
+        result = integration_runner.invoke(cli, ["clean", "--backups", "--force"])
+
+    assert result.exit_code == 1, result.output
+    assert "Failed to clean: clean boom" in result.output

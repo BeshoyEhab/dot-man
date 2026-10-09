@@ -358,3 +358,169 @@ class TestCleanOrphanedFiles:
         ):
             result = ops.clean_orphaned_files(dry_run=False)
             assert result == []
+
+
+# ─── coverage floor: summary counts, dir audit, pre-push confirm,
+#     explicit repo_path / directory sections, rmdir failure ───────
+
+
+def test_summary_counts_new_deleted_identical(tmp_path):
+    """NEW, DELETED, and identical statuses land in the right buckets."""
+
+    class FixedOps(FakeOps):
+        def iter_section_paths(self, section):
+            for status in ("NEW", "DELETED", "IDENTICAL"):
+                yield tmp_path / "local", tmp_path / "repo", status
+
+    section = Section(
+        name="s",
+        paths=[tmp_path / "local"],
+        repo_base="s",
+        secrets_filter=False,
+    )
+    ops = FixedOps(sections={"s": section}, current_branch="main")
+    summary = ops.get_status_summary()
+
+    assert summary["new"] == 1
+    assert summary["deleted"] == 1
+    assert summary["identical"] == 1
+    assert summary["modified"] == 0
+    assert summary["total_paths"] == 3
+
+
+def test_audit_scans_directory_sections(tmp_path):
+    """Directories backing a section are scanned for secrets."""
+    repo_dir = tmp_path / "secretdir"
+    repo_dir.mkdir()
+    (repo_dir / "key").write_text(
+        "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAA\n"
+        "-----END OPENSSH PRIVATE KEY-----\n"
+    )
+    local_dir = tmp_path / "localdir"
+    local_dir.mkdir()
+
+    section = Section(
+        name="d",
+        paths=[local_dir],
+        repo_path="secretdir",
+        secrets_filter=True,
+    )
+    ops = FakeOps(sections={"d": section}, current_branch="main")
+    with patch("dot_man.status_ops.REPO_DIR", tmp_path):
+        results = ops.audit()
+
+    assert len(results) == 1
+    section_name, matches = results[0]
+    assert section_name == "d"
+    assert matches[0].pattern_name == "Private Key"
+
+
+def test_pre_push_non_strict_asks_confirm(tmp_path):
+    """Non-strict mode falls through to the confirm prompt (lines 86-88)."""
+    secret_file = tmp_path / "test_secret"
+    secret_file.write_text(
+        "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAA\n"
+        "-----END OPENSSH PRIVATE KEY-----\n"
+    )
+    section = Section(
+        name="test",
+        paths=[secret_file],
+        repo_path="test_secret",
+        secrets_filter=True,
+    )
+    global_config = MagicMock(strict_mode=False)
+    ops = FakeOps(
+        sections={"test": section},
+        current_branch="main",
+        global_config=global_config,
+    )
+
+    with (
+        patch("dot_man.status_ops.REPO_DIR", tmp_path),
+        patch("dot_man.ui.confirm", return_value=False) as mock_confirm,
+    ):
+        assert ops.pre_push_audit() is False
+        mock_confirm.assert_called_once()
+
+    with (
+        patch("dot_man.status_ops.REPO_DIR", tmp_path),
+        patch("dot_man.ui.confirm", return_value=True),
+    ):
+        assert ops.pre_push_audit() is True
+
+
+def test_orphans_explicit_repo_path_section(tmp_path):
+    """Sections with explicit repo_path count as tracked (lines 179-181)."""
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    (repo_dir / "solo.conf").write_text("tracked")
+    (repo_dir / "orphan.txt").write_text("orphan")
+
+    local = tmp_path / "local" / "solo.conf"
+    local.parent.mkdir(parents=True)
+    local.write_text("tracked")
+
+    section = Section(
+        name="solo",
+        paths=[local],
+        repo_path="solo.conf",
+        secrets_filter=False,
+    )
+    ops = FakeOps(sections={"solo": section}, current_branch="main")
+    with patch("dot_man.status_ops.REPO_DIR", repo_dir):
+        orphans = ops.get_orphaned_files()
+
+    assert repo_dir / "orphan.txt" in orphans
+    assert not any("solo.conf" in str(o) for o in orphans)
+
+
+def test_orphans_directory_section_not_orphaned(tmp_path):
+    """Files under a directory-backed section are tracked via rglob (189-192)."""
+    repo_dir = tmp_path / "repo"
+    (repo_dir / "app" / "confdir").mkdir(parents=True)
+    (repo_dir / "app" / "confdir" / "app.conf").write_text("tracked")
+    (repo_dir / "orphan.txt").write_text("orphan")
+
+    local_dir = tmp_path / "local" / "confdir"
+    local_dir.mkdir(parents=True)
+    (local_dir / "app.conf").write_text("tracked")
+
+    section = Section(
+        name="app",
+        paths=[local_dir],
+        repo_base="app",
+        secrets_filter=False,
+    )
+    ops = FakeOps(sections={"app": section}, current_branch="main")
+    with patch("dot_man.status_ops.REPO_DIR", repo_dir):
+        orphans = ops.get_orphaned_files()
+
+    assert repo_dir / "orphan.txt" in orphans
+    assert not any("app.conf" in str(o) for o in orphans)
+
+
+def test_clean_rmdir_oserror_stops_descent(tmp_path):
+    """Parent rmdir failing (non-empty) stops without raising (222-223)."""
+    repo_dir = tmp_path / "repo"
+    mixed = repo_dir / "mixed"
+    mixed.mkdir(parents=True)
+    (mixed / "orphan.txt").write_text("orphan")
+    (mixed / "keep.txt").write_text("keep")
+
+    keep_local = tmp_path / "local" / "keep.txt"
+    keep_local.parent.mkdir(parents=True)
+    keep_local.write_text("keep")
+    section = Section(
+        name="keep",
+        paths=[keep_local],
+        repo_base="mixed",
+        secrets_filter=False,
+    )
+    ops = FakeOps(sections={"keep": section}, current_branch="main")
+    with patch("dot_man.status_ops.REPO_DIR", repo_dir):
+        deleted = ops.clean_orphaned_files(dry_run=False)
+
+    assert (mixed / "orphan.txt") in deleted
+    assert not (mixed / "orphan.txt").exists()
+    assert (mixed / "keep.txt").exists()
+    assert mixed.exists()

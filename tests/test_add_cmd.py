@@ -323,3 +323,145 @@ class TestAddAutoHooks:
         assert "post_deploy" in result.output
         saved = (repo_dir / "dot-man.toml").read_text()
         assert "SIGUSR1 kitty" in saved
+
+
+# ─── coverage floor: duplicate section, copy failures, secrets,
+#     inherits, post-hook failure, unexpected error ────────────────
+
+
+class TestAddFailurePaths:
+    def test_duplicate_section_errors(self, clean_env):
+        runner, dot_man_dir, repo_dir, global_toml, home = clean_env
+        _init_minimal_repo(dot_man_dir, repo_dir, global_toml)
+        test_file = home / ".bashrc"
+        test_file.write_text("# bashrc\n")
+
+        first = runner.invoke(cli, ["add", str(test_file), "--section", "dup"])
+        assert first.exit_code == 0, first.output
+
+        second = runner.invoke(cli, ["add", str(test_file), "--section", "dup"])
+        assert second.exit_code == 1
+        assert "already exists" in second.output
+
+    def test_file_copy_failure_errors(self, clean_env):
+        runner, dot_man_dir, repo_dir, global_toml, home = clean_env
+        _init_minimal_repo(dot_man_dir, repo_dir, global_toml)
+        test_file = home / ".bashrc"
+        test_file.write_text("# bashrc\n")
+
+        with patch("dot_man.cli.add_cmd.copy_file", return_value=(False, [])):
+            result = runner.invoke(cli, ["add", str(test_file), "--section", "bash"])
+
+        assert result.exit_code == 1
+        assert "Failed to copy file" in result.output
+
+    def test_file_access_failure_errors(self, clean_env):
+        runner, dot_man_dir, repo_dir, global_toml, home = clean_env
+        _init_minimal_repo(dot_man_dir, repo_dir, global_toml)
+        test_file = home / ".bashrc"
+        test_file.write_text("# bashrc\n")
+
+        with patch(
+            "dot_man.cli.add_cmd.copy_file",
+            side_effect=FileNotFoundError("gone"),
+        ):
+            result = runner.invoke(cli, ["add", str(test_file), "--section", "bash"])
+
+        assert result.exit_code == 1
+        assert "Failed to access file" in result.output
+
+    def test_unexpected_copy_error_errors(self, clean_env):
+        runner, dot_man_dir, repo_dir, global_toml, home = clean_env
+        _init_minimal_repo(dot_man_dir, repo_dir, global_toml)
+        test_file = home / ".bashrc"
+        test_file.write_text("# bashrc\n")
+
+        with patch(
+            "dot_man.cli.add_cmd.copy_file",
+            side_effect=ValueError("boom"),
+        ):
+            result = runner.invoke(cli, ["add", str(test_file), "--section", "bash"])
+
+        assert result.exit_code == 1
+        assert "Error copying file" in result.output
+
+    def test_unexpected_error_reported(self, clean_env):
+        runner, dot_man_dir, repo_dir, global_toml, home = clean_env
+        _init_minimal_repo(dot_man_dir, repo_dir, global_toml)
+        test_file = home / ".bashrc"
+        test_file.write_text("# bashrc\n")
+
+        with patch(
+            "dot_man.cli.add_cmd.get_auto_hooks_for_config",
+            side_effect=RuntimeError("detector boom"),
+        ):
+            result = runner.invoke(cli, ["add", str(test_file), "--section", "bash"])
+
+        assert result.exit_code == 1
+        assert "Failed to add: detector boom" in result.output
+
+
+class TestAddSecretsAndOptions:
+    def test_file_secrets_redacted_warns(self, clean_env):
+        runner, dot_man_dir, repo_dir, global_toml, home = clean_env
+        _init_minimal_repo(dot_man_dir, repo_dir, global_toml)
+        secret_file = home / ".env"
+        secret_file.write_text(
+            "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAA\n"
+            "-----END OPENSSH PRIVATE KEY-----\n"
+        )
+
+        with patch("dot_man.ui.ask", return_value="2"):
+            result = runner.invoke(cli, ["add", str(secret_file), "--section", "env"])
+
+        assert result.exit_code == 0, result.output
+        assert "secrets were redacted" in result.output
+        repo_copy = (repo_dir / "env" / ".env").read_text()
+        assert "BEGIN OPENSSH PRIVATE KEY" not in repo_copy
+
+    def test_directory_secrets_redacted_warns(self, clean_env):
+        runner, dot_man_dir, repo_dir, global_toml, home = clean_env
+        _init_minimal_repo(dot_man_dir, repo_dir, global_toml)
+        cfg_dir = home / ".config" / "mytool"
+        cfg_dir.mkdir(parents=True)
+        (cfg_dir / "settings.conf").write_text("key = 1\n")
+        (cfg_dir / "credentials.conf").write_text(
+            "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAA\n"
+            "-----END OPENSSH PRIVATE KEY-----\n"
+        )
+
+        with patch("dot_man.ui.ask", return_value="2"):
+            result = runner.invoke(cli, ["add", str(cfg_dir), "--section", "mytool"])
+
+        assert result.exit_code == 0, result.output
+        assert "secrets were redacted" in result.output
+
+    def test_inherits_option_printed(self, clean_env):
+        runner, dot_man_dir, repo_dir, global_toml, home = clean_env
+        _init_minimal_repo(dot_man_dir, repo_dir, global_toml)
+        test_file = home / ".bashrc"
+        test_file.write_text("# bashrc\n")
+
+        result = runner.invoke(
+            cli,
+            ["add", str(test_file), "--section", "bash", "--inherits", "base"],
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "Inherits: base" in result.output
+
+    def test_failing_post_hook_warns_and_continues(self, clean_env, tmp_path):
+        runner, dot_man_dir, repo_dir, global_toml, home = clean_env
+        _init_minimal_repo(dot_man_dir, repo_dir, global_toml)
+        test_file = home / ".bashrc"
+        test_file.write_text("# bashrc\n")
+
+        hooks_dir = tmp_path / "hooks"
+        hooks_dir.mkdir()
+        _write_hook_script(hooks_dir, "post_add", "exit 1")
+        with patch("dot_man.hooks.HOOKS_DIR", hooks_dir):
+            result = runner.invoke(cli, ["add", str(test_file), "--section", "bash"])
+
+        assert result.exit_code == 0, result.output
+        assert "post_add hook failed" in result.output
+        assert "continuing" in result.output

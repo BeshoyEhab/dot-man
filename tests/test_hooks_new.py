@@ -178,3 +178,77 @@ class TestRunHook:
 
         result = run_hook("fail_test", "pre")
         assert result is False
+
+
+class TestRunHookEdges:
+    """Failure-path coverage: chmod, stderr, timeout, spawn errors."""
+
+    def test_non_executable_hook_is_chmodded(
+        self, mock_dot_man_dir, monkeypatch, capsys
+    ):
+        from dot_man import hooks
+
+        monkeypatch.setattr(hooks, "HOOKS_DIR", mock_dot_man_dir / "hooks")
+
+        hook_path = create_hook("noexec", "pre")
+        hook_path.write_text("#!/bin/bash\necho 'still ran'\n")
+        hook_path.chmod(0o644)  # not executable
+
+        result = run_hook("noexec", "pre")
+        assert result is True
+        assert os.access(hook_path, os.X_OK)
+        assert "still ran" in capsys.readouterr().out
+
+    def test_hook_stderr_is_echoed(self, mock_dot_man_dir, monkeypatch, capsys):
+        from dot_man import hooks
+
+        monkeypatch.setattr(hooks, "HOOKS_DIR", mock_dot_man_dir / "hooks")
+
+        hook_path = create_hook("noisy", "post")
+        hook_path.write_text('#!/bin/bash\necho "warn line" 1>&2\n')
+        hook_path.chmod(0o755)
+
+        assert run_hook("noisy", "post") is True
+        assert "warn line" in capsys.readouterr().out
+
+    def test_hook_timeout_reports_and_fails(
+        self, mock_dot_man_dir, monkeypatch, capsys
+    ):
+        import subprocess as _subprocess
+        from unittest.mock import patch as _patch
+
+        from dot_man import hooks
+
+        monkeypatch.setattr(hooks, "HOOKS_DIR", mock_dot_man_dir / "hooks")
+
+        hook_path = create_hook("slow", "pre")
+        hook_path.write_text("#!/bin/bash\nsleep 999\n")
+        hook_path.chmod(0o755)
+
+        with _patch(
+            "dot_man.hooks.subprocess.run",
+            side_effect=_subprocess.TimeoutExpired(cmd="slow", timeout=30),
+        ):
+            result = run_hook("slow", "pre")
+
+        assert result is False
+        assert "Hook timed out after 30 seconds" in capsys.readouterr().out
+
+    def test_hook_spawn_error_reports_and_fails(
+        self, mock_dot_man_dir, monkeypatch, capsys
+    ):
+        from unittest.mock import patch as _patch
+
+        from dot_man import hooks
+
+        monkeypatch.setattr(hooks, "HOOKS_DIR", mock_dot_man_dir / "hooks")
+
+        hook_path = create_hook("broken", "pre")
+        hook_path.write_text("#!/bin/bash\nexit 0\n")
+        hook_path.chmod(0o755)
+
+        with _patch("dot_man.hooks.subprocess.run", side_effect=OSError("spawn boom")):
+            result = run_hook("broken", "pre")
+
+        assert result is False
+        assert "Hook error: spawn boom" in capsys.readouterr().out

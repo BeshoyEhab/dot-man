@@ -41,3 +41,12 @@ def test_show_without_init(runner, tmp_path):
         result = runner.invoke(cli, ["show", "HEAD"])
         assert result.exit_code != 0
         assert "not initialized" in result.output.lower()
+
+
+@patch("dot_man.cli.show_cmd.subprocess.run", side_effect=OSError("spawn fail"))
+def test_show_subprocess_failure_reports_error(mock_run, integration_runner):
+    """A failing git spawn exits with the error message (lines 28-29)."""
+    result = integration_runner.invoke(cli, ["show", "abc1234"])
+
+    assert result.exit_code == 1
+    assert "spawn fail" in result.output
