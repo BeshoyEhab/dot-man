@@ -755,3 +755,178 @@ class TestDiffIntegration:
 
         result = runner.invoke(cli, ["diff", "--staged", "--no-rich"])
         assert result.exit_code == 0, result.output
+
+
+# ---------------------------------------------------------------------------
+# Coverage floor: plain-diff paths, rich-diff branches, checkout fallbacks
+# ---------------------------------------------------------------------------
+
+
+def _setup_tracked_section(repo_dir, filename: str, content: str):
+    """Section config + repo-side copy + ops reload (TestDiffFile pattern)."""
+    from git import Repo
+
+    local = repo_dir / filename
+    local.write_text(content)
+    (repo_dir / "test-section").mkdir(exist_ok=True)
+    (repo_dir / "test-section" / filename).write_text(content)
+
+    config_path = repo_dir / "dot-man.toml"
+    config_path.write_text(
+        config_path.read_text() + f'\n["test-section"]\npaths = ["{local}"]\n'
+    )
+
+    repo = Repo(repo_dir)
+    repo.index.add([filename, "test-section", "dot-man.toml"])
+    repo.index.commit(f"Add {filename}")
+
+    from dot_man.operations import get_operations, reset_operations
+
+    reset_operations()
+    get_operations().reload_config()
+    return local
+
+
+class TestDiffPlainPaths:
+    """``diff --no-rich`` — the plain git subprocess branch."""
+
+    def test_plain_diff_tracked_file(self, repo_with_commits):
+        runner, _, repo_dir, _ = repo_with_commits
+        tracked = _setup_tracked_section(repo_dir, "plain_tracked.txt", "original")
+        tracked.write_text("modified")
+
+        result = runner.invoke(cli, ["diff", "--no-rich", str(tracked)])
+
+        assert result.exit_code == 0, result.output
+        assert "not tracked" not in result.output.lower()
+
+    def test_plain_diff_untracked_file_exits_1(self, repo_with_commits):
+        runner, *_ = repo_with_commits
+
+        result = runner.invoke(cli, ["diff", "--no-rich", "/nonexistent/untracked.txt"])
+
+        assert result.exit_code == 1, result.output
+        assert "not tracked" in result.output.lower()
+
+    def test_plain_diff_exception_caught(self, repo_with_commits):
+        runner, *_ = repo_with_commits
+        with patch("subprocess.run", side_effect=Exception("Simulated diff error")):
+            result = runner.invoke(cli, ["diff", "--no-rich"])
+
+        assert "Simulated diff error" in result.output
+
+
+class TestDiffRichPaths:
+    """``_show_rich_diff`` — syntax rendering and return-code handling."""
+
+    def test_rich_file_diff_renders_changes(self, repo_with_commits):
+        runner, _, repo_dir, _ = repo_with_commits
+        tracked = _setup_tracked_section(repo_dir, "rich_tracked.txt", "original")
+        tracked.write_text("modified")
+
+        result = runner.invoke(cli, ["diff", str(tracked)])
+
+        assert result.exit_code == 0, result.output
+        assert "No changes found" not in result.output
+        assert "modified" in result.output
+
+    def test_rich_diff_unknown_branch_exits_1(self, repo_with_commits):
+        runner, *_ = repo_with_commits
+
+        result = runner.invoke(cli, ["diff", "--branch", "no-such-branch-xyz"])
+
+        assert result.exit_code == 1, result.output
+        assert "Git diff failed" in result.output
+
+
+class TestCheckoutFallbackPaths:
+    """The else-branch of ``checkout``: resolve target via git itself."""
+
+    def test_checkout_head_relative_expression_is_commit(self, repo_with_commits):
+        """Non-hex rev expression: parser says branch, git says commit."""
+        runner, _, repo_dir, _ = repo_with_commits
+
+        result = runner.invoke(cli, ["checkout", "HEAD~1"])
+
+        assert result.exit_code == 0, result.output
+        assert "detached HEAD" in result.output
+
+        from git import Repo
+
+        assert Repo(repo_dir).head.is_detached
+
+
+class TestDiffRichStagedAndFallback:
+    """Staged flag and the missing-Rich fallback inside ``_show_rich_diff``."""
+
+    def test_rich_staged_diff_renders(self, repo_with_commits):
+        runner, _, repo_dir, _ = repo_with_commits
+        (repo_dir / "file_0.txt").write_text("staged edit")
+
+        from git import Repo
+
+        Repo(repo_dir).index.add(["file_0.txt"])
+
+        result = runner.invoke(cli, ["diff", "--staged"])
+
+        assert result.exit_code == 0, result.output
+        assert "No changes found" not in result.output
+        assert "staged edit" in result.output
+
+    def test_missing_rich_falls_back_to_git_diff(self, repo_with_commits):
+        """Import failure of rich rebuilds plain args (incl. branch) and runs git."""
+        import sys
+
+        runner, _, repo_dir, _ = repo_with_commits
+        from git import Repo
+
+        branch = Repo(repo_dir).active_branch.name
+
+        # Block only rich.syntax (the import under test): rich's own
+        # Console.print still needs rich.console to render the fallback
+        # message.
+        with patch.dict(sys.modules, {"rich.syntax": None}):
+            result = runner.invoke(cli, ["diff", "--staged", "--branch", branch])
+
+        assert result.exit_code == 0, result.output
+        assert "Rich not installed" in result.output
+
+
+class TestCheckoutTagFallback:
+    """The else-branch's tag fallback: parser misses, git resolves the tag."""
+
+    def test_tag_fallback_when_parser_says_branch(self, repo_with_commits):
+        runner, _, repo_dir, _ = repo_with_commits
+
+        from git import Repo
+
+        repo = Repo(repo_dir)
+        repo.create_tag("stable", message="Stable tag message")
+
+        from dot_man.operations import get_operations, reset_operations
+
+        reset_operations()
+        ops = get_operations()
+
+        real_commit = ops.git.repo.commit
+
+        def commit_only_rejects_tag_name(rev, *args, **kwargs):
+            if rev == "stable":
+                raise ValueError("no commit for you")
+            return real_commit(rev, *args, **kwargs)
+
+        with (
+            patch(
+                "dot_man.cli.common.parse_branch_arg",
+                return_value={"type": "branch", "base": "stable", "target": "stable"},
+            ),
+            patch.object(
+                ops.git.repo, "commit", side_effect=commit_only_rejects_tag_name
+            ),
+        ):
+            result = runner.invoke(cli, ["checkout", "stable"])
+
+        assert result.exit_code == 0, result.output
+        assert "Checked out tag 'stable'" in result.output
+        assert "Stable tag message" in result.output
+        assert Repo(repo_dir).head.is_detached

@@ -275,13 +275,16 @@ def _checkout_tag(ops, current_branch: str, tag_name: str):
 
 def _show_rich_diff(file: Path | None, branch: str | None, staged: bool):
     """Show syntax-highlighted diff using rich."""
-    try:
-        import subprocess
+    # Hoisted above the try: the ImportError fallback below rebuilds the
+    # plain git args and needs both names, so they must be bound even when
+    # the rich imports (which run first) are what failed.
+    import subprocess
 
+    from ..constants import REPO_DIR
+
+    try:
         from rich.console import Console
         from rich.syntax import Syntax
-
-        from ..constants import REPO_DIR
 
         console = Console()
 
