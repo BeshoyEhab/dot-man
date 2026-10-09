@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Full coverage floor (every module ≥ 90%)** — cleared the sub-90 tail with strong tests
+  across 17 modules: `navigate_preview` 69%→100%, `init_cmd` 70%→98%, `edit_cmd` 73%→99%,
+  `log_cmd` 79%→97%, `revert_cmd` 80%→100%, `clean_cmd` 81%→96%, `restore_cmd` 82%→98%,
+  `hooks_cmd` 83%→94%, `shared_sync` 84%→99%, `hooks` 85%→98%, `status_ops` 85%→100%,
+  `common` 86%→99%, `show_cmd` 86%→100%, `save_deploy_ops` 86%→99%, `add_cmd` 88%→100%,
+  `verify_cmd` 88%→100%; test isolation gaps closed in the conftest registry
+  (`clean_cmd.REPO_DIR`, `hooks.HOOKS_DIR`/`DOT_MAN_DIR` — hook tests previously touched
+  the real `~/.config/dot-man/hooks`); total suite 2350 passing, coverage 92%→96%
+  (302 missed, down from 646)
 - **Backup coverage floor** — `backups.py` 71%→100%, `cli/backup_cmd.py` 72%→95% (+16 strong tests: missing-path skips, OSError cleanup, manifest roundtrips, CLI create/list/restore flows); total suite 1985 passing, coverage 90%→91%
 - **Lock coverage + cleanup fix** — `lock.py` 79%→100% (+5 strong tests: missing parents, real fcntl contention, open/flock OSError, unlock tolerance); failed lock acquisition now resets `_fd` to `None` instead of holding a closed fd
 - **Merge coverage** — `merge.py` 80%→100% (+13 strong tests: marker parsing, missing-file paths, idempotent inject, replace position, content extraction, direct-file listing, merge/dedup strategies); total suite 2003 passing
@@ -43,6 +52,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`revert -c` restore built paths outside the repository** — the commit path computed
+  `target.relative_to(REPO_DIR.parent)`, which can never point inside the repo, so restoring
+  a tracked file from a commit always failed with `fatal: path ... exists on disk, but not
+  in <commit>`; it now resolves the section's repo path the same way `diff`/`log` do
+- **`shared_sync` never excluded the current branch** — `current = self.git.current_branch`
+  compared against the uncalled bound method, so the edited branch was treated as a
+  propagation target and showed up in `skipped`/`unchanged` report buckets; it now calls
+  `current_branch()`
+- **`verify` reported broken symlinks as missing** — `Path.exists()` follows links, so a
+  broken symlink fell into the `Missing path` branch and the dedicated `Broken symlink`
+  check was unreachable; the symlink check now runs first
 - **`init` records the branch git actually created** — `global.toml` unconditionally wrote the `DEFAULT_BRANCH` constant (`main`) while `git init` honours the host's `init.defaultBranch` (and `--import` keeps the source repo's branch), so `status`, `{branch}` and `navigate` could disagree with git from the first second (`global.toml` said `main`, repo sat on `master`); init now records `current_branch` straight from git, and an `--import` records the source branch
 - **`init --import <github url>` reaches the clone** — `--import` was typed `click.Path(exists=True)`, so any URL died at parse time with a usage error (exit 2) and the entire GitHub branch (`_parse_github_url`, clone, the trailing-slash fix) was unreachable from the CLI; validation moved into the import code, which also gives local paths the CLI's own error (exit 1) instead of a click usage message — and the unreachable duplicate `_clone_github_repo` retry that sat after `error()` (which raises) is gone
 - **`tag switch` warns on dirty worktrees** — the dirty-worktree guard lived only in `log_cmd`; the shared helper moved to `cli/common.py::warn_if_dirty()` so both HEAD-moving paths warn before abandoning uncommitted changes

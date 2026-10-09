@@ -1,6 +1,6 @@
 # TODO
 
-**Status:** v1.4.0 · 2212 tests passing · coverage 92% · docs site live
+**Status:** v1.4.0 · 2350 tests passing · coverage 96% · docs site live
 
 ---
 
@@ -36,22 +36,21 @@
 
 ---
 
-## 🧪 Coverage Focus (overall 90%, target: raise the floor)
+## 🧪 Coverage Focus (overall 96%, target: keep every module ≥ 90%)
 
-Lowest-covered modules (regenerated 2026-10-06):
+Lowest-covered modules (regenerated 2026-10-09): **none below 90%**.
 
-Lowest-covered modules (regenerated 2026-10-06):
-
-| Module | Coverage |
-|--------|----------|
-| `cli/navigate_preview.py` | 69% |
-| `cli/init_cmd.py` | 70% |
-| `cli/edit_cmd.py` | 73% |
-| `cli/log_cmd.py` | 80% |
-| `cli/revert_cmd.py` | 80% |
-| `cli/clean_cmd.py` | 81% |
-| `cli/restore_cmd.py` | 82% |
-| `cli/hooks_cmd.py` | 83% |
+- [x] **Full coverage floor — every module ≥ 90%** (regenerated 2026-10-09) — cleared the
+  whole 2026-10-06 table and the rest of the sub-90 tail: `navigate_preview` 69%→100%,
+  `init_cmd` 70%→98%, `edit_cmd` 73%→99%, `log_cmd` 79%→97%, `revert_cmd` 80%→100%,
+  `clean_cmd` 81%→96%, `restore_cmd` 82%→98%, `hooks_cmd` 83%→94%, `shared_sync`
+  84%→99%, `hooks` 85%→98%, `status_ops` 85%→100%, `common` 86%→99%, `show_cmd`
+  86%→100%, `save_deploy_ops` 86%→99%, `add_cmd` 88%→100%, `verify_cmd` 88%→100%
+  (+ `config_detector` now ≥90%); three real bugs surfaced and fixed on the way
+  (`revert -c` restored from a path outside the repo, `shared_sync` never excluded the
+  current branch, `verify` reported broken symlinks as missing); test isolation gaps
+  closed in the conftest registry (`clean_cmd.REPO_DIR`, `hooks.HOOKS_DIR`/`DOT_MAN_DIR`);
+  total suite 2350 passing, coverage 92%→96% (302 missed, down from 646)
 
 ---
 
