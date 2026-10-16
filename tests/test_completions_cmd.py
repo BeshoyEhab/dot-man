@@ -2,11 +2,36 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from unittest.mock import patch
 
 from click.testing import CliRunner
 
 from dot_man.cli.interface import cli
+
+
+class TestCompletionsPackage:
+    """The completions directory must be a real importable package.
+
+    Without an ``__init__.py`` it is only a namespace package, so ``__file__``
+    is ``None`` and the completions command crashes locating its scripts.
+    """
+
+    def test_package_has_file_and_scripts(self):
+        import importlib
+
+        pkg = importlib.import_module("dot_man.completions")
+        assert pkg.__file__ is not None
+        scripts = Path(pkg.__file__).parent
+        assert (scripts / "dot-man.bash").is_file()
+        assert (scripts / "_dot-man.zsh").is_file()
+        assert (scripts / "dot-man.fish").is_file()
+
+    def test_source_only_command_works_unpatched(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("HOME", str(tmp_path))
+        result = CliRunner().invoke(cli, ["completions", "--source-only"])
+        assert result.exit_code == 0, result.output
+        assert "dot-man.bash" in result.output
 
 
 class TestCompletionsCommand:

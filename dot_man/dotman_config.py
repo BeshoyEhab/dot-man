@@ -11,6 +11,7 @@ from .constants import (
     CONFIG_FILE_PRIORITY,
     DOT_MAN_TOML,
     REPO_DIR,
+    RESERVED_TABLES,
 )
 from .exceptions import ConfigurationError, ConfigValidationError
 from .global_config import (
@@ -98,7 +99,7 @@ class DotManConfig:
         warnings: list[str] = []
 
         for name, section in self._data.items():
-            if name in ("templates", "secrets"):
+            if name in RESERVED_TABLES:
                 continue
             if isinstance(section, dict):
                 for key in section:
@@ -141,11 +142,11 @@ class DotManConfig:
 """)
 
     def get_section_names(self) -> list[str]:
-        """Get all section names (excluding templates)."""
+        """Get all section names (excluding reserved tables)."""
         return [
             name
             for name in self._data.keys()
-            if name != "templates" and isinstance(self._data[name], dict)
+            if name not in RESERVED_TABLES and isinstance(self._data[name], dict)
         ]
 
     def get_local_templates(self) -> dict[str, Any]:
@@ -282,6 +283,9 @@ class DotManConfig:
             ignored_directories=settings.get("ignored_directories"),
             follow_symlinks=settings.get("follow_symlinks"),
             deploy_method=settings.get("deploy_method", "copy"),
+            encrypted=settings.get("encrypted"),
+            encryption_method=settings.get("encryption_method"),
+            encryption_recipient=settings.get("encryption_recipient"),
             shared=settings.get("shared", False),
         )
 
@@ -314,8 +318,8 @@ class DotManConfig:
             cleaned_paths.append(clean_p)
         paths = cleaned_paths
 
-        if name == "templates":
-            raise ConfigurationError("'templates' is a reserved section name")
+        if name in RESERVED_TABLES:
+            raise ConfigurationError(f"'{name}' is a reserved section name")
 
         section_data = {
             "paths": paths,
@@ -340,7 +344,7 @@ class DotManConfig:
         Raises:
             ConfigurationError: If section doesn't exist or invalid key provided
         """
-        if name not in self._data or name == "templates":
+        if name not in self._data or name in RESERVED_TABLES:
             raise ConfigurationError(f"Section not found: {name}")
 
         for key, value in kwargs.items():
@@ -363,7 +367,7 @@ class DotManConfig:
         Raises:
             ConfigurationError: If section doesn't exist
         """
-        if name not in self._data or name == "templates":
+        if name not in self._data or name in RESERVED_TABLES:
             raise ConfigurationError(f"Section not found: {name}")
         del self._data[name]
         self._dirty = True

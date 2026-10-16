@@ -325,3 +325,31 @@ line2
         text = '{{ if USER == "testuser" }}matched{{ endif }}'
         assert substitute_templates(text, {"USER": "testuser"}) == "matched"
         assert substitute_templates(text, {"USER": "other"}) == ""
+
+
+class TestAtomicConfigWrites:
+    """Config writes must be atomic so a crash cannot truncate a .toml."""
+
+    def test_write_uses_atomic_replace(self, tmp_path):
+        from dot_man.global_config import write_config_file
+
+        path = tmp_path / "global.toml"
+        path.write_text('existing = "keep"')
+
+        with patch("dot_man.files.os.replace") as mock_replace:
+            write_config_file(path, {"a": 1})
+
+        assert mock_replace.called
+
+    def test_failed_write_preserves_original(self, tmp_path):
+        from dot_man.global_config import write_config_file
+
+        path = tmp_path / "global.toml"
+        path.write_text('existing = "keep"')
+
+        with patch("dot_man.files.os.replace", side_effect=OSError("boom")):
+            with pytest.raises(OSError):
+                write_config_file(path, {"a": 1})
+
+        assert path.read_text() == 'existing = "keep"'
+        assert not list(tmp_path.glob("*.tmp"))

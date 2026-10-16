@@ -4,10 +4,9 @@ from abc import abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
-from .constants import LOCK_FILE, REPO_DIR
+from .constants import REPO_DIR
 from .exceptions import DotManError
-from .files import atomic_write_text, clear_comparison_cache, copy_file
-from .lock import FileLock
+from .files import atomic_write_text, copy_file
 from .merge import get_hook_for_config
 from .secrets import SecretMatch
 from .ui import warn
@@ -94,132 +93,6 @@ class BranchMixin:
     @property
     @abstractmethod
     def vault(self) -> Any: ...
-
-    def switch_branch(
-        self,
-        target_branch: str,
-        dry_run: bool = False,
-        secret_handler: Optional[Callable[[SecretMatch], str]] = None,
-        symlink_ignore: Optional[set[Path]] = None,
-    ) -> dict:
-        """
-        Switch to a different branch.
-
-        Args:
-            target_branch: Branch to switch to.
-            dry_run: If True, don't make changes.
-            secret_handler: Optional callback for secret handling.
-            symlink_ignore: Set of symlinked paths to skip when saving.
-
-        Returns dict with:
-            - saved_count: files saved from current branch
-            - deployed_count: files deployed from target branch
-            - secrets_redacted: number of secrets redacted
-            - pre_hooks: list of pre-deploy commands
-            - post_hooks: list of post-deploy commands
-            - created_branch: True if branch was newly created
-            - errors: list of error messages
-        """
-        current_branch = self.current_branch
-        result: dict[str, Any] = {
-            "saved_count": 0,
-            "deployed_count": 0,
-            "secrets_redacted": 0,
-            "pre_hooks": [],
-            "post_hooks": [],
-            "created_branch": False,
-            "errors": [],
-        }
-
-        if current_branch == target_branch and not dry_run:
-            return result
-
-        import contextlib
-
-        lock_context = FileLock(LOCK_FILE) if not dry_run else contextlib.nullcontext()
-
-        with lock_context:
-            # Phase 1: Save current branch
-            if not dry_run:
-                save_result = self.save_all(secret_handler, symlink_ignore)
-                result["saved_count"] = save_result["saved"]
-                result["secrets_redacted"] = len(save_result["secrets"])
-                result["errors"].extend(save_result["errors"])
-                # Warn about symlinked paths
-                symlinks: list[Path] = save_result.get("symlinks", [])
-                for sym_path in symlinks:
-                    result["errors"].append(
-                        f"⚠ {sym_path} is a symlink → {sym_path.resolve()}. "
-                        f"Edits affect the symlink target, not the config folder."
-                    )
-
-                commit_msg = f"Auto-save from '{current_branch}' before switch to '{target_branch}'"
-                self.git.commit(commit_msg)
-
-            # Phase 2: Switch git branch
-            branch_exists = self.git.branch_exists(target_branch)
-            result["created_branch"] = not branch_exists
-
-            if not dry_run:
-                self.git.checkout(target_branch, create=not branch_exists)
-                self.reload_config()
-
-            # Phase 3: Deploy target branch
-            if not dry_run:
-                # Auto-backup before potentially destructive deployment
-                try:
-                    paths_to_backup = []
-                    for section_name in self.get_sections():
-                        section = self.get_section(section_name)
-                        paths_to_backup.extend([p for p in section.paths if p.exists()])
-
-                    if paths_to_backup:
-                        self.backups.create_backup(
-                            paths_to_backup, note=f"pre-switch-{target_branch}"
-                        )
-                except Exception as e:
-                    result["errors"].append(f"Warning: Auto-backup failed: {e}")
-
-                # Two-Phase Deployment for Target Branch
-                try:
-                    sections = [self.get_section(name) for name in self.get_sections()]
-
-                    plan = self.scan_deployable_changes(sections)
-
-                    result["pre_hooks"].extend(plan["pre_hooks"])
-                    result["post_hooks"].extend(plan["post_hooks"])
-                    result["errors"].extend(plan["errors"])
-
-                    result["pre_hooks"] = list(dict.fromkeys(result["pre_hooks"]))
-                    result["post_hooks"] = list(dict.fromkeys(result["post_hooks"]))
-
-                    deploy_result = self.execute_deployment_plan(plan)
-
-                    result["deployed_count"] = deploy_result["deployed"]
-                    result["errors"].extend(deploy_result["errors"])
-
-                    # Auto-detect hooks based on changed files
-                    changed_files = self.get_changed_files_between_branches(
-                        current_branch, target_branch
-                    )
-                    if changed_files:
-                        auto_hooks = self.detect_hooks_for_changed_files(changed_files)
-                        for hook in auto_hooks:
-                            if hook and hook not in result["post_hooks"]:
-                                result["post_hooks"].append(hook)
-
-                except Exception as e:
-                    result["errors"].append(
-                        f"Critical error during switch deployment: {e}"
-                    )
-
-                self.global_config.current_branch = target_branch
-                self.global_config.save()
-
-                # Clear file comparison cache since files have likely changed
-            clear_comparison_cache()
-
-        return result
 
     def revert_file(self, path: Path) -> bool:
         """

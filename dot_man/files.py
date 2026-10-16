@@ -196,13 +196,26 @@ def _handle_binary_copy(
         shutil.copy2(src_path, temp_path)
         os.replace(temp_path, dest_path)
     except OSError:
-        return False, []
+        # Surface the failure instead of reporting "no change": a swallowed
+        # error here made directory deploys count a lost file as success.
+        try:
+            temp_path.unlink()
+        except OSError:
+            pass
+        raise
 
     return True, []
 
 
 def ensure_directory(path: Path, mode: int = 0o755) -> None:
-    """Ensure a directory exists with the specified mode."""
+    """Ensure a directory exists.
+
+    ``mode`` is applied only when the directory is created — an existing
+    directory keeps its permissions. Relaxing an existing private dir (e.g.
+    ~/.ssh at 0700) would break tools like ssh.
+    """
+    if path.exists():
+        return
     path.mkdir(parents=True, exist_ok=True)
     path.chmod(mode)
 
@@ -488,7 +501,10 @@ def create_symlink(source: Path, destination: Path) -> bool:
                 return True
             destination.unlink()
         elif destination.exists():
-            backup_file(destination)
+            # Never delete the destination if its backup could not be made:
+            # unlinking on a failed backup silently destroys user data.
+            if backup_file(destination) is None:
+                return False
             destination.unlink()
 
         ensure_directory(destination.parent)

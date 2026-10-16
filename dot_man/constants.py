@@ -55,6 +55,10 @@ GIT_IGNORE_PATTERNS = [
 DEFAULT_UPDATE_STRATEGY = "replace"  # replace, rename_old, ignore
 VALID_UPDATE_STRATEGIES = ["replace", "rename_old", "ignore"]
 
+# Top-level config tables that are not tracked sections. Kept in one place so
+# section enumeration, schema validation, and shared-section sync agree.
+RESERVED_TABLES = {"templates", "secrets"}
+
 # Default ignored directories for file operations
 DEFAULT_IGNORED_DIRECTORIES = [
     ".git",

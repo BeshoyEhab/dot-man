@@ -34,23 +34,28 @@ def status(verbose: bool, secrets: bool, json_output: bool):
 
         ops = get_operations()
 
-        # Repository info panel
         branch = ops.current_branch
-        remote = ops.global_config.remote_url or "[dim]Not configured[/dim]"
 
-        info_table = Table(show_header=False, box=None, padding=(0, 2))
-        info_table.add_column(style="cyan")
-        info_table.add_column()
-        info_table.add_row("Current Branch:", f"[bold]{branch}[/bold]")
-        info_table.add_row("Remote:", remote)
-        info_table.add_row("Repository:", str(REPO_DIR))
+        # Human-readable repository info panel. Machine-readable (--json)
+        # output must stay pure JSON on stdout, so it is skipped there.
+        if not json_output:
+            remote = ops.global_config.remote_url or "[dim]Not configured[/dim]"
 
-        ui.console.print(
-            Panel(
-                info_table, title="[bold]Repository Status[/bold]", border_style="blue"
+            info_table = Table(show_header=False, box=None, padding=(0, 2))
+            info_table.add_column(style="cyan")
+            info_table.add_column()
+            info_table.add_row("Current Branch:", f"[bold]{branch}[/bold]")
+            info_table.add_row("Remote:", remote)
+            info_table.add_row("Repository:", str(REPO_DIR))
+
+            ui.console.print(
+                Panel(
+                    info_table,
+                    title="[bold]Repository Status[/bold]",
+                    border_style="blue",
+                )
             )
-        )
-        ui.console.print()
+            ui.console.print()
 
         # Get detailed status once (Optimized single pass)
         status_items = list(ops.get_detailed_status())

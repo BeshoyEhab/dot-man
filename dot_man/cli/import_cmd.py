@@ -120,7 +120,7 @@ def _detect_chezmoi() -> str | None:
     ]
 
     for d in chezmoi_dirs:
-        if d.exists() and (d / ".git").exists() or any(d.iterdir()):
+        if d.exists() and ((d / ".git").exists() or any(d.iterdir())):
             return str(d)
 
     return None

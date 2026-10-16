@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Navigate to a commit/tag now deploys and records the branch** — previously
+  only branch navigation ran `deploy_all` and persisted `current_branch`;
+  commit/tag navigation dropped you into a detached HEAD with the old files.
+  All three paths now share one save→switch→deploy pipeline.
+- **Pre-switch backup on the live navigate path** — navigating creates a
+  recovery backup of tracked files before deploying the target configuration.
+- **`checkout_commit` updates the working tree** — it moved the branch ref
+  only, so `rollback` and `navigate <tag>`/`<sha>` deployed stale file content;
+  it now checks out the commit properly.
+- **`ensure_directory` no longer relaxes existing directory modes** — deploying
+  `~/.ssh/config` used to chmod `~/.ssh` to `0755`, breaking ssh.
+- **`create_symlink` keeps the destination when its backup fails** — a failed
+  backup previously still deleted the file, silently destroying user data.
+- **Binary-copy failures are surfaced** — a failed copy was reported as
+  "no change" (and directory deploys counted the file as success); it now
+  raises so callers record the error.
+- **`export` honors `--branch` and `--include-secrets`** — tar/zip now export
+  the requested branch's committed tree via `git archive` (previously the
+  flags were silently ignored); JSON gets a real ISO-8601 `exported_at` and a
+  repo-relative `repo_path`.
+- **`status --json` emits valid JSON** — the repository info panel used to
+  print to stdout before the JSON, breaking `json.loads`; human output is now
+  gated on non-JSON mode.
+- **Non-atomic config writes could truncate `*.toml`** — `write_config_file`
+  now routes through `atomic_write_text` (temp file + `os.replace`).
+- **First-run onboarding no longer hijacks `--help`/`--version` or scripts** —
+  it runs only for an interactive bare `dot-man` or `dot-man init`; added
+  `--no-onboarding`.
+- **`dot_man/completions` is now a real package** — the missing `__init__.py`
+  made `__file__` `None`, so `dot-man completions` crashed locating its scripts.
+- **Section encryption fields are forwarded to `Section`** — `encrypted`,
+  `encryption_method`, and `encryption_recipient` were parsed but discarded.
+- **`[templates]`/`[secrets]` are reserved tables** — they can no longer be
+  mistaken for a user section.
+- **`import chezmoi`/`import all` no longer crash on empty directories** —
+  fixed operator precedence in chezmoi detection.
+
+### Removed
+
+- **Dead `BranchMixin.switch_branch`** — no production caller; superseded by
+  the unified navigate pipeline.
+
 ## [1.5.0] - 2026-10-09
 
 ### Added

@@ -1,13 +1,19 @@
 """Tests for cli/export_cmd.py — export dotfiles to tar, zip, json."""
 
 import json
+import tarfile
+import zipfile
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
+from git import Repo
 
 from dot_man.cli.interface import cli
+from dot_man.core import GitManager
+from dot_man.section import Section
 
 
 @pytest.fixture
@@ -16,169 +22,205 @@ def runner():
 
 
 @pytest.fixture
-def mock_ops():
+def initialized(tmp_path):
+    """Pretend dot-man is initialized so require_init passes."""
+    dotman_dir = tmp_path / "config"
+    dotman_dir.mkdir()
+    with patch("dot_man.cli.common.DOT_MAN_DIR", dotman_dir):
+        yield dotman_dir
+
+
+def _make_repo(tmp_path: Path) -> tuple[Path, GitManager, str]:
+    """Create a real repo with a default and a divergent work branch."""
+    repo_dir = tmp_path / "repo"
+    repo_dir.mkdir()
+    repo = Repo.init(repo_dir)
+    with repo.config_writer() as config:
+        config.set_value("user", "name", "Test")
+        config.set_value("user", "email", "test@test.com")
+
+    (repo_dir / "a.txt").write_text("main-content")
+    repo.index.add(["a.txt"])
+    repo.index.commit("initial")
+    default = repo.active_branch.name
+
+    repo.git.checkout("-b", "work")
+    (repo_dir / "a.txt").write_text("work-content")
+    repo.index.add(["a.txt"])
+    repo.index.commit("work change")
+    repo.git.checkout(default)
+
+    return repo_dir, GitManager(repo_dir), default
+
+
+def _ops_with(gm: GitManager, branch: str = "main") -> MagicMock:
     ops = MagicMock()
-    ops.current_branch = "main"
-    ops.get_sections.return_value = ["shell", "config"]
-    shell_section = MagicMock()
-    shell_section.paths = [Path("/home/user/.bashrc")]
-    config_section = MagicMock()
-    config_section.paths = [Path("/home/user/.config/nvim")]
-    ops.get_section.side_effect = lambda name: {
-        "shell": shell_section,
-        "config": config_section,
-    }[name]
+    ops.git = gm
+    ops.current_branch = branch
     return ops
 
 
-class TestExportTar:
-    """Test tar export."""
+class TestExportArchive:
+    """tar/zip must export the requested branch's committed tree."""
 
-    def test_export_creates_tarball(self, runner, tmp_path):
+    def test_tar_exports_requested_branch(self, runner, tmp_path, initialized):
+        repo_dir, gm, default = _make_repo(tmp_path)
         output = tmp_path / "backup.tar.gz"
-        with patch("dot_man.operations.get_operations") as mock_get:
-            mock_get.return_value.current_branch = "main"
-            result = runner.invoke(cli, ["export", "tar", str(output)])
-        # Should attempt to create tar (may fail if REPO_DIR doesn't exist)
-        assert result.exit_code in (0, 1)
+        ops = _ops_with(gm)
 
-    def test_export_tar_adds_suffix(self, runner, tmp_path):
-        output = tmp_path / "backup"
-        with patch("dot_man.operations.get_operations") as mock_get:
-            mock_get.return_value.current_branch = "main"
-            with patch("dot_man.cli.export_cmd.REPO_DIR", tmp_path / "repo"):
-                (tmp_path / "repo").mkdir(exist_ok=True)
-                (tmp_path / "repo" / "test.txt").write_text("hello")
-                result = runner.invoke(cli, ["export", "tar", str(output)])
-        assert result.exit_code == 0
-
-    def test_export_tar_with_branch(self, runner, tmp_path):
-        output = tmp_path / "backup.tar.gz"
-        with patch("dot_man.operations.get_operations") as mock_get:
-            mock_get.return_value.current_branch = "main"
+        with (
+            patch("dot_man.operations.get_operations", return_value=ops),
+            patch("dot_man.cli.export_cmd.REPO_DIR", repo_dir),
+        ):
             result = runner.invoke(
                 cli, ["export", "tar", str(output), "--branch", "work"]
             )
-        assert result.exit_code in (0, 1)
 
-    def test_export_tar_error_handling(self, runner, tmp_path):
-        output = tmp_path / "backup.tar.gz"
-        with patch("dot_man.operations.get_operations") as mock_get:
-            mock_get.return_value.current_branch = "main"
-            with patch("tarfile.open", side_effect=OSError("disk full")):
-                result = runner.invoke(cli, ["export", "tar", str(output)])
-        assert result.exit_code == 1
+        assert result.exit_code == 0, result.output
+        with tarfile.open(output) as tar:
+            content = tar.extractfile("dotman-export/a.txt").read().decode()
+        assert content == "work-content"
 
+    def test_zip_exports_current_branch_by_default(self, runner, tmp_path, initialized):
+        repo_dir, gm, default = _make_repo(tmp_path)
+        output = tmp_path / "dots.zip"
+        ops = _ops_with(gm, branch=default)
 
-class TestExportZip:
-    """Test zip export."""
+        with (
+            patch("dot_man.operations.get_operations", return_value=ops),
+            patch("dot_man.cli.export_cmd.REPO_DIR", repo_dir),
+        ):
+            result = runner.invoke(cli, ["export", "zip", str(output)])
 
-    def test_export_creates_zip(self, runner, tmp_path):
-        output = tmp_path / "backup.zip"
-        with patch("dot_man.operations.get_operations") as mock_get:
-            mock_get.return_value.current_branch = "main"
-            with patch("dot_man.cli.export_cmd.REPO_DIR", tmp_path / "repo"):
-                (tmp_path / "repo").mkdir(exist_ok=True)
-                (tmp_path / "repo" / "test.txt").write_text("hello")
-                result = runner.invoke(cli, ["export", "zip", str(output)])
-        assert result.exit_code == 0
+        assert result.exit_code == 0, result.output
+        with zipfile.ZipFile(output) as zipf:
+            assert zipf.read("dotman-export/a.txt").decode() == "main-content"
 
-    def test_export_zip_adds_suffix(self, runner, tmp_path):
-        output = tmp_path / "backup"
-        with patch("dot_man.operations.get_operations") as mock_get:
-            mock_get.return_value.current_branch = "main"
-            with patch("dot_man.cli.export_cmd.REPO_DIR", tmp_path / "repo"):
-                (tmp_path / "repo").mkdir(exist_ok=True)
-                (tmp_path / "repo" / "test.txt").write_text("hello")
-                result = runner.invoke(cli, ["export", "zip", str(output)])
-        assert result.exit_code == 0
+    def test_tar_adds_suffix(self, runner, tmp_path, initialized):
+        repo_dir, gm, default = _make_repo(tmp_path)
+        ops = _ops_with(gm, branch=default)
 
-    def test_export_zip_error_handling(self, runner, tmp_path):
-        output = tmp_path / "backup.zip"
-        with patch("dot_man.operations.get_operations") as mock_get:
-            mock_get.return_value.current_branch = "main"
-            with patch("zipfile.ZipFile", side_effect=OSError("permission denied")):
-                result = runner.invoke(cli, ["export", "zip", str(output)])
+        with (
+            patch("dot_man.operations.get_operations", return_value=ops),
+            patch("dot_man.cli.export_cmd.REPO_DIR", repo_dir),
+        ):
+            result = runner.invoke(cli, ["export", "tar", str(tmp_path / "backup")])
+
+        assert result.exit_code == 0, result.output
+        assert (tmp_path / "backup.tar.gz").exists()
+
+    def test_archive_error_handling(self, runner, tmp_path, initialized):
+        ops = MagicMock()
+        ops.current_branch = "main"
+        ops.git.repo.git.archive.side_effect = OSError("disk full")
+
+        with patch("dot_man.operations.get_operations", return_value=ops):
+            result = runner.invoke(
+                cli, ["export", "tar", str(tmp_path / "backup.tar.gz")]
+            )
+
         assert result.exit_code == 1
 
 
 class TestExportJson:
-    """Test JSON export."""
+    """JSON manifest contents and metadata."""
 
-    def test_export_creates_json(self, runner, tmp_path):
-        output = tmp_path / "manifest.json"
-        with patch(
-            "dot_man.operations.get_operations",
-            return_value=mock_ops_from_tmp(tmp_path),
-        ):
-            result = runner.invoke(cli, ["export", "json", str(output)])
-        assert result.exit_code == 0
-        assert output.exists()
-        data = json.loads(output.read_text())
-        assert data["version"] == "1.0"
-        assert data["branch"] == "main"
+    def test_manifest_has_iso_timestamp_and_repo_path(
+        self, runner, tmp_path, initialized
+    ):
+        bashrc = tmp_path / ".bashrc"
+        bashrc.write_text("export EDITOR=vim")
 
-    def test_export_json_adds_suffix(self, runner, tmp_path):
-        output = tmp_path / "manifest"
-        with patch(
-            "dot_man.operations.get_operations",
-            return_value=mock_ops_from_tmp(tmp_path),
-        ):
-            result = runner.invoke(cli, ["export", "json", str(output)])
-        assert result.exit_code == 0
-        assert (tmp_path / "manifest.json").exists()
-
-    def test_export_json_includes_content(self, runner, tmp_path):
-        (tmp_path / ".bashrc").write_text("export EDITOR=vim")
-        output = tmp_path / "manifest.json"
+        section = Section(name="shell", paths=[str(bashrc)], repo_base="shell")
         ops = MagicMock()
         ops.current_branch = "main"
         ops.get_sections.return_value = ["shell"]
-        shell_section = MagicMock()
-        shell_section.paths = [tmp_path / ".bashrc"]
-        ops.get_section.return_value = shell_section
+        ops.get_section.return_value = section
 
-        with patch("dot_man.operations.get_operations", return_value=ops):
+        output = tmp_path / "manifest.json"
+        with (
+            patch("dot_man.operations.get_operations", return_value=ops),
+            patch("dot_man.cli.export_cmd.REPO_DIR", tmp_path / "repo"),
+        ):
+            result = runner.invoke(cli, ["export", "json", str(output)])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(output.read_text())
+        assert data["branch"] == "main"
+        # Real ISO-8601 timestamp, not a path.
+        datetime.fromisoformat(data["exported_at"])
+        assert data["files"][0]["repo_path"] == "shell/.bashrc"
+
+    def test_include_secrets_embeds_content(self, runner, tmp_path, initialized):
+        bashrc = tmp_path / ".bashrc"
+        bashrc.write_text("export EDITOR=vim")
+
+        section = Section(name="shell", paths=[str(bashrc)], repo_base="shell")
+        ops = MagicMock()
+        ops.current_branch = "main"
+        ops.get_sections.return_value = ["shell"]
+        ops.get_section.return_value = section
+
+        output = tmp_path / "manifest.json"
+        with (
+            patch("dot_man.operations.get_operations", return_value=ops),
+            patch("dot_man.cli.export_cmd.REPO_DIR", tmp_path / "repo"),
+        ):
             result = runner.invoke(
                 cli, ["export", "json", str(output), "--include-secrets"]
             )
-        assert result.exit_code == 0
-        data = json.loads(output.read_text())
-        assert any(f.get("content") == "export EDITOR=vim" for f in data["files"])
 
-    def test_export_json_error_on_write(self, runner, tmp_path):
+        assert result.exit_code == 0, result.output
+        data = json.loads(output.read_text())
+        assert data["files"][0]["content"] == "export EDITOR=vim"
+
+    def test_no_content_without_include_secrets(self, runner, tmp_path, initialized):
+        bashrc = tmp_path / ".bashrc"
+        bashrc.write_text("secret")
+
+        section = Section(name="shell", paths=[str(bashrc)], repo_base="shell")
+        ops = MagicMock()
+        ops.current_branch = "main"
+        ops.get_sections.return_value = ["shell"]
+        ops.get_section.return_value = section
+
         output = tmp_path / "manifest.json"
-        with patch(
-            "dot_man.operations.get_operations",
-            return_value=mock_ops_from_tmp(tmp_path),
+        with (
+            patch("dot_man.operations.get_operations", return_value=ops),
+            patch("dot_man.cli.export_cmd.REPO_DIR", tmp_path / "repo"),
         ):
-            with patch("builtins.open", side_effect=OSError("read only")):
-                result = runner.invoke(cli, ["export", "json", str(output)])
+            runner.invoke(cli, ["export", "json", str(output)])
+
+        data = json.loads(output.read_text())
+        assert "content" not in data["files"][0]
+
+    def test_json_adds_suffix(self, runner, tmp_path, initialized):
+        ops = MagicMock()
+        ops.current_branch = "main"
+        ops.get_sections.return_value = []
+
+        with patch("dot_man.operations.get_operations", return_value=ops):
+            result = runner.invoke(cli, ["export", "json", str(tmp_path / "manifest")])
+
+        assert result.exit_code == 0, result.output
+        assert (tmp_path / "manifest.json").exists()
+
+    def test_json_write_error(self, runner, tmp_path, initialized):
+        ops = MagicMock()
+        ops.current_branch = "main"
+        ops.get_sections.return_value = []
+
+        with (
+            patch("dot_man.operations.get_operations", return_value=ops),
+            patch("pathlib.Path.write_text", side_effect=OSError("read only")),
+        ):
+            result = runner.invoke(
+                cli, ["export", "json", str(tmp_path / "manifest.json")]
+            )
+
         assert result.exit_code == 1
 
 
-class TestExportFormats:
-    """Test format validation."""
-
-    def test_invalid_format_rejected(self, runner):
-        result = runner.invoke(cli, ["export", "xml", "output.xml"])
-        assert result.exit_code != 0
-
-    def test_all_formats_accepted(self, runner, tmp_path):
-        for fmt in ("tar", "zip", "json"):
-            output = tmp_path / f"test.{fmt}"
-            with patch("dot_man.operations.get_operations") as mock_get:
-                mock_get.return_value.current_branch = "main"
-                with patch("dot_man.cli.export_cmd.REPO_DIR", tmp_path / "repo"):
-                    (tmp_path / "repo").mkdir(exist_ok=True)
-                    result = runner.invoke(cli, ["export", fmt, str(output)])
-            # May succeed or fail depending on format, but should not error on format validation
-            assert "Invalid" not in (result.output or "")
-
-
-def mock_ops_from_tmp(tmp_path):
-    """Create a mock ops object for testing."""
-    ops = MagicMock()
-    ops.current_branch = "main"
-    ops.get_sections.return_value = []
-    return ops
+def test_invalid_format_rejected(runner):
+    result = runner.invoke(cli, ["export", "xml", "output.xml"])
+    assert result.exit_code != 0

@@ -193,29 +193,36 @@ def load_config_file(path: Path, label: str = "Config") -> tuple[dict, Any]:
 def write_config_file(path: Path, data: dict, preserve_doc: Any = None) -> None:
     """Write TOML/YAML configuration data to file, preserving comments when possible.
 
+    Writes are atomic (temp file + ``os.replace``) so an interrupted or failed
+    write can never truncate an existing configuration file.
+
     Args:
         path: File path to write to
         data: Dictionary of data to write
         preserve_doc: Optional existing TOML/YAML document to update (preserves comments)
     """
+    import io
+
+    from .files import atomic_write_text
+
     if path.suffix in (".yaml", ".yml"):
         from ruamel.yaml import YAML
 
         yaml = YAML()
+        stream = io.StringIO()
         if preserve_doc is not None:
             update_config_doc(preserve_doc, data)
-            with open(path, "w") as f:
-                yaml.dump(preserve_doc, f)
+            yaml.dump(preserve_doc, stream)
         else:
-            with open(path, "w") as f:
-                yaml.dump(data, f)
+            yaml.dump(data, stream)
+        atomic_write_text(path, stream.getvalue())
     else:
         # TOML
         if preserve_doc is not None:
             update_config_doc(preserve_doc, data)
-            path.write_text(tomlkit.dumps(preserve_doc))
+            atomic_write_text(path, tomlkit.dumps(preserve_doc))
         else:
-            path.write_text(tomlkit.dumps(data))
+            atomic_write_text(path, tomlkit.dumps(data))
 
 
 def _write_toml(path: Path, data: dict, preserve_doc: Any = None) -> None:

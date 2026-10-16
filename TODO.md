@@ -6,6 +6,9 @@
 
 ## 🔜 Next Up
 
+> Full audit findings are phased in `TODO-ENHANCEMENTS.md`
+> (P1 correctness → P2 security → P3 architecture → P4 CLI/UX → P5 tests/CI/docs).
+
 ### Simplification & Real-World Usability
 
 > Lots of features, most unused or overwhelming. Goal: a normal user

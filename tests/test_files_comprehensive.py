@@ -175,17 +175,16 @@ class TestHandleBinaryCopy:
         assert saved
 
     def test_handle_binary_copy_error(self, tmp_path):
-        """Binary copy should return (False, []) on OSError."""
+        """Binary copy failures must raise, not masquerade as "no change"."""
         from dot_man.files import _handle_binary_copy
 
         src = tmp_path / "src.bin"
         dst = tmp_path / "dst.bin"
-        src.write_bytes(b"\x01\x02")
+        src.write_bytes(b"\xff\xfe")
 
-        with patch("shutil.copy2", side_effect=OSError("copy failed")):
-            saved, secrets = _handle_binary_copy(src, dst, check_secrets=True)
-        assert not saved
-        assert not secrets
+        with patch("dot_man.files.shutil.copy2", side_effect=OSError("copy failed")):
+            with pytest.raises(OSError):
+                _handle_binary_copy(src, dst, check_secrets=True)
 
 
 class TestEnsureDirectory:
@@ -203,6 +202,32 @@ class TestEnsureDirectory:
         d.mkdir()
         ensure_directory(d)
         assert d.is_dir()
+
+    def test_ensure_directory_does_not_relax_existing_mode(self, tmp_path):
+        """Existing private dirs (e.g. ~/.ssh 0700) must keep their mode.
+
+        Deploying ~/.ssh/config once silently rewrote ~/.ssh to 0755 and ssh
+        then refused the key, so ensure_directory must never chmod a dir that
+        already exists.
+        """
+        from dot_man.files import ensure_directory
+
+        d = tmp_path / "ssh"
+        d.mkdir()
+        d.chmod(0o700)
+
+        ensure_directory(d)
+
+        assert (d.stat().st_mode & 0o777) == 0o700
+
+    def test_ensure_directory_creates_with_requested_mode(self, tmp_path):
+        from dot_man.files import ensure_directory
+
+        d = tmp_path / "new" / "nested"
+        ensure_directory(d, mode=0o700)
+
+        assert d.is_dir()
+        assert (d.stat().st_mode & 0o777) == 0o700
 
 
 class TestMatchesPatterns:
@@ -509,6 +534,36 @@ class TestCreateSymlink:
         assert create_symlink(src, dst) is True
         assert dst.is_symlink()
         assert dst.read_text() == "content"
+
+    def test_create_symlink_keeps_dest_when_backup_fails(self, tmp_path):
+        """A failed backup must abort before the destination is unlinked."""
+        from dot_man.files import create_symlink
+
+        src = tmp_path / "target.txt"
+        dst = tmp_path / "link.txt"
+        src.write_text("new content")
+        dst.write_text("precious user data")
+
+        with patch("dot_man.files.backup_file", return_value=None):
+            result = create_symlink(src, dst)
+
+        assert result is False
+        assert not dst.is_symlink()
+        assert dst.read_text() == "precious user data"
+
+    def test_copy_directory_counts_binary_failure(self, tmp_path):
+        """A binary file that fails to copy must increment the failure count."""
+        from dot_man.files import copy_directory
+
+        src_dir = tmp_path / "src"
+        src_dir.mkdir()
+        (src_dir / "blob.bin").write_bytes(b"\xff\xfe\xfd")
+
+        with patch("dot_man.files.shutil.copy2", side_effect=OSError("disk full")):
+            copied, failed, _ = copy_directory(src_dir, tmp_path / "dest")
+
+        assert copied == 0
+        assert failed == 1
 
     def test_create_symlink_source_not_found(self, tmp_path):
         from dot_man.files import create_symlink

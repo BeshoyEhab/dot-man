@@ -236,6 +236,47 @@ class TestAddSectionErrors:
             cfg.add_section("templates", ["~/x"])
 
 
+class TestReservedTables:
+    """Top-level reserved tables must never be treated as tracked sections."""
+
+    def test_secrets_table_is_not_a_section(self, tmp_path):
+        cfg = _load(
+            tmp_path,
+            "[secrets]\npatterns = ['CUSTOM_[A-Z]+']\n\n"
+            "[bashrc]\npaths = ['~/.bashrc']\n",
+        )
+
+        assert cfg.get_section_names() == ["bashrc"]
+
+    def test_secrets_name_reserved(self, tmp_path):
+        from dot_man.dotman_config import DotManConfig
+        from dot_man.exceptions import ConfigurationError
+
+        cfg = DotManConfig(tmp_path)
+        with pytest.raises(ConfigurationError, match="reserved"):
+            cfg.add_section("secrets", ["~/x"])
+
+
+class TestSectionEncryptionFields:
+    """Per-section encryption config must reach the resolved Section."""
+
+    def test_encryption_fields_forwarded(self, tmp_path):
+        cfg = _load(
+            tmp_path,
+            "[creds]\n"
+            "paths = ['~/.creds']\n"
+            "encrypted = true\n"
+            "encryption_method = 'age'\n"
+            "encryption_recipient = 'me@example.com'\n",
+        )
+
+        section = cfg.get_section("creds")
+
+        assert section.encrypted is True
+        assert section.encryption_method == "age"
+        assert section.encryption_recipient == "me@example.com"
+
+
 class TestUpdateSection:
     """update_section edits keys and removes them on None."""
 

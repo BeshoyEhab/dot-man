@@ -17,8 +17,13 @@ from .common import DotManGroup
 @click.version_option(version=__version__, prog_name="dot-man")
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed output on console")
 @click.option("--debug", is_flag=True, help="Enable debug logging to file")
+@click.option(
+    "--no-onboarding",
+    is_flag=True,
+    help="Skip the first-run onboarding tutorial",
+)
 @click.pass_context
-def cli(ctx, verbose: bool, debug: bool):
+def cli(ctx, verbose: bool, debug: bool, no_onboarding: bool):
     """dot-man: The Dotfile Manager for Professionals.
 
     Git-powered branching for your dotfiles. Switch between configurations

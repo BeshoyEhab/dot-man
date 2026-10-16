@@ -158,6 +158,25 @@ class TestCheckoutCommit:
         # Should be in detached HEAD state
         assert gm.repo.head.is_detached
 
+    def test_checkout_commit_updates_working_tree(self, tmp_path):
+        """checkout_commit must update the worktree, not just the HEAD ref.
+
+        Moving only ``head.reference`` leaves the checked-out files on the
+        newer commit, so callers that read REPO_DIR (rollback, navigate to a
+        tag/commit) deploy stale content instead of the requested one.
+        """
+        repo_path = _init_repo(tmp_path)
+        repo = Repo(repo_path)
+        (repo_path / "README.md").write_text("# changed")
+        repo.index.add(["README.md"])
+        repo.index.commit("Second commit")
+        first_sha = list(repo.iter_commits())[-1].hexsha
+
+        gm = GitManager(repo_path)
+        gm.checkout_commit(first_sha)
+
+        assert (repo_path / "README.md").read_text() == "# dot-man"
+
     def test_checkout_commit_invalid_sha(self, tmp_path):
         """checkout_commit should raise on invalid SHA."""
         from gitdb.exc import BadName

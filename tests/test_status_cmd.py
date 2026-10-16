@@ -267,3 +267,20 @@ class TestStatusNextSteps:
 
         assert result.exit_code == 0, result.output
         assert "Next Steps" not in result.output
+
+    def test_json_output_is_parseable(self, runner, mock_ops):
+        """`status --json` must emit pure JSON on stdout.
+
+        The repository-info panel used to print before the JSON branch, so
+        json.loads() failed on the leading Rich box-drawing characters.
+        """
+        import json
+
+        with patch("dot_man.operations.get_operations", return_value=mock_ops):
+            result = runner.invoke(cli, ["status", "--json"])
+
+        assert result.exit_code == 0, result.output
+        data = json.loads(result.output)
+        assert data["branch"] == "main"
+        assert data["summary"]["modified"] == 1
+        assert [s["name"] for s in data["sections"]] == ["shell", "config"]

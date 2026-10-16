@@ -190,6 +190,29 @@ class TestNavigateCommitReal:
         assert result.exit_code == 0
         assert "Commit: custom commit words" in result.output
 
+    def test_navigate_commit_deploys_and_marks_active(
+        self, navigate_integration, tmp_path
+    ):
+        """Navigating to a commit deploys that commit's config and marks it active."""
+        from dot_man.constants import REPO_DIR
+        from dot_man.core import GitManager
+        from dot_man.global_config import GlobalConfig
+
+        test_file = _add_tracked_file(navigate_integration, tmp_path, content="v1\n")
+        repo = GitManager(REPO_DIR).repo
+        repo.git.add(A=True)
+        repo.index.commit("seed commit config")
+        sha = repo.head.commit.hexsha
+
+        test_file.write_text("v2\n")
+        result = navigate_integration.invoke(cli, ["navigate", sha, "--no-save"])
+        assert result.exit_code == 0, f"Commit navigate failed: {result.output}"
+
+        assert test_file.read_text() == "v1\n"
+        gc = GlobalConfig()
+        gc.load()
+        assert gc.current_branch == sha
+
 
 class TestNavigateTagReal:
     """Test navigating to tags for real (covers the tag checkout fix)."""
@@ -224,6 +247,29 @@ class TestNavigateTagReal:
         assert result.exit_code == 0, f"Tag navigate failed: {result.output}"
         assert "Switched to tag 'v1.0'" in result.output
         assert GitManager(REPO_DIR).repo.head.is_detached
+
+    def test_navigate_tag_deploys_and_marks_active(
+        self, navigate_integration, tmp_path
+    ):
+        """Navigating to a tag deploys that tag's config and marks it active."""
+        from dot_man.constants import REPO_DIR
+        from dot_man.core import GitManager
+        from dot_man.global_config import GlobalConfig
+
+        test_file = _add_tracked_file(navigate_integration, tmp_path, content="v1\n")
+        repo = GitManager(REPO_DIR).repo
+        repo.git.add(A=True)
+        repo.index.commit("seed tag config")
+        self._make_tag("v1.0")
+
+        test_file.write_text("v2\n")
+        result = navigate_integration.invoke(cli, ["navigate", "v1.0", "--no-save"])
+        assert result.exit_code == 0, f"Tag navigate failed: {result.output}"
+
+        assert test_file.read_text() == "v1\n"
+        gc = GlobalConfig()
+        gc.load()
+        assert gc.current_branch == "v1.0"
 
     def test_navigate_tag_saves_first(self, navigate_integration, tmp_path):
         """Test navigating to a tag saves pending changes."""
@@ -349,6 +395,19 @@ class TestBranchNavigateSaveFlows:
         assert "Deployed 1 file" in result.output
         assert "Switched to 'hooked'" in result.output
         assert test_file.read_text() == "v1\n"
+
+    def test_navigate_auto_backups_before_switch(self, navigate_integration, tmp_path):
+        """A pre-switch snapshot is created so rollback has a recovery point."""
+        from dot_man.constants import BACKUPS_DIR
+
+        _add_tracked_file(navigate_integration, tmp_path)
+        self._make_branch("backup-target")
+        result = navigate_integration.invoke(
+            cli, ["navigate", "backup-target", "--no-save"]
+        )
+        assert result.exit_code == 0, f"Navigate failed: {result.output}"
+        snapshots = list(BACKUPS_DIR.iterdir()) if BACKUPS_DIR.exists() else []
+        assert snapshots, "expected a pre-switch backup snapshot"
 
     def test_save_reports_secrets(self, navigate_integration, tmp_path):
         """Test save warns when secrets are redacted mid-navigate."""

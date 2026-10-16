@@ -18,11 +18,11 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from .constants import CONFIG_FILE_PRIORITY
+from .constants import CONFIG_FILE_PRIORITY, RESERVED_TABLES
 
 __all__ = ["GitPlumbing", "GitPlumbingError", "SharedSectionSync", "SharedSyncReport"]
 
-_RESERVED_KEYS = {"templates", "secrets"}
+_RESERVED_KEYS = RESERVED_TABLES
 
 
 def _parse_toml(text: str) -> dict | None:

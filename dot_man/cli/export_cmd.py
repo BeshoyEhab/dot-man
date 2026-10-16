@@ -1,9 +1,7 @@
 """Export command for exporting dotfiles to portable formats."""
 
 import json
-import os
-import tarfile
-import zipfile
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -59,69 +57,65 @@ def export_cmd(format: str, output: str, branch: str | None, include_secrets: bo
     ui.console.print(f"[dim]Exporting branch: {current_branch}[/dim]")
 
     if format == "tar":
-        _export_tar(output, current_branch, include_secrets)
+        _export_archive(ops, current_branch, output, "tar.gz", include_secrets)
     elif format == "zip":
-        _export_zip(output, current_branch, include_secrets)
+        _export_archive(ops, current_branch, output, "zip", include_secrets)
     elif format == "json":
-        _export_json(output, current_branch, include_secrets)
+        _export_json(ops, output, current_branch, include_secrets)
 
 
-def _export_tar(output: str, branch: str, include_secrets: bool):
-    """Export to tar.gz archive."""
+def _export_archive(
+    ops, branch: str, output: str, fmt: str, include_secrets: bool
+) -> None:
+    """Export a branch's committed tree via `git archive`.
+
+    Using ``git archive`` (rather than copying the working directory) means the
+    requested ``--branch`` is honored even when it is not currently checked out,
+    and only committed content is exported.
+    """
+    suffix = ".tar.gz" if fmt == "tar.gz" else ".zip"
     output_path = Path(output).expanduser().resolve()
 
-    if not str(output_path).endswith((".tar.gz", ".tgz")):
-        output_path = output_path.with_suffix(".tar.gz")
+    if not str(output_path).endswith(suffix):
+        output_path = output_path.with_suffix(suffix)
 
-    ui.console.print(f"[dim]Creating tar archive: {output_path}[/dim]")
+    ui.console.print(
+        f"[dim]Creating {fmt} archive of branch '{branch}': {output_path}[/dim]"
+    )
+
+    if include_secrets:
+        ui.console.print(
+            "[yellow]Warning: archives contain the branch tree as committed; "
+            "encrypted secrets are not decrypted.[/yellow]"
+        )
 
     try:
-        with tarfile.open(output_path, "w:gz") as tar:
-            tar.add(REPO_DIR, arcname="dotman-export")
-
-        success(f"Exported to {output_path}")
+        ops.git.repo.git.archive(
+            f"--format={fmt}",
+            f"--output={output_path}",
+            "--prefix=dotman-export/",
+            branch,
+        )
+        success(f"Exported branch '{branch}' to {output_path}")
     except Exception as e:
         error(f"Export failed: {e}", exit_code=1)
 
 
-def _export_zip(output: str, branch: str, include_secrets: bool):
-    """Export to zip archive."""
-    output_path = Path(output).expanduser().resolve()
-
-    if not str(output_path).endswith(".zip"):
-        output_path = output_path.with_suffix(".zip")
-
-    ui.console.print(f"[dim]Creating zip archive: {output_path}[/dim]")
-
-    try:
-        with zipfile.ZipFile(output_path, "w", zipfile.ZIP_DEFLATED) as zipf:
-            for root, dirs, files in os.walk(REPO_DIR):
-                for file in files:
-                    file_path = Path(root) / file
-                    arcname = file_path.relative_to(REPO_DIR)
-                    zipf.write(file_path, arcname)
-
-        success(f"Exported to {output_path}")
-    except Exception as e:
-        error(f"Export failed: {e}", exit_code=1)
-
-
-def _export_json(output: str, branch: str, include_secrets: bool):
-    """Export to JSON manifest."""
+def _export_json(ops, output: str, branch: str, include_secrets: bool) -> None:
+    """Export a JSON manifest describing tracked files."""
     output_path = Path(output).expanduser().resolve()
 
     if not str(output_path).endswith(".json"):
         output_path = output_path.with_suffix(".json")
 
-    ui.console.print(f"[dim]Creating JSON manifest: {output_path}[/dim]")
+    ui.console.print(
+        f"[dim]Creating JSON manifest of branch '{branch}': {output_path}[/dim]"
+    )
 
-    from ..operations import get_operations
-
-    ops = get_operations()
     manifest: dict[str, Any] = {
         "version": "1.0",
         "branch": branch,
-        "exported_at": str(Path().home()),
+        "exported_at": datetime.now(timezone.utc).isoformat(),
         "files": [],
     }
 
@@ -129,26 +123,35 @@ def _export_json(output: str, branch: str, include_secrets: bool):
         section = ops.get_section(section_name)
         for path_str in section.paths:
             path = Path(path_str).expanduser()
-            if path.exists():
-                file_entry = {
-                    "section": section_name,
-                    "local_path": str(path),
-                    "repo_path": str(path_str),
-                }
+            if not path.exists():
+                continue
 
-                if include_secrets:
-                    try:
-                        with open(path, "r", encoding="utf-8", errors="ignore") as f:
-                            file_entry["content"] = f.read()
-                    except Exception:
-                        pass
+            file_entry = {
+                "section": section_name,
+                "local_path": str(path),
+                "repo_path": _repo_relative_path(section, path),
+            }
 
-                manifest["files"].append(file_entry)
+            if include_secrets:
+                try:
+                    file_entry["content"] = path.read_text(
+                        encoding="utf-8", errors="ignore"
+                    )
+                except Exception:
+                    pass
+
+            manifest["files"].append(file_entry)
 
     try:
-        with open(output_path, "w") as f:
-            json.dump(manifest, f, indent=2)
-
+        output_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
         success(f"Exported {len(manifest['files'])} files to {output_path}")
     except Exception as e:
         error(f"Export failed: {e}", exit_code=1)
+
+
+def _repo_relative_path(section, path: Path) -> str:
+    """Return the path a local file maps to inside the repository."""
+    try:
+        return str(section.get_repo_path(path, REPO_DIR).relative_to(REPO_DIR))
+    except (AttributeError, ValueError):
+        return str(path)

@@ -134,9 +134,12 @@ class GitManager:
             sha: Full or partial commit SHA
         """
         try:
-            # Try to resolve the commit
+            # Resolve first so a bad name/blob SHA raises here...
             commit = self.repo.commit(sha)
-            self.repo.head.reference = commit
+            # ...then actually check it out. Setting head.reference moves the
+            # ref only and leaves the worktree on the old content, so callers
+            # that read REPO_DIR would deploy stale files.
+            self.repo.git.checkout(commit.hexsha)
         except (GitCommandError, ValueError, OSError) as e:
             raise GitOperationError(f"Failed to checkout commit '{sha}': {e}")
 

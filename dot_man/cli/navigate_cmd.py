@@ -344,9 +344,14 @@ def _handle_commit_navigate(
 
     run_checkout_hooks("pre", commit_sha)
 
+    _auto_backup(ops, commit_sha)
+
     ops.git.checkout_commit(commit_sha)
     ui.console.print(f"  Checked out commit: [dim]{commit_sha}[/dim]")
     ui.console.print("[yellow]Note: You are in detached HEAD state[/yellow]")
+
+    _deploy_checked_out_config(ops, commit_sha)
+
     ui.console.print("  Use 'dot-man navigate <branch>' to return to a branch")
 
     run_checkout_hooks("post", commit_sha)
@@ -408,6 +413,8 @@ def _handle_tag_navigate(
         else:
             ui.console.print(f"  Saved {saved_count} files (no commit)")
 
+    _auto_backup(ops, tag_name)
+
     if base_branch and base_branch != "HEAD" and ops.git.branch_exists(base_branch):
         ops.git.checkout(base_branch)
         ui.console.print(f"  Switched to branch: {base_branch}")
@@ -418,6 +425,8 @@ def _handle_tag_navigate(
     # local branch heads, so checkout the tag's commit (detached HEAD).
     ops.git.checkout_commit(tag_commit)
     ui.console.print(f"  Checked out tag: [dim]{tag_name}[/dim]")
+
+    _deploy_checked_out_config(ops, tag_name)
 
     success(f"Switched to tag '{tag_name}'")
 
@@ -474,6 +483,60 @@ def _deploy_target_config(ops, current_branch, target_branch):
     ops.global_config.save()
 
     run_switch_hooks("post", ops, current_branch, target_branch)
+
+    run_branch_hooks(ops, "on_activate")
+    return deployed_count
+
+
+def _auto_backup(ops, label: str) -> None:
+    """Snapshot existing tracked paths before a switch for rollback safety."""
+    try:
+        paths_to_backup = []
+        for section_name in ops.get_sections():
+            section = ops.get_section(section_name)
+            paths_to_backup.extend([p for p in section.paths if p.exists()])
+
+        if paths_to_backup:
+            backup_id = ops.backups.create_backup(
+                paths_to_backup, note=f"pre-switch-{label}"
+            )
+            if backup_id:
+                ui.console.print(f"  [dim]Backup: {backup_id}[/dim]")
+    except Exception as e:
+        logging.debug("Auto-backup failed: %s", e)
+        warn(f"Auto-backup failed: {e}")
+
+
+def _deploy_checked_out_config(ops, label: str) -> int:
+    """Reload and deploy a just-checked-out config, marking it active.
+
+    Tag/commit navigation share this so they behave like branch navigation:
+    the checked-out configuration is deployed to $HOME and recorded as the
+    active configuration, instead of only moving git HEAD.
+    """
+    ops.reload_config()
+
+    ui.console.print()
+    ui.console.print(f"[bold]Deploying '{label}' configuration...[/bold]")
+
+    pre_hooks, post_hooks = _collect_deploy_hooks(ops)
+    _run_shell_hooks(pre_hooks, "Running pre-deploy hooks")
+
+    deploy_result = ops.deploy_all()
+    deployed_count = int(deploy_result["deployed"])
+    errors = [e for e in deploy_result["errors"] if e and str(e).strip()]
+
+    if errors:
+        for err in errors:
+            ui.console.print(f"  [red]• {err}[/red]")
+        ui.error(f"Encountered {len(errors)} errors during deploy:")
+
+    ui.console.print(f"  Deployed {deployed_count} files")
+
+    _run_shell_hooks(post_hooks, "Running post-deploy hooks")
+
+    ops.global_config.current_branch = label
+    ops.global_config.save()
 
     run_branch_hooks(ops, "on_activate")
     return deployed_count
@@ -638,6 +701,8 @@ def _switch_to_branch(ops, current_branch, target_branch, force):
             ui.console.print("[dim]Aborted.[/dim]")
             return False
         ui.console.print(f"  Creating new branch: [cyan]{target_branch}[/cyan]")
+
+    _auto_backup(ops, target_branch)
 
     ops.git.checkout(target_branch, create=not branch_exists)
     if branch_exists:

@@ -78,7 +78,8 @@ where = ["."]
 include = ["dot_man*"]
 
 [tool.setuptools.package-data]
-dot_man = ["py.typed", "completions/*"]
+dot_man = ["py.typed"]
+"dot_man.completions" = ["*.bash", "*.fish", "*.zsh"]
 
 [tool.black]
 line-length = 88

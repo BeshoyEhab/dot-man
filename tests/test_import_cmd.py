@@ -68,6 +68,18 @@ class TestDetectChezmoi:
 
         assert result is None
 
+    def test_returns_none_when_no_dirs_exist(self, tmp_path):
+        """The common case — no chezmoi installed — must return None, not crash."""
+        from dot_man.cli.import_cmd import _detect_chezmoi
+
+        home = tmp_path / "home"
+        home.mkdir()
+
+        with patch("dot_man.cli.import_cmd.Path.home", return_value=home):
+            result = _detect_chezmoi()
+
+        assert result is None
+
 
 class TestDetectYadm:
     """Tests for _detect_yadm()."""
