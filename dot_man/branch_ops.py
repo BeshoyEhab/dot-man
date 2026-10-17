@@ -172,11 +172,17 @@ class BranchMixin:
             if section_name:
                 try:
                     section = self.get_section(section_name)
-                except Exception:
+                except Exception as e:
+                    logging.debug(
+                        "Could not resolve section %s for hook detection: %s",
+                        section_name,
+                        e,
+                    )
                     section = None
             try:
                 branch = self.current_branch
-            except Exception:
+            except Exception as e:
+                logging.debug("Could not read current branch for hook detection: %s", e)
                 branch = ""
             if section is not None:
                 first = str(section.paths[0]) if section.paths else ""

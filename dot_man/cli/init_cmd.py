@@ -379,7 +379,8 @@ def _wizard_save_and_summarize(
         first_section = files_to_add[0][1]
         try:
             first_hook = dotman_config.get_section(first_section).post_deploy
-        except Exception:
+        except Exception as e:
+            logging.debug("Could not read post_deploy for %s: %s", first_section, e)
             first_hook = None
         example = _format_hook_example(first_section, first_hook)
         if example:

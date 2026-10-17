@@ -50,16 +50,20 @@ class TestResolveTarget:
 
     def test_invalid_target_returns_none(self):
         """Returns None when the target cannot be resolved."""
+        from git.exc import BadName
+
         git = MagicMock()
-        git.repo.commit.side_effect = Exception("not found")
+        git.repo.commit.side_effect = BadName("not found")
 
         result = _resolve_target(git, "nonexistent")
         assert result is None
 
     def test_git_command_failure_returns_none(self):
-        """Returns None when repo.commit raises any exception."""
+        """Returns None when repo.commit raises a git lookup error."""
+        from git.exc import BadName
+
         git = MagicMock()
-        git.repo.commit.side_effect = Exception("git error")
+        git.repo.commit.side_effect = BadName("git error")
 
         result = _resolve_target(git, "broken")
         assert result is None

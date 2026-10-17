@@ -5,6 +5,8 @@ from pathlib import Path
 from typing import cast
 
 import click
+from git import GitCommandError
+from git.exc import BadName
 from rich.table import Table
 
 from .. import ui
@@ -18,6 +20,68 @@ from .common import (
     warn,
 )
 from .interface import cli as main
+
+
+def _render_rollback_plan(git, resolved_sha: str, display_target: str) -> None:
+    """Print the target commit header and the files that will change."""
+    commit_obj = git.repo.commit(resolved_sha)
+    msg_first_line = str(commit_obj.message).strip().split("\n")[0]
+
+    ui.console.print()
+    ui.console.print("[bold]Rollback Plan[/bold]")
+    ui.console.print()
+    ui.console.print(f"  [dim]Target:[/dim]  {display_target}")
+    ui.console.print(
+        f"  [dim]Commit:[/dim]  [cyan]{resolved_sha[:7]}[/cyan]  {msg_first_line}"
+    )
+    ui.console.print(
+        f"  [dim]Author:[/dim]  {commit_obj.author.name}  "
+        f"[dim]{commit_obj.committed_datetime.strftime('%Y-%m-%d %H:%M')}[/dim]"
+    )
+    ui.console.print()
+
+    # Show which files would change
+    try:
+        diff_output = git.repo.git.diff("--name-status", f"{resolved_sha}...HEAD")
+        if diff_output.strip():
+            ui.console.print("[bold]Files that will change:[/bold]")
+            for line in diff_output.strip().splitlines()[:15]:
+                parts = line.split("\t", 1)
+                if len(parts) == 2:
+                    status_char, fname = parts
+                    colour = {"M": "yellow", "A": "green", "D": "red"}.get(
+                        status_char[0], "white"
+                    )
+                    label = {"M": "modified", "A": "added", "D": "deleted"}.get(
+                        status_char[0], status_char
+                    )
+                    ui.console.print(f"  [{colour}]{label:8}[/{colour}]  {fname}")
+            if diff_output.strip().count("\n") >= 15:
+                remaining = diff_output.strip().count("\n") - 14
+                ui.console.print(f"  [dim]… and {remaining} more[/dim]")
+        else:
+            ui.console.print("[dim]No file differences detected.[/dim]")
+    except (GitCommandError, ValueError, AttributeError):
+        logging.debug("Failed to compute diff for rollback preview")
+
+    ui.console.print()
+
+
+def _create_rollback_backup(ops) -> None:
+    """Snapshot current tracked paths before rolling back."""
+    ui.console.print("[bold]Creating safety backup of current state…[/bold]")
+    try:
+        paths_to_backup: list[Path] = []
+        for section_name in ops.get_sections():
+            section = ops.get_section(section_name)
+            paths_to_backup.extend(p for p in section.paths if p.exists())
+
+        if paths_to_backup:
+            backup_id = ops.backups.create_backup(paths_to_backup, note="pre-rollback")
+            if backup_id:
+                ui.console.print(f"  [green]✓[/green] Backup: {backup_id}")
+    except Exception as exc:
+        warn(f"Backup failed (continuing anyway): {exc}")
 
 
 @main.command("rollback", cls=AliasedCommand, aliases=["rol"])
@@ -111,47 +175,7 @@ def rollback(
 
         resolved_sha = cast(str, resolved_sha)
         # ── Show what we're rolling back to ───────────────────────────────────
-        commit_obj = git.repo.commit(resolved_sha)
-        msg_first_line = str(commit_obj.message).strip().split("\n")[0]
-
-        ui.console.print()
-        ui.console.print("[bold]Rollback Plan[/bold]")
-        ui.console.print()
-        ui.console.print(f"  [dim]Target:[/dim]  {display_target}")
-        ui.console.print(
-            f"  [dim]Commit:[/dim]  [cyan]{resolved_sha[:7]}[/cyan]  {msg_first_line}"
-        )
-        ui.console.print(
-            f"  [dim]Author:[/dim]  {commit_obj.author.name}  "
-            f"[dim]{commit_obj.committed_datetime.strftime('%Y-%m-%d %H:%M')}[/dim]"
-        )
-        ui.console.print()
-
-        # Show which files would change
-        try:
-            diff_output = git.repo.git.diff("--name-status", f"{resolved_sha}...HEAD")
-            if diff_output.strip():
-                ui.console.print("[bold]Files that will change:[/bold]")
-                for line in diff_output.strip().splitlines()[:15]:
-                    parts = line.split("\t", 1)
-                    if len(parts) == 2:
-                        status_char, fname = parts
-                        colour = {"M": "yellow", "A": "green", "D": "red"}.get(
-                            status_char[0], "white"
-                        )
-                        label = {"M": "modified", "A": "added", "D": "deleted"}.get(
-                            status_char[0], status_char
-                        )
-                        ui.console.print(f"  [{colour}]{label:8}[/{colour}]  {fname}")
-                if diff_output.strip().count("\n") >= 15:
-                    remaining = diff_output.strip().count("\n") - 14
-                    ui.console.print(f"  [dim]… and {remaining} more[/dim]")
-            else:
-                ui.console.print("[dim]No file differences detected.[/dim]")
-        except Exception:
-            logging.debug("Failed to compute diff for rollback preview")
-
-        ui.console.print()
+        _render_rollback_plan(git, resolved_sha, display_target)
 
         if dry_run:
             ui.console.print("[dim]Dry run — no changes made.[/dim]")
@@ -167,21 +191,7 @@ def rollback(
                 return
 
         # ── Auto-backup current state ─────────────────────────────────────────
-        ui.console.print("[bold]Creating safety backup of current state…[/bold]")
-        try:
-            paths_to_backup: list[Path] = []
-            for section_name in ops.get_sections():
-                section = ops.get_section(section_name)
-                paths_to_backup.extend(p for p in section.paths if p.exists())
-
-            if paths_to_backup:
-                backup_id = ops.backups.create_backup(
-                    paths_to_backup, note="pre-rollback"
-                )
-                if backup_id:
-                    ui.console.print(f"  [green]✓[/green] Backup: {backup_id}")
-        except Exception as exc:
-            warn(f"Backup failed (continuing anyway): {exc}")
+        _create_rollback_backup(ops)
 
         # ── Checkout target commit (detached HEAD) ────────────────────────────
         ui.console.print(f"[bold]Checking out {resolved_sha[:7]}…[/bold]")
@@ -260,5 +270,5 @@ def _resolve_target(git, target: str) -> str | None:
     try:
         commit = git.repo.commit(target)
         return cast(str, commit.hexsha)
-    except Exception:
+    except (GitCommandError, BadName, ValueError, KeyError, AttributeError):
         return None

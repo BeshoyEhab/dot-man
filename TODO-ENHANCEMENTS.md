@@ -211,7 +211,7 @@ green.
 | [x] | A9 Unreachable dead block in `_switch_to_branch` | Low | S | Low | `navigate_cmd.py:651-698` |
 | [x] | A10 `get_section` uncached; re-reads `global.toml` per hook | Low-Med | S | Med | `section.py:190-207` |
 | [ ] | A11 Mixins rely on implicit host state (13-method `FakeOps`) | Low-Med | M | Med | `operations.py:42`, `tests/test_branch_ops.py:11-65` |
-| [ ] | A12 Long functions mixing orchestration/rendering/hooks | Low | M | Med | `cli/doctor_cmd.py`, `cli/status_cmd.py`, `cli/rollback_cmd.py` |
+| [x] | A12 Long functions mixing orchestration/rendering/hooks | Low | M | Med | `cli/doctor_cmd.py`, `cli/status_cmd.py`, `cli/rollback_cmd.py` |
 | [x] | A13 `reload_config` clears only `_dotman_config` (stale watch) | Low | S | Low | `operations.py:94-96` |
 
 ### Details
@@ -261,20 +261,28 @@ picks up branch changes.
 
 ### Status (partial)
 
-Done in the Phase 3 pass: A2, A3, A5, A7, A8, A9, A10, A13. Two of these were
+Done in the Phase 3 pass: A2, A3, A5, A7, A8, A9, A10, A12, A13. Some were
 scoped, not exhaustive:
 
 - **A5** — single-sourced via `VALID_SECTION_KEYS = inspect.signature(
   Section.__init__)`; `to_dict`/`__init__` remain hand-written but are guarded
   by a test asserting every emitted key is valid.
 - **A6** — the four silent `except Exception: pass` sites (branch_ops,
-  secrets, template_cmd, export_cmd) now narrow + log; `core.py` and
-  `secrets.scan_git_history` handlers narrowed to Git/OS errors. The remaining
-  ~140 broad handlers are tracked as **A6b** (incremental, per-module).
+  secrets, template_cmd, export_cmd) now narrow + log; `core.py`,
+  `secrets.scan_git_history`, `rollback_cmd._resolve_target`, and the
+  branch_ops best-effort fallbacks were narrowed to specific errors. The
+  remaining ~140 broad handlers are tracked as **A6b** (incremental).
+- **A12** — `status`, `doctor`, and `rollback` command bodies now delegate to
+  module-level render/backup helpers.
 
-Still open: **A1** (unify library vs CLI switch path), **A4** (global
-singleton / import-time path binding), **A6b** (broad-handler sweep),
-**A11** (mixin → composition/Protocol), **A12** (extract long CLI bodies).
+Still open — deliberately deferred, each a high-complexity change that
+deserves its own focused pass rather than a rushed edit:
+
+- **A1** — unify the library `branch_ops` switch path with the CLI pipeline.
+- **A4** — replace import-time `REPO_DIR`/path binding with call-time accessors
+  or injected config (retires conftest's ~25 patch targets).
+- **A6b** — sweep the remaining broad `except Exception` handlers.
+- **A11** — replace the mixin trio with composition / a host `Protocol`.
 
 ---
 

@@ -10,6 +10,34 @@ from .common import AliasedCommand, error, require_init, success
 from .interface import cli as main
 
 
+class _DoctorReport:
+    """Collects pass/fail/warn outcomes and prints each check line."""
+
+    def __init__(self) -> None:
+        self.passed = 0
+        self.failed = 0
+        self.warned = 0
+
+    @staticmethod
+    def _line(mark: str, style: str, label: str, detail: str) -> str:
+        msg = f"[{style}]{mark}[/{style}] {label}"
+        if detail:
+            msg += f" [dim]({detail})[/dim]"
+        return msg
+
+    def check_pass(self, label: str, detail: str = "") -> None:
+        self.passed += 1
+        ui.console.print(self._line("✓", "success", label, detail))
+
+    def check_fail(self, label: str, detail: str = "") -> None:
+        self.failed += 1
+        ui.console.print(self._line("✗", "error", label, detail))
+
+    def check_warn(self, label: str, detail: str = "") -> None:
+        self.warned += 1
+        ui.console.print(self._line("⚠", "warning", label, detail))
+
+
 @main.command("doctor", cls=AliasedCommand, aliases=["doc"])
 @require_init
 def doctor():
@@ -21,33 +49,10 @@ def doctor():
     """
     from ..operations import get_operations
 
-    checks_passed = 0
-    checks_failed = 0
-    checks_warned = 0
-
-    def check_pass(label: str, detail: str = "") -> None:
-        nonlocal checks_passed
-        checks_passed += 1
-        msg = f"[success]✓[/success] {label}"
-        if detail:
-            msg += f" [dim]({detail})[/dim]"
-        ui.console.print(msg)
-
-    def check_fail(label: str, detail: str = "") -> None:
-        nonlocal checks_failed
-        checks_failed += 1
-        msg = f"[error]✗[/error] {label}"
-        if detail:
-            msg += f" [dim]({detail})[/dim]"
-        ui.console.print(msg)
-
-    def check_warn(label: str, detail: str = "") -> None:
-        nonlocal checks_warned
-        checks_warned += 1
-        msg = f"[warning]⚠[/warning] {label}"
-        if detail:
-            msg += f" [dim]({detail})[/dim]"
-        ui.console.print(msg)
+    report = _DoctorReport()
+    check_pass = report.check_pass
+    check_fail = report.check_fail
+    check_warn = report.check_warn
 
     ui.console.print("[bold]dot-man doctor[/bold]")
     ui.console.print()
@@ -211,20 +216,20 @@ def doctor():
 
     # Summary
     ui.console.print("[bold]Summary[/bold]")
-    total = checks_passed + checks_failed + checks_warned
+    total = report.passed + report.failed + report.warned
     ui.console.print(
-        f"  [success]{checks_passed}[/success] passed, "
-        f"[warning]{checks_warned}[/warning] warnings, "
-        f"[error]{checks_failed}[/error] failed "
+        f"  [success]{report.passed}[/success] passed, "
+        f"[warning]{report.warned}[/warning] warnings, "
+        f"[error]{report.failed}[/error] failed "
         f"[dim]({total} checks)[/dim]"
     )
 
-    if checks_failed == 0:
+    if report.failed == 0:
         ui.console.print()
         success("dot-man is healthy!")
     else:
         ui.console.print()
         error(
-            f"{checks_failed} check(s) failed. See above for details.",
+            f"{report.failed} check(s) failed. See above for details.",
             exit_code=1,
         )

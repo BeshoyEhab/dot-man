@@ -104,6 +104,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Silent exception handlers narrowed** — the bare `except Exception: pass`
   sites in `branch_ops`/`secrets`/`template_cmd`/`export_cmd` now catch
   specific errors and log; `core`/`secrets` git handlers target Git/OS errors.
+- **Long command bodies extracted** — `status`, `doctor`, and `rollback` now
+  delegate rendering/backup to module-level helpers instead of inline blocks.
 
 ## [1.5.0] - 2026-10-09
 
