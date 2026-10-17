@@ -7,10 +7,11 @@ from pathlib import Path
 import click
 
 from .. import ui
-from ..constants import REPO_DIR
+from ..constants import LOCK_FILE, REPO_DIR
 from ..core import GitManager
 from ..files import compare_files
 from ..hooks import run_checkout_hooks, run_switch_hooks
+from ..lock import FileLock, LockError
 from .common import (
     BRANCH,
     AliasedCommand,
@@ -794,12 +795,23 @@ def _handle_branch_navigate(
         f"[bold]Navigating to branch[/bold] [cyan]{target_branch}[/cyan]..."
     )
 
-    _save_before_navigate(ops, current_branch, target_branch, save_mode, commit_message)
+    # Hold one lock across save + checkout + deploy so a concurrent dot-man
+    # process cannot interleave and deploy a half-switched configuration.
+    # save_all/deploy_all take the same lock; FileLock is reentrant per thread.
+    deployed_count = 0
+    try:
+        with FileLock(LOCK_FILE):
+            _save_before_navigate(
+                ops, current_branch, target_branch, save_mode, commit_message
+            )
 
-    if not _switch_to_branch(ops, current_branch, target_branch, force):
+            if not _switch_to_branch(ops, current_branch, target_branch, force):
+                return
+
+            deployed_count = _deploy_target_config(ops, current_branch, target_branch)
+    except LockError as e:
+        error(str(e))
         return
-
-    deployed_count = _deploy_target_config(ops, current_branch, target_branch)
 
     ui.console.print()
     success(f"Switched to '{target_branch}'")

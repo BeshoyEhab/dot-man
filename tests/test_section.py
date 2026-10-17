@@ -310,11 +310,10 @@ class TestResolveHook:
         assert "{config_root}" not in result
 
     def test_resolve_paths_placeholder(self):
-        """{paths} must render the exact space-joined path list.
+        """{paths} renders each shell-quoted path, space-separated.
 
-        Pinning the full string (not substrings) catches separator or
-        expansion regressions. Path inputs are stored verbatim, so the
-        assertion is hermetic — no home-directory coupling.
+        Values are quoted (S2) so a path containing shell metacharacters
+        cannot inject commands into the hook's `sh -c` invocation.
         """
         from dot_man.section import Section
 
@@ -323,7 +322,7 @@ class TestResolveHook:
             paths=[Path("~/.config/nvim"), Path("~/.vimrc")],
         )
         result = section._resolve_hook("echo {paths}")
-        assert result == "echo ~/.config/nvim ~/.vimrc"
+        assert result == "echo '~/.config/nvim' '~/.vimrc'"
 
     def test_resolve_qs_config_backward_compat(self):
         """{qs_config} should still work as alias for {config_name}."""
@@ -593,6 +592,27 @@ class TestSectionMethods:
         result = section.get_repo_path(source, tmp_path / "repo")
 
         assert str(result) == str(tmp_path / "repo" / "nvim" / "lua" / "mod.lua")
+
+    def test_get_repo_path_rejects_escape(self, tmp_path):
+        """An explicit repo_path must stay inside the repository (S6)."""
+        from dot_man.exceptions import ConfigValidationError
+        from dot_man.section import Section
+
+        section = Section(
+            name="evil",
+            paths=["~/.bashrc"],
+            repo_path="../../etc/passwd",
+        )
+        with pytest.raises(ConfigValidationError):
+            section.get_repo_path(Path("/home/user/.bashrc"), tmp_path / "repo")
+
+    def test_get_repo_path_rejects_absolute_repo_path(self, tmp_path):
+        from dot_man.exceptions import ConfigValidationError
+        from dot_man.section import Section
+
+        section = Section(name="evil", paths=["~/.bashrc"], repo_path="/etc/passwd")
+        with pytest.raises(ConfigValidationError):
+            section.get_repo_path(Path("/home/user/.bashrc"), tmp_path / "repo")
 
     def test_get_repo_path_same_basename_different_dirs_do_not_collide(self, tmp_path):
         """Two files with the same basename in different subdirectories must

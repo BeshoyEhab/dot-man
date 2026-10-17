@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **`bootstrap` no longer uses `shell=True`** — package names come from the
+  repo config, so a crafted name could run arbitrary commands; they are now
+  validated and executed as argv with `shell=False`.
+- **Hook placeholders are shell-quoted** — values substituted into `{...}` /
+  `pre_deploy` etc. are `shlex.quote`d, closing injection via tracked paths.
+- **Encryption is wired into save/deploy** — encrypted sections were stored in
+  cleartext; save now writes only ciphertext (plaintext removed) and deploy
+  decrypts to the target.
+- **Secret lines are masked in output** — `audit` and the interactive secret
+  prompt no longer print the live secret; JSON `export --include-secrets` is
+  written `0600`.
+- **`atomic_write_text` preserves the destination's mode** — overwriting a
+  `0600` file (e.g. `~/.ssh/config`) no longer widens it to `0644`.
+- **`repo_path` cannot escape `REPO_DIR`** — an explicit path outside the repo
+  is rejected at load time.
+- **Vault key hardening** — the key is created `0600` atomically (no
+  write-then-chmod race); key rotation keeps a recovery backup only when opted
+  in and restores state if the vault write fails.
+- **`audit --history`** — scans commit history and the index for secrets that
+  were committed and later removed.
+- **Stronger secret detection** — values are checked (not whole lines) for
+  false positives, entropy scoring gates generic high-entropy strings, and
+  GitHub/GitLab/Slack/AWS-STS token formats are covered.
+- **GPG/AGE argument-injection and output-permission fixes** — recipients are
+  validated, `--` terminates options, symmetric mode is non-interactive
+  (`--batch`), and decrypted files are chmod `0600`.
+- **File lock waits instead of failing instantly and is reentrant** —
+  navigate holds one lock across save/switch/deploy.
+- **Copy writes refuse symlinked destinations by default** — deploy opts in
+  explicitly; saves guard against redirected writes.
+- **`watch` reports redacted secrets** — file, pattern, and masked line are
+  shown instead of silently redacting.
+
 ### Fixed
 
 - **Navigate to a commit/tag now deploys and records the branch** — previously

@@ -164,6 +164,33 @@ class TestRunWithPm:
 
                     assert _run_with_pm("apt", "apt install {package}", "pkg") is False
 
+    def test_runs_without_shell(self):
+        """Commands must run as an argv list with no shell interpolation."""
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stderr="")
+            with patch("dot_man.cli.bootstrap_cmd.ui"):
+                from dot_man.cli.bootstrap_cmd import _run_with_pm
+
+                assert _run_with_pm("brew", "brew install {package}", "git") is True
+
+        args, kwargs = mock_run.call_args
+        assert isinstance(args[0], list)
+        assert kwargs.get("shell", False) is False
+
+    def test_rejects_shell_metacharacters(self):
+        """A malicious package name must never reach the shell."""
+        with patch("subprocess.run") as mock_run:
+            with patch("dot_man.cli.bootstrap_cmd.ui"):
+                with patch("dot_man.cli.bootstrap_cmd.warn"):
+                    from dot_man.cli.bootstrap_cmd import _run_with_pm
+
+                    result = _run_with_pm(
+                        "apt", "apt install -y {package}", "evil; touch /tmp/pwned"
+                    )
+
+        assert result is False
+        mock_run.assert_not_called()
+
 
 class TestBootstrapCommand:
     """Test the bootstrap CLI command."""

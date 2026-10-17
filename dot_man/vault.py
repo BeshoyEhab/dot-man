@@ -3,9 +3,11 @@
 __all__ = ["SecretVault", "VaultError"]
 
 import json
+import os
 import threading
 from contextlib import contextmanager
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, Generator, Optional
 
 from cryptography.fernet import Fernet
@@ -77,15 +79,51 @@ class SecretVault:
                 raise VaultError(f"Failed to load encryption key: {e}")
 
     def _generate_key(self) -> None:
-        """Generate a new encryption key."""
+        """Generate a new encryption key with 0600 from creation.
+
+        Creating the file via ``os.open`` with the mode set at open time
+        avoids the write-then-chmod window where the key was briefly
+        world-readable under a permissive umask.
+        """
         key = Fernet.generate_key()
 
         # Ensure config dir exists
         self.config_dir.mkdir(parents=True, exist_ok=True)
 
-        # Save key with restricted permissions
-        self.key_file.write_bytes(key)
-        self.key_file.chmod(0o600)  # Read/write for owner only
+        try:
+            fd = os.open(
+                str(self.key_file), os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600
+            )
+        except FileExistsError:
+            # Another process won the race; keep its key.
+            return
+        with os.fdopen(fd, "wb") as f:
+            f.write(key)
+
+    @staticmethod
+    def _atomic_write_key(path: Path, data: bytes) -> None:
+        """Atomically replace a key file, 0600 from creation."""
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        fd = os.open(str(tmp), os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        try:
+            with os.fdopen(fd, "wb") as f:
+                f.write(data)
+        except OSError:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise
+        os.replace(tmp, path)
+
+    @staticmethod
+    def _keep_key_backup_enabled() -> bool:
+        return os.environ.get("DOTMAN_KEEP_KEY_BACKUP", "").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+            "on",
+        }
 
     def load(self) -> None:
         """Load vault data from disk if changed."""
@@ -316,11 +354,16 @@ class SecretVault:
 
         return pattern.sub(replace_match, content)
 
-    def rotate_key(self) -> int:
+    def rotate_key(self, keep_backup: bool = False) -> int:
         """Generate a new key and re-encrypt all secrets.
 
         Returns the number of secrets re-encrypted.
         Raises VaultError if any decryption fails (aborts without modifying).
+
+        The old key is written to ``.key.bak`` before the swap so an
+        interrupted rotation stays recoverable; that backup is removed on
+        success unless retention is opted into (``keep_backup=True`` or the
+        ``DOTMAN_KEEP_KEY_BACKUP`` environment variable).
         """
         with self._lock:
             self.load()
@@ -337,24 +380,38 @@ class SecretVault:
                         f"Failed to decrypt secret in {s['file_path']}: {e}"
                     )
 
-            # Generate new key
+            # Generate new key and re-encrypt in memory
             new_key = Fernet.generate_key()
             new_fernet = Fernet(new_key)
-
-            # Re-encrypt with new key
+            original_values = [s["encrypted_value"] for s in self._data["secrets"]]
             for s, pt in zip(self._data["secrets"], plaintexts):
                 s["encrypted_value"] = new_fernet.encrypt(pt).decode("utf-8")
 
-            # Backup old key, write new key
+            self.config_dir.mkdir(parents=True, exist_ok=True)
             backup = self.key_file.with_suffix(".key.bak")
-            if backup.exists():
-                backup.unlink()
-            self.key_file.rename(backup)
-            self.key_file.write_bytes(new_key)
-            self.key_file.chmod(0o600)
 
-            # Update state
-            self._fernet = new_fernet
-            self.save()
+            # Recovery point: keep the old key until the new vault is durable.
+            if self.key_file.exists():
+                self._atomic_write_key(backup, self.key_file.read_bytes())
+
+            try:
+                self._atomic_write_key(self.key_file, new_key)
+                self._fernet = new_fernet
+                self.save()
+            except Exception:
+                # Restore the old key and in-memory ciphertext so the old
+                # vault remains decryptable.
+                self._fernet = old_fernet
+                if backup.exists():
+                    os.replace(backup, self.key_file)
+                for s, old_value in zip(self._data["secrets"], original_values):
+                    s["encrypted_value"] = old_value
+                raise
+
+            if not (keep_backup or self._keep_key_backup_enabled()):
+                try:
+                    backup.unlink()
+                except OSError:
+                    pass
 
             return len(self._data["secrets"])

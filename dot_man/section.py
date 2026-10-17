@@ -216,8 +216,18 @@ class Section:
         back to the basename under ``repo_base``.
         """
         if self.repo_path:
-            # Explicit repo_path for single files
-            return repo_dir / self.repo_path
+            # Explicit repo_path for single files — must stay inside the repo,
+            # otherwise a crafted config could read/write arbitrary paths.
+            target = repo_dir / self.repo_path
+            try:
+                inside = target.resolve().is_relative_to(repo_dir.resolve())
+            except (OSError, RuntimeError):
+                inside = False
+            if not inside:
+                raise ConfigValidationError(
+                    f"repo_path {self.repo_path!r} escapes the repository."
+                )
+            return target
         for tracked in self.paths:
             for root in (tracked, Path(tracked.expanduser())):
                 try:

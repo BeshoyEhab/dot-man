@@ -144,6 +144,9 @@ def _export_json(ops, output: str, branch: str, include_secrets: bool) -> None:
 
     try:
         output_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+        if include_secrets:
+            # Secret-bearing manifests must not be world-readable.
+            output_path.chmod(0o600)
         success(f"Exported {len(manifest['files'])} files to {output_path}")
     except Exception as e:
         error(f"Export failed: {e}", exit_code=1)

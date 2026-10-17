@@ -487,6 +487,58 @@ class TestGetFileStatus:
         assert get_file_status(local, repo) == "MODIFIED"
 
 
+class TestSymlinkDestinationGuard:
+    """S12: refuse to write through a symlinked destination by default."""
+
+    def test_smart_save_refuses_symlink_destination(self, tmp_path):
+        from dot_man.files import smart_save_file
+
+        src = tmp_path / "src.txt"
+        src.write_text("new content")
+        target = tmp_path / "target.txt"
+        target.write_text("original")
+        dest = tmp_path / "dest.txt"
+        dest.symlink_to(target)
+
+        saved, _ = smart_save_file(src, dest)
+
+        assert saved is False
+        assert target.read_text() == "original"
+        assert dest.is_symlink()
+
+    def test_smart_save_allows_symlink_when_opted_in(self, tmp_path):
+        from dot_man.files import smart_save_file
+
+        src = tmp_path / "src.txt"
+        src.write_text("new content")
+        target = tmp_path / "target.txt"
+        target.write_text("original")
+        dest = tmp_path / "dest.txt"
+        dest.symlink_to(target)
+
+        saved, _ = smart_save_file(src, dest, allow_symlink=True)
+
+        assert saved is True
+        assert not dest.is_symlink()
+        assert dest.read_text() == "new content"
+        assert target.read_text() == "original"
+
+    def test_copy_file_refuses_symlink_destination(self, tmp_path):
+        from dot_man.files import copy_file
+
+        src = tmp_path / "src.txt"
+        src.write_text("new content")
+        target = tmp_path / "target.txt"
+        target.write_text("original")
+        dest = tmp_path / "dest.txt"
+        dest.symlink_to(target)
+
+        saved, _ = copy_file(src, dest, filter_secrets_enabled=False)
+
+        assert saved is False
+        assert target.read_text() == "original"
+
+
 class TestCreateSymlink:
     def test_create_symlink_basic(self, tmp_path):
         from dot_man.files import create_symlink

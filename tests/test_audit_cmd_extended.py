@@ -58,6 +58,7 @@ def make_match(
     match.pattern_name = pattern
     match.severity = MagicMock()
     match.severity.value = severity
+    match.history_ref = ""
     return match
 
 
@@ -222,6 +223,48 @@ class TestAuditExceptions:
         ):
             result = runner.invoke(cli, ["audit"])
         assert result.exit_code != 0
+
+    def test_dotman_error_with_exit_code(self, runner):
+        from dot_man.exceptions import DotManError
+
+        with patch(
+            "dot_man.cli.audit_cmd.get_custom_scanner",
+            side_effect=DotManError("boom", exit_code=7),
+        ):
+            result = runner.invoke(cli, ["audit"])
+        assert result.exit_code == 7
+
+    def test_permanently_redacted_secrets_are_filtered(self, runner, clean_repo):
+        with patch("dot_man.cli.audit_cmd.REPO_DIR", clean_repo):
+            with patch("dot_man.cli.audit_cmd.get_custom_scanner") as mock_scanner:
+                mock_scanner.return_value.scan_directory.return_value = [
+                    make_match(repo_dir=clean_repo)
+                ]
+                with patch("dot_man.cli.audit_cmd.SecretGuard") as MockGuard:
+                    MockGuard.return_value.is_allowed.return_value = False
+                    with patch(
+                        "dot_man.cli.audit_cmd.PermanentRedactGuard"
+                    ) as MockPerm:
+                        MockPerm.return_value.should_redact.return_value = True
+                        result = runner.invoke(cli, ["audit"])
+        assert result.exit_code == 0
+        assert "No secrets detected" in result.output
+
+    def test_history_matches_displayed(self, runner, clean_repo):
+        with patch("dot_man.cli.audit_cmd.REPO_DIR", clean_repo):
+            with patch("dot_man.cli.audit_cmd.get_custom_scanner") as mock_scanner:
+                historical = make_match(repo_dir=clean_repo, filename="old.txt")
+                historical.history_ref = "abc1234"
+                mock_scanner.return_value.scan_directory.return_value = [historical]
+                with patch("dot_man.cli.audit_cmd.SecretGuard") as MockGuard:
+                    MockGuard.return_value.is_allowed.return_value = False
+                    with patch(
+                        "dot_man.cli.audit_cmd.PermanentRedactGuard"
+                    ) as MockPerm:
+                        MockPerm.return_value.should_redact.return_value = False
+                        result = runner.invoke(cli, ["audit"])
+        assert result.exit_code == 0
+        assert "abc1234" in result.output
 
     def test_keyboard_interrupt(self, runner):
         with patch(

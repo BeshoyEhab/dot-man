@@ -151,7 +151,29 @@ class TestExportJson:
         datetime.fromisoformat(data["exported_at"])
         assert data["files"][0]["repo_path"] == "shell/.bashrc"
 
-    def test_include_secrets_embeds_content(self, runner, tmp_path, initialized):
+    def test_no_content_without_include_secrets(self, runner, tmp_path, initialized):
+        bashrc = tmp_path / ".bashrc"
+        bashrc.write_text("secret")
+
+        section = Section(name="shell", paths=[str(bashrc)], repo_base="shell")
+        ops = MagicMock()
+        ops.current_branch = "main"
+        ops.get_sections.return_value = ["shell"]
+        ops.get_section.return_value = section
+
+        output = tmp_path / "manifest.json"
+        with (
+            patch("dot_man.operations.get_operations", return_value=ops),
+            patch("dot_man.cli.export_cmd.REPO_DIR", tmp_path / "repo"),
+        ):
+            runner.invoke(cli, ["export", "json", str(output)])
+
+        data = json.loads(output.read_text())
+        assert "content" not in data["files"][0]
+
+    def test_include_secrets_embeds_content_and_is_private(
+        self, runner, tmp_path, initialized
+    ):
         bashrc = tmp_path / ".bashrc"
         bashrc.write_text("export EDITOR=vim")
 
@@ -173,26 +195,7 @@ class TestExportJson:
         assert result.exit_code == 0, result.output
         data = json.loads(output.read_text())
         assert data["files"][0]["content"] == "export EDITOR=vim"
-
-    def test_no_content_without_include_secrets(self, runner, tmp_path, initialized):
-        bashrc = tmp_path / ".bashrc"
-        bashrc.write_text("secret")
-
-        section = Section(name="shell", paths=[str(bashrc)], repo_base="shell")
-        ops = MagicMock()
-        ops.current_branch = "main"
-        ops.get_sections.return_value = ["shell"]
-        ops.get_section.return_value = section
-
-        output = tmp_path / "manifest.json"
-        with (
-            patch("dot_man.operations.get_operations", return_value=ops),
-            patch("dot_man.cli.export_cmd.REPO_DIR", tmp_path / "repo"),
-        ):
-            runner.invoke(cli, ["export", "json", str(output)])
-
-        data = json.loads(output.read_text())
-        assert "content" not in data["files"][0]
+        assert (output.stat().st_mode & 0o777) == 0o600
 
     def test_json_adds_suffix(self, runner, tmp_path, initialized):
         ops = MagicMock()

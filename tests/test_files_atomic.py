@@ -24,6 +24,22 @@ def test_atomic_write_text_overwrite(tmp_path):
     assert dest.read_text(encoding="utf-8") == new_content
 
 
+def test_atomic_write_text_preserves_mode(tmp_path):
+    """Overwriting a private file must not widen its permissions.
+
+    The temp file is umask-based; without copying the destination's mode,
+    replacing a 0600 secret file (e.g. ~/.ssh/config) relaxed it to 0644.
+    """
+    dest = tmp_path / "private.txt"
+    dest.write_text("secret", encoding="utf-8")
+    dest.chmod(0o600)
+
+    atomic_write_text(dest, "updated secret")
+
+    assert dest.read_text(encoding="utf-8") == "updated secret"
+    assert (dest.stat().st_mode & 0o777) == 0o600
+
+
 def test_smart_save_file_identical(tmp_path):
     src = tmp_path / "src.txt"
     dest = tmp_path / "dest.txt"

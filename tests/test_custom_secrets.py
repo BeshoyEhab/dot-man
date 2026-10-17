@@ -160,7 +160,8 @@ def test_cli_audit_with_custom_patterns(integration_runner):
     # Run audit command via runner
     result = integration_runner.invoke(cli, ["audit"])
 
-    # Should detect the secret
+    # Should detect the secret without echoing its value (S4 masking)
     assert result.exit_code == 0
     assert "Internal ID" in result.output
-    assert "internal_id_token_ab12cd34" in result.output
+    assert "internal_id_token_ab12cd34" not in result.output
+    assert "***" in result.output

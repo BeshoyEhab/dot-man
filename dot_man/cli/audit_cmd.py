@@ -16,14 +16,21 @@ from .interface import cli as main
     "--strict", is_flag=True, help="Exit with error if secrets found (for CI/CD)"
 )
 @click.option("--fix", is_flag=True, help="Automatically redact found secrets")
+@click.option(
+    "--history",
+    is_flag=True,
+    help="Also scan git history and staged content (finds removed secrets)",
+)
 @require_init
-def audit(strict: bool, fix: bool):
+def audit(strict: bool, fix: bool, history: bool):
     """Scan repository for accidentally committed secrets.
 
     Scans all files in the repository for API keys, passwords,
     private keys, and other sensitive data.
 
     Use --strict in CI/CD pipelines to fail builds if secrets are found.
+    Use --history to also scan commit history and the index, which catches
+    secrets that were committed and later removed from the working tree.
     """
     try:
         scanner = get_custom_scanner()
@@ -36,6 +43,10 @@ def audit(strict: bool, fix: bool):
         ui.console.print()
 
         all_matches = list(scanner.scan_directory(REPO_DIR))
+
+        if history:
+            git = GitManager()
+            all_matches.extend(scanner.scan_git_history(git.repo))
 
         # Filter out allowed or permanently redacted secrets
         matches = [
@@ -81,10 +92,16 @@ def audit(strict: bool, fix: bool):
             ui.console.print("─" * 50)
 
             for match in items:
-                rel_path = match.file.relative_to(REPO_DIR)
-                ui.console.print(f"  File: [cyan]{rel_path}[/cyan]")
+                if match.history_ref:
+                    ui.console.print(
+                        f"  File: [cyan]{match.file}[/cyan] "
+                        f"[dim]({match.history_ref})[/dim]"
+                    )
+                else:
+                    rel_path = match.file.relative_to(REPO_DIR)
+                    ui.console.print(f"  File: [cyan]{rel_path}[/cyan]")
                 ui.console.print(
-                    f"  Line {match.line_number}: {match.line_content[:60]}..."
+                    f"  Line {match.line_number}: {match.masked_line[:60]}..."
                 )
                 ui.console.print(f"  Pattern: {match.pattern_name}")
                 ui.console.print()
@@ -110,25 +127,30 @@ def audit(strict: bool, fix: bool):
                 ui.info("Aborted.")
                 return
 
-            # Perform redaction
-            fixed_files = set()
-            for match in matches:
-                if match.file in fixed_files:
-                    continue
+            # Perform redaction (working-tree findings only; historical blobs
+            # can't be edited in place).
+            fixable = [m for m in matches if not m.history_ref]
+            if not fixable:
+                ui.info("Nothing to redact in the working tree.")
+            else:
+                fixed_files = set()
+                for match in fixable:
+                    if match.file in fixed_files:
+                        continue
 
-                content = match.file.read_text()
-                redacted, count = scanner.redact_content(content)
-                if count > 0:
-                    match.file.write_text(redacted)
-                    fixed_files.add(match.file)
-                    ui.console.print(
-                        f"  [green]✓[/green] Redacted {count} secrets in {match.file.name}"
-                    )
+                    content = match.file.read_text()
+                    redacted, count = scanner.redact_content(content)
+                    if count > 0:
+                        match.file.write_text(redacted)
+                        fixed_files.add(match.file)
+                        ui.console.print(
+                            f"  [green]✓[/green] Redacted {count} secrets in {match.file.name}"
+                        )
 
-            # Commit changes
-            git = GitManager()
-            git.commit("Security: Auto-redacted secrets detected by audit")
-            success(f"Redacted secrets in {len(fixed_files)} files")
+                # Commit changes
+                git = GitManager()
+                git.commit("Security: Auto-redacted secrets detected by audit")
+                success(f"Redacted secrets in {len(fixed_files)} files")
 
         if strict:
             error("Secrets detected (strict mode)", exit_code=50)

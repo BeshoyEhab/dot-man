@@ -579,6 +579,25 @@ class TestWatchObserverBackend:
         assert "Stopped" in result.output
 
 
+class TestWatchSecretAudit:
+    """S13: redacted secrets must leave a visible audit trail."""
+
+    def test_watch_reports_redacted_secrets(self, integration_runner, tmp_path):
+        from dot_man.operations import reset_operations
+
+        test_file = _make_watch_file(integration_runner, tmp_path)
+        test_file.write_text("key = AKIAIOSFODNN7REALKEY1\n")
+        reset_operations()
+
+        result = _run_watch_polling(integration_runner, ["--no-commit"])
+
+        assert result.exit_code == 0, result.output
+        assert "AWS Access Key ID" in result.output
+        assert "Secrets were detected" in result.output
+        # The live secret value must never be echoed.
+        assert "AKIAIOSFODNN7REALKEY1" not in result.output
+
+
 class TestWatchTopLevelErrors:
     """Test watch command-level error handling."""
 

@@ -153,15 +153,92 @@ def test_rotate_key(vault):
     vault.stash_secret("f1", 1, "p1", "secret1", "main")
     vault.stash_secret("f2", 2, "p2", "secret2", "work")
 
-    count = vault.rotate_key()
+    count = vault.rotate_key(keep_backup=True)
     assert count == 2
 
-    # Old key backed up
+    # Old key backed up when retention is opted in
     assert vault.key_file.with_suffix(".key.bak").exists()
 
     # Secrets still decryptable
     assert vault.get_secret("f1", 1, "main") == "secret1"
     assert vault.get_secret("f2", 2, "work") == "secret2"
+
+
+def test_rotate_key_drops_backup_by_default(vault):
+    """`.key.bak` must not accumulate unless retention is opted in."""
+    vault.stash_secret("f1", 1, "p1", "secret1", "main")
+
+    vault.rotate_key()
+
+    assert not vault.key_file.with_suffix(".key.bak").exists()
+    assert vault.get_secret("f1", 1, "main") == "secret1"
+
+
+def test_rotate_key_keep_backup_env(vault, monkeypatch):
+    vault.stash_secret("f1", 1, "p1", "secret1", "main")
+    monkeypatch.setenv("DOTMAN_KEEP_KEY_BACKUP", "1")
+
+    vault.rotate_key()
+
+    assert vault.key_file.with_suffix(".key.bak").exists()
+
+
+def test_generated_key_is_private(temp_vault_dir):
+    """The key must be created 0600 with no world-readable window (S7)."""
+    v = SecretVault()
+    v.config_dir = temp_vault_dir
+    v.vault_file = temp_vault_dir / "vault.json"
+    v.key_file = temp_vault_dir / ".key"
+
+    v._get_fernet()
+
+    assert v.key_file.exists()
+    assert (v.key_file.stat().st_mode & 0o777) == 0o600
+
+
+def test_generate_key_keeps_existing_on_race(temp_vault_dir):
+    """If another process created the key first, _generate_key keeps it."""
+    v = SecretVault()
+    v.config_dir = temp_vault_dir
+    v.key_file = temp_vault_dir / ".key"
+    v.key_file.write_bytes(b"existing-key")
+
+    v._generate_key()
+
+    assert v.key_file.read_bytes() == b"existing-key"
+
+
+def test_rotate_key_restores_state_on_save_failure(vault, monkeypatch):
+    """A failed rotation must leave the old key and vault usable."""
+    vault.stash_secret("f1", 1, "p1", "secret1", "main")
+    old_key = vault.key_file.read_bytes()
+
+    def boom() -> None:
+        raise OSError("disk full")
+
+    monkeypatch.setattr(vault, "save", boom)
+
+    with pytest.raises(OSError):
+        vault.rotate_key()
+
+    assert vault.key_file.read_bytes() == old_key
+    assert vault.get_secret("f1", 1, "main") == "secret1"
+
+
+def test_atomic_write_key_cleans_temp_on_error(tmp_path, monkeypatch):
+    import os as _os
+
+    key_file = tmp_path / "key"
+
+    def boom(fd, mode):
+        raise OSError("nope")
+
+    monkeypatch.setattr(_os, "fdopen", boom)
+
+    with pytest.raises(OSError):
+        SecretVault._atomic_write_key(key_file, b"data")
+
+    assert not (tmp_path / "key.tmp").exists()
 
 
 def test_rotate_key_empty_vault(vault):

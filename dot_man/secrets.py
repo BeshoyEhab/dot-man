@@ -14,12 +14,13 @@ __all__ = [
 
 import json
 import logging
+import math
 import re
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Callable, Iterable, Iterator, TypedDict
+from typing import Any, Callable, Iterable, Iterator, TypedDict
 
 from .constants import DOT_MAN_DIR, SECRET_REDACTION_TEXT
 from .utils import sha256_hex
@@ -195,6 +196,17 @@ class SecretMatch:
     pattern_name: str
     severity: Severity
     matched_text: str
+    history_ref: str = ""
+
+    @property
+    def masked_line(self) -> str:
+        """Line content with the matched secret replaced by ``***``.
+
+        Never print ``line_content`` directly: it contains the live secret.
+        """
+        if self.matched_text:
+            return self.line_content.replace(self.matched_text, "***")
+        return self.line_content
 
 
 # ============================================================================
@@ -229,6 +241,30 @@ DEFAULT_PATTERNS: list[SecretPattern] = [
         pattern=re.compile(r"gh[ps]_[a-zA-Z0-9]{36}"),
         severity=Severity.HIGH,
         description="GitHub Personal Access Token",
+    ),
+    SecretPattern(
+        name="GitHub Fine-Grained PAT",
+        pattern=re.compile(r"github_pat_[A-Za-z0-9_]{22,}"),
+        severity=Severity.HIGH,
+        description="GitHub fine-grained personal access token",
+    ),
+    SecretPattern(
+        name="GitLab Token",
+        pattern=re.compile(r"glpat-[A-Za-z0-9_-]{20,}"),
+        severity=Severity.HIGH,
+        description="GitLab personal access token",
+    ),
+    SecretPattern(
+        name="Slack Token",
+        pattern=re.compile(r"xox[baprs]-[A-Za-z0-9-]{10,}"),
+        severity=Severity.HIGH,
+        description="Slack API token",
+    ),
+    SecretPattern(
+        name="AWS Session Token",
+        pattern=re.compile(r"ASIA[0-9A-Z]{16}"),
+        severity=Severity.CRITICAL,
+        description="AWS temporary (STS) access key ID",
     ),
     SecretPattern(
         name="Generic API Key",
@@ -275,7 +311,40 @@ DEFAULT_PATTERNS: list[SecretPattern] = [
         severity=Severity.MEDIUM,
         description="Generic secret assignment",
     ),
+    SecretPattern(
+        name="High Entropy String",
+        pattern=re.compile(r"[A-Za-z0-9+/=_\-]{32,}"),
+        severity=Severity.MEDIUM,
+        description="Long random-looking string (entropy scored)",
+    ),
 ]
+
+
+def shannon_entropy(value: str) -> float:
+    """Return Shannon entropy (bits per character) of ``value``.
+
+    Random secrets score high (~4+ for base64-ish text); repeated or
+    sequential filler scores low. Used to keep the generic
+    "High Entropy String" pattern from flagging hashes-as-documentation or
+    long-but-repetitive blobs.
+    """
+    if not value:
+        return 0.0
+    counts: dict[str, int] = {}
+    for ch in value:
+        counts[ch] = counts.get(ch, 0) + 1
+    length = len(value)
+    entropy = 0.0
+    for count in counts.values():
+        p = count / length
+        entropy -= p * math.log2(p)
+    return entropy
+
+
+# Minimum bits/char for the "High Entropy String" pattern to be reported.
+MIN_ENTROPY_BITS_PER_CHAR = 3.0
+# Pattern names whose value must pass the entropy threshold.
+ENTROPY_SCORED_PATTERNS = {"High Entropy String"}
 
 # False positive indicators - lines containing these are skipped
 FALSE_POSITIVE_INDICATORS = [
@@ -298,10 +367,20 @@ class SecretScanner:
     def __init__(self, patterns: list[SecretPattern] | None = None):
         self.patterns = patterns or DEFAULT_PATTERNS
 
-    def is_false_positive(self, line: str) -> bool:
-        """Check if a line is likely a false positive."""
-        line_lower = line.lower()
-        return any(indicator in line_lower for indicator in FALSE_POSITIVE_INDICATORS)
+    def is_false_positive(self, line: str, value: str | None = None) -> bool:
+        """Check if a detected value (or line) is likely a false positive.
+
+        Indicators are matched against the detected *value* when one is
+        supplied, so a comment containing "example" no longer hides a real
+        secret elsewhere on the line.
+        """
+        target = (value if value is not None else line).lower()
+        return any(indicator in target for indicator in FALSE_POSITIVE_INDICATORS)
+
+    def _passes_entropy(self, name: str, value: str) -> bool:
+        if name not in ENTROPY_SCORED_PATTERNS:
+            return True
+        return shannon_entropy(value) >= MIN_ENTROPY_BITS_PER_CHAR
 
     def is_binary_file(self, path: Path) -> bool:
         """Check if a file is binary."""
@@ -319,21 +398,23 @@ class SecretScanner:
         file_path = file_path or Path("<string>")
 
         for line_number, line in enumerate(lines, start=1):
-            # Skip likely false positives
-            if self.is_false_positive(line):
-                continue
-
             for pattern in self.patterns:
                 match = pattern.pattern.search(line)
-                if match:
-                    yield SecretMatch(
-                        file=file_path,
-                        line_number=line_number,
-                        line_content=line.strip(),
-                        pattern_name=pattern.name,
-                        severity=pattern.severity,
-                        matched_text=match.group(0),
-                    )
+                if not match:
+                    continue
+                value = match.group(0)
+                if self.is_false_positive(line, value=value):
+                    continue
+                if not self._passes_entropy(pattern.name, value):
+                    continue
+                yield SecretMatch(
+                    file=file_path,
+                    line_number=line_number,
+                    line_content=line.strip(),
+                    pattern_name=pattern.name,
+                    severity=pattern.severity,
+                    matched_text=value,
+                )
 
     def scan_content(
         self, content: str, file_path: Path | None = None
@@ -374,6 +455,61 @@ class SecretScanner:
 
             yield from self.scan_file(path)
 
+    def scan_git_history(
+        self, repo: Any, include_index: bool = True
+    ) -> Iterator[SecretMatch]:
+        """Scan git history and (optionally) the index for secrets.
+
+        A working-tree-only scan misses secrets that were committed and later
+        removed (or are staged but not yet committed). Blobs are deduplicated
+        by object id, so each unique version of a file is scanned once.
+        Results carry ``history_ref`` (short commit sha, ``"index"`` for staged
+        content) and ``file`` is the path *inside* the repo, not on disk.
+        Never raises: unreadable objects are skipped.
+        """
+        seen: set[str] = set()
+
+        def scan_blob(hexsha: str, path: Path, ref: str) -> Iterator[SecretMatch]:
+            if hexsha in seen:
+                return
+            seen.add(hexsha)
+            try:
+                text = repo.git.cat_file("blob", hexsha)
+            except Exception:
+                return
+            if "\x00" in text[:8192]:
+                return
+            for match in self.scan_lines(text.splitlines(), path):
+                match.history_ref = ref
+                yield match
+
+        if include_index:
+            try:
+                for entry in repo.index.entries.values():
+                    yield from scan_blob(entry.hexsha, Path(entry.path), "index")
+            except Exception:
+                pass
+
+        try:
+            commits = repo.iter_commits("--all")
+        except Exception:
+            return
+
+        for commit in commits:
+            try:
+                tree = commit.tree
+            except Exception:
+                continue
+            try:
+                for item in tree.traverse():
+                    if item.type != "blob":
+                        continue
+                    yield from scan_blob(
+                        item.hexsha, Path(item.path), commit.hexsha[:8]
+                    )
+            except Exception:
+                continue
+
     def redact_content(
         self,
         content: str,
@@ -396,47 +532,52 @@ class SecretScanner:
         file_path = file_path or Path("<string>")
 
         for line_number, line in enumerate(content.splitlines(keepends=True), start=1):
-            # precise matching logic needed to handle multiple secrets in one line appropriately
-            # checking for false positives first
-            if self.is_false_positive(line):
-                redacted_lines.append(line)
-                continue
-
             current_line = line
 
             for pattern in self.patterns:
-                match = pattern.pattern.search(current_line)
-                if match:
-                    replacement_text = SECRET_REDACTION_TEXT
-                    should_redact = True
-                    matched_text = match.group(0)
+                # Detect against the pristine line: redaction substitutions
+                # (e.g. the vault's ***REDACTED:<hash>*** marker) must not be
+                # re-scanned by later patterns as if they were new secrets.
+                match = pattern.pattern.search(line)
+                if not match:
+                    continue
 
-                    if callback:
-                        secret_match = SecretMatch(
-                            file=file_path,
-                            line_number=line_number,
-                            line_content=line.strip(),
-                            pattern_name=pattern.name,
-                            severity=pattern.severity,
-                            matched_text=matched_text,
-                        )
-                        result = callback(secret_match)
+                matched_text = match.group(0)
+                # Indicators are matched against the value, not the whole
+                # line, so a trailing comment ("# example") cannot mask a
+                # real secret.
+                if self.is_false_positive(line, value=matched_text):
+                    continue
+                if not self._passes_entropy(pattern.name, matched_text):
+                    continue
 
-                        if result == "KEEP" or result == "IGNORE":
-                            should_redact = False
-                        elif result == "REDACT":
-                            should_redact = True
-                        else:
-                            # Use custom replacement (e.g., hashed redaction)
-                            should_redact = True
-                            replacement_text = result
+                replacement_text = SECRET_REDACTION_TEXT
+                should_redact = True
 
-                    if should_redact:
-                        # Replace the matched text with redaction
-                        current_line = pattern.pattern.sub(
-                            replacement_text, current_line
-                        )
-                        count += 1
+                if callback:
+                    secret_match = SecretMatch(
+                        file=file_path,
+                        line_number=line_number,
+                        line_content=line.strip(),
+                        pattern_name=pattern.name,
+                        severity=pattern.severity,
+                        matched_text=matched_text,
+                    )
+                    result = callback(secret_match)
+
+                    if result == "KEEP" or result == "IGNORE":
+                        should_redact = False
+                    elif result == "REDACT":
+                        should_redact = True
+                    else:
+                        # Use custom replacement (e.g., hashed redaction)
+                        should_redact = True
+                        replacement_text = result
+
+                if should_redact:
+                    # Replace the matched text with redaction
+                    current_line = pattern.pattern.sub(replacement_text, current_line)
+                    count += 1
 
             redacted_lines.append(current_line)
 

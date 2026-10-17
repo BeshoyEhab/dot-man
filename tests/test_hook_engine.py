@@ -37,6 +37,22 @@ def test_unknown_placeholder_passes_through_literally():
     assert resolve_hook("echo {branch}", ctx) == "echo {branch}"
 
 
+def test_placeholders_are_shell_quoted():
+    """Placeholder values come from repo config and must be shell-quoted.
+
+    A branch named `main; touch /tmp/pwned` used to be interpolated raw into
+    the `sh -c` hook command, executing the injected command.
+    """
+    ctx = HookContext(section_name="qs", branch="main; touch /tmp/pwned")
+    result = resolve_hook("echo {branch}", ctx)
+    assert result == "echo 'main; touch /tmp/pwned'"
+
+
+def test_paths_placeholder_quotes_each_path():
+    ctx = HookContext(section_name="x", paths=("a b", "c;d"))
+    assert resolve_hook("echo {paths}", ctx) == "echo 'a b' 'c;d'"
+
+
 def test_file_token_resolves(hook_dirs):
     repo_hooks, _ = hook_dirs
     script = repo_hooks / "log.sh"

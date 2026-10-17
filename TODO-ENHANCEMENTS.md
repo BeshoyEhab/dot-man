@@ -119,19 +119,19 @@ gate green.
 
 | Done | Item | Impact | Effort | Complexity | Location |
 |------|------|--------|--------|-----------|----------|
-| [ ] | S1 `bootstrap` uses `shell=True` with repo-supplied names | Critical | S | Low | `cli/bootstrap_cmd.py:108-115` |
-| [ ] | S2 Repo hooks + `{placeholder}` unquoted into `sh -c` | Critical | M | Med | `hook_engine.py:67-113`, `section.py:166-176` |
-| [ ] | S3 Encryption not wired into save/deploy (false security) | High | L | High | `save_deploy_ops.py:142-197`, `encrypt_cmd.py:160` |
-| [ ] | S4 Real secret lines printed cleartext; world-readable export | High | S | Low | `audit_cmd.py:87`, `common.py:336`, `export_cmd.py:139` |
-| [ ] | S5 `atomic_write_text` resets mode to 0644 | High | S | Low | `files.py:54-74` |
-| [ ] | S6 `repo_path` from config escapes `REPO_DIR` | Med | S | Low | `section.py:218-230` |
-| [ ] | S7 Vault key write-then-chmod race + rotation defects | Med | M | Med | `vault.py:79-88,319-358` |
-| [ ] | S8 `audit` never scans git history/index | Med | M | Med | `audit_cmd.py:38`, `secrets.py:362` |
-| [ ] | S9 Secret filter false-positives; no entropy; narrow patterns | Med | M | Med | `secrets.py:204-304` |
-| [ ] | S10 GPG/AGE arg injection; decrypted output 0644 | Med | S | Low | `encryption.py:64,86-91,129` |
-| [ ] | S11 Non-blocking lock; navigate phases not atomic | Med | M | Med | `lock.py:41`, `navigate_cmd.py:460,593` |
-| [ ] | S12 Symlink TOCTOU (no `O_NOFOLLOW`/`lstat`) | Med | M | Med | `files.py:490`, `branch_ops.py:276` |
-| [ ] | S13 `watch` silently redacts secrets with no audit trail | Med | S | Low | `watch_cmd.py:255` |
+| [x] | S1 `bootstrap` uses `shell=True` with repo-supplied names | Critical | S | Low | `cli/bootstrap_cmd.py:108-115` |
+| [x] | S2 Repo hooks + `{placeholder}` unquoted into `sh -c` | Critical | M | Med | `hook_engine.py:67-113`, `section.py:166-176` |
+| [x] | S3 Encryption not wired into save/deploy (false security) | High | L | High | `save_deploy_ops.py:142-197`, `encrypt_cmd.py:160` |
+| [x] | S4 Real secret lines printed cleartext; world-readable export | High | S | Low | `audit_cmd.py:87`, `common.py:336`, `export_cmd.py:139` |
+| [x] | S5 `atomic_write_text` resets mode to 0644 | High | S | Low | `files.py:54-74` |
+| [x] | S6 `repo_path` from config escapes `REPO_DIR` | Med | S | Low | `section.py:218-230` |
+| [x] | S7 Vault key write-then-chmod race + rotation defects | Med | M | Med | `vault.py:79-88,319-358` |
+| [x] | S8 `audit` never scans git history/index | Med | M | Med | `audit_cmd.py:38`, `secrets.py:362` |
+| [x] | S9 Secret filter false-positives; no entropy; narrow patterns | Med | M | Med | `secrets.py:204-304` |
+| [x] | S10 GPG/AGE arg injection; decrypted output 0644 | Med | S | Low | `encryption.py:64,86-91,129` |
+| [x] | S11 Non-blocking lock; navigate phases not atomic | Med | M | Med | `lock.py:41`, `navigate_cmd.py:460,593` |
+| [x] | S12 Symlink TOCTOU (no `O_NOFOLLOW`/`lstat`) | Med | M | Med | `files.py:490`, `branch_ops.py:276` |
+| [x] | S13 `watch` silently redacts secrets with no audit trail | Med | S | Low | `watch_cmd.py:255` |
 
 ### Details
 

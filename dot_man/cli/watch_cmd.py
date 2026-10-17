@@ -254,7 +254,8 @@ def watch(interval: float, commit: bool, message: str, dry_run: bool):
             try:
                 result = ops.save_all()
                 saved = result["saved"]
-                secrets = len(result["secrets"])
+                secret_matches = result["secrets"]
+                secrets = len(secret_matches)
                 errors = result["errors"]
                 symlinks = result.get("symlinks", [])
 
@@ -267,6 +268,16 @@ def watch(interval: float, commit: bool, message: str, dry_run: bool):
                 if secrets:
                     summary += f", {secrets} secret(s) redacted"
                 ui.console.print(f"  [green]✓[/green] {summary}")
+
+                # Never redact silently: leave an audit trail (file, pattern,
+                # masked line). Vault-stashed values can be recovered later.
+                if secret_matches:
+                    warn("Secrets were detected and redacted (stashed in the vault):")
+                    for secret in secret_matches:
+                        ui.console.print(
+                            f"    • {secret.file}:{secret.line_number} "
+                            f"[{secret.pattern_name}] {secret.masked_line[:60]}"
+                        )
 
                 if errors:
                     for e in errors:

@@ -1,6 +1,7 @@
 """Bootstrap command for dot-man — install packages via system package managers."""
 
 import logging
+import re
 import shutil
 import subprocess
 
@@ -105,13 +106,32 @@ def _load_bootstrap_packages() -> dict[str, list[str]]:
     return {}
 
 
+# Package names may contain letters, digits and these separators. Anything
+# else (spaces, ; | & $ ` etc.) is rejected so it can never reach a shell.
+_PACKAGE_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._+@/:-]*$")
+
+
+def _is_safe_package_name(package: str) -> bool:
+    """Return True when a package name is safe to pass to a package manager."""
+    return bool(_PACKAGE_NAME_RE.match(package))
+
+
 def _run_with_pm(pm: str, command_template: str, package: str) -> bool:
-    """Run a package manager command. Returns True on success."""
+    """Run a package manager command. Returns True on success.
+
+    The template is split into an argv list and executed without a shell, so
+    package names loaded from repo config cannot inject shell commands.
+    """
+    if package and not _is_safe_package_name(package):
+        warn(f"Refusing to install unsafe package name: {package!r}")
+        return False
+
     cmd = command_template.format(package=package)
-    ui.console.print(f"  [cyan]$ {cmd}[/cyan]")
+    argv = cmd.split()
+    ui.console.print(f"  [cyan]$ {' '.join(argv)}[/cyan]")
     try:
         result = subprocess.run(
-            cmd, shell=True, capture_output=True, text=True, timeout=300
+            argv, capture_output=True, text=True, timeout=300, shell=False
         )
         if result.returncode == 0:
             return True

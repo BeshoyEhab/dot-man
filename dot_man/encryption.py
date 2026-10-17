@@ -14,6 +14,24 @@ class EncryptionError(DotManError):
     pass
 
 
+def _validate_recipient(recipient: str, tool: str) -> None:
+    """Reject recipients that could be smuggled as command-line options.
+
+    A recipient beginning with ``-`` would be interpreted by gpg/age as an
+    option (e.g. ``--output /etc/passwd``); embedded newlines/controls are
+    also rejected. Legitimate recipients (emails, key IDs, ``age1...``
+    keys) never start with ``-``.
+    """
+    if not recipient:
+        raise EncryptionError(f"{tool} recipient must not be empty")
+    if recipient.startswith("-"):
+        raise EncryptionError(
+            f"Refusing {tool} recipient starting with '-': {recipient!r}"
+        )
+    if any(ch in recipient for ch in "\r\n\x00"):
+        raise EncryptionError(f"Invalid control character in {tool} recipient")
+
+
 class EncryptionManager:
     """Manage file encryption using GPG or AGE."""
 
@@ -58,14 +76,15 @@ class EncryptionManager:
         self, input_path: Path, output_path: Path, recipient: str | None
     ) -> None:
         """Encrypt using GPG."""
-        cmd = ["gpg", "--encrypt", "--armor"]
+        cmd = ["gpg", "--encrypt", "--armor", "--batch"]
 
         if recipient:
+            _validate_recipient(recipient, "GPG")
             cmd.extend(["--recipient", recipient])
         else:
             cmd.append("--symmetric")
 
-        cmd.extend(["--output", str(output_path), str(input_path)])
+        cmd.extend(["--output", str(output_path), "--", str(input_path)])
 
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
@@ -80,12 +99,13 @@ class EncryptionManager:
         self, input_path: Path, output_path: Path, recipient: str | None
     ) -> None:
         """Decrypt using GPG."""
-        cmd = ["gpg", "--decrypt", "--armor"]
+        cmd = ["gpg", "--decrypt", "--armor", "--batch"]
 
         if recipient:
+            _validate_recipient(recipient, "GPG")
             cmd.extend(["--recipient", recipient])
 
-        cmd.extend(["--output", str(output_path), str(input_path)])
+        cmd.extend(["--output", str(output_path), "--", str(input_path)])
 
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
@@ -96,12 +116,15 @@ class EncryptionManager:
         except subprocess.TimeoutExpired:
             raise EncryptionError("GPG decryption timed out")
 
+        self._restrict_output(output_path)
+
     def _encrypt_age(
         self, input_path: Path, output_path: Path, recipient: str | None
     ) -> None:
         """Encrypt using AGE."""
         if not recipient:
             raise EncryptionError("AGE encryption requires a recipient")
+        _validate_recipient(recipient, "AGE")
 
         cmd = [
             "age",
@@ -110,6 +133,7 @@ class EncryptionManager:
             str(output_path),
             "-r",
             recipient,
+            "--",
             str(input_path),
         ]
 
@@ -133,7 +157,7 @@ class EncryptionManager:
         if identity:
             cmd.extend(["-i", identity])
 
-        cmd.append(str(input_path))
+        cmd.extend(["--", str(input_path)])
 
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
@@ -143,6 +167,16 @@ class EncryptionManager:
             raise EncryptionError("AGE not installed")
         except subprocess.TimeoutExpired:
             raise EncryptionError("AGE decryption timed out")
+
+        self._restrict_output(output_path)
+
+    @staticmethod
+    def _restrict_output(output_path: Path) -> None:
+        """Decrypted files are secrets: force owner-only permissions."""
+        try:
+            os.chmod(output_path, 0o600)
+        except OSError:
+            pass
 
 
 def is_gpg_available() -> bool:

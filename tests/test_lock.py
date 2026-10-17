@@ -64,7 +64,7 @@ class TestFileLockEdgeCases:
 
             from dot_man.lock import FileLock
 
-            lock = FileLock(lock_path)
+            lock = FileLock(lock_path, timeout=0.05)
             with pytest.raises(LockError, match="another dot-man process"):
                 lock.__enter__()
             assert lock._fd is None
@@ -127,3 +127,65 @@ class TestLockError:
         error = LockError("Lock failed")
         assert isinstance(error, DotManError)
         assert "Lock" in str(error)
+
+
+class TestFileLockRetryAndReentrancy:
+    """S11: wait for a contended lock; reentrant within a thread."""
+
+    def test_waits_for_contended_lock(self, tmp_path):
+        import threading
+        import time
+
+        from dot_man.lock import FileLock
+
+        lock_path = tmp_path / "test.lock"
+        acquired = threading.Event()
+
+        def hold():
+            with FileLock(lock_path):
+                acquired.set()
+                time.sleep(0.2)
+
+        thread = threading.Thread(target=hold)
+        thread.start()
+        acquired.wait(timeout=2.0)
+
+        waiter = FileLock(lock_path, timeout=2.0)
+        with waiter:
+            assert waiter._fd is not None
+        thread.join()
+
+    def test_times_out_and_raises(self, tmp_path):
+        import threading
+        import time
+
+        from dot_man.lock import FileLock, LockError
+
+        lock_path = tmp_path / "test.lock"
+        acquired = threading.Event()
+
+        def hold():
+            with FileLock(lock_path):
+                acquired.set()
+                time.sleep(0.5)
+
+        thread = threading.Thread(target=hold)
+        thread.start()
+        acquired.wait(timeout=2.0)
+
+        with pytest.raises(LockError):
+            FileLock(lock_path, timeout=0.05).__enter__()
+        thread.join()
+
+    def test_reentrant_same_thread(self, tmp_path):
+        from dot_man.lock import FileLock
+
+        lock_path = tmp_path / "test.lock"
+        outer = FileLock(lock_path)
+        with outer:
+            inner = FileLock(lock_path)
+            with inner:
+                assert outer._fd is not None
+                assert inner._reentrant is True
+            assert outer._fd is not None
+        assert outer._fd is None

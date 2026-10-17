@@ -333,7 +333,7 @@ def get_secret_handler() -> Callable[[SecretMatch], str]:
         ui.console.print()
         ui.warn("Potential secret detected!")
         ui.console.print(f"File: [cyan]{match.file}[/cyan]")
-        ui.console.print(f"Line {match.line_number}: {match.line_content[:80]}...")
+        ui.console.print(f"Line {match.line_number}: {match.masked_line[:80]}...")
         ui.console.print(
             f"Pattern: {match.pattern_name} (severity: {match.severity.value})"
         )

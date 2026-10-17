@@ -336,3 +336,101 @@ class TestDetectAvailableEncryption:
         ):
             result = detect_available_encryption()
         assert result == []
+
+
+class TestArgInjectionHardening:
+    """S10: recipients must not be smuggleable as command-line options."""
+
+    def test_gpg_encrypt_rejects_dash_recipient(self, tmp_path):
+        mgr = EncryptionManager(method="gpg")
+        inp = tmp_path / "in"
+        out = tmp_path / "out"
+        inp.write_text("data")
+
+        with patch("subprocess.run") as mock_run:
+            with pytest.raises(EncryptionError, match="starting with"):
+                mgr.encrypt_file(inp, out, recipient="--output=/etc/passwd")
+        mock_run.assert_not_called()
+
+    def test_age_encrypt_rejects_dash_recipient(self, tmp_path):
+        mgr = EncryptionManager(method="age")
+        inp = tmp_path / "in"
+        out = tmp_path / "out"
+        inp.write_text("data")
+
+        with patch("subprocess.run") as mock_run:
+            with pytest.raises(EncryptionError, match="starting with"):
+                mgr.encrypt_file(inp, out, recipient="-o")
+        mock_run.assert_not_called()
+
+    def test_gpg_uses_option_terminator(self, tmp_path):
+        mgr = EncryptionManager(method="gpg")
+        inp = tmp_path / "in"
+        out = tmp_path / "out"
+        inp.write_text("data")
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            mgr.encrypt_file(inp, out, recipient="user@example.com")
+
+        args = mock_run.call_args[0][0]
+        assert "--" in args
+        assert args.index("--") < args.index(str(inp))
+
+    def test_gpg_symmetric_is_batch(self, tmp_path):
+        mgr = EncryptionManager(method="gpg")
+        inp = tmp_path / "in"
+        out = tmp_path / "out"
+        inp.write_text("data")
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            mgr.encrypt_file(inp, out)
+
+        args = mock_run.call_args[0][0]
+        assert "--symmetric" in args
+        assert "--batch" in args
+
+    def test_age_uses_option_terminator(self, tmp_path):
+        mgr = EncryptionManager(method="age")
+        inp = tmp_path / "in"
+        out = tmp_path / "out"
+        inp.write_text("data")
+
+        with patch("subprocess.run") as mock_run:
+            mock_run.return_value = MagicMock(returncode=0)
+            mgr.encrypt_file(inp, out, recipient="age1test")
+
+        args = mock_run.call_args[0][0]
+        assert "--" in args
+        assert args.index("--") < args.index(str(inp))
+
+    def test_decrypt_gpg_output_is_private(self, tmp_path):
+        mgr = EncryptionManager(method="gpg")
+        inp = tmp_path / "enc.asc"
+        out = tmp_path / "decrypted.txt"
+        inp.write_text("encrypted")
+
+        def fake_run(cmd, **kwargs):
+            out.write_text("secret")
+            return MagicMock(returncode=0)
+
+        with patch("subprocess.run", side_effect=fake_run):
+            mgr.decrypt_file(inp, out)
+
+        assert (out.stat().st_mode & 0o777) == 0o600
+
+    def test_decrypt_age_output_is_private(self, tmp_path):
+        mgr = EncryptionManager(method="age")
+        inp = tmp_path / "enc.age"
+        out = tmp_path / "decrypted.txt"
+        inp.write_text("encrypted")
+
+        def fake_run(cmd, **kwargs):
+            out.write_text("secret")
+            return MagicMock(returncode=0)
+
+        with patch("subprocess.run", side_effect=fake_run):
+            mgr.decrypt_file(inp, out)
+
+        assert (out.stat().st_mode & 0o777) == 0o600

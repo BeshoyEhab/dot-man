@@ -17,6 +17,7 @@ from .files import (
     copy_file,
     deploy_directory_with_symlinks,
     deploy_file_or_symlink,
+    ensure_directory,
 )
 from .lock import FileLock
 from .secrets import SecretMatch
@@ -121,6 +122,103 @@ class SaveDeployMixin:
         """Merge section exclude patterns with ignored directories."""
         return (section.exclude or []) + (section.ignored_directories or [])
 
+    # ─── Encryption (S3): ciphertext lives in the repo, plaintext on disk ───
+
+    @staticmethod
+    def _is_encrypted_section(section: Section) -> bool:
+        """True only for a real ``encrypted = true`` (not a MagicMock attr)."""
+        return getattr(section, "encrypted", False) is True
+
+    @staticmethod
+    def _encrypted_repo_path(repo_path: Path) -> Path:
+        """Repo file path that holds a single encrypted file's ciphertext."""
+        return repo_path.with_suffix(repo_path.suffix + ".gpg")
+
+    def _encryption_manager(self, section: Section):
+        from typing import Literal, cast
+
+        from .encryption import EncryptionManager
+
+        method = getattr(section, "encryption_method", "gpg") or "gpg"
+        if method not in ("gpg", "age"):
+            method = "gpg"
+        return EncryptionManager(cast(Literal["gpg", "age"], method))
+
+    def _encrypt_local_to_repo(
+        self, section: Section, local_path: Path, repo_path: Path, errors: list[str]
+    ) -> int:
+        """Encrypt local content into the repo, removing any plaintext copy."""
+        from .encryption import EncryptionError
+
+        enc = self._encryption_manager(section)
+        recipient = getattr(section, "encryption_recipient", None)
+        count = 0
+        try:
+            if local_path.is_file():
+                target = self._encrypted_repo_path(repo_path)
+                ensure_directory(target.parent)
+                enc.encrypt_file(local_path, target, recipient)
+                if repo_path.is_file():
+                    repo_path.unlink()
+                return 1
+
+            for src in sorted(p for p in local_path.rglob("*") if p.is_file()):
+                rel = src.relative_to(local_path)
+                plain = repo_path / rel
+                target = self._encrypted_repo_path(plain)
+                ensure_directory(target.parent)
+                enc.encrypt_file(src, target, recipient)
+                count += 1
+
+            if repo_path.is_dir():
+                for plain in repo_path.rglob("*"):
+                    if plain.is_file() and plain.suffix != ".gpg":
+                        plain.unlink()
+        except EncryptionError as e:
+            errors.append(f"Failed to encrypt {local_path}: {e}")
+            return 0
+        return count
+
+    def _decrypt_repo_to_local(
+        self, section: Section, repo_path: Path, local_path: Path, errors: list[str]
+    ) -> int:
+        """Decrypt repo ciphertext to local_path, or fail closed."""
+        from .encryption import EncryptionError
+
+        enc = self._encryption_manager(section)
+        recipient = getattr(section, "encryption_recipient", None)
+
+        if self._encrypted_repo_path(repo_path).exists():
+            encrypted = self._encrypted_repo_path(repo_path)
+            try:
+                ensure_directory(local_path.parent)
+                enc.decrypt_file(encrypted, local_path, recipient)
+                return 1
+            except EncryptionError as e:
+                errors.append(f"Failed to decrypt {encrypted}: {e}")
+                return 0
+
+        if repo_path.is_dir():
+            count = 0
+            try:
+                for enc_file in sorted(repo_path.rglob("*.gpg")):
+                    rel = enc_file.relative_to(repo_path)
+                    target = (local_path / rel).with_suffix("")
+                    ensure_directory(target.parent)
+                    enc.decrypt_file(enc_file, target, recipient)
+                    count += 1
+            except EncryptionError as e:
+                errors.append(f"Failed to decrypt {repo_path}: {e}")
+                return count
+            return count
+
+        errors.append(
+            f"Encrypted data missing for {local_path}: expected "
+            f"{self._encrypted_repo_path(repo_path).name}. "
+            "Refusing to deploy plaintext."
+        )
+        return 0
+
     def _deploy_repo_path(
         self,
         repo_path: Path,
@@ -137,6 +235,9 @@ class SaveDeployMixin:
 
         Returns count of files deployed.
         """
+        if self._is_encrypted_section(section):
+            return self._decrypt_repo_to_local(section, repo_path, local_path, errors)
+
         deployed = 0
         try:
             if repo_path.is_file():
@@ -150,7 +251,12 @@ class SaveDeployMixin:
                         errors.append(f"Failed to symlink {repo_path} to {local_path}")
                 else:
                     success, _ = copy_file(
-                        repo_path, local_path, filter_secrets_enabled=False
+                        repo_path,
+                        local_path,
+                        filter_secrets_enabled=False,
+                        # Deploy intentionally replaces a symlinked dotfile
+                        # with a regular file (a warning is emitted above).
+                        allow_symlink=True,
                     )
                     if success:
                         if section.render_templates:
@@ -179,6 +285,7 @@ class SaveDeployMixin:
                         include_patterns=section.include,
                         exclude_patterns=final_excludes,
                         follow_symlinks=section.follow_symlinks,
+                        allow_symlink=True,
                     )
                     if section.render_templates:
                         for deployed_file in local_path.rglob("*"):
@@ -301,6 +408,11 @@ class SaveDeployMixin:
             repo_path = section.get_repo_path(local_path, REPO_DIR)
 
             try:
+                if self._is_encrypted_section(section):
+                    saved += self._encrypt_local_to_repo(
+                        section, local_path, repo_path, errors
+                    )
+                    continue
                 if local_path.is_file():
                     success, secrets = copy_file(
                         local_path,
@@ -394,11 +506,17 @@ class SaveDeployMixin:
                     continue
 
                 try:
-                    if not repo_path.exists():
+                    if self._is_encrypted_section(section):
+                        enc_file = self._encrypted_repo_path(repo_path)
+                        storage = enc_file if enc_file.exists() else repo_path
+                    else:
+                        storage = repo_path
+
+                    if not storage.exists():
                         continue
 
                     will_change = not local_path.exists() or not compare_files(
-                        repo_path, local_path
+                        storage, local_path
                     )
 
                     if will_change:

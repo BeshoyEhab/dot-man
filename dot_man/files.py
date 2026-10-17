@@ -63,6 +63,13 @@ def atomic_write_text(path: Path, content: str, encoding: str = "utf-8") -> None
         with temp_path.open("w", encoding=encoding, newline="") as f:
             f.write(content)
 
+        # Preserve the destination's existing permissions: the temp file is
+        # umask-based, so replacing a 0600 secret file must not widen it.
+        try:
+            os.chmod(temp_path, path.stat().st_mode & 0o7777)
+        except FileNotFoundError:
+            pass
+
         # Atomic rename
         os.replace(temp_path, path)
     except OSError:
@@ -131,6 +138,7 @@ def smart_save_file(
     dest_path: Path,
     secret_handler: Callable[[SecretMatch], str] | None = None,
     check_secrets: bool = True,
+    allow_symlink: bool = False,
 ) -> tuple[bool, list[SecretMatch]]:
     """Smartly save a file from source to destination.
 
@@ -139,6 +147,11 @@ def smart_save_file(
     3. Compares result with destination.
     4. Atomically writes if different.
 
+    A symlinked destination is refused (returns ``(False, [])``) unless
+    ``allow_symlink`` is set: a link swapped by an attacker between the
+    check and the write would otherwise redirect the write to an arbitrary
+    path.
+
     Returns:
         tuple(saved: bool, secrets: list[SecretMatch])
     """
@@ -146,6 +159,14 @@ def smart_save_file(
 
     if not src_path.is_file():
         return False, []
+
+    # Refuse to write through a symlinked destination (TOCTOU defense).
+    try:
+        if not allow_symlink and dest_path.is_symlink():
+            logging.warning("Refusing to write through symlink: %s", dest_path)
+            return False, []
+    except OSError:
+        pass
 
     # 1. Read source
     try:
@@ -239,6 +260,7 @@ def copy_file(
     destination: Path,
     filter_secrets_enabled: bool = True,
     secret_handler: Callable[[SecretMatch], str] | None = None,
+    allow_symlink: bool = False,
 ) -> tuple[bool, list[SecretMatch]]:
     """Copy a file from source to destination.
 
@@ -249,6 +271,7 @@ def copy_file(
         destination,
         secret_handler=secret_handler,
         check_secrets=filter_secrets_enabled,
+        allow_symlink=allow_symlink,
     )
     return saved, secrets
 
@@ -302,6 +325,7 @@ def _copy_walk_file(
     exclude_patterns: list[str],
     filter_secrets_enabled: bool,
     secret_handler: Callable[[SecretMatch], str] | None,
+    allow_symlink: bool = False,
 ) -> tuple[int, int, list[SecretMatch]]:
     """Copy one walked file; returns (copied, failed, secrets)."""
     src_file = root_path / filename
@@ -329,6 +353,7 @@ def _copy_walk_file(
             dest_path,
             secret_handler=secret_handler,
             check_secrets=filter_secrets_enabled,
+            allow_symlink=allow_symlink,
         )
         return (1, 0, secrets) if saved else (0, 0, secrets)
     except Exception as e:
@@ -344,6 +369,7 @@ def copy_directory(
     exclude_patterns: list[str] | None = None,
     secret_handler: Callable[[SecretMatch], str] | None = None,
     follow_symlinks: bool = False,
+    allow_symlink: bool = False,
 ) -> tuple[int, int, list[SecretMatch]]:
     """Copy a directory recursively with pattern filtering and efficient pruning.
 
@@ -384,6 +410,7 @@ def copy_directory(
                 exclude_patterns,
                 filter_secrets_enabled,
                 secret_handler,
+                allow_symlink,
             )
             files_copied += copied
             files_failed += failed
@@ -520,6 +547,7 @@ def deploy_file_or_symlink(
     deploy_method: str = "copy",
     filter_secrets_enabled: bool = True,
     secret_handler: Callable[[SecretMatch], str] | None = None,
+    allow_symlink: bool = False,
 ) -> tuple[bool, list[SecretMatch]]:
     """Deploy a file from source to destination, either by copy or symlink.
 
@@ -541,6 +569,7 @@ def deploy_file_or_symlink(
         destination,
         filter_secrets_enabled=filter_secrets_enabled,
         secret_handler=secret_handler,
+        allow_symlink=allow_symlink,
     )
 
 

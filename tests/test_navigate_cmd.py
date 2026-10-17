@@ -409,6 +409,33 @@ class TestBranchNavigateSaveFlows:
         snapshots = list(BACKUPS_DIR.iterdir()) if BACKUPS_DIR.exists() else []
         assert snapshots, "expected a pre-switch backup snapshot"
 
+    def test_navigate_wraps_transaction_in_single_lock(
+        self, navigate_integration, tmp_path
+    ):
+        """S11: the whole save/switch/deploy transaction holds one lock."""
+        from unittest.mock import patch
+
+        from dot_man.cli import navigate_cmd
+
+        _add_tracked_file(navigate_integration, tmp_path)
+        self._make_branch("lock-target")
+
+        entered = []
+        real = navigate_cmd.FileLock
+
+        class Spy(real):
+            def __enter__(self):
+                entered.append(1)
+                return super().__enter__()
+
+        with patch.object(navigate_cmd, "FileLock", Spy):
+            result = navigate_integration.invoke(
+                cli, ["navigate", "lock-target", "--no-save"]
+            )
+
+        assert result.exit_code == 0, f"Navigate failed: {result.output}"
+        assert entered, "navigate must acquire the transaction lock"
+
     def test_save_reports_secrets(self, navigate_integration, tmp_path):
         """Test save warns when secrets are redacted mid-navigate."""
         self._make_branch("other")

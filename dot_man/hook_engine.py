@@ -30,14 +30,25 @@ class HookContext:
     branch: str = ""
 
     def placeholders(self) -> dict[str, str]:
-        """Canonical vocabulary; `{qs_config}` is the deprecated spelling."""
+        """Canonical vocabulary, shell-quoted to neutralize injection.
+
+        Hook strings come from repo config and are run through ``sh -c``. Raw
+        interpolation of a branch/path value (e.g. a branch named
+        ``main; touch /tmp/pwned``) let a crafted value run arbitrary commands,
+        so every value is passed through ``shlex.quote`` — normally safe values
+        are left untouched. ``{qs_config}`` is the deprecated ``{config_name}``.
+        """
+
+        def q(value: str) -> str:
+            return shlex.quote(value) if value else ""
+
         return {
-            "section_name": self.section_name,
-            "config_name": self.config_name,
-            "config_root": self.config_root,
-            "paths": " ".join(self.paths),
-            "branch": self.branch,
-            "qs_config": self.config_name,
+            "section_name": q(self.section_name),
+            "config_name": q(self.config_name),
+            "config_root": q(self.config_root),
+            "paths": " ".join(q(p) for p in self.paths),
+            "branch": q(self.branch),
+            "qs_config": q(self.config_name),
         }
 
 
