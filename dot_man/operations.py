@@ -23,7 +23,7 @@ from .branch_ops import BranchMixin
 from .config import DotManConfig, GlobalConfig, Section
 from .constants import REPO_DIR
 from .core import GitManager
-from .files import get_file_status
+from .files import get_file_status, matches_patterns
 from .lock import FileLock  # noqa: F401 (re-exported for test_lock.py)
 
 # Import mixins
@@ -92,8 +92,13 @@ class DotManOperations(SaveDeployMixin, BranchMixin, StatusMixin):
         return self._git
 
     def reload_config(self) -> None:
-        """Reload configurations (e.g., after branch switch)."""
-        self._dotman_config = None  # Force reload on next access
+        """Reload configurations (e.g., after branch switch).
+
+        Drops all branch-derived caches so long-lived processes (e.g.
+        ``watch``) observe the new branch on the next access.
+        """
+        self._global_config = None
+        self._dotman_config = None
 
     @property
     def current_branch(self) -> str:
@@ -121,9 +126,7 @@ class DotManOperations(SaveDeployMixin, BranchMixin, StatusMixin):
             if local_path.is_dir():
                 # For directories, iterate over files inside
                 if local_path.exists():
-                    excludes = (section.exclude or []) + (
-                        section.ignored_directories or []
-                    )
+                    excludes = self._build_final_excludes(section)
 
                     for root, dirs, files in os.walk(
                         local_path, followlinks=section.follow_symlinks
@@ -139,16 +142,16 @@ class DotManOperations(SaveDeployMixin, BranchMixin, StatusMixin):
                             for i in range(len(dirs) - 1, -1, -1):
                                 d_name = dirs[i]
                                 d_rel = root_rel / d_name
-                                if self._matches_patterns(d_rel, excludes):
+                                if matches_patterns(d_rel, excludes):
                                     del dirs[i]
 
                         for file in files:
                             local_file = root_path / file
                             rel = local_file.relative_to(local_path)
 
-                            if excludes and self._matches_patterns(rel, excludes):
+                            if excludes and matches_patterns(rel, excludes):
                                 continue
-                            if section.include and not self._matches_patterns(
+                            if section.include and not matches_patterns(
                                 rel, section.include
                             ):
                                 continue
@@ -159,18 +162,16 @@ class DotManOperations(SaveDeployMixin, BranchMixin, StatusMixin):
 
                 # Also check repo for files that might be deleted locally
                 if repo_path.exists():
-                    excludes = (section.exclude or []) + (
-                        section.ignored_directories or []
-                    )
+                    excludes = self._build_final_excludes(section)
 
                     for repo_file in repo_path.rglob("*"):
                         if repo_file.is_file():
                             rel = repo_file.relative_to(repo_path)
                             local_file = local_path / rel
 
-                            if excludes and self._matches_patterns(rel, excludes):
+                            if excludes and matches_patterns(rel, excludes):
                                 continue
-                            if section.include and not self._matches_patterns(
+                            if section.include and not matches_patterns(
                                 rel, section.include
                             ):
                                 continue
@@ -181,16 +182,6 @@ class DotManOperations(SaveDeployMixin, BranchMixin, StatusMixin):
                 # Single file
                 status = get_file_status(local_path, repo_path)
                 yield local_path, repo_path, status
-
-    def _matches_patterns(self, path: Path, patterns: list[str]) -> bool:
-        """Check if path matches any pattern."""
-        from fnmatch import fnmatch
-
-        name = path.name
-        for pattern in patterns:
-            if fnmatch(name, pattern) or fnmatch(str(path), pattern):
-                return True
-        return False
 
 
 # ─── Singleton Management ──────────────────────────────────

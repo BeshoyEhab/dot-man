@@ -22,6 +22,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Iterable, Iterator, TypedDict
 
+from git import GitCommandError
+
 from .constants import DOT_MAN_DIR, SECRET_REDACTION_TEXT
 from .utils import sha256_hex
 
@@ -475,7 +477,8 @@ class SecretScanner:
             seen.add(hexsha)
             try:
                 text = repo.git.cat_file("blob", hexsha)
-            except Exception:
+            except (GitCommandError, OSError, ValueError) as e:
+                logging.debug("Skipping unreadable blob %s: %s", hexsha, e)
                 return
             if "\x00" in text[:8192]:
                 return
@@ -487,18 +490,19 @@ class SecretScanner:
             try:
                 for entry in repo.index.entries.values():
                     yield from scan_blob(entry.hexsha, Path(entry.path), "index")
-            except Exception:
-                pass
+            except (GitCommandError, OSError, ValueError, AttributeError) as e:
+                logging.debug("Skipping git index scan: %s", e)
 
         try:
             commits = repo.iter_commits("--all")
-        except Exception:
+        except (GitCommandError, ValueError) as e:
+            logging.debug("Skipping git history scan: %s", e)
             return
 
         for commit in commits:
             try:
                 tree = commit.tree
-            except Exception:
+            except (GitCommandError, ValueError, AttributeError):
                 continue
             try:
                 for item in tree.traverse():
@@ -507,7 +511,7 @@ class SecretScanner:
                     yield from scan_blob(
                         item.hexsha, Path(item.path), commit.hexsha[:8]
                     )
-            except Exception:
+            except (GitCommandError, ValueError, AttributeError):
                 continue
 
     def redact_content(

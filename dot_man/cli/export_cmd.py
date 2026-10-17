@@ -1,6 +1,7 @@
 """Export command for exporting dotfiles to portable formats."""
 
 import json
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -137,8 +138,8 @@ def _export_json(ops, output: str, branch: str, include_secrets: bool) -> None:
                     file_entry["content"] = path.read_text(
                         encoding="utf-8", errors="ignore"
                     )
-                except Exception:
-                    pass
+                except OSError as e:
+                    logging.debug("Could not read %s for export: %s", path, e)
 
             manifest["files"].append(file_entry)
 

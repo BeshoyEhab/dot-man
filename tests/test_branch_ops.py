@@ -198,8 +198,10 @@ class TestGetChangedFilesBetweenBranches:
 
     def test_git_error(self):
         """Should return empty list on git error."""
+        from git import GitCommandError
+
         git = MagicMock()
-        git.repo.git.diff.side_effect = Exception("git error")
+        git.repo.git.diff.side_effect = GitCommandError("diff", "git error")
         ops = FakeOps(git=git)
         result = ops.get_changed_files_between_branches("main", "feature")
         assert result == []

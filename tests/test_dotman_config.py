@@ -158,6 +158,35 @@ class TestTemplateInheritance:
         assert cfg.get_section("bashrc").update_strategy == "rename_old"
 
 
+class TestGetSectionCaching:
+    """Resolved sections are memoized and invalidated on mutation (A10)."""
+
+    def test_repeated_get_section_returns_cached_instance(self, tmp_path):
+        cfg = _load(tmp_path, "[bashrc]\npaths = ['~/.bashrc']\n")
+
+        first = cfg.get_section("bashrc")
+
+        assert cfg.get_section("bashrc") is first
+
+    def test_update_section_invalidates_cache(self, tmp_path):
+        cfg = _load(tmp_path, "[bashrc]\npaths = ['~/.bashrc']\n")
+        first = cfg.get_section("bashrc")
+
+        cfg.update_section("bashrc", deploy_method="symlink")
+        second = cfg.get_section("bashrc")
+
+        assert second is not first
+        assert second.deploy_method == "symlink"
+
+    def test_add_section_invalidates_cache(self, tmp_path):
+        cfg = _load(tmp_path, "[bashrc]\npaths = ['~/.bashrc']\n")
+
+        cfg.add_section("nvim", ["~/.config/nvim"])
+        section = cfg.get_section("nvim")
+
+        assert section.name == "nvim"
+
+
 class TestGetSectionValidation:
     """get_section rejects bad shapes and bad values."""
 

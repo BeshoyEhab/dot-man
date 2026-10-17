@@ -85,6 +85,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Dead `BranchMixin.switch_branch`** — no production caller; superseded by
   the unified navigate pipeline.
+- **Dead `merge.py` universal-merge machinery** (`UniversalMergeManager`,
+  `merge_files`, `HOOK_CATEGORIES`, `get_universal_additions`, `reload_all_dots`)
+  — no production caller; the one live piece, `get_hook_for_config`, moved into
+  `hook_engine` and now shares the single `HOOK_CONFIG_MAP` / `FILE_TO_HOOK_MAP`
+  hook vocabulary.
+- **Dead `dot-man tui` stub** — the command only printed a "under development"
+  banner; removed along with its stale coverage `omit` entries.
+
+### Changed
+
+- **`reload_config` drops all branch-derived caches** (`global_config` +
+  `dotman_config`), so a long-lived `watch` observes branch switches.
+- **Resolved sections are memoized** — `DotManConfig.get_section` caches per
+  name and invalidates on load/add/update/remove.
+- **`VALID_SECTION_KEYS` is derived** from `Section.__init__`'s signature,
+  removing the duplicated field list.
+- **Silent exception handlers narrowed** — the bare `except Exception: pass`
+  sites in `branch_ops`/`secrets`/`template_cmd`/`export_cmd` now catch
+  specific errors and log; `core`/`secrets` git handlers target Git/OS errors.
 
 ## [1.5.0] - 2026-10-09
 

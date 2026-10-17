@@ -44,7 +44,7 @@ class TestHookToolCoverage:
 
     def test_resolver_covers_tools(self):
         from dot_man.constants import HOOK_ALIASES
-        from dot_man.merge import get_hook_for_config
+        from dot_man.hook_engine import get_hook_for_config
 
         for tool in HOOK_TOOLS:
             assert get_hook_for_config(tool) == HOOK_ALIASES[f"{tool}_reload"]

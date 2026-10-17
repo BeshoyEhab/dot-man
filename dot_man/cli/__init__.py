@@ -56,7 +56,6 @@ from .status_cmd import status
 from .switch_cmd import switch
 from .tag_cmd import tag
 from .template_cmd import template
-from .tui_cmd import tui
 from .verify_cmd import verify
 from .watch_cmd import watch
 
@@ -95,7 +94,6 @@ __all__ = [
     "branch",
     "remote",
     "sync",
-    "tui",
     "config",
     "revert",
     "restore",

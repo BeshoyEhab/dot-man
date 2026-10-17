@@ -68,6 +68,22 @@ class TestDotManOperationsProperties:
         assert result is not None
 
 
+class TestReloadConfig:
+    """reload_config must drop all branch-derived caches (A13)."""
+
+    def test_clears_global_and_dotman_config(self):
+        from dot_man.operations import DotManOperations
+
+        ops = DotManOperations()
+        ops._global_config = MagicMock()
+        ops._dotman_config = MagicMock()
+
+        ops.reload_config()
+
+        assert ops._global_config is None
+        assert ops._dotman_config is None
+
+
 class TestOperationsModuleExports:
     """Test module exports."""
 
@@ -143,8 +159,10 @@ class TestIterSectionPaths:
         results = list(_ops().iter_section_paths(section))
 
         assert self._names(results) == {"top.log"}
-        assert _ops()._matches_patterns(Path("sub/a.log"), ["sub/*.log"]) is True
-        assert _ops()._matches_patterns(Path("sub/a.log"), ["*.txt"]) is False
+        from dot_man.files import matches_patterns
+
+        assert matches_patterns(Path("sub/a.log"), ["sub/*.log"]) is True
+        assert matches_patterns(Path("sub/a.log"), ["*.txt"]) is False
 
     def test_deleted_reported(self, tmp_path, monkeypatch):
         """Repo files missing locally yield DELETED; filters still apply."""

@@ -6,6 +6,33 @@ from unittest.mock import patch
 import pytest
 
 
+class TestSectionSchema:
+    """VALID_SECTION_KEYS is derived from Section.__init__ (A5)."""
+
+    def test_valid_section_keys_match_init_signature(self):
+        import inspect
+
+        from dot_man.section import VALID_SECTION_KEYS, Section
+
+        params = set(inspect.signature(Section.__init__).parameters)
+        params -= {"self", "name"}
+        assert VALID_SECTION_KEYS == params
+
+    def test_to_dict_keys_are_all_valid(self):
+        from dot_man.section import VALID_SECTION_KEYS, Section
+
+        section = Section(
+            name="x",
+            paths=["~/.config/x"],
+            deploy_method="symlink",
+            encrypted=True,
+            shared=True,
+            pre_deploy="echo hi",
+            update_strategy="rename_old",
+        )
+        assert set(section.to_dict()) <= VALID_SECTION_KEYS
+
+
 class TestSectionInit:
     """Test Section initialization."""
 

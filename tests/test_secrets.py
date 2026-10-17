@@ -227,8 +227,10 @@ class TestCoverageGaps:
     def test_scan_git_history_tolerates_broken_repo(self):
         from unittest.mock import MagicMock
 
+        from git import GitCommandError
+
         repo = MagicMock()
-        repo.iter_commits.side_effect = RuntimeError("boom")
+        repo.iter_commits.side_effect = GitCommandError("iter_commits", "boom")
         repo.index.entries = {}
         assert list(SecretScanner().scan_git_history(repo)) == []
 

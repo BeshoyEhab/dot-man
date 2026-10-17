@@ -374,7 +374,7 @@ class GitManager:
             for tag in self.repo.tags:
                 if tag.commit.hexsha.startswith(sha[:7]):
                     tags.append(tag.name)
-        except Exception:
+        except (GitCommandError, ValueError, AttributeError):
             logging.debug("Failed to get tags for commit %s", sha)
         return tags
 
@@ -485,7 +485,7 @@ class GitManager:
             if stashed:
                 try:
                     self.repo.git.stash("pop")
-                except Exception as stash_err:
+                except GitCommandError as stash_err:
                     logging.warning(
                         "Failed to restore stash after pull conflict: %s", stash_err
                     )
@@ -502,7 +502,7 @@ class GitManager:
             if stashed:
                 try:
                     self.repo.git.stash("pop")
-                except Exception as stash_err:
+                except GitCommandError as stash_err:
                     logging.warning(
                         "Failed to restore stash after pull OSError: %s", stash_err
                     )

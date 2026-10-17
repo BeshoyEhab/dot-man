@@ -110,17 +110,11 @@ addopts = "-v"
 
 [tool.coverage.run]
 omit = [
-    # TUI modules (optional dependency)
-    "dot_man/tui.py",
-    "dot_man/tui_editor.py",
+    # TUI log viewer (optional dependency)
     "dot_man/tui_log.py",
     # Entry points
     "dot_man/cli/main.py",
     "dot_man/cli/interface.py",
-    # Interactive wizards (require user input)
-    "dot_man/cli/interactive.py",
-    # TUI command
-    "dot_man/cli/tui_cmd.py",
 ]
 
 [tool.coverage.report]

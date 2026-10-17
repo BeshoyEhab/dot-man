@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TypedDict
 
-from .merge import get_hook_for_config
+from .hook_engine import get_hook_for_config
 
 
 class ConfigInfo(TypedDict):
@@ -460,7 +460,7 @@ def get_auto_hooks_for_config(
 ) -> dict[str, str] | None:
     """Get suggested hooks based on config name and paths.
 
-    Uses the comprehensive hook system from merge.py for all popular
+    Uses the shared hook vocabulary in hook_engine for all popular
     configurations including shells, window managers, terminals, bars,
     editors, and tools.
 

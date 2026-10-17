@@ -1,7 +1,8 @@
 """Section configuration for dot-man."""
 
-__all__ = ["Section"]
+__all__ = ["Section", "VALID_SECTION_KEYS"]
 
+import inspect
 import os
 from pathlib import Path
 from typing import Any, Optional
@@ -287,3 +288,13 @@ class Section:
             result["shared"] = True
 
         return result
+
+
+# The single source of truth for section config keys: everything Section
+# accepts as a keyword argument except ``name`` (which is the section's own
+# identifier, not a config field). Validated by tests/test_section.py.
+VALID_SECTION_KEYS = frozenset(
+    param
+    for param in inspect.signature(Section.__init__).parameters
+    if param not in ("self", "name")
+)

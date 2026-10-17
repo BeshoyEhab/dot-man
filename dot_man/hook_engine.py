@@ -18,6 +18,100 @@ HOOKS_DIR = DOT_MAN_DIR / "hooks"
 HOOK_FILE_PATTERN = re.compile(r"(?<![\w/:\\])file:([^\s;|&\"']+)")
 HOOK_FILE_ESCAPE_PATTERN = re.compile(r"\\(file:[^\s;|&\"']+)")
 
+# Config-name substring -> HOOK_ALIASES key. First match wins. This is the one
+# vocabulary mapping config names to reload hooks; FILE_TO_HOOK_MAP does the
+# same for tracked paths.
+HOOK_CONFIG_MAP: dict[str, str] = {
+    "nvim": "nvim_sync",
+    "vim": "vim_reload",
+    "fish": "fish_reload",
+    "bashrc": "bash_reload",
+    "zshrc": "zsh_reload",
+    "zsh": "zsh_reload",
+    "tmux": "tmux_reload",
+    "kitty": "kitty_reload",
+    "alacritty": "alacritty_reload",
+    "wezterm": "wezterm_reload",
+    "hyprland": "hyprland_reload",
+    "hypr": "hyprland_reload",
+    "sway": "sway_reload",
+    "i3": "i3_reload",
+    "awesome": "awesome_reload",
+    "polybar": "polybar_reload",
+    "waybar": "waybar_reload",
+    "starship": "starship_reload",
+    "fzf": "fzf_reload",
+    "emacs": "emacs_reload",
+    "doom": "doom_reload",
+    "xresources": "xreload",
+    "ssh": "ssh_reload",
+    "git": "git_reload",
+    "foot": "foot_reload",
+    "bspwm": "bspwm_reload",
+    "qtile": "qtile_reload",
+    "eww": "eww_reload",
+    "mako": "mako_reload",
+    "quickshell": "",  # custom reload provided per-section
+    "qs": "",  # custom reload provided per-section
+}
+
+# Tracked-path substring -> HOOK_ALIASES key.
+FILE_TO_HOOK_MAP: dict[str, str] = {
+    ".bashrc": "bash_reload",
+    ".zshrc": "zsh_reload",
+    ".bash_profile": "bash_reload",
+    ".zprofile": "zsh_reload",
+    ".config/fish": "fish_reload",
+    ".tmux.conf": "tmux_reload",
+    ".config/nvim": "nvim_sync",
+    ".config/kitty": "kitty_reload",
+    ".config/foot": "foot_reload",
+    ".config/alacritty": "alacritty_reload",
+    ".config/wezterm": "wezterm_reload",
+    ".config/hypr": "hyprland_reload",
+    ".config/hyprland": "hyprland_reload",
+    ".config/sway": "sway_reload",
+    ".config/i3": "i3_reload",
+    ".config/bspwm": "bspwm_reload",
+    ".config/qtile": "qtile_reload",
+    ".config/awesome": "awesome_reload",
+    ".config/polybar": "polybar_reload",
+    ".config/waybar": "waybar_reload",
+    ".config/eww": "eww_reload",
+    ".config/mako": "mako_reload",
+    ".config/dunst": "dunst_reload",
+    ".config/picom": "picom_reload",
+    ".Xresources": "xreload",
+    ".config/starship": "starship_reload",
+    ".fzf.bash": "fzf_reload",
+    ".fzf.zsh": "fzf_reload",
+    ".emacs.d": "emacs_reload",
+    ".vimrc": "vim_reload",
+    ".gitconfig": "git_reload",
+}
+
+
+def get_hook_for_config(config_name: str) -> str | None:
+    """Resolve a config name (or path) to its reload command.
+
+    Returns the command for the first matching config key, or ``None`` for an
+    unknown name or a config that ships no universal hook (e.g. quickshell).
+    """
+    config_lower = config_name.lower()
+    for key, alias in HOOK_CONFIG_MAP.items():
+        if key in config_lower:
+            return constants.HOOK_ALIASES.get(alias) if alias else None
+    return None
+
+
+def get_hook_for_file(file_path: str) -> str | None:
+    """Resolve a tracked path to its reload hook alias key, or ``None``."""
+    file_str = str(file_path)
+    for pattern, hook_name in FILE_TO_HOOK_MAP.items():
+        if pattern in file_str or file_str.endswith(pattern):
+            return hook_name
+    return None
+
 
 @dataclass(frozen=True)
 class HookContext:

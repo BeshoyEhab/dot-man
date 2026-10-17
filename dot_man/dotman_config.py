@@ -20,30 +20,7 @@ from .global_config import (
     substitute_templates,
     write_config_file,
 )
-from .section import Section
-
-VALID_SECTION_KEYS = {
-    "paths",
-    "repo_base",
-    "repo_path",
-    "secrets_filter",
-    "update_strategy",
-    "include",
-    "exclude",
-    "pre_deploy",
-    "post_deploy",
-    "on_activate",
-    "on_deactivate",
-    "inherits",
-    "ignored_directories",
-    "follow_symlinks",
-    "deploy_method",
-    "encrypted",
-    "encryption_method",
-    "encryption_recipient",
-    "shared",
-}
-"""Canonical set of valid keys for section config."""
+from .section import VALID_SECTION_KEYS, Section
 
 
 class DotManConfig:
@@ -73,6 +50,14 @@ class DotManConfig:
         self._global_config = global_config
         self._doc: Any = None  # For preserving comments
         self._dirty: bool = False
+        # Resolved sections are memoized per name and cleared on any mutation
+        # (load/add/update/remove) so repeated get_section calls don't re-run
+        # inheritance/template resolution or re-read global.toml per hook.
+        self._section_cache: dict[str, Section] = {}
+
+    def _invalidate_sections(self) -> None:
+        """Drop the resolved-section cache after a config mutation."""
+        self._section_cache.clear()
 
     @property
     def repo_path(self) -> Path:
@@ -86,6 +71,7 @@ class DotManConfig:
         """
         self._data, self._doc = load_config_file(self._path)
         self._dirty = False
+        self._invalidate_sections()
 
         warnings = self._validate_schema()
         for w in warnings:
@@ -222,6 +208,9 @@ class DotManConfig:
 
     def get_section(self, name: str) -> Section:
         """Get a fully resolved section with inheritance applied."""
+        if name in self._section_cache:
+            return self._section_cache[name]
+
         if name not in self._data or name == "templates":
             raise ConfigurationError(f"Section not found: {name}")
 
@@ -266,7 +255,7 @@ class DotManConfig:
         # so invalid values fail with ConfigValidationError either way.
 
         # Build Section object
-        return Section(
+        section = Section(
             name=name,
             paths=paths,
             repo_base=settings.get("repo_base", name),
@@ -288,6 +277,8 @@ class DotManConfig:
             encryption_recipient=settings.get("encryption_recipient"),
             shared=settings.get("shared", False),
         )
+        self._section_cache[name] = section
+        return section
 
     def add_section(
         self,
@@ -333,6 +324,7 @@ class DotManConfig:
 
         self._data[name] = section_data
         self._dirty = True
+        self._invalidate_sections()
 
     def update_section(self, name: str, **kwargs) -> None:
         """Update an existing section's properties.
@@ -357,6 +349,7 @@ class DotManConfig:
                 self._data[name][key] = value
 
         self._dirty = True
+        self._invalidate_sections()
 
     def remove_section(self, name: str) -> None:
         """Remove a section from the configuration.
@@ -371,6 +364,7 @@ class DotManConfig:
             raise ConfigurationError(f"Section not found: {name}")
         del self._data[name]
         self._dirty = True
+        self._invalidate_sections()
 
     def validate(self) -> list[str]:
         """Validate the configuration file. Returns list of warnings."""

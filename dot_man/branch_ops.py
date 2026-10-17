@@ -1,52 +1,24 @@
 """Branch and revert operations mixin for DotManOperations."""
 
+import logging
 from abc import abstractmethod
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
+from git import GitCommandError
+
 from .constants import REPO_DIR
 from .exceptions import DotManError
 from .files import atomic_write_text, copy_file
-from .merge import get_hook_for_config
+from .hook_engine import (
+    FILE_TO_HOOK_MAP,  # noqa: F401 (re-exported for tests)
+    get_hook_for_file,
+)
 from .secrets import SecretMatch
 from .ui import warn
 
 if TYPE_CHECKING:
     pass
-
-FILE_TO_HOOK_MAP = {
-    ".bashrc": "bash_reload",
-    ".zshrc": "zsh_reload",
-    ".bash_profile": "bash_reload",
-    ".zprofile": "zsh_reload",
-    ".config/fish": "fish_reload",
-    ".tmux.conf": "tmux_reload",
-    ".config/nvim": "nvim_sync",
-    ".config/kitty": "kitty_reload",
-    ".config/foot": "foot_reload",
-    ".config/alacritty": "alacritty_reload",
-    ".config/wezterm": "wezterm_reload",
-    ".config/hypr": "hyprland_reload",
-    ".config/hyprland": "hyprland_reload",
-    ".config/sway": "sway_reload",
-    ".config/i3": "i3_reload",
-    ".config/bspwm": "bspwm_reload",
-    ".config/qtile": "qtile_reload",
-    ".config/awesome": "awesome_reload",
-    ".config/polybar": "polybar_reload",
-    ".config/waybar": "waybar_reload",
-    ".config/eww": "eww_reload",
-    ".config/mako": "mako_reload",
-    ".config/dunst": "dunst_reload",
-    ".config/picom": "picom_reload",
-    ".Xresources": "xreload",
-    ".config/starship": "starship_reload",
-    ".fzf.bash": "fzf_reload",
-    ".fzf.zsh": "fzf_reload",
-    ".emacs.d": "emacs_reload",
-    ".vimrc": "vim_reload",
-    ".gitconfig": "git_reload",
-}
 
 
 class BranchMixin:
@@ -173,8 +145,10 @@ class BranchMixin:
             )
             if diff_output.strip():
                 return [f.strip() for f in diff_output.strip().split("\n") if f.strip()]
-        except Exception:
-            pass
+        except GitCommandError as e:
+            logging.debug(
+                "git diff %s...%s failed: %s", source_branch, target_branch, e
+            )
         return []
 
     def detect_hooks_for_changed_files(self, changed_files: list[str]) -> list[str]:
@@ -186,7 +160,6 @@ class BranchMixin:
         Returns:
             List of hook commands to execute (deduplicated)
         """
-        from .constants import HOOK_ALIASES
         from .hook_engine import HookContext, resolve_hook
 
         hooks_to_run = set()
@@ -217,18 +190,11 @@ class BranchMixin:
             else:
                 context = HookContext(branch=branch if isinstance(branch, str) else "")
 
-            for pattern, hook_name in FILE_TO_HOOK_MAP.items():
-                if pattern in file_str or file_str.endswith(pattern):
-                    if hook_name in HOOK_ALIASES:
-                        resolved = resolve_hook(hook_name, context)
-                        if resolved:
-                            hooks_to_run.add(resolved)
-                    else:
-                        # Fallback to get_hook_for_config
-                        fallback_cmd = get_hook_for_config(pattern)
-                        if fallback_cmd:
-                            hooks_to_run.add(fallback_cmd)
-                    break
+            hook_name = get_hook_for_file(file_str)
+            if hook_name:
+                resolved = resolve_hook(hook_name, context)
+                if resolved:
+                    hooks_to_run.add(resolved)
 
             if section is not None:
                 if section.pre_deploy:

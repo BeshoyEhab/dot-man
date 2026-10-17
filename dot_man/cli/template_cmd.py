@@ -1,5 +1,6 @@
 """Template variables command for dot-man CLI."""
 
+import logging
 import os
 import platform
 import socket
@@ -235,8 +236,8 @@ def template_substitute(content: str):
                 val = getter()
                 if val:
                     result = result.replace(placeholder, str(val))
-            except Exception:
-                pass
+            except (OSError, KeyError, ValueError, AttributeError) as e:
+                logging.debug("System variable %s unavailable: %s", var_name, e)
 
         ui.console.print(result)
 

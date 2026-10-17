@@ -201,18 +201,18 @@ green.
 | Done | Item | Impact | Effort | Complexity | Location |
 |------|------|--------|--------|-----------|----------|
 | [ ] | A1 Branch-switch workflow duplicated (library vs CLI) | High | L | High | `branch_ops.py:98-222` vs `navigate_cmd.py:578-750` |
-| [ ] | A2 ~370 lines of dead `merge.py` machinery; buggy merge | Med | M | Med | `merge.py:44-427` |
-| [ ] | A3 Five overlapping hook vocabularies | Med | M | Med | `constants.py:80`, `merge.py`, `config_detector.py` |
+| [x] | A2 ~370 lines of dead `merge.py` machinery; buggy merge | Med | M | Med | `merge.py:44-427` |
+| [x] | A3 Five overlapping hook vocabularies | Med | M | Med | `constants.py:80`, `merge.py`, `config_detector.py` |
 | [ ] | A4 Global singleton + import-time path binding (patch wall) | Med | M | High | `operations.py:198-212`, `tests/conftest.py:56-98` |
-| [ ] | A5 Section schema duplicated across 4+ places | Med | M | Med | `dotman_config.py:24-44`, `section.py:29-51,232-278` |
+| [x] | A5 Section schema duplicated across 4+ places | Med | M | Med | `dotman_config.py:24-44`, `section.py:29-51,232-278` |
 | [ ] | A6 153 `except Exception` clauses hide real bugs | Med | M | Med | `core.py:278,335,374`, `secrets.py:566`, … |
-| [ ] | A7 `iter_section_paths`/pattern logic duplicated 4+× | Low-Med | M | Med | `operations.py:111-193`, `save_deploy_ops.py:389`, `navigate_cmd.py:427,490` |
-| [ ] | A8 Dead/stale TUI + non-existent coverage omits + `textual` weight | Low-Med | S | Low | `cli/tui_cmd.py`, `pyproject.toml:110-123` |
-| [ ] | A9 Unreachable dead block in `_switch_to_branch` | Low | S | Low | `navigate_cmd.py:651-698` |
-| [ ] | A10 `get_section` uncached; re-reads `global.toml` per hook | Low-Med | S | Med | `section.py:190-207` |
+| [x] | A7 `iter_section_paths`/pattern logic duplicated 4+× | Low-Med | M | Med | `operations.py:111-193`, `save_deploy_ops.py:389`, `navigate_cmd.py:427,490` |
+| [x] | A8 Dead/stale TUI + non-existent coverage omits + `textual` weight | Low-Med | S | Low | `cli/tui_cmd.py`, `pyproject.toml:110-123` |
+| [x] | A9 Unreachable dead block in `_switch_to_branch` | Low | S | Low | `navigate_cmd.py:651-698` |
+| [x] | A10 `get_section` uncached; re-reads `global.toml` per hook | Low-Med | S | Med | `section.py:190-207` |
 | [ ] | A11 Mixins rely on implicit host state (13-method `FakeOps`) | Low-Med | M | Med | `operations.py:42`, `tests/test_branch_ops.py:11-65` |
 | [ ] | A12 Long functions mixing orchestration/rendering/hooks | Low | M | Med | `cli/doctor_cmd.py`, `cli/status_cmd.py`, `cli/rollback_cmd.py` |
-| [ ] | A13 `reload_config` clears only `_dotman_config` (stale watch) | Low | S | Low | `operations.py:94-96` |
+| [x] | A13 `reload_config` clears only `_dotman_config` (stale watch) | Low | S | Low | `operations.py:94-96` |
 
 ### Details
 
@@ -258,6 +258,23 @@ hook context instead of re-reading disk.
 
 **A13** — Reset `_global_config` too (or all state) so long-lived `watch`
 picks up branch changes.
+
+### Status (partial)
+
+Done in the Phase 3 pass: A2, A3, A5, A7, A8, A9, A10, A13. Two of these were
+scoped, not exhaustive:
+
+- **A5** — single-sourced via `VALID_SECTION_KEYS = inspect.signature(
+  Section.__init__)`; `to_dict`/`__init__` remain hand-written but are guarded
+  by a test asserting every emitted key is valid.
+- **A6** — the four silent `except Exception: pass` sites (branch_ops,
+  secrets, template_cmd, export_cmd) now narrow + log; `core.py` and
+  `secrets.scan_git_history` handlers narrowed to Git/OS errors. The remaining
+  ~140 broad handlers are tracked as **A6b** (incremental, per-module).
+
+Still open: **A1** (unify library vs CLI switch path), **A4** (global
+singleton / import-time path binding), **A6b** (broad-handler sweep),
+**A11** (mixin → composition/Protocol), **A12** (extract long CLI bodies).
 
 ---
 

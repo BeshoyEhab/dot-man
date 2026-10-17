@@ -714,53 +714,6 @@ def _switch_to_branch(ops, current_branch, target_branch, force):
         )
     ops.reload_config()
     return True
-    """Display what a branch switch would do, changing nothing."""
-    ui.console.print(
-        f"[bold]Dry Run:[/bold] Navigate [cyan]{current_branch}[/cyan] → [cyan]{target_branch}[/cyan]"
-    )
-    ui.console.print()
-
-    # Phase 1: What would be saved
-    sections = get_changed_sections(ops)
-    if sections:
-        ui.console.print(
-            f"[bold]Phase 1:[/bold] Would save {len(sections)} section(s): {', '.join(sections)}"
-        )
-    else:
-        ui.console.print("[bold]Phase 1:[/bold] No changes to save")
-    ui.console.print()
-
-    # Phase 2: Branch switch
-    branch_exists = ops.git.branch_exists(target_branch)
-    if branch_exists:
-        ui.console.print(
-            f"[bold]Phase 2:[/bold] Would checkout existing branch: [cyan]{target_branch}[/cyan]"
-        )
-    else:
-        ui.console.print(
-            f"[bold]Phase 2:[/bold] Would create and checkout new branch: [cyan]{target_branch}[/cyan]"
-        )
-    ui.console.print()
-
-    # Phase 3: What would be deployed
-    ui.console.print("[bold]Phase 3:[/bold] Would deploy configuration...")
-    deploy_items, pre_hooks, post_hooks = _collect_dry_run_deploy_items(ops)
-
-    if deploy_items:
-        for local, method in deploy_items:
-            ui.console.print(f"  [yellow]{local}[/yellow]{method}")
-    else:
-        ui.console.print("  [dim]No files would change[/dim]")
-
-    if pre_hooks:
-        ui.console.print(f"  pre_deploy: {', '.join(pre_hooks)}")
-    if post_hooks:
-        ui.console.print(f"  post_deploy: {', '.join(post_hooks)}")
-
-    ui.console.print()
-    ui.console.print(
-        f"[bold]Phase 4:[/bold] Would update current_branch → {target_branch}"
-    )
 
 
 def _handle_branch_navigate(
