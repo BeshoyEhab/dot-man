@@ -27,6 +27,11 @@ from .common import DotManGroup
 )
 @click.option("--no-color", "no_color", is_flag=True, help="Disable coloured output")
 @click.option(
+    "--plain",
+    is_flag=True,
+    help="Plain ASCII output: no emoji, colour, or box drawing",
+)
+@click.option(
     "--json",
     "json_output",
     is_flag=True,
@@ -46,6 +51,7 @@ def cli(
     yes: bool,
     no_input: bool,
     no_color: bool,
+    plain: bool,
     json_output: bool,
     no_onboarding: bool,
 ):
@@ -97,6 +103,7 @@ def cli(
     ctx.obj["YES"] = yes
     ctx.obj["NO_INPUT"] = no_input
     ctx.obj["NO_COLOR"] = no_color
+    ctx.obj["PLAIN"] = plain
     ctx.obj["JSON"] = json_output
 
     # Apply the global output/confirmation flags process-wide.
@@ -106,4 +113,5 @@ def cli(
         no_input=no_input,
         no_color=no_color,
         json=json_output,
+        plain=plain,
     )

@@ -16,6 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fast instead of blocking on a prompt, `--no-color` rebuilds the Rich
   consoles without colour, and `--json` is honoured by `status` (and is
   available to any command via `ui.json_mode()`).
+- **`--plain` and width-aware output** — `--plain` swaps emoji and
+  box-drawing for ASCII (`/` `[ok]` `[!]` `[x]` `->`, `-` rules, `DIR`/`FILE`
+  icons). Rules now use Rich's console-width layout instead of a hardcoded
+  50/40, and `status` truncates paths with a cell-aware `ui.truncate_text`
+  rather than a magic `[-32:]` slice.
 
 ### Security
 

@@ -37,6 +37,7 @@ _quiet = False
 _assume_yes = False
 _no_input = False
 _json_mode = False
+_plain = False
 
 
 def configure(
@@ -46,19 +47,22 @@ def configure(
     no_input: bool = False,
     no_color: bool = False,
     json: bool = False,
+    plain: bool = False,
 ) -> None:
     """Apply the root group's global flags to the shared UI state.
 
     Called by the root CLI callback (and by tests) so behaviour is
     process-wide and deterministic. Always resets every flag so a flag
-    can never leak from one invocation to the next.
+    can never leak from one invocation to the next. ``plain`` implies
+    ``no_color`` (ASCII output should never carry ANSI codes).
     """
-    global _quiet, _assume_yes, _no_input, _json_mode
+    global _quiet, _assume_yes, _no_input, _json_mode, _plain
     _quiet = quiet
     _assume_yes = yes
     _no_input = no_input
     _json_mode = json
-    _build_consoles(no_color)
+    _plain = plain
+    _build_consoles(no_color or plain)
 
 
 def is_quiet() -> bool:
@@ -79,6 +83,38 @@ def assume_yes() -> bool:
 def no_input_enabled() -> bool:
     """Return True when ``--no-input`` forbids interactive prompts."""
     return _no_input
+
+
+def plain() -> bool:
+    """Return True when ``--plain`` requested ASCII-only output."""
+    return _plain
+
+
+def icon(emoji: str, fallback: str) -> str:
+    """Return ``emoji``, or a text ``fallback`` in ``--plain`` mode."""
+    return fallback if _plain else emoji
+
+
+def rule(title: str = "", char: str = "─") -> None:
+    """Print a rule that spans the console width (Rich auto-fits it)."""
+    if _quiet:
+        return
+    console.rule(title, characters=("-" if _plain else char))
+
+
+def truncate_text(text: str, max_width: int) -> str:
+    """Clip ``text`` to ``max_width`` terminal cells, adding an ellipsis.
+
+    Cell-aware (unlike a raw slice), so wide/combining characters do not
+    push a table column past the terminal edge.
+    """
+    from rich.text import Text
+
+    if max_width < 1:
+        return ""
+    rich_text = Text(text)
+    rich_text.truncate(max_width, overflow="ellipsis")
+    return rich_text.plain
 
 
 def print_banner(title: str, subtitle: str = "") -> None:
@@ -102,21 +138,24 @@ def info(message: str) -> None:
     """Print an info message."""
     if _quiet:
         return
-    console.print(f"[info]ℹ[/info]  {message}")
+    marker = "[info]\\[i][/info]" if _plain else "[info]ℹ[/info]"
+    console.print(f"{marker}  {message}")
 
 
 def success(message: str) -> None:
     """Print a success message."""
     if _quiet:
         return
-    console.print(f"[success]✓[/success] {message}")
+    marker = "[success]\\[ok][/success]" if _plain else "[success]✓[/success]"
+    console.print(f"{marker} {message}")
 
 
 def warn(message: str) -> None:
     """Print a warning message."""
     if _quiet:
         return
-    console.print(f"[warning]⚠[/warning] {message}")
+    marker = "[warning]\\[!][/warning]" if _plain else "[warning]⚠[/warning]"
+    console.print(f"{marker} {message}")
 
 
 def error(message: str, exit_code: int = 1) -> None:
@@ -127,7 +166,8 @@ def error(message: str, exit_code: int = 1) -> None:
     Exits via ``raise SystemExit`` (never ``sys.exit``) so exit codes
     stay consistent and testable across all commands.
     """
-    error_console.print(f"[error]✗ Error:[/error] {message}")
+    marker = "[error]\\[x][/error]" if _plain else "[error]✗[/error]"
+    error_console.print(f"{marker} Error: {message}")
     if exit_code != 0:
         raise SystemExit(exit_code)
 
@@ -185,7 +225,8 @@ def hint(message: str) -> None:
     """Print a helpful hint or suggestion."""
     if _quiet:
         return
-    console.print(f"[dim]💡 {message}[/dim]")
+    marker = "->" if _plain else "💡"
+    console.print(f"[dim]{marker} {message}[/dim]")
 
 
 def next_steps(steps: list[str]) -> None:
@@ -204,15 +245,10 @@ def next_steps(steps: list[str]) -> None:
 
 
 def section(title: str, content: str) -> None:
-    """Print a titled section with content."""
+    """Print a titled section with content, auto-fitted to the console."""
     if _quiet:
         return
     console.print()
-    width = max(len(title) + 4, 40)
-    console.print(f"[bold cyan]┌{'─' * width}┐[/bold cyan]")
-    console.print(
-        f"[bold cyan]│[/bold cyan]  {title}{' ' * (width - len(title) - 2)}[bold cyan]│[/bold cyan]"
-    )
-    console.print(f"[bold cyan]└{'─' * width}┘[/bold cyan]")
+    rule(title)
     if content:
         console.print(f"  {content}")

@@ -169,6 +169,7 @@ These apply to every command and come before the subcommand:
 | `dot-man --yes <cmd>` | Assume yes for all confirmation prompts |
 | `dot-man --no-input <cmd>` | Never prompt; fail when input would be required |
 | `dot-man --no-color <cmd>` | Disable coloured output |
+| `dot-man --plain <cmd>` | Plain ASCII output: no emoji, colour, or box drawing |
 | `dot-man --json <cmd>` | Emit machine-readable JSON where supported |
 | `dot-man -v <cmd>` | Show detailed output on console |
 | `dot-man --debug <cmd>` | Enable debug logging to file |

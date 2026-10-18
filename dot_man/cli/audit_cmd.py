@@ -96,7 +96,7 @@ def audit(strict: bool, fix: bool, history: bool):
             items = by_severity[severity]
 
             ui.console.print(f"[{color}]{severity}[/{color}] ({len(items)} findings)")
-            ui.console.print("─" * 50)
+            ui.rule()
 
             for match in items:
                 if match.history_ref:
@@ -114,7 +114,7 @@ def audit(strict: bool, fix: bool, history: bool):
                 ui.console.print()
 
         # Summary
-        ui.console.print("─" * 50)
+        ui.rule()
         ui.console.print(
             f"[bold]Total:[/bold] {len(matches)} secrets in {len(set(m.file for m in matches))} files"
         )

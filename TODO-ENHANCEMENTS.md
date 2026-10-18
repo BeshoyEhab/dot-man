@@ -304,7 +304,7 @@ deserves its own focused pass rather than a rushed edit:
 | [x] | U8 `sync --push-only --pull-only` silently no-ops | Low | S | Low | `remote_cmd.py:172-194` |
 | [x] | U9 `config create --examples` always-on no-op flag | Low | S | Low | `config_cmd.py:199` |
 | [x] | U10 Trim alias noise + remove self-aliases | Low | S | Low | `add_cmd.py:25`, `log_cmd.py:21` |
-| [ ] | U11 Terminal-width aware output; text fallback for emoji | Low-Med | M | Med | `ui.py:120`, `status_cmd.py:167-188`, `rollback_cmd.py:226` |
+| [x] | U11 Terminal-width aware output; text fallback for emoji | Low-Med | M | Med | `ui.py:120`, `status_cmd.py:167-188`, `rollback_cmd.py:226` |
 
 ### Details
 
@@ -344,7 +344,7 @@ Rich auto-fitting tables; pair icons with text; add `--plain`.
 
 ### Status
 
-- **Done:** U1, U5–U10 (the global flags, the Low-effort UX fixes,
+- **Done:** U1, U5–U11 (the global flags, the Low-effort UX fixes,
   `import` commit confirmation, and the CLI group normalisation).
 - **Partial:** U3 (deprecated shims `switch`/`checkout`/`tag switch` are now
   `hidden=True`; the overlapping-command merge — `restore`/`revert -c`,
@@ -384,7 +384,15 @@ Rich auto-fitting tables; pair icons with text; add `--plain`.
   honours the global `--json`. A conftest autouse fixture resets the flags
   between tests. (`NO_COLOR` env support is delegated to Rich's own handling;
   not explicitly tested.)
-- **Deferred (Large/Med):** U11 remains open.
+- **U11:** `--plain` (ASCII markers, `-` rules, `DIR`/`FILE` icons), width-aware
+  rules via `ui.rule()` (replacing `"─" * 50` in `audit`), and
+  `ui.truncate_text()` (cell-aware ellipsis, replacing `display_path[-32:]`
+  in `status`). `ui.section()` now uses an auto-fitted rule instead of a
+  fixed 40-wide box. Shared printers and `status` icons honour plain mode;
+  per-command emoji in other files are left as-is (the fallback covers the
+  common surface).
+- **Deferred (Large/Med):** none — Phase 4 complete; U2/U3/U4 partials noted
+  above remain.
 
 ---
 

@@ -21,7 +21,14 @@ class TestGlobalFlagHelp:
         result = CliRunner().invoke(cli, ["--help"])
 
         assert result.exit_code == 0
-        for flag in ["--quiet", "--yes", "--no-input", "--no-color", "--json"]:
+        for flag in [
+            "--quiet",
+            "--yes",
+            "--no-input",
+            "--no-color",
+            "--plain",
+            "--json",
+        ]:
             assert flag in result.output, f"{flag} missing from --help"
 
 

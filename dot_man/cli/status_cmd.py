@@ -138,13 +138,16 @@ def _render_status_table(
 
             color = status_colors.get(file_status, "white")
 
-            # Icon
-            icon = "📁" if local_path.is_dir() else "📄"
-
-            # Shorten path
+            # Shorten path, width-aware, and fall back to an ASCII icon
+            # in --plain mode.
+            icon = ui.icon(
+                "📁" if local_path.is_dir() else "📄",
+                "DIR" if local_path.is_dir() else "FILE",
+            )
             display_path = str(local_path).replace(str(Path.home()), "~")
-            if len(display_path) > 35:
-                display_path = "..." + display_path[-32:]
+            display_path = ui.truncate_text(
+                display_path, max(24, ui.console.width - 40)
+            )
 
             details = ""
             if file_status == "MODIFIED" and verbose:
@@ -160,7 +163,7 @@ def _render_status_table(
             ):
                 matches = list(scanner.scan_file(local_path))
                 if matches:
-                    secret_indicator = " [red]🔒[/red]"
+                    secret_indicator = f" [red]{ui.icon('🔒', '[locked]')}[/red]"
                     secrets_found.extend(matches)
 
             file_table.add_row(
