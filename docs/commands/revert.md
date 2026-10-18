@@ -2,6 +2,9 @@
 
 Restore files from the repository to your local system.
 
+This is the canonical single-file restore. The deprecated `dot-man restore
+<file> <sha>` command forwards here (and is removed in v2.0).
+
 ## Example
 
 ```bash
@@ -21,8 +24,7 @@ dot-man revert <file> --force
 | Flag | Description |
 |------|-------------|
 | `--commit`, `-c` | Restore from a specific commit |
-| `--dry-run`, `-n` | Show what would be reverted |
-| `--all` | Revert all tracked files |
+| `--force` | Skip the confirmation prompt |
 
 ## Examples
 
@@ -30,12 +32,6 @@ dot-man revert <file> --force
 # Restore a file from the repo
 dot-man revert ~/.bashrc
 
-# Restore from a specific commit
+# Restore from a specific commit (canonical replacement for `restore`)
 dot-man revert ~/.bashrc --commit abc1234
-
-# Preview what would be reverted
-dot-man revert ~/.config/nvim --dry-run
-
-# Restore all files
-dot-man revert --all
 ```

@@ -14,7 +14,7 @@ dot-man backup list      # find the snapshot id
 ```bash
 dot-man backup create
 dot-man backup list
-dot-man backup restore <id>
+dot-man rollback --backup <id>   # restores a snapshot (replaces backup restore)
 ```
 
 ## Subcommands
@@ -36,12 +36,15 @@ List available backups:
 dot-man backup list
 ```
 
-### backup restore
+### backup restore (deprecated)
 
-Restore from a backup:
+!!! warning "Deprecated"
+    `dot-man backup restore <id>` is renamed to
+    `dot-man rollback --backup <id>` and will be removed in v2.0. The old
+    command still works, prints a warning, and forwards to the new one.
 
 ```bash
-dot-man backup restore <backup-id>
+dot-man rollback --backup <backup-id>
 ```
 
 ## Configuration
@@ -63,5 +66,5 @@ dot-man backup create
 dot-man backup list
 
 # Restore a specific backup
-dot-man backup restore 2024-01-15_12-00-00
+dot-man rollback --backup 2024-01-15_12-00-00
 ```

@@ -15,6 +15,7 @@ dot-man rollback -n 3     # go back three commits
 dot-man rollback
 dot-man rollback -n 3
 dot-man rollback <target>
+dot-man rollback --backup <id>
 dot-man rollback --list
 dot-man rollback --dry-run
 ```
@@ -23,10 +24,12 @@ dot-man rollback --dry-run
 
 | Flag | Description |
 |------|-------------|
-| `--to`, `-t` | Rollback to a specific tag or commit |
-| `-n` | Number of commits to roll back (default: 1) |
+| `TARGET` | Commit SHA, tag, or `HEAD~N` to roll back to |
+| `--steps`, `-n` | Number of commits to roll back (default: 1) |
+| `--backup <id>` | Restore local files from a safety snapshot (replaces `backup restore`) |
 | `--list` | Show available rollback points |
-| `--dry-run`, `-n` | Preview rollback without changes |
+| `--dry-run` | Preview rollback without changes |
+| `--force`, `-f` | Skip the confirmation prompt |
 
 ## What Happens
 
@@ -45,7 +48,10 @@ dot-man rollback
 dot-man rollback -n 3
 
 # Roll back to a tag
-dot-man rollback --to v1.0
+dot-man rollback v1.0
+
+# Restore a safety snapshot (canonical replacement for `backup restore`)
+dot-man rollback --backup 2024-01-15_12-00-00
 
 # See what you can roll back to
 dot-man rollback --list

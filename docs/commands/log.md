@@ -15,15 +15,16 @@ dot-man log
 dot-man log -n 10
 dot-man log --diff
 dot-man log --stat
+dot-man log --commit abc1234
 ```
 
 ## Options
 
 | Flag | Description |
 |------|-------------|
-| `--limit`, `-n` | Number of commits to show (default: 20) |
-| `--diff` | Show diffs for each commit |
-| `--oneline` | Compact one-line format |
+| `--count`, `-n` | Number of commits to show |
+| `--diff`, `-d` | Show diffs for each commit |
+| `--commit`, `-C` | Full diff for a single commit (replaces `show`) |
 | `--stat` | Show file change statistics |
 | `--interactive` | Open TUI log browser |
 
@@ -36,8 +37,8 @@ dot-man log
 # Last 5 commits with diffs
 dot-man log -n 5 --diff
 
-# Compact view
-dot-man log --oneline
+# Full diff for one commit (canonical replacement for `show`)
+dot-man log --commit abc1234
 
 # See what files changed
 dot-man log --stat

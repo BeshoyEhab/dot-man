@@ -84,6 +84,23 @@ def _create_rollback_backup(ops) -> None:
         warn(f"Backup failed (continuing anyway): {exc}")
 
 
+def _restore_backup(ops, backup_id: str, force: bool) -> None:
+    """Restore local files from a safety backup snapshot.
+
+    Shared by ``rollback --backup`` and the deprecated ``backup restore``
+    alias so both routes behave identically.
+    """
+    if not force:
+        if not ui.confirm(
+            f"Restore backup '{backup_id}'? This will overwrite local files."
+        ):
+            return
+
+    ui.console.print(f"[bold]Restoring backup {backup_id}…[/bold]")
+    ops.backups.restore_backup(backup_id)
+    success("Backup restored successfully!")
+
+
 @main.command("rollback", cls=AliasedCommand)
 @click.argument("target", required=False, shell_complete=complete_commits)
 @click.option(
@@ -91,6 +108,13 @@ def _create_rollback_backup(ops) -> None:
     "list_only",
     is_flag=True,
     help="List available rollback points without rolling back",
+)
+@click.option(
+    "--backup",
+    "backup_id",
+    default=None,
+    help="Restore local files from a safety backup snapshot (replaces "
+    "'backup restore')",
 )
 @click.option(
     "--steps",
@@ -115,6 +139,7 @@ def _create_rollback_backup(ops) -> None:
 def rollback(
     target: str | None,
     list_only: bool,
+    backup_id: str | None,
     steps: int,
     dry_run: bool,
     force: bool,
@@ -137,6 +162,7 @@ def rollback(
         dot-man rollback -n 3             # undo last 3 auto-saves
         dot-man rollback abc1234          # go to specific commit
         dot-man rollback v1.0             # go to tag
+        dot-man rollback --backup <id>    # restore a safety backup snapshot
         dot-man rollback --list           # see available rollback points
         dot-man rollback --dry-run        # preview without changes
     """
@@ -149,6 +175,11 @@ def rollback(
         # ── List mode ────────────────────────────────────────────────────────
         if list_only:
             _show_rollback_points(ops)
+            return
+
+        # ── Snapshot mode ────────────────────────────────────────────────────
+        if backup_id:
+            _restore_backup(ops, backup_id, force)
             return
 
         # ── Resolve target commit ─────────────────────────────────────────────

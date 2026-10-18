@@ -179,6 +179,33 @@ class TestRevertFromCommitReal:
         assert result.exit_code == 1, result.output
         assert "File not tracked" in result.output
 
+    def test_commit_restore_updates_repo_working_copy(
+        self, integration_runner, tmp_path
+    ):
+        """`revert -c` restores both the local file and the in-repo copy.
+
+        Writing only the local file would leave the repo work tree dirty and
+        `dot-man status` reporting a phantom pending change.
+        """
+        from dot_man import constants
+        from dot_man.operations import get_operations
+
+        target, sha = self._tracked(integration_runner, tmp_path, ".revrc", "repo v1")
+
+        section = get_operations().get_section(".revrc")
+        repo_rel = section.get_repo_path(target, constants.get_repo_dir()).relative_to(
+            constants.get_repo_dir()
+        )
+        repo_copy = constants.get_repo_dir() / repo_rel
+        repo_copy.write_text("repo junk")
+
+        result = integration_runner.invoke(
+            cli, ["revert", str(target), "-c", sha, "--force"]
+        )
+
+        assert result.exit_code == 0, result.output
+        assert repo_copy.read_text() == "repo v1"
+
     def test_commit_without_file_in_history_errors(self, integration_runner, tmp_path):
         from dot_man.core import GitManager
 

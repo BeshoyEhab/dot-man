@@ -2,7 +2,7 @@
 
 import os
 from contextlib import ExitStack
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from click.testing import CliRunner
@@ -139,9 +139,11 @@ class TestBackupList:
 
 class TestBackupRestore:
     def test_backup_restore_help(self, runner):
-        """Backup restore help."""
+        """Deprecated `backup restore --help` points at `rollback --backup`."""
         result = runner.invoke(cli, ["backup", "restore", "--help"])
-        assert result.exit_code in [0, 2]
+        assert result.exit_code == 0
+        assert "DEPRECATED" in result.output
+        assert "rollback --backup" in result.output
 
     def test_backup_restore_without_id(self, runner):
         """Backup restore without backup id."""
@@ -238,6 +240,9 @@ class TestBackupRestoreFlow:
         assert result.exit_code == 0
         assert "restored successfully" in result.output
         assert (home / ".bashrc").read_text() == 'alias ll="ls -la"\n'
+        # Deprecated alias still warns about the replacement.
+        assert "deprecated" in result.output.lower()
+        assert "rollback --backup" in result.output
 
     def test_restore_confirm_abort_keeps_files(self, clean_env):
         """Answering 'no' at the prompt leaves local files alone."""
@@ -258,12 +263,78 @@ class TestBackupRestoreFlow:
         assert (home / ".bashrc").read_text() == "modified content\n"
 
     def test_restore_missing_id_fails(self, clean_env):
-        """Unknown backup id reports failure."""
+        """Unknown backup id reports the BackupError (exit 41), not a bare 1."""
         runner, dot_man_dir, repo_dir, global_toml = clean_env
         _init_repo(repo_dir)
         _setup_global_toml(global_toml)
 
         result = runner.invoke(cli, ["backup", "restore", "nope", "--force"])
 
-        assert result.exit_code != 0
-        assert "Failed to restore backup" in result.output
+        assert result.exit_code == 41
+        assert "Backup 'nope' not found" in result.output
+
+
+class TestBackupErrorBranches:
+    """Error and empty-result paths for backup create/list/restore."""
+
+    def test_create_empty_result_warns(self, clean_env):
+        """A snapshot returning no id warns instead of reporting success."""
+        runner, dot_man_dir, repo_dir, global_toml = clean_env
+        _init_repo(repo_dir)
+        _setup_global_toml(global_toml)
+
+        tracked = repo_dir / "tracked.txt"
+        tracked.write_text("x")
+        ops = MagicMock()
+        ops.get_sections.return_value = ["s"]
+        ops.get_section.return_value.paths = [tracked]
+        ops.backups.create_backup.return_value = ""
+
+        with patch("dot_man.operations.get_operations", return_value=ops):
+            result = runner.invoke(cli, ["backup", "create"])
+
+        assert result.exit_code == 0
+        assert "empty" in result.output.lower()
+
+    def test_create_failure_reports(self, clean_env):
+        """A raising create path is reported, not swallowed."""
+        runner, dot_man_dir, repo_dir, global_toml = clean_env
+        _init_repo(repo_dir)
+        _setup_global_toml(global_toml)
+
+        with patch(
+            "dot_man.operations.get_operations",
+            side_effect=RuntimeError("boom"),
+        ):
+            result = runner.invoke(cli, ["backup", "create"])
+
+        assert result.exit_code == 1
+        assert "Failed to create backup: boom" in result.output
+
+    def test_list_failure_reports(self, clean_env):
+        """A raising list path is reported."""
+        runner, dot_man_dir, repo_dir, global_toml = clean_env
+        _init_repo(repo_dir)
+        _setup_global_toml(global_toml)
+
+        ops = MagicMock()
+        ops.backups.list_backups.side_effect = RuntimeError("bad list")
+        with patch("dot_man.operations.get_operations", return_value=ops):
+            result = runner.invoke(cli, ["backup", "list"])
+
+        assert result.exit_code == 1
+        assert "Failed to list backups: bad list" in result.output
+
+    def test_restore_unexpected_error_reports(self, clean_env):
+        """A non-DotManError from restore hits the generic handler (exit 1)."""
+        runner, dot_man_dir, repo_dir, global_toml = clean_env
+        _init_repo(repo_dir)
+        _setup_global_toml(global_toml)
+
+        ops = MagicMock()
+        ops.backups.restore_backup.side_effect = RuntimeError("disk gone")
+        with patch("dot_man.operations.get_operations", return_value=ops):
+            result = runner.invoke(cli, ["backup", "restore", "any", "--force"])
+
+        assert result.exit_code == 1
+        assert "Failed to restore backup: disk gone" in result.output

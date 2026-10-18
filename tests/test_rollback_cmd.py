@@ -455,3 +455,51 @@ class TestRollbackFullFlow:
         result = integration_runner.invoke(cli, ["rollback", "--steps", "1", "--force"])
         assert result.exit_code == 0
         assert "deployed" in result.output.lower() or "Rolled back" in result.output
+
+
+class TestRollbackBackup:
+    """`rollback --backup <id>` restores a snapshot (replaces `backup restore`)."""
+
+    @staticmethod
+    def _tracked_with_backup(runner, tmp_path):
+        """Track a real file, snapshot it, then dirty the local copy."""
+        from dot_man.backups import BackupManager
+
+        target = tmp_path / "home" / ".backuprc"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("original\n")
+        add = runner.invoke(cli, ["add", str(target), "--section", "bk"])
+        assert add.exit_code == 0, add.output
+
+        backup_id = BackupManager().create_backup([target], note="snap")
+        assert backup_id
+        target.write_text("modified\n")
+        return target, backup_id
+
+    def test_backup_restores_files(self, integration_runner, tmp_path):
+        target, backup_id = self._tracked_with_backup(integration_runner, tmp_path)
+
+        result = integration_runner.invoke(
+            cli, ["rollback", "--backup", backup_id, "--force"]
+        )
+
+        assert result.exit_code == 0, result.output
+        assert "restored successfully" in result.output
+        assert target.read_text() == "original\n"
+
+    def test_backup_confirm_abort_keeps_files(self, integration_runner, tmp_path):
+        target, backup_id = self._tracked_with_backup(integration_runner, tmp_path)
+
+        with patch("dot_man.cli.rollback_cmd.ui.confirm", return_value=False):
+            result = integration_runner.invoke(cli, ["rollback", "--backup", backup_id])
+
+        assert result.exit_code == 0, result.output
+        assert target.read_text() == "modified\n"
+
+    def test_unknown_backup_reports_failure(self, integration_runner, tmp_path):
+        result = integration_runner.invoke(
+            cli, ["rollback", "--backup", "nope", "--force"]
+        )
+
+        assert result.exit_code == 41, result.output
+        assert "Backup 'nope' not found" in result.output

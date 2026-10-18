@@ -10,6 +10,51 @@ from .common import AliasedCommand, complete_commits, error, require_init, succe
 from .interface import cli as main
 
 
+def restore_file_from_commit(ops, target_path: Path, commit: str, force: bool) -> bool:
+    """Overwrite ``target_path`` (and the repo copy) with the ``commit`` version.
+
+    Shared by ``revert --commit`` and the deprecated ``restore`` alias so the
+    two can never drift.  Failures exit through ``error()``; a declined
+    confirmation returns ``False`` without touching anything.
+    """
+    repo_rel: Path | None = None
+    for section_name in ops.get_sections():
+        section = ops.get_section(section_name)
+        for tracked_path in section.paths:
+            if tracked_path.resolve() == target_path:
+                repo_rel = section.get_repo_path(
+                    tracked_path, constants.get_repo_dir()
+                ).relative_to(constants.get_repo_dir())
+                break
+        if repo_rel is not None:
+            break
+
+    if repo_rel is None:
+        error(f"File not tracked: {target_path}")
+        return False
+
+    try:
+        file_content = ops.git.repo.git.show(f"{commit}:{repo_rel}")
+    except Exception as e:
+        error(f"Could not restore from commit: {e}")
+        return False
+
+    if not force:
+        if not ui.confirm(f"Overwrite '{target_path}' with version from {commit}?"):
+            return False
+
+    target_path.parent.mkdir(parents=True, exist_ok=True)
+    target_path.write_text(file_content)
+
+    # Keep the repo working copy in sync so `dot-man status` stays clean.
+    repo_path = constants.get_repo_dir() / repo_rel
+    repo_path.parent.mkdir(parents=True, exist_ok=True)
+    repo_path.write_text(file_content)
+
+    success(f"Restored: {target_path} from {commit}")
+    return True
+
+
 @main.command("revert", cls=AliasedCommand)
 @click.argument("path", type=click.Path(path_type=Path))
 @click.option("--force", is_flag=True, help="Skip confirmation prompt")
@@ -31,7 +76,6 @@ def revert(path: Path, force: bool, commit: str | None):
         dot-man revert ~/.bashrc -c abc1234    # Restore from specific commit
     """
     try:
-
         from ..operations import get_operations
 
         ops = get_operations()
@@ -40,49 +84,9 @@ def revert(path: Path, force: bool, commit: str | None):
         target_path = path.expanduser().resolve()
 
         if commit:
-            # Restore from specific commit
-            ui.console.print(
-                f"Restoring [cyan]{target_path}[/cyan] from commit [yellow]{commit}[/yellow]..."
-            )
-
-            # Find the file in git history
-            try:
-                # Resolve the in-repo path the same way diff/log/show do:
-                # the old relative_to(REPO_DIR.parent) produced
-                # DOT_MAN_DIR-relative paths that never matched anything
-                # inside the repo, so -c could never restore a real file.
-                repo_rel = None
-                for section_name in ops.get_sections():
-                    section = ops.get_section(section_name)
-                    for tracked_path in section.paths:
-                        if tracked_path.resolve() == target_path:
-                            repo_rel = section.get_repo_path(
-                                tracked_path, constants.get_repo_dir()
-                            ).relative_to(constants.get_repo_dir())
-                            break
-                    if repo_rel is not None:
-                        break
-                if repo_rel is None:
-                    error(f"File not tracked: {target_path}")
-
-                # Get the file content from the commit
-                file_content = ops.git.repo.git.show(f"{commit}:{repo_rel}")
-
-                if not force:
-                    if not ui.confirm(
-                        f"Overwrite '{target_path}' with version from {commit}?"
-                    ):
-                        return
-
-                # Write the content
-                target_path.parent.mkdir(parents=True, exist_ok=True)
-                target_path.write_text(file_content)
-
-                success(f"Restored: {target_path} from {commit}")
-                return
-
-            except Exception as e:
-                error(f"Could not restore from commit: {e}")
+            # Canonical single-file restore from a past commit.
+            restore_file_from_commit(ops, target_path, commit, force)
+            return
 
         # Default: revert to current branch version
         if not force:
@@ -93,8 +97,6 @@ def revert(path: Path, force: bool, commit: str | None):
 
         if ops.revert_file(target_path):
             success(f"Reverted: {target_path}")
-        else:
-            pass
 
     except DotManError as e:
         error(str(e), e.exit_code)

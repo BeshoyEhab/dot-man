@@ -15,10 +15,11 @@ def runner():
 
 
 def test_restore_help(runner):
-    """Test restore help command."""
+    """Deprecated `restore --help` points at `revert --commit`."""
     result = runner.invoke(cli, ["restore", "--help"])
     assert result.exit_code == 0
-    assert "Restore a file from history" in result.output
+    assert "DEPRECATED" in result.output
+    assert "revert" in result.output
 
 
 @patch("dot_man.operations.get_operations")
@@ -97,6 +98,9 @@ def test_restore_real_force_overwrites(integration_runner):
     assert result.exit_code == 0, result.output
     assert target.read_text() == "repo v1"
     assert "Restored:" in result.output
+    # Deprecated alias still warns about the replacement.
+    assert "deprecated" in result.output.lower()
+    assert "revert" in result.output
 
 
 def test_restore_declined_keeps_local(integration_runner):

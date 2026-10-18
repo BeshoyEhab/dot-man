@@ -208,12 +208,13 @@ These apply to every command and come before the subcommand:
 | `dot-man log` | Show commit history |
 | `dot-man log --diff` | History with diffs |
 | `dot-man log --interactive` | TUI log browser |
-| `dot-man show <commit>` | Full diff for a commit |
+| `dot-man log --commit abc123` | Full diff for one commit |
 | `dot-man tag create v1.0` | Create a tag |
 | `dot-man tag list` | List all tags |
 | `dot-man tag switch v1.0` | Checkout a tag |
 | `dot-man rollback` | Roll back to previous commit |
 | `dot-man rollback -n 3` | Roll back 3 commits |
+| `dot-man rollback --backup <id>` | Restore a safety backup snapshot |
 | `dot-man rollback --list` | Show available rollback points |
 
 ### Security
@@ -258,7 +259,7 @@ These apply to every command and come before the subcommand:
 | `dot-man doctor` | Run health checks |
 | `dot-man verify` | Validate repo integrity |
 | `dot-man backup create` | Create a manual backup |
-| `dot-man backup restore <id>` | Restore from backup |
+| `dot-man rollback --backup <id>` | Restore a backup (replaces `backup restore`) |
 
 ---
 

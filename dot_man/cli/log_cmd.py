@@ -1,6 +1,7 @@
 """Log command for dot-man CLI."""
 
 import logging
+import subprocess
 from pathlib import Path
 
 import click
@@ -9,6 +10,7 @@ from .. import constants, ui
 from .common import (
     AliasedCommand,
     complete_branches,
+    complete_commits,
     complete_tags,
     error,
     require_init,
@@ -18,35 +20,28 @@ from .common import (
 from .interface import cli as main
 
 
-@main.command("log", cls=AliasedCommand)
-@click.argument("file", required=False, type=click.Path(path_type=Path))
-@click.option("-n", "--count", type=int, help="Number of commits to show")
-@click.option(
-    "--diff", "-d", "show_diff", is_flag=True, help="Show diff for each commit"
-)
-@click.option("--stat", is_flag=True, help="Show file change statistics")
-@click.option("--interactive", "-i", is_flag=True, help="Interactive log browser")
-@require_init
-def log(
-    file: Path | None, count: int | None, show_diff: bool, stat: bool, interactive: bool
-):
-    """Show commit history.
-
-    Examples:
-        dot-man log
-        dot-man log .bashrc
-        dot-man log -n 20
-        dot-man log --diff
-        dot-man log --interactive
-    """
+def _log_impl(
+    file: Path | None,
+    count: int | None,
+    show_diff: bool,
+    stat: bool,
+    interactive: bool,
+    commit: str | None,
+) -> None:
+    """Show commit history (or one commit's diff) — shared with ``show``."""
     try:
-        import subprocess
-
         if interactive:
             from ..tui_log import LogViewerApp
 
             app = LogViewerApp()
             app.run()
+            return
+
+        if commit:
+            subprocess.run(
+                ["git", "show", "--color=always", commit],
+                cwd=constants.get_repo_dir(),
+            )
             return
 
         git_args = ["git", "log", "--color=always"]
@@ -89,6 +84,42 @@ def log(
         error(str(e))
 
 
+@main.command("log", cls=AliasedCommand)
+@click.argument("file", required=False, type=click.Path(path_type=Path))
+@click.option("-n", "--count", type=int, help="Number of commits to show")
+@click.option(
+    "--diff", "-d", "show_diff", is_flag=True, help="Show diff for each commit"
+)
+@click.option("--stat", is_flag=True, help="Show file change statistics")
+@click.option("--interactive", "-i", is_flag=True, help="Interactive log browser")
+@click.option(
+    "--commit",
+    "-C",
+    help="Show the full diff for a single commit (replaces 'show')",
+    shell_complete=complete_commits,
+)
+@require_init
+def log(
+    file: Path | None,
+    count: int | None,
+    show_diff: bool,
+    stat: bool,
+    interactive: bool,
+    commit: str | None,
+):
+    """Show commit history.
+
+    Examples:
+        dot-man log
+        dot-man log .bashrc
+        dot-man log -n 20
+        dot-man log --diff
+        dot-man log --interactive
+        dot-man log --commit abc1234
+    """
+    _log_impl(file, count, show_diff, stat, interactive, commit)
+
+
 @main.command("diff", cls=AliasedCommand)
 @click.argument("file", required=False, type=click.Path(path_type=Path))
 @click.option(
@@ -114,8 +145,6 @@ def diff(file: Path | None, branch: str | None, staged: bool, rich: bool):
         dot-man diff --no-rich          # Use plain git diff
     """
     try:
-        import subprocess
-
         if rich:
             _show_rich_diff(file, branch, staged)
         else:
@@ -281,11 +310,9 @@ def _checkout_tag(ops, current_branch: str, tag_name: str):
 
 def _show_rich_diff(file: Path | None, branch: str | None, staged: bool):
     """Show syntax-highlighted diff using rich."""
-    # Hoisted above the try: the ImportError fallback below rebuilds the
-    # plain git args and needs both names, so they must be bound even when
-    # the rich imports (which run first) are what failed.
-    import subprocess
-
+    # subprocess is imported at module scope: the ImportError fallback below
+    # rebuilds the plain git args and needs it bound even when the rich
+    # imports (which run first) are what failed.
     try:
         from rich.console import Console
         from rich.syntax import Syntax

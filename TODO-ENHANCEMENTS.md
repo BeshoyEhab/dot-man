@@ -210,7 +210,7 @@ green.
 | [x] | A8 Dead/stale TUI + non-existent coverage omits + `textual` weight | Low-Med | S | Low | `cli/tui_cmd.py`, `pyproject.toml:110-123` |
 | [x] | A9 Unreachable dead block in `_switch_to_branch` | Low | S | Low | `navigate_cmd.py:651-698` |
 | [x] | A10 `get_section` uncached; re-reads `global.toml` per hook | Low-Med | S | Med | `section.py:190-207` |
-| [ ] | A11 Mixins rely on implicit host state (13-method `FakeOps`) | Low-Med | M | Med | `operations.py:42`, `tests/test_branch_ops.py:11-65` |
+| [ ] | A11 Mixins rely on implicit host state (13-method `FakeOps`) — deferred decision | Low-Med | M | Med | `operations.py:42`, `tests/test_branch_ops.py:11-65` |
 | [x] | A12 Long functions mixing orchestration/rendering/hooks | Low | M | Med | `cli/doctor_cmd.py`, `cli/status_cmd.py`, `cli/rollback_cmd.py` |
 | [x] | A13 `reload_config` clears only `_dotman_config` (stale watch) | Low | S | Low | `operations.py:94-96` |
 
@@ -308,14 +308,14 @@ Resolved in the deferred pass (`phase-3-deferred` branch):
   `(KeyError, DotManError)`, and `Section._get_current_branch` →
   `(OSError, DotManError)`.
 
-Still open — deliberately deferred, each a high-complexity change that
-deserves its own focused pass rather than a rushed edit:
-
-- **A11** — replace the mixin trio with composition / a host `Protocol`. The
-  host surface is implicit and duplicated as ~23 `@abstractmethod` stubs, and
-  `FakeOps` (a BranchMixin subclass) re-implements it in tests. A full
-  composition swap touches four test files (24 call sites) for low impact;
-  recommended as a dedicated change.
+- **A11 — deferred by decision (accepted, not fixed).** The mixin trio is
+  kept: the host surface is implicit and duplicated as ~23 `@abstractmethod`
+  stubs, and `FakeOps` (a `BranchMixin` subclass) re-implements it across four
+  test files (24 sites in `test_branch_ops.py` alone). The mixins are a
+  well-contained, working pattern and the impact is rated Low-Med, so a full
+  composition swap — extracting host services, rewiring call sites, and
+  rewriting the test doubles — is not worth its churn and risk right now. It
+  is a candidate for a dedicated change if the host contract needs to scale.
 
 ---
 
@@ -329,7 +329,7 @@ deserves its own focused pass rather than a rushed edit:
 |------|------|--------|--------|-----------|----------|
 | [x] | U1 Add global `--json`/`--quiet`/`--yes`/`--no-input`/`--no-color` | High | M | Med | `interface.py`, all `*_cmd.py` |
 | [x] | U2 Uniform `--dry-run`/`--force`; `init --force` must warn | Med-High | M | Med | `init_cmd.py:22,58-65` |
-| [ ] | U3 Merge/remove overlapping commands + hide deprecated shims | Med | M | Med | `restore_cmd.py`, `revert_cmd.py`, `switch_cmd.py`, `log_cmd.py` |
+| [x] | U3 Merge/remove overlapping commands + hide deprecated shims | Med | M | Med | `restore_cmd.py`, `revert_cmd.py`, `switch_cmd.py`, `log_cmd.py` |
 | [x] | U4 Consistent diagnostics/streams/`ExitCode` everywhere | Med | M | Med | `common.py:96-100,30-43`, `audit_cmd.py:134` |
 | [x] | U5 Normalize subcommand styles (groups vs positional `Choice`) | Low-Med | M | Med | `encrypt_cmd.py:26`, `vault_cmd.py:11`, `hooks_cmd.py:11` |
 | [x] | U6 `import` commits all changes without confirm/dry-run | Med | S | Low | `import_cmd.py:217-219,269,339` |
@@ -377,12 +377,12 @@ Rich auto-fitting tables; pair icons with text; add `--plain`.
 
 ### Status
 
-- **Done:** U1–U2, U4–U11 (the global flags, the Low-effort UX fixes,
-  `import` commit confirmation, the CLI group normalisation, uniform
-  `--dry-run`, and diagnostics routing).
-- **Partial:** U3 (deprecated shims `switch`/`checkout`/`tag switch` are now
-  `hidden=True`; the overlapping-command merge — `restore`/`revert -c`,
-  `show`/`log`, `backup restore`/`rollback` — is a design call, not done).
+- **Done:** U1–U11.
+  - U3: the deprecated shims `switch`/`checkout`/`tag switch` were already
+    `hidden=True`; the overlapping commands are now consolidated. `show` →
+    `log --commit`, `backup restore` → `rollback --backup`, and `restore` →
+    `revert --commit` (which also now syncs the in-repo copy). The three old
+    commands remain as hidden, deprecated forwarding shims until v2.0.
 - **U2:** `--dry-run` added to `bootstrap` (prints every package-manager
   command, still rejects unsafe package names), `audit --fix` (prints the
   redaction count; never writes or commits), and `vault rotate-key` (prints the

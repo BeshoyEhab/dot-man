@@ -212,6 +212,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Tests now patch only `dot_man.constants.*`; the ~25 per-module conftest
   targets are gone. Deriving `LOCK_FILE` at call time also stops test runs
   from writing a lock file into the real `~/.config/dot-man`.
+- **Overlapping commands consolidated** — `dot-man show <sha>` is folded into
+  `dot-man log --commit <sha>`, and `dot-man backup restore <id>` into
+  `dot-man rollback --backup <id>`. `dot-man restore <file> <sha>` was already
+  a duplicate of `dot-man revert <file> --commit <sha>`, which now also keeps
+  the in-repo working copy in sync (so `status` no longer reports a phantom
+  change). All three are now hidden, deprecated shims that warn and forward to
+  the canonical command; they are removed in v2.0.
 
 ## [1.5.0] - 2026-10-09
 
