@@ -298,7 +298,7 @@ deserves its own focused pass rather than a rushed edit:
 | [ ] | U2 Uniform `--dry-run`/`--force`; `init --force` must warn | Med-High | M | Med | `init_cmd.py:22,58-65` |
 | [ ] | U3 Merge/remove overlapping commands + hide deprecated shims | Med | M | Med | `restore_cmd.py`, `revert_cmd.py`, `switch_cmd.py`, `log_cmd.py` |
 | [ ] | U4 Consistent diagnostics/streams/`ExitCode` everywhere | Med | M | Med | `common.py:96-100,30-43`, `audit_cmd.py:134` |
-| [ ] | U5 Normalize subcommand styles (groups vs positional `Choice`) | Low-Med | M | Med | `encrypt_cmd.py:26`, `vault_cmd.py:11`, `hooks_cmd.py:11` |
+| [x] | U5 Normalize subcommand styles (groups vs positional `Choice`) | Low-Med | M | Med | `encrypt_cmd.py:26`, `vault_cmd.py:11`, `hooks_cmd.py:11` |
 | [x] | U6 `import` commits all changes without confirm/dry-run | Med | S | Low | `import_cmd.py:217-219,269,339` |
 | [x] | U7 `profile switch` prints wrong deprecation warning | Low | S | Low | `profile_cmd.py:206-212` |
 | [x] | U8 `sync --push-only --pull-only` silently no-ops | Low | S | Low | `remote_cmd.py:172-194` |
@@ -344,8 +344,8 @@ Rich auto-fitting tables; pair icons with text; add `--plain`.
 
 ### Status
 
-- **Done:** U6–U10 (the four Low-effort UX fixes plus `import` commit
-  confirmation).
+- **Done:** U5–U10 (the Low-effort UX fixes, `import` commit confirmation,
+  and the CLI group normalisation).
 - **Partial:** U3 (deprecated shims `switch`/`checkout`/`tag switch` are now
   `hidden=True`; the overlapping-command merge — `restore`/`revert -c`,
   `show`/`log`, `backup restore`/`rollback` — is a design call, not done) and
@@ -371,7 +371,13 @@ Rich auto-fitting tables; pair icons with text; add `--plain`.
   real `~/.config/dot-man` (they were order-dependent and returned `7`);
   added `secrets.py` load/save/`_canonicalize_path` edge tests to re-clear the
   90% module floor.
-- **Deferred (Large/Med):** U1, U5, U11 remain open.
+- **U5:** `encrypt`, `vault`, and `hooks` are now Click groups with
+  subcommands (`help-all`/completion discover them); invocation strings are
+  unchanged. This exposed a real bug — `vault_cmd` was imported nowhere, so
+  `dot-man vault` never registered; it is now wired up and covered by a
+  registration test. `--method`/`--recipient` moved from the parent to the
+  `encrypt`/`decrypt` subcommands.
+- **Deferred (Large/Med):** U1, U11 remain open.
 
 ---
 

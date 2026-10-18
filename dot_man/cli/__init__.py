@@ -4,7 +4,14 @@ This package provides the CLI entry point for dot-man.
 It exposes the modular CLI implementation.
 """
 
-from . import bootstrap_cmd, discover_cmd, encrypt_cmd, export_cmd, import_cmd
+from . import (
+    bootstrap_cmd,
+    discover_cmd,
+    encrypt_cmd,
+    export_cmd,
+    import_cmd,
+    vault_cmd,
+)
 from .add_cmd import add
 from .audit_cmd import audit
 from .backup_cmd import backup
@@ -113,6 +120,7 @@ __all__ = [
     "import_cmd",
     "export_cmd",
     "encrypt_cmd",
+    "vault_cmd",
     "discover_cmd",
     "bootstrap_cmd",
     "completions",

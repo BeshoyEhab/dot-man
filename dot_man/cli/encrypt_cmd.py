@@ -12,7 +12,6 @@ from ..encryption import (
     detect_available_encryption,
 )
 from .common import (
-    AliasedCommand,
     complete_sections,
     error,
     require_init,
@@ -22,8 +21,52 @@ from .common import (
 from .interface import cli as main
 
 
-@main.command("encrypt", cls=AliasedCommand)
-@click.argument("action", type=click.Choice(["encrypt", "decrypt", "status"]))
+@main.group("encrypt")
+def encrypt_group():
+    """Encrypt or decrypt sensitive dotfile sections.
+
+    Actions:
+      encrypt  - Encrypt a section's files
+      decrypt  - Decrypt a section's files
+      status   - Show encryption status of all sections
+
+    Examples:
+        dot-man encrypt status                # Show encryption status
+        dot-man encrypt encrypt ssh-config   # Encrypt ssh-config section
+        dot-man encrypt decrypt ssh-config   # Decrypt ssh-config section
+        dot-man encrypt encrypt secrets -r age1...  # Use AGE encryption
+    """
+
+
+def _resolve_encryption_method(method: str) -> Literal["gpg", "age"]:
+    """Validate tooling and fall back to an available method.
+
+    Exits via ``error()`` when no encryption tool is installed.
+    """
+    available = detect_available_encryption()
+    if not available:
+        error(
+            "No encryption tools available. Install GPG or AGE:\n"
+            "  GPG: brew install gpg\n"
+            "  AGE: brew install age",
+            exit_code=1,
+        )
+
+    if method not in available:
+        warn(f"{method} not available. Using {available[0]} instead.")
+        return available[0]
+    return method  # type: ignore[return-value]
+
+
+@encrypt_group.command("status")
+@require_init
+def encrypt_status():
+    """Show encryption status of all sections."""
+    _resolve_encryption_method("gpg")
+    _show_encryption_status()
+
+
+@encrypt_group.command("encrypt")
 @click.argument("section", required=False, shell_complete=complete_sections)
 @click.option(
     "--method",
@@ -38,44 +81,39 @@ from .interface import cli as main
     help="Encryption recipient (GPG key ID or AGE recipient)",
 )
 @require_init
-def encrypt_cmd(
-    action: str,
+def encrypt_section(
     section: str | None,
     method: Literal["gpg", "age"],
     recipient: str | None,
 ):
-    """Encrypt or decrypt sensitive dotfile sections.
+    """Encrypt a section's files."""
+    method = _resolve_encryption_method(method)
+    _encrypt_section(section, method, recipient)
 
-    Actions:
-      encrypt  - Encrypt a section's files
-      decrypt  - Decrypt a section's files
-      status   - Show encryption status of all sections
 
-    Examples:
-        dot-man encrypt status                # Show encryption status
-        dot-man encrypt encrypt ssh-config   # Encrypt ssh-config section
-        dot-man encrypt decrypt ssh-config   # Decrypt ssh-config section
-        dot-man encrypt encrypt secrets -r age1...  # Use AGE encryption
-    """
-    available = detect_available_encryption()
-    if not available:
-        error(
-            "No encryption tools available. Install GPG or AGE:\n"
-            "  GPG: brew install gpg\n"
-            "  AGE: brew install age",
-            exit_code=1,
-        )
-
-    if method not in available:
-        warn(f"{method} not available. Using {available[0]} instead.")
-        method = available[0]
-
-    if action == "status":
-        _show_encryption_status()
-    elif action == "encrypt":
-        _encrypt_section(section, method, recipient)
-    elif action == "decrypt":
-        _decrypt_section(section, method, recipient)
+@encrypt_group.command("decrypt")
+@click.argument("section", required=False, shell_complete=complete_sections)
+@click.option(
+    "--method",
+    "-m",
+    type=click.Choice(["gpg", "age"]),
+    default="gpg",
+    help="Encryption method to use",
+)
+@click.option(
+    "--recipient",
+    "-r",
+    help="Encryption recipient (GPG key ID or AGE recipient)",
+)
+@require_init
+def decrypt_section(
+    section: str | None,
+    method: Literal["gpg", "age"],
+    recipient: str | None,
+):
+    """Decrypt a section's files."""
+    method = _resolve_encryption_method(method)
+    _decrypt_section(section, method, recipient)
 
 
 def _show_encryption_status():

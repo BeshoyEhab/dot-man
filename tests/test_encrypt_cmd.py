@@ -39,13 +39,15 @@ class TestEncryptHelp:
 
     def test_encrypt_method_option(self):
         """Test --method option is recognized."""
-        result = CliRunner().invoke(cli, ["encrypt", "--help"])
-        assert "--method" in result.output or "-m" in result.output
+        result = CliRunner().invoke(cli, ["encrypt", "encrypt", "--help"])
+        assert result.exit_code == 0
+        assert "--method" in result.output
 
     def test_encrypt_recipient_option(self):
         """Test --recipient option is recognized."""
-        result = CliRunner().invoke(cli, ["encrypt", "--help"])
-        assert "--recipient" in result.output or "-r" in result.output
+        result = CliRunner().invoke(cli, ["encrypt", "encrypt", "--help"])
+        assert result.exit_code == 0
+        assert "--recipient" in result.output
 
     def test_invalid_action(self):
         """Test that invalid action is rejected."""
@@ -840,7 +842,8 @@ class TestEncryptCLIBasic:
         assert result.exit_code == 2
 
     def test_encrypt_method_choices(self):
-        """Test method choices appear in help."""
-        result = CliRunner().invoke(cli, ["encrypt", "--help"])
+        """Test method choices appear in the encrypt subcommand help."""
+        result = CliRunner().invoke(cli, ["encrypt", "encrypt", "--help"])
+        assert result.exit_code == 0
         assert "gpg" in result.output
         assert "age" in result.output

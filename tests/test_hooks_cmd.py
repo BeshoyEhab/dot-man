@@ -22,10 +22,10 @@ def test_hooks_delete_missing_args(integration_runner):
 
 def test_hooks_create_non_string_guard(integration_runner, capsys):
     """Direct call with a non-string name hits the type guard."""
-    callback = cli.commands["hooks"].callback
+    callback = cli.commands["hooks"].commands["create"].callback
 
     with pytest.raises(SystemExit) as excinfo:
-        callback(command="create", phase="pre", name=123)
+        callback(phase="pre", name=123)
 
     assert excinfo.value.code == 1
     captured = capsys.readouterr()
@@ -35,10 +35,10 @@ def test_hooks_create_non_string_guard(integration_runner, capsys):
 
 def test_hooks_delete_non_string_guard(integration_runner):
     """Direct call with a non-string name raises the ClickException guard."""
-    callback = cli.commands["hooks"].callback
+    callback = cli.commands["hooks"].commands["delete"].callback
 
     with pytest.raises(click.ClickException) as excinfo:
-        callback(command="delete", phase="pre", name=123)
+        callback(phase="pre", name=123)
 
     assert "Hook name and phase must be strings" in str(excinfo.value)
 

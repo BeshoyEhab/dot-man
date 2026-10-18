@@ -1,19 +1,12 @@
 """Vault command for managing the secret vault."""
 
-import click
-
 from .. import ui
-from .common import AliasedCommand, error, require_init, success, warn
+from .common import error, require_init, success, warn
 from .interface import cli as main
 
 
-@main.command("vault", cls=AliasedCommand)
-@click.argument(
-    "action",
-    type=click.Choice(["rotate-key", "status"]),
-)
-@require_init
-def vault_cmd(action: str):
+@main.group("vault")
+def vault():
     """Manage the secret vault.
 
     Actions:
@@ -24,10 +17,20 @@ def vault_cmd(action: str):
         dot-man vault rotate-key   # Rotate the Fernet encryption key
         dot-man vault status       # Show vault info
     """
-    if action == "rotate-key":
-        _rotate_key()
-    elif action == "status":
-        _vault_status()
+
+
+@vault.command("rotate-key")
+@require_init
+def vault_rotate_key():
+    """Generate a new encryption key and re-encrypt all secrets."""
+    _rotate_key()
+
+
+@vault.command("status")
+@require_init
+def vault_status():
+    """Show vault statistics."""
+    _vault_status()
 
 
 def _rotate_key():

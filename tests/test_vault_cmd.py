@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from click.testing import CliRunner
 
-from dot_man.cli.vault_cmd import vault_cmd
+from dot_man.cli.vault_cmd import vault as vault_group
 
 
 class TestVaultStatus:
@@ -21,7 +21,7 @@ class TestVaultStatus:
             vault._data = {"secrets": []}
 
             runner = CliRunner()
-            result = runner.invoke(vault_cmd, ["status"])
+            result = runner.invoke(vault_group, ["status"])
 
             assert result.exit_code == 0
             vault.load.assert_called_once()
@@ -40,7 +40,7 @@ class TestVaultStatus:
             vault._data = {"secrets": [{"branch": "main"}, {"branch": "work"}]}
 
             runner = CliRunner()
-            result = runner.invoke(vault_cmd, ["status"])
+            result = runner.invoke(vault_group, ["status"])
 
             assert result.exit_code == 0
 
@@ -55,7 +55,7 @@ class TestVaultStatus:
             vault._data = {"secrets": []}
 
             runner = CliRunner()
-            result = runner.invoke(vault_cmd, ["status"])
+            result = runner.invoke(vault_group, ["status"])
 
             assert result.exit_code == 0
 
@@ -75,7 +75,7 @@ class TestVaultStatus:
             vault._data = {"secrets": []}
 
             runner = CliRunner()
-            result = runner.invoke(vault_cmd, ["status"])
+            result = runner.invoke(vault_group, ["status"])
 
             assert result.exit_code == 0
 
@@ -91,7 +91,7 @@ class TestVaultRotateKey:
             vault._data = {"secrets": []}
 
             runner = CliRunner()
-            result = runner.invoke(vault_cmd, ["rotate-key"])
+            result = runner.invoke(vault_group, ["rotate-key"])
 
             assert result.exit_code == 0
             vault.rotate_key.assert_not_called()
@@ -108,7 +108,7 @@ class TestVaultRotateKey:
             mock_ui.confirm.return_value = False
 
             runner = CliRunner()
-            result = runner.invoke(vault_cmd, ["rotate-key"])
+            result = runner.invoke(vault_group, ["rotate-key"])
 
             assert result.exit_code == 0
             vault.rotate_key.assert_not_called()
@@ -126,7 +126,7 @@ class TestVaultRotateKey:
             vault.rotate_key.return_value = 3
 
             runner = CliRunner()
-            result = runner.invoke(vault_cmd, ["rotate-key"])
+            result = runner.invoke(vault_group, ["rotate-key"])
 
             assert result.exit_code == 0
             vault.rotate_key.assert_called_once()
@@ -144,7 +144,7 @@ class TestVaultRotateKey:
             vault.rotate_key.side_effect = Exception("decryption failed")
 
             runner = CliRunner()
-            result = runner.invoke(vault_cmd, ["rotate-key"])
+            result = runner.invoke(vault_group, ["rotate-key"])
 
             assert result.exit_code == 1
 
@@ -155,11 +155,31 @@ class TestVaultCmdDispatch:
     def test_vault_invalid_action(self):
         """Vault with invalid action shows error."""
         runner = CliRunner()
-        result = runner.invoke(vault_cmd, ["invalid"])
+        result = runner.invoke(vault_group, ["invalid"])
         assert result.exit_code != 0
 
     def test_vault_no_action(self):
         """Vault with no action shows usage."""
         runner = CliRunner()
-        result = runner.invoke(vault_cmd, [])
+        result = runner.invoke(vault_group, [])
         assert result.exit_code != 0
+
+
+class TestVaultRegistration:
+    """Regression: the vault group must be reachable from the main CLI."""
+
+    def test_vault_is_registered_on_main_cli(self):
+        """'dot-man vault' must exist on the root group."""
+        from dot_man.cli.interface import cli
+
+        assert "vault" in cli.commands
+
+    def test_vault_help_lists_subcommands(self):
+        """'dot-man vault --help' lists rotate-key and status."""
+        from dot_man.cli.interface import cli
+
+        result = CliRunner().invoke(cli, ["vault", "--help"])
+
+        assert result.exit_code == 0, result.output
+        assert "rotate-key" in result.output
+        assert "status" in result.output

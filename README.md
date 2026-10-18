@@ -210,6 +210,8 @@ dot-man navigate work
 | `dot-man audit --fix` | Auto-redact detected secrets |
 | `dot-man encrypt encrypt <section>` | Encrypt a section with GPG/AGE |
 | `dot-man encrypt status` | Show encryption status |
+| `dot-man vault rotate-key` | Rotate the vault encryption key |
+| `dot-man vault status` | Show secret vault statistics |
 
 ### Import / Export / Discovery
 

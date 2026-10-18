@@ -96,6 +96,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`sync` and `profile switch` gained `--dry-run`** — both previously mutated
   branch/remote state with no preview; `--dry-run` now reports the planned
   actions and exits without side effects.
+- **`dot-man vault` was unreachable** — the `vault_cmd` module was imported
+  nowhere, so the command was never registered on the root group (only the
+  command object itself was exercised in tests); it is now wired into the CLI
+  and guarded by a registration test.
 
 ### Removed
 
@@ -131,6 +135,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`import` no longer commits silently** — after importing it asks for
   confirmation (or `--yes`), supports `--no-commit`, and the source helpers
   return the written paths instead of committing internally.
+- **`encrypt`, `vault`, and `hooks` are proper Click groups** — their
+  positional `Choice` actions became subcommands, so `help-all` and shell
+  completion now discover them (`dot-man vault rotate-key`,
+  `dot-man hooks create pre switch`, `dot-man encrypt encrypt <section>`).
+  The invocation strings are unchanged; `--method`/`--recipient` now live on
+  the `encrypt`/`decrypt` subcommands rather than the parent.
 
 ## [1.5.0] - 2026-10-09
 
