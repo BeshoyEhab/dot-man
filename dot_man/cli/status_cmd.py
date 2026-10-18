@@ -189,6 +189,8 @@ def status(verbose: bool, secrets: bool, json_output: bool):
     Shows the current branch, tracked files, and any pending changes
     that would be saved on the next switch.
     """
+    # Honour the root group's global --json as well as the local flag.
+    json_output = json_output or ui.json_mode()
     try:
         from ..operations import get_operations
 

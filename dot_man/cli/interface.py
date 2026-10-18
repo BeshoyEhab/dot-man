@@ -17,13 +17,38 @@ from .common import DotManGroup
 @click.version_option(version=__version__, prog_name="dot-man")
 @click.option("--verbose", "-v", is_flag=True, help="Show detailed output on console")
 @click.option("--debug", is_flag=True, help="Enable debug logging to file")
+@click.option("--quiet", "-q", is_flag=True, help="Suppress non-essential output")
+@click.option("--yes", "-y", is_flag=True, help="Assume yes for all prompts")
+@click.option(
+    "--no-input",
+    "no_input",
+    is_flag=True,
+    help="Never prompt; fail when input would be required",
+)
+@click.option("--no-color", "no_color", is_flag=True, help="Disable coloured output")
+@click.option(
+    "--json",
+    "json_output",
+    is_flag=True,
+    help="Emit machine-readable JSON where supported",
+)
 @click.option(
     "--no-onboarding",
     is_flag=True,
     help="Skip the first-run onboarding tutorial",
 )
 @click.pass_context
-def cli(ctx, verbose: bool, debug: bool, no_onboarding: bool):
+def cli(
+    ctx,
+    verbose: bool,
+    debug: bool,
+    quiet: bool,
+    yes: bool,
+    no_input: bool,
+    no_color: bool,
+    json_output: bool,
+    no_onboarding: bool,
+):
     """dot-man: The Dotfile Manager for Professionals.
 
     Git-powered branching for your dotfiles. Switch between configurations
@@ -68,3 +93,17 @@ def cli(ctx, verbose: bool, debug: bool, no_onboarding: bool):
     ctx.ensure_object(dict)
     ctx.obj["DEBUG"] = debug
     ctx.obj["VERBOSE"] = verbose
+    ctx.obj["QUIET"] = quiet
+    ctx.obj["YES"] = yes
+    ctx.obj["NO_INPUT"] = no_input
+    ctx.obj["NO_COLOR"] = no_color
+    ctx.obj["JSON"] = json_output
+
+    # Apply the global output/confirmation flags process-wide.
+    ui.configure(
+        quiet=quiet,
+        yes=yes,
+        no_input=no_input,
+        no_color=no_color,
+        json=json_output,
+    )

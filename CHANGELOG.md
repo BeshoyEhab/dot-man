@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Global CLI flags** — the root group now accepts `--quiet/-q`,
+  `--yes/-y`, `--no-input`, `--no-color`, and `--json`. They apply
+  process-wide via `ui.configure()`: `--quiet` silences informational output
+  (errors always show), `--yes` auto-confirms prompts, `--no-input` fails
+  fast instead of blocking on a prompt, `--no-color` rebuilds the Rich
+  consoles without colour, and `--json` is honoured by `status` (and is
+  available to any command via `ui.json_mode()`).
+
 ### Security
 
 - **`bootstrap` no longer uses `shell=True`** — package names come from the

@@ -159,6 +159,20 @@ dot-man navigate work
 
 ## Commands
 
+### Global Flags
+
+These apply to every command and come before the subcommand:
+
+| Flag | Description |
+|------|-------------|
+| `dot-man --quiet <cmd>` | Suppress non-essential output (errors still show) |
+| `dot-man --yes <cmd>` | Assume yes for all confirmation prompts |
+| `dot-man --no-input <cmd>` | Never prompt; fail when input would be required |
+| `dot-man --no-color <cmd>` | Disable coloured output |
+| `dot-man --json <cmd>` | Emit machine-readable JSON where supported |
+| `dot-man -v <cmd>` | Show detailed output on console |
+| `dot-man --debug <cmd>` | Enable debug logging to file |
+
 ### Navigation
 
 | Command | Description |

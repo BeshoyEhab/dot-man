@@ -18,6 +18,22 @@ from unittest.mock import patch
 import pytest
 from click.testing import CliRunner
 
+
+@pytest.fixture(autouse=True)
+def _reset_ui_global_flags():
+    """Reset the process-wide ui flags between tests.
+
+    The root CLI callback calls ``ui.configure`` on every invocation, but
+    tests that exercise ``ui`` directly (or a command that set a flag) must
+    not leak ``--quiet``/``--yes``/``--no-color`` state into the next test.
+    """
+    from dot_man import ui
+
+    ui.configure()
+    yield
+    ui.configure()
+
+
 # =============================================================================
 # Directory scaffolding
 # =============================================================================
