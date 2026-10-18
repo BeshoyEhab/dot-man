@@ -206,6 +206,24 @@ class TestRevertFromCommitReal:
         assert result.exit_code == 0, result.output
         assert repo_copy.read_text() == "repo v1"
 
+    def test_commit_restore_preserves_trailing_newline(
+        self, integration_runner, tmp_path
+    ):
+        """Restore must reproduce the blob byte-for-byte.
+
+        `git show` (and GitPython's stdout handling) strips the trailing
+        newline; using it silently truncated every restored dotfile.
+        """
+        target, sha = self._tracked(integration_runner, tmp_path, ".nlrc", "line\n")
+        target.write_bytes(b"junk\n")
+
+        result = integration_runner.invoke(
+            cli, ["revert", str(target), "-c", sha, "--force"]
+        )
+
+        assert result.exit_code == 0, result.output
+        assert target.read_bytes() == b"line\n"
+
     def test_commit_without_file_in_history_errors(self, integration_runner, tmp_path):
         from dot_man.core import GitManager
 

@@ -39,7 +39,9 @@ def test_restore_commit(mock_confirm, mock_get_ops, integration_runner, tmp_path
             return r / "mysection/test.txt"
 
     mock_ops.get_section.return_value = MockSection()
-    mock_ops.git.repo.git.show.return_value = "restored content"
+    mock_ops.git.repo.commit.return_value.tree.__truediv__.return_value.data_stream.read.return_value = (
+        b"restored content"
+    )
 
     mock_confirm.return_value = True
 
@@ -101,6 +103,21 @@ def test_restore_real_force_overwrites(integration_runner):
     # Deprecated alias still warns about the replacement.
     assert "deprecated" in result.output.lower()
     assert "revert" in result.output
+
+
+def test_restore_preserves_trailing_newline(integration_runner):
+    """Deprecated `restore` reproduces the blob byte-for-byte."""
+    from pathlib import Path
+
+    target = Path.home() / ".nlrc"
+    target.write_text("line\n")
+    sha = _track_and_commit(integration_runner, target, "nlrc")
+    target.write_bytes(b"junk\n")
+
+    result = integration_runner.invoke(cli, ["restore", str(target), sha, "--force"])
+
+    assert result.exit_code == 0, result.output
+    assert target.read_bytes() == b"line\n"
 
 
 def test_restore_declined_keeps_local(integration_runner):

@@ -65,6 +65,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Restored files were truncated by one trailing newline** —
+  `restore`/`revert --commit` read the file with `git show`, whose stdout
+  handling strips the final newline, silently corrupting every restored
+  dotfile (and leaving the repo copy dirty). The blob is now read through the
+  git object API, so the content is byte-exact.
 - **`[dry-run]` marker rendered literally** — Rich parsed the literal
   `[dry-run]` prefix as an unknown markup tag and silently dropped it, so
   `watch --dry-run` never showed its intended marker. Brackets are escaped,

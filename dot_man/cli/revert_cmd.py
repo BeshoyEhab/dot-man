@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import click
+from git import GitCommandError
 
 from .. import constants, ui
 from ..exceptions import DotManError
@@ -34,8 +35,12 @@ def restore_file_from_commit(ops, target_path: Path, commit: str, force: bool) -
         return False
 
     try:
-        file_content = ops.git.repo.git.show(f"{commit}:{repo_rel}")
-    except Exception as e:
+        # Read the blob through the object API. ``git show`` (and any command
+        # run through GitPython's stdout handling) strips the trailing
+        # newline, which silently truncated dotfiles on every restore.
+        blob = ops.git.repo.commit(commit).tree / str(repo_rel)
+        content = blob.data_stream.read()
+    except (GitCommandError, KeyError, ValueError, AttributeError) as e:
         error(f"Could not restore from commit: {e}")
         return False
 
@@ -44,12 +49,12 @@ def restore_file_from_commit(ops, target_path: Path, commit: str, force: bool) -
             return False
 
     target_path.parent.mkdir(parents=True, exist_ok=True)
-    target_path.write_text(file_content)
+    target_path.write_bytes(content)
 
     # Keep the repo working copy in sync so `dot-man status` stays clean.
     repo_path = constants.get_repo_dir() / repo_rel
     repo_path.parent.mkdir(parents=True, exist_ok=True)
-    repo_path.write_text(file_content)
+    repo_path.write_bytes(content)
 
     success(f"Restored: {target_path} from {commit}")
     return True
