@@ -85,9 +85,13 @@ class TestTemplateList:
         repo.index.add(["test.txt"])
         repo.index.commit("Initial")
 
+        from dot_man.global_config import GlobalConfig
+
+        GlobalConfig().create_default()
+
         result = runner.invoke(cli, ["template", "list"])
 
-        assert result.exit_code in [0, 1]
+        assert result.exit_code == 0, result.output
 
 
 class TestTemplateSet:
@@ -112,9 +116,13 @@ class TestTemplateSet:
         repo.index.add(["test.txt"])
         repo.index.commit("Initial")
 
+        from dot_man.global_config import GlobalConfig
+
+        GlobalConfig().create_default()
+
         result = runner.invoke(cli, ["template", "set", "MACHINE", "test-machine"])
 
-        assert result.exit_code in [0, 1]
+        assert result.exit_code == 0, result.output
 
     def test_template_set_from_env(self, clean_env):
         """Template set from environment."""
@@ -132,11 +140,15 @@ class TestTemplateSet:
         repo.index.add(["test.txt"])
         repo.index.commit("Initial")
 
+        from dot_man.global_config import GlobalConfig
+
+        GlobalConfig().create_default()
+
         result = runner.invoke(
             cli, ["template", "set", "TEST_VAR", "--from-env", "HOME"]
         )
 
-        assert result.exit_code in [0, 1]
+        assert result.exit_code == 0, result.output
 
 
 class TestTemplateGet:
@@ -161,9 +173,13 @@ class TestTemplateGet:
         repo.index.add(["test.txt"])
         repo.index.commit("Initial")
 
+        from dot_man.global_config import GlobalConfig
+
+        GlobalConfig().create_default()
+
         result = runner.invoke(cli, ["template", "get", "MACHINE"])
 
-        assert result.exit_code in [0, 1]
+        assert result.exit_code == 0, result.output
 
 
 class TestTemplateDelete:
@@ -182,4 +198,169 @@ class TestTemplateSystem:
     def test_template_system_runs(self, runner):
         """Template system runs."""
         result = runner.invoke(cli, ["template", "system"])
-        assert result.exit_code in [0, 1]
+        assert result.exit_code == 0, result.output
+
+
+class TestTemplateCallbackEdgeCases:
+    """Error and empty-data branches of the template subcommands.
+
+    These call the Click callbacks directly so the failure paths are
+    deterministic (no dependency on the ambient environment).
+    """
+
+    @staticmethod
+    def _ops(data):
+        from unittest.mock import MagicMock
+
+        ops = MagicMock()
+        ops.global_config._data = data
+        return ops
+
+    def test_set_initialises_non_dict_templates(self):
+        from dot_man.cli import template_cmd
+
+        ops = self._ops({"templates": "not-a-dict"})
+        with patch("dot_man.operations.get_operations", return_value=ops):
+            template_cmd.template_set.callback("KEY", "value", None)
+
+        assert ops.global_config._data["templates"] == {"KEY": "value"}
+        ops.global_config.save.assert_called_once()
+
+    def test_set_from_env_missing_value_errors(self):
+        from dot_man.cli import template_cmd
+
+        ops = self._ops({})
+        with (
+            patch("dot_man.operations.get_operations", return_value=ops),
+            patch.dict(os.environ, {}, clear=True),
+            patch("dot_man.cli.template_cmd.error") as mock_error,
+        ):
+            template_cmd.template_set.callback("KEY", None, "MISSING_VAR")
+
+        mock_error.assert_called_once()
+        assert (
+            mock_error.call_args.args[0]
+            == "Environment variable 'MISSING_VAR' is not set"
+        )
+
+    def test_set_failure_is_reported(self):
+        from dot_man.cli import template_cmd
+
+        with (
+            patch(
+                "dot_man.operations.get_operations",
+                side_effect=RuntimeError("boom"),
+            ),
+            patch("dot_man.cli.template_cmd.error") as mock_error,
+        ):
+            template_cmd.template_set.callback("KEY", "value", None)
+
+        assert mock_error.call_args.args[0] == "boom"
+
+    def test_get_failure_is_reported(self):
+        from dot_man.cli import template_cmd
+
+        with (
+            patch(
+                "dot_man.operations.get_operations",
+                side_effect=RuntimeError("nope"),
+            ),
+            patch("dot_man.cli.template_cmd.error") as mock_error,
+        ):
+            template_cmd.template_get.callback("KEY")
+
+        assert mock_error.call_args.args[0] == "nope"
+
+    def test_list_with_no_templates_prints_placeholder(self, capsys):
+        from dot_man.cli import template_cmd
+
+        ops = self._ops({})
+        with patch("dot_man.operations.get_operations", return_value=ops):
+            template_cmd.template_list.callback()
+
+        assert "No templates defined" in capsys.readouterr().out
+
+    def test_list_system_variable_failure_is_rendered(self, capsys):
+        from dot_man.cli import template_cmd
+
+        ops = self._ops({})
+
+        def _boom():
+            raise RuntimeError("unavailable")
+
+        with (
+            patch("dot_man.operations.get_operations", return_value=ops),
+            patch.dict(template_cmd.SYSTEM_VARS, {"BROKEN": _boom}),
+        ):
+            template_cmd.template_list.callback()
+
+        assert "{BROKEN}" in capsys.readouterr().out
+
+    def test_list_failure_is_reported(self):
+        from dot_man.cli import template_cmd
+
+        with (
+            patch(
+                "dot_man.operations.get_operations",
+                side_effect=RuntimeError("list boom"),
+            ),
+            patch("dot_man.cli.template_cmd.error") as mock_error,
+        ):
+            template_cmd.template_list.callback()
+
+        assert mock_error.call_args.args[0] == "list boom"
+
+    def test_system_variable_failure_is_rendered(self, capsys):
+        from dot_man.cli import template_cmd
+
+        def _boom():
+            raise RuntimeError("system boom")
+
+        with patch.dict(template_cmd.SYSTEM_VARS, {"BROKEN": _boom}):
+            template_cmd.template_system.callback()
+
+        # The failed variable is annotated with its source and error text.
+        assert "failed" in capsys.readouterr().out
+
+    def test_system_failure_is_reported(self):
+        from dot_man.cli import template_cmd
+
+        with (
+            patch.object(
+                template_cmd.ui.console, "print", side_effect=RuntimeError("render")
+            ),
+            patch("dot_man.cli.template_cmd.error") as mock_error,
+        ):
+            template_cmd.template_system.callback()
+
+        assert mock_error.call_args.args[0] == "render"
+
+    def test_substitute_system_variable_failure_is_skipped(self, capsys):
+        from dot_man.cli import template_cmd
+
+        ops = self._ops({})
+
+        def _boom():
+            raise OSError("no value")
+
+        with (
+            patch("dot_man.operations.get_operations", return_value=ops),
+            patch.dict(template_cmd.SYSTEM_VARS, {"BROKEN": _boom}),
+        ):
+            template_cmd.template_substitute.callback("{{BROKEN}}")
+
+        assert "{BROKEN}" in capsys.readouterr().out
+
+    def test_substitute_failure_is_reported(self):
+        from dot_man.cli import template_cmd
+
+        with (
+            patch(
+                "dot_man.operations.get_operations",
+                side_effect=RuntimeError("sub boom"),
+            ),
+            patch("dot_man.cli.template_cmd.error") as mock_error,
+        ):
+            template_cmd.template_substitute.callback("{{OS}}")
+
+        assert mock_error.call_args.args[0] == "sub boom"

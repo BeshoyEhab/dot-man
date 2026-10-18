@@ -1,6 +1,6 @@
 # TODO
 
-**Status:** v1.5.0 · 2350 tests passing · coverage 96% · docs site live
+**Status:** v1.5.0 · 2459 tests passing · coverage 96% · docs site live
 
 ---
 

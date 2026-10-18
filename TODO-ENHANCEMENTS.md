@@ -406,16 +406,16 @@ strict; quality gate green.
 
 | Done | Item | Impact | Effort | Complexity | Location |
 |------|------|--------|--------|-----------|----------|
-| [ ] | T1 Export tests hit the real repo; assertions vacuous | Med-High | S | Low | `tests/test_export_cmd.py:31-62` |
-| [ ] | T2 43 vacuous `exit_code in [0,1]` assertions | Med | M | Low | `tests/test_cli_commands.py`, `test_backup_cmd.py`, … |
-| [ ] | T3 No coverage gate despite 96% claim | Med | S | Low | `.github/workflows/ci.yml:31` |
-| [ ] | T4 CI gaps: no macOS, no security scan, no docs build, publish unguarded | Med | M | Low | `.github/workflows/*` |
-| [ ] | T5 `uninstall.sh` uninstalls wrong dist name (`dot-man` vs `dotman-git`) | Med | S | Low | `uninstall.sh:35,42` |
-| [ ] | T6 Version not single-sourced; stale coverage omits; setuptools floor | Low | S | Low | `pyproject.toml:3,73,110-123`, `dot_man/__init__.py` |
-| [ ] | T7 `watchdog` not installed in CI → default watch path untested | Low | S | Low | `tests/test_watch_cmd.py:371,561`, `pyproject.toml:46` |
-| [ ] | T8 Docs drift (badge, roadmap, SECURITY, DEVELOPMENT, CONTRIBUTING) | Med | M | Low | `README.md:15,199,429,458`, `SECURITY.md`, `DEVELOPMENT.md` |
-| [ ] | T9 No property-based tests; no e2e `clone`/`push`/`pull` coverage | Low | L | Med | `tests/`, `core.py` push/pull |
-| [ ] | T10 Committed personal artifacts (`pro-mgr.toml`, `integration/`, `docs/superpowers/*`) | Low | S | Low | repo root |
+| [x] | T1 Export tests hit the real repo; assertions vacuous | Med-High | S | Low | `tests/test_export_cmd.py:31-62` |
+| [x] | T2 43 vacuous `exit_code in [0,1]` assertions | Med | M | Low | `tests/test_cli_commands.py`, `test_backup_cmd.py`, … |
+| [x] | T3 No coverage gate despite 96% claim | Med | S | Low | `.github/workflows/ci.yml:31` |
+| [x] | T4 CI gaps: no macOS, no security scan, no docs build, publish unguarded | Med | M | Low | `.github/workflows/*` |
+| [x] | T5 `uninstall.sh` uninstalls wrong dist name (`dot-man` vs `dotman-git`) | Med | S | Low | `uninstall.sh:35,42` |
+| [x] | T6 Version not single-sourced; stale coverage omits; setuptools floor | Low | S | Low | `pyproject.toml:3,73,110-123`, `dot_man/__init__.py` |
+| [x] | T7 `watchdog` not installed in CI → default watch path untested | Low | S | Low | `tests/test_watch_cmd.py:371,561`, `pyproject.toml:46` |
+| [x] | T8 Docs drift (badge, roadmap, SECURITY, DEVELOPMENT, CONTRIBUTING) | Med | M | Low | `README.md:15,199,429,458`, `SECURITY.md`, `DEVELOPMENT.md` |
+| [x] | T9 No property-based tests; no e2e `clone`/`push`/`pull` coverage | Low | L | Med | `tests/`, `core.py` push/pull |
+| [x] | T10 Committed personal artifacts (`pro-mgr.toml`, `integration/`, `docs/superpowers/*`) | Low | S | Low | repo root |
 
 ### Details
 
@@ -450,3 +450,42 @@ an integration test exercising real `clone`/`push`/`pull`.
 **T10** — Remove or refresh `pro-mgr.toml` (says v0.3.0), drop/wire
 `integration/`, exclude `docs/superpowers/*` from the published site, and add
 `.superpowers/` to the root `.gitignore`.
+
+### Status
+
+- **Done:** T1–T10.
+- **T1:** already strong (real repo, exact codes, archive contents asserted) —
+  verified rather than rewritten.
+- **T2:** all 16 remaining `exit_code in (0, 1)` assertions replaced with exact
+  codes. The config-dependent "runs" tests were made *genuinely* run by
+  creating a default global config (and `backup create` now uses the canonical
+  `integration_runner`); the not-initialized cases use `uninitialized_runner`
+  and assert `1`; `navigate` uses `--yes` (also an end-to-end check of U1).
+- **T3:** `--cov-fail-under=95` in the CI test job.
+- **T4:** macOS (3.12) added to the matrix; `permissions: contents: read` +
+  `concurrency` on CI/CodeQL; Dependabot (pip + github-actions); CodeQL
+  workflow (Python); `docs` job running `mkdocs build --strict`;
+  `publish.yml` now runs tests + a `tag == v{version}` check before building.
+  *Not done:* SHA-pinning actions, and `bandit`/`pip-audit` (CodeQL covers the
+  security-scan requirement without new deps).
+- **T5:** `uninstall.sh` tries `dotman-git` then `dot-man`, and derives the
+  version from the installed package instead of the stale `v0.1.0` banner.
+- **T6:** `dynamic = ["version"]` reading `dot_man.__version__`; `setuptools>=77`;
+  the entry-point `omit`s (`cli/interface.py`, `cli/main.py`) removed so the new
+  CLI code is measured (`tui_log.py` stays omitted — optional deps). Un-omitting
+  exposed modules that had slipped under the floor once T2 stopped exercising
+  their error paths, so target tests were added: `main.py`/`template_cmd.py`/
+  `config_detector.py` back to **100%**, `interface.py` 95% (only the
+  unreachable mkdir-OSError pair remains).
+- **T7:** `watchdog` added to the `dev` extra (installed by CI's
+  `uv sync --extra dev`).
+- **T8:** README badge `90%`→`96%`, test count refreshed, roadmap checkboxes
+  (docs site, `--json`) updated, `docs/roadmap.md` counts + `--json` moved to
+  shipped; SECURITY supported version `1.5.x` + author contact; DEVELOPMENT
+  fixture names corrected; DEVELOPMENT/CONTRIBUTING switched to `uv run`.
+- **T9:** `tests/test_properties.py` (hypothesis: template substitution,
+  entropy, secret-scanner totality/masking) and `tests/test_git_e2e.py` (real
+  bare remote → push → clone → commit → pull).
+- **T10:** `pro-mgr.toml` and `integration/` removed (unreferenced);
+  `superpowers/` added to `mkdocs.yml` `exclude_docs`; `.superpowers/` added to
+  `.gitignore`.

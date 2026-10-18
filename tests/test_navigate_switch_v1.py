@@ -20,9 +20,8 @@ class TestNavigateCreateBranch:
         test_file.parent.mkdir(parents=True, exist_ok=True)
         test_file.write_text("nav test")
         integration_runner.invoke(cli, ["add", str(test_file), "--section", "nav-test"])
-        result = integration_runner.invoke(cli, ["navigate", "work"])
-        # Navigate may succeed or show a warning
-        assert result.exit_code in (0, 1)
+        result = integration_runner.invoke(cli, ["--yes", "navigate", "work"])
+        assert result.exit_code == 0, result.output
 
     def test_navigate_switch_existing(self, integration_runner, tmp_path):
         """Switching away and back to the initial branch really works.

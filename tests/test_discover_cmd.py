@@ -37,11 +37,10 @@ class TestDiscoverHelp:
 class TestDiscoverWithoutInit:
     """Test discover command when not initialized."""
 
-    def test_discover_without_init(self):
-        """Discover without init shows welcome banner."""
-        runner = CliRunner()
-        result = runner.invoke(cli, ["discover"])
-        assert result.exit_code in (0, 1)
+    def test_discover_without_init(self, uninitialized_runner):
+        """Discover without init exits with the not-initialized code."""
+        result = uninitialized_runner.invoke(cli, ["discover"])
+        assert result.exit_code == 1, result.output
 
 
 class TestDiscoverNoConfigs:

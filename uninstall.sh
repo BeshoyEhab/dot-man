@@ -21,9 +21,13 @@ COMPLETIONS_BASH="${COMPLETIONS_BASH:-$HOME/.local/share/bash-completion/complet
 COMPLETIONS_ZSH="${COMPLETIONS_ZSH:-$HOME/.local/share/zsh/site-functions}"
 COMPLETIONS_FISH="${COMPLETIONS_FISH:-$HOME/.config/fish/completions}"
 
+# The PyPI distribution is `dotman-git`; older installs may use `dot-man`.
+PKG_NAMES=("dotman-git" "dot-man")
+VERSION="$(python3 -c 'import dot_man; print(dot_man.__version__)' 2>/dev/null || echo "unknown")"
+
 echo ""
 echo "╔══════════════════════════════════════╗"
-echo "║      dot-man Uninstaller v0.1.0      ║"
+printf '║%-38s║\n' "      dot-man Uninstaller v${VERSION}"
 echo "╚══════════════════════════════════════╝"
 echo ""
 
@@ -32,21 +36,28 @@ print_info "Uninstalling dot-man package..."
 
 # Try pipx first (preferred)
 if command -v pipx &> /dev/null; then
-    if pipx uninstall dot-man 2>/dev/null; then
-        print_status "Package uninstalled with pipx"
-    fi
+    for pkg in "${PKG_NAMES[@]}"; do
+        if pipx uninstall "$pkg" 2>/dev/null; then
+            print_status "Package '$pkg' uninstalled with pipx"
+            break
+        fi
+    done
 fi
 
 # Also try pip (in case installed both ways)
-if command -v pip3 &> /dev/null; then
-    if pip3 uninstall -y dot-man 2>/dev/null; then
-        print_status "Package uninstalled with pip"
+for pkg in "${PKG_NAMES[@]}"; do
+    if command -v pip3 &> /dev/null; then
+        if pip3 uninstall -y "$pkg" 2>/dev/null; then
+            print_status "Package '$pkg' uninstalled with pip"
+            break
+        fi
+    elif command -v pip &> /dev/null; then
+        if pip uninstall -y "$pkg" 2>/dev/null; then
+            print_status "Package '$pkg' uninstalled with pip"
+            break
+        fi
     fi
-elif command -v pip &> /dev/null; then
-    if pip uninstall -y dot-man 2>/dev/null; then
-        print_status "Package uninstalled with pip"
-    fi
-fi
+done
 
 # Remove the binary if it exists in ~/.local/bin
 if [ -f "$HOME/.local/bin/dot-man" ]; then

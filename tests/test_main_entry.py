@@ -56,6 +56,15 @@ class TestShouldAutoOnboard:
 
         assert main_mod._should_auto_onboard(["add", "~/.bashrc"]) is False
 
+    def test_isatty_failure_is_treated_as_non_interactive(self, monkeypatch):
+        class _Boom:
+            def isatty(self) -> bool:
+                raise ValueError("no tty info")
+
+        _patch_sys(monkeypatch, main_mod, ["dot-man"], _Boom())
+
+        assert main_mod._should_auto_onboard([]) is False
+
 
 class TestMainVersion:
     """`dot-man --version` on a fresh machine must print the version only."""
@@ -80,3 +89,42 @@ class TestMainVersion:
         assert exc.value.code == 0
         assert "1.5.0" in capsys.readouterr().out
         assert not fresh.exists()
+
+
+class TestMainFlow:
+    """`main()` routes first-run onboarding and swallows install failures."""
+
+    def test_first_run_runs_onboarding_and_skips_cli(self, monkeypatch):
+        import dot_man.cli.completion_engine as completion_engine
+        import dot_man.cli.onboarding as onboarding
+
+        calls: dict[str, bool] = {}
+        monkeypatch.setattr(completion_engine, "maybe_run_completion", lambda: None)
+        monkeypatch.setattr(onboarding, "is_first_run", lambda: True)
+        monkeypatch.setattr(
+            onboarding, "run_onboarding", lambda: calls.setdefault("onboard", True)
+        )
+        monkeypatch.setattr(main_mod, "_should_auto_onboard", lambda argv: True)
+        monkeypatch.setattr(main_mod, "cli", lambda: calls.setdefault("cli", True))
+
+        main_mod.main()
+
+        assert calls == {"onboard": True}
+
+    def test_completion_install_failure_is_swallowed(self, monkeypatch):
+        import dot_man.cli.completion_engine as completion_engine
+        import dot_man.cli.completions_cmd as completions_cmd
+        import dot_man.cli.onboarding as onboarding
+
+        def _boom() -> None:
+            raise RuntimeError("cannot install completions")
+
+        calls: dict[str, bool] = {}
+        monkeypatch.setattr(completion_engine, "maybe_run_completion", lambda: None)
+        monkeypatch.setattr(onboarding, "is_first_run", lambda: False)
+        monkeypatch.setattr(completions_cmd, "run_install", _boom)
+        monkeypatch.setattr(main_mod, "cli", lambda: calls.setdefault("cli", True))
+
+        main_mod.main()
+
+        assert calls == {"cli": True}

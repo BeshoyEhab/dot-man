@@ -79,9 +79,13 @@ class TestProfileList:
         repo.index.add(["test.txt"])
         repo.index.commit("Initial")
 
+        from dot_man.global_config import GlobalConfig
+
+        GlobalConfig().create_default()
+
         result = runner.invoke(cli, ["profile", "list"])
 
-        assert result.exit_code in [0, 1]
+        assert result.exit_code == 0, result.output
 
 
 class TestProfileSet:
@@ -115,9 +119,13 @@ class TestProfileCreate:
         repo.index.add(["test.txt"])
         repo.index.commit("Initial")
 
+        from dot_man.global_config import GlobalConfig
+
+        GlobalConfig().create_default()
+
         result = runner.invoke(cli, ["profile", "create", "work"])
 
-        assert result.exit_code in [0, 1]
+        assert result.exit_code == 0, result.output
 
     def test_profile_create_with_inherits(self, clean_env):
         """Profile create with inherits."""
@@ -135,10 +143,14 @@ class TestProfileCreate:
         repo.index.add(["test.txt"])
         repo.index.commit("Initial")
 
+        from dot_man.global_config import GlobalConfig
+
+        GlobalConfig().create_default()
+
         runner.invoke(cli, ["profile", "create", "base"])
         result = runner.invoke(cli, ["profile", "create", "work", "--inherits", "base"])
 
-        assert result.exit_code in [0, 1]
+        assert result.exit_code == 0, result.output
 
 
 class TestProfileDelete:

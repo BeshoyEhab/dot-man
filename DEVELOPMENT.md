@@ -89,14 +89,19 @@ def test_my_new_feature(tmp_path):
 ### Test Execution
 ```bash
 # Run all tests (Fast)
-pytest tests/ -v
+uv run pytest tests/ -v
 
 # Run with coverage (Gatekeeper)
-pytest --cov=dot_man --cov-report=term-missing
+uv run pytest --cov=dot_man --cov-report=term-missing
 ```
 
 ### Test Fixtures (`conftest.py`)
-Familiarize yourself with the fixtures in `tests/conftest.py`. The suite provides pre-configured mock environments (`mock_env`, `mock_git_repo`) that isolate tests to `/tmp` directories, preventing your local `~/.config/dot-man/` from being destroyed during a test run.
+Familiarize yourself with the fixtures in `tests/conftest.py`. The suite provides
+pre-configured, isolated environments — chiefly `integration_runner` (a fully
+initialized dot-man repo) and `uninitialized_runner` (an empty env), plus
+`temp_home`, `mock_dot_man_dir`, and `git_repo` (+ `_with_branches`/`_with_tags`/
+`_with_commits`). They redirect every dot-man path into `/tmp`, so your local
+`~/.config/dot-man/` is never touched during a test run.
 
 ### Debugging the CLI
 If a command is failing locally, use the built-in debug logger:
@@ -118,13 +123,13 @@ We follow **PEP 8** strictly.
 
 ```bash
 # 1. Format code (Max line length 88)
-black dot_man/ tests/
+uv run black dot_man/ tests/
 
 # 2. Lint code (Catches unused imports, f-string errors)
-ruff check dot_man/ tests/ --fix
+uv run ruff check dot_man/ tests/ --fix
 
 # 3. Check types (Required: 0 errors)
-mypy dot_man/ --ignore-missing-imports
+uv run mypy dot_man/ --ignore-missing-imports
 ```
 
 If `mypy` complains about a library lacking stubs (like `tomlkit` or `GitPython`), suppress it inline using `# type: ignore` but leave a comment explaining why.
@@ -134,7 +139,8 @@ If `mypy` complains about a library lacking stubs (like `tomlkit` or `GitPython`
 ## 🚀 Release Process
 
 When a milestone is complete:
-1. Bump version strings in `pyproject.toml` and `dot_man/__init__.py`.
+1. Bump `__version__` in `dot_man/__init__.py` — it is the single source;
+   `pyproject.toml` reads it dynamically.
 2. Move items from `Unreleased` to a new version header in `CHANGELOG.md`.
 3. Check off completed checkboxes in `TODO.md`.
 4. Update `docs/roadmap.md` to mark the phase as complete.

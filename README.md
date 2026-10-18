@@ -12,7 +12,7 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
-[![Coverage](https://img.shields.io/badge/coverage-90%25-green)](https://github.com/BeshoyEhab/dot-man)
+[![Coverage](https://img.shields.io/badge/coverage-96%25-green)](https://github.com/BeshoyEhab/dot-man)
 [![Docs](https://img.shields.io/badge/docs-online-blue)](https://beshoyehab.github.io/dot-man/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/BeshoyEhab/dot-man/pulls)
 
@@ -443,7 +443,7 @@ System variables (`{{HOSTNAME}}`, `{{USER}}`, `{{SHELL}}`, etc.) are auto-popula
 | Version | `1.5.0` |
 | Python | `3.10 · 3.11 · 3.12 · 3.13` |
 | Platforms | Linux, macOS |
-| Test Coverage | 96% (2350 tests) |
+| Test Coverage | 96% (2459 tests) |
 | Commands | 30+ |
 | PyPI | [`dotman-git`](https://pypi.org/project/dotman-git/) |
 
@@ -454,16 +454,17 @@ System variables (`{{HOSTNAME}}`, `{{USER}}`, `{{SHELL}}`, etc.) are auto-popula
 ```bash
 git clone https://github.com/BeshoyEhab/dot-man.git
 cd dot-man
-pip install -e ".[dev]"
+uv sync --extra dev
+pre-commit install
 
 # Run tests
-pytest tests/ -v
+uv run pytest tests/ -v
 
 # Run full quality gate
-black dot_man/ tests/
-ruff check dot_man/ tests/
-mypy dot_man/ --ignore-missing-imports
-pytest tests/ --cov=dot_man --cov-report=term-missing
+uv run black dot_man/ tests/
+uv run ruff check dot_man/ tests/
+uv run mypy dot_man/ --ignore-missing-imports
+uv run pytest tests/ --cov=dot_man --cov-report=term-missing
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) and [DEVELOPMENT.md](DEVELOPMENT.md) for full guides.
@@ -472,8 +473,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) and [DEVELOPMENT.md](DEVELOPMENT.md) for 
 
 ## Roadmap
 
-- [x] 80%+ test coverage
-- [ ] Full documentation site (mkdocs)
+- [x] 90%+ test coverage (every module)
+- [x] Full documentation site (mkdocs)
 - [x] Symlink mode
 - [x] `dot-man watch` — auto-sync on file change
 - [x] Deploy rollback (transaction-style)

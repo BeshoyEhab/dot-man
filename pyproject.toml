@@ -1,6 +1,6 @@
 [project]
 name = "dotman-git"
-version = "1.5.0"
+dynamic = ["version"]
 description = "Dotfile manager with git-powered branching"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -56,6 +56,8 @@ dev = [
     "ruff>=0.4.0",
     "pre-commit>=3.0.0",
     "ruamel.yaml>=0.17.0",
+    "watchdog>=4.0",
+    "hypothesis>=6.100.0",
 ]
 
 [project.scripts]
@@ -70,8 +72,11 @@ Documentation = "https://github.com/BeshoyEhab/dot-man#readme"
 Changelog = "https://github.com/BeshoyEhab/dot-man/blob/main/CHANGELOG.md"
 
 [build-system]
-requires = ["setuptools>=61"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.dynamic]
+version = { attr = "dot_man.__version__" }
 
 [tool.setuptools.packages.find]
 where = ["."]
@@ -112,9 +117,6 @@ addopts = "-v"
 omit = [
     # TUI log viewer (optional dependency)
     "dot_man/tui_log.py",
-    # Entry points
-    "dot_man/cli/main.py",
-    "dot_man/cli/interface.py",
 ]
 
 [tool.coverage.report]

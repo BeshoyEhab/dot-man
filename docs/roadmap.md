@@ -2,7 +2,7 @@
 
 ## v1.5.0 - Current Stable ✅
 
-- ✅ Full coverage floor — every module ≥ 90% (2350 tests, 96% coverage)
+- ✅ Full coverage floor — every module ≥ 90% (2459 tests, 96% coverage)
 - ✅ Consistent exit codes — `ExitCode` enum, `sys.exit()` eliminated
 - ✅ Centralized error handling — `DotManGroup.invoke()` routes through `handle_exception()`
 - ✅ Two-level help — `help`/`--help` happy path, `help-all` everything, man page
@@ -20,6 +20,13 @@
 
 ## v1.6.0 - Next Release (Planned)
 
+### CLI Experience
+
+- ✅ Global flags — `--quiet`/`--yes`/`--no-input`/`--no-color`/`--json`/`--plain`
+- ✅ `encrypt`/`vault`/`hooks` normalized to Click groups
+- ✅ Terminal-width-aware output and plain mode
+- ✅ `import` asks before committing (`--yes`/`--no-commit`)
+
 ### Extensibility
 
 - [ ] Plugin API — extension mechanism for third-party tools (parked)
@@ -28,8 +35,8 @@
 
 ## Coverage Focus
 
-Lowest-covered modules (source of truth: `TODO.md`, regenerated 2026-10-09): **none
-below 90%** — the floor sweep cleared every module (suite 2350 passing, 96% coverage).
+Lowest-covered modules (source of truth: `TODO.md`, regenerated 2026-10-18): **none
+below 90%** — the floor sweep cleared every module (suite 2459 passing, 96% coverage).
 
 ---
 
@@ -43,7 +50,7 @@ below 90%** — the floor sweep cleared every module (suite 2350 passing, 96% co
 ### User Experience
 
 - [ ] Web dashboard — Browser-based configuration management
-- [ ] JSON output — `--json` option for scripting
+- ✅ JSON output — global `--json` flag (shipped in v1.6.0 CLI improvements)
 
 ### Ecosystem
 
@@ -55,7 +62,7 @@ below 90%** — the floor sweep cleared every module (suite 2350 passing, 96% co
 ## Completed Milestones
 
 ### v1.5.0 — Coverage Floor & UX Hardening (2026-10-09)
-- ✅ Full coverage floor — every module ≥ 90% (suite 2350 passing, 96% coverage)
+- ✅ Full coverage floor — every module ≥ 90% (suite 2459 passing, 96% coverage)
 - ✅ Consistent exit codes — `ExitCode` enum, `sys.exit()` eliminated
 - ✅ Centralized error handling — `DotManGroup.invoke()` routes through `handle_exception()`
 - ✅ Two-level help — `help`/`--help` happy path, `help-all` everything, man page

@@ -32,8 +32,8 @@ class TestLogCommand:
 
     def test_log_untracked_file(self, integration_runner):
         result = integration_runner.invoke(cli, ["log", "/nonexistent/file"])
-        # May show "not tracked" or just succeed with empty output
-        assert result.exit_code in (0, 1)
+        assert result.exit_code == 1, result.output
+        assert "not tracked" in result.output.lower()
 
 
 class TestDiffCommand:

@@ -116,8 +116,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   command object itself was exercised in tests); it is now wired into the CLI
   and guarded by a registration test.
 
+### Tests
+
+- **Vacuous exit-code assertions removed** — every `exit_code in (0, 1)` was
+  replaced with the exact expected code. The config-dependent command tests
+  now create a real default global config (so the commands actually run)
+  instead of tolerating any result; not-initialized paths use the isolated
+  `uninitialized_runner` fixture; `navigate` uses `--yes`.
+- **Property-based tests** (`hypothesis`) — invariants for
+  `substitute_templates` (every known placeholder is replaced; unrelated text
+  is untouched), `shannon_entropy` (non-negative, bounded by `log2(n)`,
+  permutation-invariant), and the secret scanner (scanning arbitrary content
+  never raises and `masked_line` never leaks a match).
+- **Real clone/push/pull end-to-end test** — a bare remote, a push, a clone,
+  a commit on the clone, and a final pull that fetches the change.
+
 ### Removed
 
+- **Stale personal artifacts** — the unreferenced `pro-mgr.toml` (a leftover
+  from the old project name, pinned at v0.3.0) and the unreferenced
+  `integration/` template were removed; `superpowers/` is now excluded from the
+  published docs and `.superpowers/` is gitignored.
 - **Dead `BranchMixin.switch_branch`** — no production caller; superseded by
   the unified navigate pipeline.
 - **Dead `merge.py` universal-merge machinery** (`UniversalMergeManager`,
@@ -136,6 +155,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Version is single-sourced** — `pyproject.toml` uses `dynamic = ["version"]`
+  reading `dot_man.__version__`; the build requires `setuptools>=77` (SPDX
+  `license = "MIT"`). The `cli/interface.py` / `cli/main.py` coverage omits were
+  removed so the CLI code is actually measured.
+- **CI hardening** — the test job enforces `--cov-fail-under=95`; macOS (3.12)
+  joined the matrix; CI and a new CodeQL workflow run with least-privilege
+  permissions and a `concurrency` group; a docs job builds `mkdocs --strict`;
+  Dependabot tracks pip and GitHub Actions; `publish.yml` now runs the tests and
+  a `tag == v{version}` check before building.
+- **`uninstall.sh` fixes** — uninstalls the correct `dotman-git` distribution
+  (falling back to `dot-man`) and derives the version from the installed
+  package instead of the stale `v0.1.0` banner.
+- **Docs refreshed** — coverage badge `90%`→`96%`, roadmap checkboxes and test
+  counts, SECURITY supported version (`1.5.x`) and contact, DEVELOPMENT fixture
+  names, and `uv run` usage in DEVELOPMENT/CONTRIBUTING.
 - **`reload_config` drops all branch-derived caches** (`global_config` +
   `dotman_config`), so a long-lived `watch` observes branch switches.
 - **Resolved sections are memoized** — `DotManConfig.get_section` caches per

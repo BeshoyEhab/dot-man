@@ -66,3 +66,6 @@ site/
 
 # Personal dot-man config (author's machine)
 /config.toml
+
+# Superpowers session state (local tooling)
+.superpowers/

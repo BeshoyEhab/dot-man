@@ -64,9 +64,9 @@ class TestAuditHelp:
 
 
 class TestAuditWithoutInit:
-    def test_audit_runs_without_init(self, runner):
-        result = runner.invoke(cli, ["audit"])
-        assert result.exit_code in [0, 1]
+    def test_audit_runs_without_init(self, uninitialized_runner):
+        result = uninitialized_runner.invoke(cli, ["audit"])
+        assert result.exit_code == 1, result.output
 
 
 class TestAuditOptions:

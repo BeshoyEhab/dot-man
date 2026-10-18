@@ -111,3 +111,4 @@ exclude_docs: |
   modules/
   review/
   specs/
+  superpowers/

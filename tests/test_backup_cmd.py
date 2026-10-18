@@ -103,10 +103,10 @@ class TestBackupHelp:
 
 
 class TestBackupWithoutInit:
-    def test_backup_without_init(self, runner):
-        """Backup without init."""
-        result = runner.invoke(cli, ["backup", "create"])
-        assert result.exit_code in [0, 1]
+    def test_backup_without_init(self, uninitialized_runner):
+        """Backup without init fails with the not-initialized exit code."""
+        result = uninitialized_runner.invoke(cli, ["backup", "create"])
+        assert result.exit_code == 1, result.output
 
 
 class TestBackupCreate:
@@ -115,25 +115,12 @@ class TestBackupCreate:
         result = runner.invoke(cli, ["backup", "create", "--help"])
         assert result.exit_code in [0, 2]
 
-    def test_backup_create_runs(self, clean_env):
-        """Backup create runs."""
-        runner, dot_man_dir, repo_dir, global_toml = clean_env
+    def test_backup_create_runs(self, integration_runner):
+        """Backup create succeeds in an initialized environment."""
+        result = integration_runner.invoke(cli, ["backup", "create"])
 
-        from git import Repo
-
-        repo = Repo.init(repo_dir)
-        config_writer = repo.config_writer()
-        config_writer.set_value("user", "name", "Test")
-        config_writer.set_value("user", "email", "test@test.com")
-        config_writer.release()
-
-        (repo_dir / "test.txt").write_text("test")
-        repo.index.add(["test.txt"])
-        repo.index.commit("Initial")
-
-        result = runner.invoke(cli, ["backup", "create"])
-
-        assert result.exit_code in [0, 1]
+        assert result.exit_code == 0, result.output
+        assert "backup" in result.output.lower()
 
 
 class TestBackupList:
@@ -160,7 +147,7 @@ class TestBackupList:
 
         result = runner.invoke(cli, ["backup", "list"])
 
-        assert result.exit_code in [0, 1]
+        assert result.exit_code == 0, result.output
 
 
 class TestBackupRestore:

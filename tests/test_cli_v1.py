@@ -14,8 +14,7 @@ class TestDoctorCommand:
 
     def test_doctor_basic(self, integration_runner):
         result = integration_runner.invoke(cli, ["doctor"])
-        # Doctor may report failures for DOT_MAN_TOML (string constant)
-        assert result.exit_code in (0, 1)
+        assert result.exit_code == 0, result.output
         assert "dot-man doctor" in result.output
 
 

@@ -104,6 +104,27 @@ class TestNoColorFlag:
         assert ui.error_console.no_color is False
 
 
+class TestVerboseAndDebug:
+    """-v/--debug emit their notices through the root group callback."""
+
+    def test_verbose_prints_notice(self, uninitialized_runner):
+        import logging
+
+        root = logging.getLogger()
+        before = list(root.handlers)
+        try:
+            result = uninitialized_runner.invoke(cli, ["-v", "status"])
+        finally:
+            root.handlers[:] = before
+
+        assert "Verbose mode enabled" in result.output
+
+    def test_debug_prints_notice(self, uninitialized_runner):
+        result = uninitialized_runner.invoke(cli, ["--debug", "status"])
+
+        assert "Debug logging enabled" in result.output
+
+
 class TestGlobalJsonFlag:
     """--json is recorded on the context and honoured by ``status``."""
 

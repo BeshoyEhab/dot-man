@@ -9,16 +9,13 @@ Thank you for your interest in contributing! This document provides guidelines a
 git clone https://github.com/BeshoyEhab/dot-man.git
 cd dot-man
 
-# Create virtual environment
-python -m venv .venv
-source .venv/bin/activate  # or: source .venv/bin/activate.fish
-
-# Install in development mode with dev dependencies
-pip install -e ".[dev]"
+# Install uv (https://docs.astral.sh/uv/) and create the managed environment
+uv sync --extra dev
+pre-commit install
 
 # Verify installation
-dot-man --version
-pytest tests/ -v
+uv run dot-man --version
+uv run pytest tests/ -v
 ```
 
 ## Project Structure
@@ -73,13 +70,13 @@ dot-man/
 
 ```bash
 # Run all tests
-pytest tests/ -v
+uv run pytest tests/ -v
 
 # Run with coverage
-pytest tests/ --cov=dot_man --cov-report=term-missing
+uv run pytest tests/ --cov=dot_man --cov-report=term-missing
 
 # Run specific test
-pytest tests/test_core.py -v
+uv run pytest tests/test_core.py -v
 ```
 
 ## Code Style
@@ -92,21 +89,22 @@ This project uses:
 
 ```bash
 # Format code
-black dot_man/ tests/
+uv run black dot_man/ tests/
 
 # Lint code
-ruff check dot_man/ tests/
+uv run ruff check dot_man/ tests/
 
 # Check types
-mypy dot_man/ --ignore-missing-imports
+uv run mypy dot_man/ --ignore-missing-imports
 ```
 
 ## Adding a New Command
 
 1. Create `dot_man/cli/mycommand_cmd.py`
-2. Define your Click command decorating with `@cli.command()`
+2. Define your Click command with `@main.command("name", cls=AliasedCommand)`
+   (`from .interface import cli as main`)
 3. Import it in `dot_man/cli/__init__.py` (this triggers registration)
-4. Add shell completion in `dot_man/cli/common.py` if needed
+4. Add completions with the `@completes` decorator in `dot_man/cli/completions.py`
 5. Add business logic to the appropriate operations mixin (`save_deploy_ops.py`, `branch_ops.py`, or `status_ops.py`)
 6. Add tests to `tests/test_mycommand_cmd.py`
 7. Update `README.md` command table and `CHANGELOG.md`
@@ -115,10 +113,10 @@ Example command file (`dot_man/cli/mycommand_cmd.py`):
 
 ```python
 import click
-from .common import require_init, success, error
-from .interface import cli
+from .common import AliasedCommand, require_init, success, error
+from .interface import cli as main
 
-@cli.command()
+@main.command("mycommand", cls=AliasedCommand)
 @click.option("--verbose", "-v", is_flag=True)
 @require_init
 def mycommand(verbose: bool):
@@ -133,7 +131,10 @@ def mycommand(verbose: bool):
     success("Done!")
 ```
 
-> **Important:** Commands are registered via import side effects. The `@cli.command()` decorator must run at import time. Adding the import to `cli/__init__.py` is what makes the command available. Without that import, the command will not appear in `dot-man --help`.
+> **Important:** Commands are registered via import side effects. The
+> `@main.command(...)` decorator must run at import time, so import the module
+> (or its command) in `cli/__init__.py`. Without that import, the command will
+> not appear in `dot-man --help`.
 
 ## Architecture Overview
 

@@ -4,8 +4,8 @@
 
 | Version | Supported          |
 |---------|--------------------|
-| 1.2.x   | :white_check_mark: |
-| < 1.2   | :x:                |
+| 1.5.x   | :white_check_mark: |
+| < 1.5   | :x:                |
 
 ## Reporting a Vulnerability
 
@@ -15,7 +15,7 @@ dot-man handles sensitive data (API keys, tokens, passwords). If you discover a 
 
 ### How to Report
 
-1. Email: **bishoymorad47@gmail.com** with:
+1. Email: **beshoyehabhhmm@gmail.com** with:
    - Description of the vulnerability
    - Steps to reproduce
    - Potential impact assessment
