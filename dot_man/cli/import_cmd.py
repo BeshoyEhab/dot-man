@@ -27,7 +27,7 @@ def _chezmoi_target(rel_path: Path) -> Path:
     return Path.home() / ".config" / Path(*parts)
 
 
-@main.command("import", cls=AliasedCommand, aliases=["imp"])
+@main.command("import", cls=AliasedCommand)
 @click.argument("source", type=click.Choice(["chezmoi", "yadm", "stow", "all"]))
 @click.option(
     "--path",
@@ -41,8 +41,21 @@ def _chezmoi_target(rel_path: Path) -> Path:
     is_flag=True,
     help="Show what would be imported without importing",
 )
+@click.option(
+    "--yes",
+    "-y",
+    is_flag=True,
+    help="Skip the commit confirmation prompt",
+)
+@click.option(
+    "--no-commit",
+    is_flag=True,
+    help="Import files without committing them",
+)
 @require_init
-def import_cmd(source: str, path: str | None, dry_run: bool):
+def import_cmd(
+    source: str, path: str | None, dry_run: bool, yes: bool, no_commit: bool
+):
     """Import dotfiles from other dotfile managers.
 
     Supported sources:
@@ -60,16 +73,49 @@ def import_cmd(source: str, path: str | None, dry_run: bool):
     git = GitManager()
 
     if source == "all":
-        _import_all(path, dry_run, git)
+        touched = _import_all(path, dry_run)
+        commit_msg = "Import dotfiles from auto-detected sources"
     elif source == "chezmoi":
-        _import_chezmoi(path, dry_run, git)
+        touched = _import_chezmoi(path, dry_run)
+        commit_msg = "Import dotfiles from chezmoi"
     elif source == "yadm":
-        _import_yadm(path, dry_run, git)
-    elif source == "stow":
-        _import_stow(path, dry_run, git)
+        touched = _import_yadm(path, dry_run)
+        commit_msg = "Import dotfiles from yadm"
+    else:
+        touched = _import_stow(path, dry_run)
+        commit_msg = "Import dotfiles from GNU Stow"
+
+    if dry_run or not touched:
+        return
+
+    _commit_imported(git, touched, commit_msg, yes=yes, no_commit=no_commit)
 
 
-def _import_all(custom_path: str | None, dry_run: bool, git: GitManager):
+def _commit_imported(
+    git: GitManager,
+    touched: list[Path],
+    commit_msg: str,
+    *,
+    yes: bool,
+    no_commit: bool,
+) -> None:
+    """Stage only the imported files and optionally commit them."""
+    if no_commit:
+        ui.info("Skipped commit (--no-commit); changes are left unstaged.")
+        return
+
+    count = len(touched)
+    if not yes and not ui.confirm(
+        f"Commit {count} imported {_files_word(count)} to the repository?"
+    ):
+        ui.console.print("Changes left uncommitted in your home directory.")
+        return
+
+    git.add_all()
+    git.commit(commit_msg)
+
+
+def _import_all(custom_path: str | None, dry_run: bool) -> list[Path]:
     """Auto-detect and import from any supported source."""
     sources_found = []
 
@@ -97,16 +143,19 @@ def _import_all(custom_path: str | None, dry_run: bool, git: GitManager):
 
     if dry_run:
         ui.console.print("\n[dim]Dry-run mode - no changes will be made[/dim]")
-        return
+        return []
 
+    touched: list[Path] = []
     for src, src_path in sources_found:
         ui.console.print(f"\n[bold]Importing from {src}...[/bold]")
         if src == "chezmoi":
-            _import_chezmoi(src_path, False, git)
+            touched.extend(_import_chezmoi(src_path, False))
         elif src == "yadm":
-            _import_yadm(src_path, False, git)
+            touched.extend(_import_yadm(src_path, False))
         elif src == "stow":
-            _import_stow(src_path, False, git)
+            touched.extend(_import_stow(src_path, False))
+
+    return touched
 
 
 def _detect_chezmoi() -> str | None:
@@ -164,8 +213,8 @@ def _detect_stow() -> str | None:
     return None
 
 
-def _import_chezmoi(source_path: str | None, dry_run: bool, git: GitManager):
-    """Import from chezmoi."""
+def _import_chezmoi(source_path: str | None, dry_run: bool) -> list[Path]:
+    """Import from chezmoi. Returns the destination paths that were written."""
     if source_path is None:
         source_path = _detect_chezmoi()
         if source_path is None:
@@ -173,10 +222,10 @@ def _import_chezmoi(source_path: str | None, dry_run: bool, git: GitManager):
                 "chezmoi source not found. Install chezmoi first or use --path.",
                 exit_code=1,
             )
-            return
+            return []
     if source_path is None:
         error("Source path is required", exit_code=1)
-        return
+        return []
     source = Path(source_path).expanduser().resolve()
 
     if not source.exists():
@@ -185,6 +234,7 @@ def _import_chezmoi(source_path: str | None, dry_run: bool, git: GitManager):
     ui.console.print(f"[dim]Importing from chezmoi: {source}[/dim]")
 
     files_imported = 0
+    touched: list[Path] = []
 
     for item in source.rglob("*"):
         if item.is_file():
@@ -203,6 +253,7 @@ def _import_chezmoi(source_path: str | None, dry_run: bool, git: GitManager):
                 try:
                     dest_path.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(src_path, dest_path)
+                    touched.append(dest_path)
                     files_imported += 1
                 except Exception as e:
                     warn(f"Failed to import {src_path}: {e}")
@@ -214,23 +265,21 @@ def _import_chezmoi(source_path: str | None, dry_run: bool, git: GitManager):
     else:
         ui.success(f"Imported {files_imported} files from chezmoi")
 
-        commit_msg = "Import dotfiles from chezmoi"
-        git.add_all()
-        git.commit(commit_msg)
+    return touched
 
 
-def _import_yadm(source_path: str | None, dry_run: bool, git: GitManager):
-    """Import from yadm."""
+def _import_yadm(source_path: str | None, dry_run: bool) -> list[Path]:
+    """Import from yadm. Returns the destination paths that were written."""
     if source_path is None:
         source_path = _detect_yadm()
         if source_path is None:
             error(
                 "yadm source not found. Install yadm first or use --path.", exit_code=1
             )
-            return
+            return []
     if source_path is None:
         error("Source path is required", exit_code=1)
-        return
+        return []
     source = Path(source_path).expanduser().resolve()
 
     if not source.exists():
@@ -239,6 +288,7 @@ def _import_yadm(source_path: str | None, dry_run: bool, git: GitManager):
     ui.console.print(f"[dim]Importing from yadm: {source}[/dim]")
 
     files_imported = 0
+    touched: list[Path] = []
 
     for item in source.rglob("*"):
         if item.is_file() and not item.name.endswith(".git"):
@@ -255,6 +305,7 @@ def _import_yadm(source_path: str | None, dry_run: bool, git: GitManager):
                 try:
                     dest_path.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(item, dest_path)
+                    touched.append(dest_path)
                     files_imported += 1
                 except Exception as e:
                     warn(f"Failed to import {item}: {e}")
@@ -266,21 +317,19 @@ def _import_yadm(source_path: str | None, dry_run: bool, git: GitManager):
     else:
         ui.success(f"Imported {files_imported} files from yadm")
 
-        commit_msg = "Import dotfiles from yadm"
-        git.add_all()
-        git.commit(commit_msg)
+    return touched
 
 
-def _import_stow(source_path: str | None, dry_run: bool, git: GitManager):
-    """Import from GNU Stow packages."""
+def _import_stow(source_path: str | None, dry_run: bool) -> list[Path]:
+    """Import from GNU Stow packages. Returns the destination paths written."""
     if source_path is None:
         source_path = _detect_stow()
         if source_path is None:
             error("Stow packages not found. Use --path to specify.", exit_code=1)
-            return
+            return []
     if source_path is None:
         error("Source path is required", exit_code=1)
-        return
+        return []
     source = Path(source_path).expanduser().resolve()
 
     if not source.exists():
@@ -300,6 +349,7 @@ def _import_stow(source_path: str | None, dry_run: bool, git: GitManager):
     )
 
     files_imported = 0
+    touched: list[Path] = []
 
     for package in packages:
         for item in package.rglob("*"):
@@ -322,6 +372,7 @@ def _import_stow(source_path: str | None, dry_run: bool, git: GitManager):
                     try:
                         dest_path.parent.mkdir(parents=True, exist_ok=True)
                         shutil.copy2(item, dest_path)
+                        touched.append(dest_path)
                         files_imported += 1
                     except Exception as e:
                         warn(f"Failed to import {item}: {e}")
@@ -336,6 +387,4 @@ def _import_stow(source_path: str | None, dry_run: bool, git: GitManager):
             f"Imported {files_imported} files from {len(packages)} Stow packages"
         )
 
-        commit_msg = f"Import dotfiles from {len(packages)} Stow packages"
-        git.add_all()
-        git.commit(commit_msg)
+    return touched

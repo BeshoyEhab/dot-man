@@ -176,7 +176,7 @@ def _render_status_table(
     return secrets_found
 
 
-@main.command("status", cls=AliasedCommand, aliases=["sta"])
+@main.command("status", cls=AliasedCommand)
 @click.option("-v", "--verbose", is_flag=True, help="Show detailed information")
 @click.option("--secrets", is_flag=True, help="Highlight files with detected secrets")
 @click.option(

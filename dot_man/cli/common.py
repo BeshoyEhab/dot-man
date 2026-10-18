@@ -39,6 +39,7 @@ class ExitCode(IntEnum):
     ERROR = 1
     USAGE = 2
     CONFIG = 7
+    AUDIT = 50
     INTERRUPTED = 130
 
 
@@ -48,7 +49,7 @@ lives in `dot-man help-all`. Aliases and deprecated shims are never
 listed in the short view."""
 
 
-def error(message: str, exit_code: int = 1) -> None:
+def error(message: str, exit_code: int = ExitCode.ERROR) -> None:
     """Print error message and exit (callers must not rely on a return,
     except the exit_code=0 print-only path)."""
     ui.error(message, exit_code)
@@ -146,7 +147,7 @@ class DotManGroup(click.Group):
         if suggestion:
             ui.warn(f"Did you mean '{suggestion}'?")
 
-        ctx.exit(2)
+        ctx.exit(ExitCode.USAGE)
 
     def format_commands(
         self, ctx: click.Context, formatter: click.HelpFormatter

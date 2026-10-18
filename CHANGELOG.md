@@ -80,6 +80,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   mistaken for a user section.
 - **`import chezmoi`/`import all` no longer crash on empty directories** —
   fixed operator precedence in chezmoi detection.
+- **`profile switch` no longer prints the `switch` deprecation warning** — it
+  calls the navigate implementation directly instead of the deprecated shim.
+- **`sync --push-only --pull-only` now errors** — passing both flags was a
+  silent no-op; it fails fast with a usage error (`ExitCode.USAGE`).
+- **`config create --examples` is a real toggle** — it was `is_flag` with
+  `default=True` so it could never be turned off; now `--examples/--no-examples`
+  works, and `--minimal`/`--no-examples` write a truly comment-free file.
+- **Exit codes are named** — `init`'s magic `2` and `audit --strict`'s `50`
+  are now `ExitCode.USAGE` and `ExitCode.AUDIT`; `error()` defaults to
+  `ExitCode.ERROR`.
+- **`init --force` warns before wiping** — it used to reinitialize silently;
+  it now prints the data-loss warning and reinitializes consistently with the
+  confirmed interactive path.
+- **`sync` and `profile switch` gained `--dry-run`** — both previously mutated
+  branch/remote state with no preview; `--dry-run` now reports the planned
+  actions and exits without side effects.
 
 ### Removed
 
@@ -92,6 +108,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hook vocabulary.
 - **Dead `dot-man tui` stub** — the command only printed a "under development"
   banner; removed along with its stale coverage `omit` entries.
+- **Obscure command aliases** — the 22 three-letter aliases (`dep`, `sta`,
+  `syn`, …) and the two self-aliases (`add`, `log`) were dropped; only the
+  high-value `nav` alias for `navigate` remains.
+- **Deprecated shims hidden from help** — `switch`, `checkout`, and `tag
+  switch` are now `hidden=True` (still invocable, still warn), so they no
+  longer appear in `help`/`help-all` listings ahead of the v2.0 removal.
 
 ### Changed
 
@@ -106,6 +128,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   specific errors and log; `core`/`secrets` git handlers target Git/OS errors.
 - **Long command bodies extracted** — `status`, `doctor`, and `rollback` now
   delegate rendering/backup to module-level helpers instead of inline blocks.
+- **`import` no longer commits silently** — after importing it asks for
+  confirmation (or `--yes`), supports `--no-commit`, and the source helpers
+  return the written paths instead of committing internally.
 
 ## [1.5.0] - 2026-10-09
 

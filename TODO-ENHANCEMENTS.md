@@ -299,11 +299,11 @@ deserves its own focused pass rather than a rushed edit:
 | [ ] | U3 Merge/remove overlapping commands + hide deprecated shims | Med | M | Med | `restore_cmd.py`, `revert_cmd.py`, `switch_cmd.py`, `log_cmd.py` |
 | [ ] | U4 Consistent diagnostics/streams/`ExitCode` everywhere | Med | M | Med | `common.py:96-100,30-43`, `audit_cmd.py:134` |
 | [ ] | U5 Normalize subcommand styles (groups vs positional `Choice`) | Low-Med | M | Med | `encrypt_cmd.py:26`, `vault_cmd.py:11`, `hooks_cmd.py:11` |
-| [ ] | U6 `import` commits all changes without confirm/dry-run | Med | S | Low | `import_cmd.py:217-219,269,339` |
-| [ ] | U7 `profile switch` prints wrong deprecation warning | Low | S | Low | `profile_cmd.py:206-212` |
-| [ ] | U8 `sync --push-only --pull-only` silently no-ops | Low | S | Low | `remote_cmd.py:172-194` |
-| [ ] | U9 `config create --examples` always-on no-op flag | Low | S | Low | `config_cmd.py:199` |
-| [ ] | U10 Trim alias noise + remove self-aliases | Low | S | Low | `add_cmd.py:25`, `log_cmd.py:21` |
+| [x] | U6 `import` commits all changes without confirm/dry-run | Med | S | Low | `import_cmd.py:217-219,269,339` |
+| [x] | U7 `profile switch` prints wrong deprecation warning | Low | S | Low | `profile_cmd.py:206-212` |
+| [x] | U8 `sync --push-only --pull-only` silently no-ops | Low | S | Low | `remote_cmd.py:172-194` |
+| [x] | U9 `config create --examples` always-on no-op flag | Low | S | Low | `config_cmd.py:199` |
+| [x] | U10 Trim alias noise + remove self-aliases | Low | S | Low | `add_cmd.py:25`, `log_cmd.py:21` |
 | [ ] | U11 Terminal-width aware output; text fallback for emoji | Low-Med | M | Med | `ui.py:120`, `status_cmd.py:167-188`, `rollback_cmd.py:226` |
 
 ### Details
@@ -341,6 +341,37 @@ high-value ones (`nav`).
 
 **U11** — Replace hardcoded widths (`display_path[-32:]`, `"─" * 50`) with
 Rich auto-fitting tables; pair icons with text; add `--plain`.
+
+### Status
+
+- **Done:** U6–U10 (the four Low-effort UX fixes plus `import` commit
+  confirmation).
+- **Partial:** U3 (deprecated shims `switch`/`checkout`/`tag switch` are now
+  `hidden=True`; the overlapping-command merge — `restore`/`revert -c`,
+  `show`/`log`, `backup restore`/`rollback` — is a design call, not done) and
+  U4 (magic exit codes replaced with named `ExitCode` members: `AUDIT = 50`,
+  `USAGE`; `error()` now defaults to `ExitCode.ERROR`; routing exception
+  diagnostics to stderr is not done). U2 so far: `init --force` warns, and
+  `--dry-run` added to `sync` + `profile switch`; `--dry-run` on `bootstrap`,
+  `audit --fix`, and `vault rotate-key` is not.
+- **U6:** `import` now requires confirmation before committing, adds `--yes`
+  (skip prompt) and `--no-commit`; helpers return the written paths and no
+  longer commit internally. Note: imported files land in `$HOME` (outside the
+  repo work tree), so the commit still stages the repo via `add_all()` — the
+  "stage only touched files" refinement does not apply here.
+- **U9:** `--examples/--no-examples` is now a real toggle; `--minimal`/
+  `--no-examples` write a truly comment-free file (drops the preserved TOML
+  document, which previously re-appended example comments).
+- **U10:** all 22 three-letter aliases and the two self-aliases were removed;
+  only the high-value `nav` alias remains (tests updated to assert the removed
+  aliases no longer resolve).
+- **Test hygiene (overlaps Phase 5 T2):** added an isolated
+  `uninitialized_runner` conftest fixture and switched the
+  `status`/`branch list`/`switch` "without init" tests off the developer's
+  real `~/.config/dot-man` (they were order-dependent and returned `7`);
+  added `secrets.py` load/save/`_canonicalize_path` edge tests to re-clear the
+  90% module floor.
+- **Deferred (Large/Med):** U1, U5, U11 remain open.
 
 ---
 

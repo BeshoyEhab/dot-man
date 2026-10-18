@@ -15,7 +15,11 @@ from .common import (
 from .interface import cli as main
 
 
-@main.command(deprecated=True, help="⚠️ DEPRECATED: Use 'dot-man navigate' instead")
+@main.command(
+    deprecated=True,
+    hidden=True,
+    help="⚠️ DEPRECATED: Use 'dot-man navigate' instead",
+)
 @click.option(
     "--dry-run",
     "-n",

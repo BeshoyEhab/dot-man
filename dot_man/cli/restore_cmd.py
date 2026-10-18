@@ -10,7 +10,7 @@ from .common import AliasedCommand, complete_commits, error, require_init, succe
 from .interface import cli as main
 
 
-@main.command("restore", cls=AliasedCommand, aliases=["rst"])
+@main.command("restore", cls=AliasedCommand)
 @click.argument("file", type=click.Path(path_type=Path))
 @click.argument("commit", shell_complete=complete_commits)
 @click.option("--force", is_flag=True, help="Skip confirmation prompt")

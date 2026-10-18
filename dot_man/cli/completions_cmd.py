@@ -9,7 +9,7 @@ from .common import AliasedCommand
 from .interface import cli as main
 
 
-@main.command("completions", cls=AliasedCommand, aliases=["cpl"])
+@main.command("completions", cls=AliasedCommand)
 @click.option(
     "--shell",
     type=click.Choice(["bash", "zsh", "fish", "all"]),

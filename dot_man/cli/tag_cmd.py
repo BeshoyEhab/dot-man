@@ -140,7 +140,7 @@ def tag_delete(name: str, force: bool):
         error(str(e))
 
 
-@tag.command("switch", deprecated=True)
+@tag.command("switch", deprecated=True, hidden=True)
 @click.argument("name", shell_complete=complete_tags)
 @require_init
 def tag_switch(name: str):

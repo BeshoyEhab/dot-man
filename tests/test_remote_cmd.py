@@ -335,6 +335,29 @@ class TestSync:
         mock_instance.pull.assert_called_once_with(rebase=True)
         mock_instance.push.assert_not_called()
 
+    def test_push_only_and_pull_only_are_mutually_exclusive(self, integration_runner):
+        """Passing both --push-only and --pull-only must fail with a usage error."""
+        result = integration_runner.invoke(cli, ["sync", "--push-only", "--pull-only"])
+
+        assert result.exit_code == 2
+        assert "mutually exclusive" in result.output
+
+    @patch("dot_man.cli.remote_cmd.GitManager")
+    def test_dry_run_makes_no_changes(self, mock_git_manager, integration_runner):
+        """--dry-run reports the planned actions without touching the remote."""
+        mock_instance = MagicMock()
+        mock_instance.has_remote.return_value = True
+        mock_instance.current_branch.return_value = "main"
+        mock_git_manager.return_value = mock_instance
+
+        result = integration_runner.invoke(cli, ["sync", "--dry-run"])
+
+        assert result.exit_code == 0, result.output
+        assert "Dry run" in result.output
+        mock_instance.fetch.assert_not_called()
+        mock_instance.pull.assert_not_called()
+        mock_instance.push.assert_not_called()
+
     @patch("dot_man.cli.remote_cmd.GitManager")
     def test_pre_push_audit_fails_aborts_push(
         self, mock_git_manager, integration_runner

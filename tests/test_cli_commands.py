@@ -112,12 +112,13 @@ class TestBasicCLI:
 class TestStatusCommand:
     """Tests for 'dot-man status' command."""
 
-    def test_status_without_init(self, runner):
+    def test_status_without_init(self, uninitialized_runner):
         """Status should error gracefully when not initialized."""
-        result = runner.invoke(cli, ["status"])
+        result = uninitialized_runner.invoke(cli, ["status"])
 
-        # Should indicate not initialized or run successfully
-        assert result.exit_code in [0, 1]
+        # A clear non-zero "not initialized" failure, not a crash.
+        assert result.exit_code == 1
+        assert "init" in result.output.lower()
 
     def test_status_help(self, runner):
         """Status --help should show options."""
@@ -137,11 +138,12 @@ class TestBranchCommand:
         assert result.exit_code == 0
         assert "list" in result.output.lower() or "delete" in result.output.lower()
 
-    def test_branch_list_without_init(self, runner):
+    def test_branch_list_without_init(self, uninitialized_runner):
         """Branch list should handle uninitialized state."""
-        result = runner.invoke(cli, ["branch", "list"])
+        result = uninitialized_runner.invoke(cli, ["branch", "list"])
 
-        assert result.exit_code in [0, 1]
+        assert result.exit_code == 1
+        assert "init" in result.output.lower()
 
 
 class TestSwitchCommand:
@@ -154,11 +156,12 @@ class TestSwitchCommand:
         assert result.exit_code == 0
         assert "dry-run" in result.output.lower() or "force" in result.output.lower()
 
-    def test_switch_without_init(self, runner):
+    def test_switch_without_init(self, uninitialized_runner):
         """Switch should handle uninitialized state."""
-        result = runner.invoke(cli, ["switch", "main"])
+        result = uninitialized_runner.invoke(cli, ["switch", "main"])
 
-        assert result.exit_code in [0, 1]
+        assert result.exit_code == 1
+        assert "init" in result.output.lower()
 
 
 class TestDeployCommand:

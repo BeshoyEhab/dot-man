@@ -154,6 +154,71 @@ class TestProfileSwitch:
         result = runner.invoke(cli, ["profile", "switch", "--help"])
         assert result.exit_code in [0, 2]
 
+    def test_profile_switch_does_not_emit_deprecation_warning(self, clean_env):
+        """profile switch must not route through the deprecated switch command."""
+        runner, dot_man_dir, repo_dir, global_toml = clean_env
+
+        from git import Repo
+
+        repo = Repo.init(repo_dir)
+        config_writer = repo.config_writer()
+        config_writer.set_value("user", "name", "Test")
+        config_writer.set_value("user", "email", "test@test.com")
+        config_writer.release()
+
+        (repo_dir / "test.txt").write_text("test")
+        repo.index.add(["test.txt"])
+        repo.index.commit("Initial")
+        repo.create_head("work")
+
+        from dot_man.global_config import GlobalConfig
+
+        global_toml.parent.mkdir(parents=True, exist_ok=True)
+        GlobalConfig().create_default()
+
+        create_result = runner.invoke(cli, ["profile", "create", "work"])
+        assert create_result.exit_code == 0, create_result.output
+
+        with patch("dot_man.cli.navigate_cmd._navigate_impl") as mock_nav:
+            result = runner.invoke(cli, ["profile", "switch", "work"])
+
+        assert result.exit_code == 0, result.output
+        assert "deprecated" not in result.output.lower()
+        mock_nav.assert_called_once()
+        assert mock_nav.call_args.kwargs["target"]["target"] == "work"
+
+    def test_profile_switch_dry_run_does_not_switch(self, clean_env):
+        """--dry-run reports the target branch but performs no switch."""
+        runner, dot_man_dir, repo_dir, global_toml = clean_env
+
+        from git import Repo
+
+        repo = Repo.init(repo_dir)
+        config_writer = repo.config_writer()
+        config_writer.set_value("user", "name", "Test")
+        config_writer.set_value("user", "email", "test@test.com")
+        config_writer.release()
+
+        (repo_dir / "test.txt").write_text("test")
+        repo.index.add(["test.txt"])
+        repo.index.commit("Initial")
+        repo.create_head("work")
+
+        from dot_man.global_config import GlobalConfig
+
+        global_toml.parent.mkdir(parents=True, exist_ok=True)
+        GlobalConfig().create_default()
+
+        create_result = runner.invoke(cli, ["profile", "create", "work"])
+        assert create_result.exit_code == 0, create_result.output
+
+        with patch("dot_man.cli.navigate_cmd._navigate_impl") as mock_nav:
+            result = runner.invoke(cli, ["profile", "switch", "work", "--dry-run"])
+
+        assert result.exit_code == 0, result.output
+        assert "would switch" in result.output.lower()
+        mock_nav.assert_not_called()
+
 
 class TestProfileDetect:
     def test_profile_detect_help(self, runner):

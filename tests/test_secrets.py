@@ -1,3 +1,7 @@
+import json
+import logging
+from pathlib import Path
+
 import pytest
 
 from dot_man.secrets import SecretGuard, SecretMatch, SecretScanner, filter_secrets
@@ -254,3 +258,107 @@ class TestCoverageGaps:
         ):
             scanner = get_custom_scanner()
         assert scanner.patterns
+
+
+class TestSecretGuardPersistence:
+    """BaseSecretGuard load/save edge cases (coverage floor for secrets.py)."""
+
+    def test_canonicalize_path_falls_back_on_oserror(self):
+        """A path whose resolve() raises OSError falls back to absolute()."""
+        from unittest.mock import patch
+
+        from dot_man.secrets import _canonicalize_path
+
+        with patch("pathlib.Path.resolve", side_effect=OSError("boom")):
+            result = _canonicalize_path("~/some/relative")
+
+        assert result == str(Path("~/some/relative").expanduser().absolute())
+
+    def test_load_reads_existing_json_file(self, tmp_path):
+        """An existing secrets file is parsed back into the list."""
+        from dot_man.secrets import SecretGuard
+
+        list_path = tmp_path / "allowed.json"
+        list_path.write_text(
+            json.dumps(
+                [
+                    {
+                        "file_path": "/a",
+                        "secret_hash": "h",
+                        "pattern_name": "p",
+                        "added_at": "2024-01-01T00:00:00Z",
+                    }
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        guard = SecretGuard(path=list_path)
+
+        assert guard._secrets == [
+            {
+                "file_path": "/a",
+                "secret_hash": "h",
+                "pattern_name": "p",
+                "added_at": "2024-01-01T00:00:00Z",
+            }
+        ]
+
+    def test_load_returns_empty_on_invalid_json(self, tmp_path):
+        """A corrupt secrets file is treated as an empty list."""
+        from dot_man.secrets import SecretGuard
+
+        list_path = tmp_path / "allowed.json"
+        list_path.write_text("{not valid json", encoding="utf-8")
+
+        guard = SecretGuard(path=list_path)
+
+        assert guard._secrets == []
+
+    def test_save_logs_warning_on_oserror(self, tmp_path, caplog):
+        """A write failure is logged, not raised."""
+        from unittest.mock import patch
+
+        from dot_man.secrets import SecretGuard
+
+        guard = SecretGuard(path=tmp_path / "allowed.json")
+
+        with patch("pathlib.Path.write_text", side_effect=OSError("disk full")):
+            with caplog.at_level(logging.WARNING, logger="dot_man.secrets"):
+                guard.save()
+
+        assert "Could not save secrets list" in caplog.text
+
+    def test_load_returns_empty_on_oserror(self, tmp_path):
+        """An unreadable secrets file falls back to an empty list."""
+        from unittest.mock import patch
+
+        from dot_man.secrets import SecretGuard
+
+        list_path = tmp_path / "allowed.json"
+        list_path.write_text("[]", encoding="utf-8")
+
+        with patch("pathlib.Path.read_text", side_effect=OSError("unreadable")):
+            guard = SecretGuard(path=list_path)
+
+        assert guard._secrets == []
+
+    def test_duplicate_add_is_idempotent(self, temp_config_dir):
+        """Adding the same secret twice keeps a single entry."""
+        guard = SecretGuard(config_dir=temp_config_dir)
+
+        guard.add_allowed("/a", "secret-line", "p")
+        guard.add_allowed("/a", "secret-line", "p")
+
+        assert len(guard._secrets) == 1
+
+    def test_permanent_redact_guard_roundtrip(self, temp_config_dir):
+        """PermanentRedactGuard stores and reports entries."""
+        from dot_man.secrets import PermanentRedactGuard
+
+        guard = PermanentRedactGuard(config_dir=temp_config_dir)
+        assert not guard.should_redact("/a", "secret-line", "p")
+
+        guard.add_permanent_redact("/a", "secret-line", "p")
+
+        assert guard.should_redact("/a", "secret-line", "p")

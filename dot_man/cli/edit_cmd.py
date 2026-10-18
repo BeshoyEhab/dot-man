@@ -13,7 +13,7 @@ from .common import AliasedCommand, error, require_init, success, warn
 from .interface import cli as main
 
 
-@main.command("edit", cls=AliasedCommand, aliases=["edt"])
+@main.command("edit", cls=AliasedCommand)
 @click.option("--editor", help="Editor to use (default: config or $VISUAL or $EDITOR)")
 @click.option("--global", "edit_global", is_flag=True, help="Edit global configuration")
 @click.option(

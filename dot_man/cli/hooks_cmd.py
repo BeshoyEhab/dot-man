@@ -7,7 +7,7 @@ from .common import AliasedCommand, error, require_init, success, warn
 from .interface import cli as main
 
 
-@main.command("hooks", cls=AliasedCommand, aliases=["hks"])
+@main.command("hooks", cls=AliasedCommand)
 @click.argument("command", type=click.Choice(["list", "create", "delete"]))
 @click.argument("phase", type=click.Choice(["pre", "post"]), required=False)
 @click.argument("name", type=str, required=False)

@@ -38,7 +38,7 @@ class _DoctorReport:
         ui.console.print(self._line("⚠", "warning", label, detail))
 
 
-@main.command("doctor", cls=AliasedCommand, aliases=["doc"])
+@main.command("doctor", cls=AliasedCommand)
 @require_init
 def doctor():
     """Run diagnostics and health checks.

@@ -18,7 +18,7 @@ from .common import (
 from .interface import cli as main
 
 
-@main.command("log", cls=AliasedCommand, aliases=["log"])
+@main.command("log", cls=AliasedCommand)
 @click.argument("file", required=False, type=click.Path(path_type=Path))
 @click.option("-n", "--count", type=int, help="Number of commits to show")
 @click.option(
@@ -87,7 +87,7 @@ def log(
         error(str(e))
 
 
-@main.command("diff", cls=AliasedCommand, aliases=["dif"])
+@main.command("diff", cls=AliasedCommand)
 @click.argument("file", required=False, type=click.Path(path_type=Path))
 @click.option(
     "--branch",
@@ -160,7 +160,11 @@ def diff(file: Path | None, branch: str | None, staged: bool, rich: bool):
         error(str(e))
 
 
-@main.command(deprecated=True, help="⚠️ DEPRECATED: Use 'dot-man navigate' instead")
+@main.command(
+    deprecated=True,
+    hidden=True,
+    help="⚠️ DEPRECATED: Use 'dot-man navigate' instead",
+)
 @click.argument("target", shell_complete=complete_tags)
 @require_init
 def checkout(target: str):

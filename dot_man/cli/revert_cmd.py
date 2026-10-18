@@ -10,7 +10,7 @@ from .common import AliasedCommand, complete_commits, error, require_init, succe
 from .interface import cli as main
 
 
-@main.command("revert", cls=AliasedCommand, aliases=["rev"])
+@main.command("revert", cls=AliasedCommand)
 @click.argument("path", type=click.Path(path_type=Path))
 @click.option("--force", is_flag=True, help="Skip confirmation prompt")
 @click.option(

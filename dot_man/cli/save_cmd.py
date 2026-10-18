@@ -34,7 +34,7 @@ def _warn_symlinks(save_result: dict) -> None:
         )
 
 
-@main.command("save", cls=AliasedCommand, aliases=["sv"])
+@main.command("save", cls=AliasedCommand)
 @click.option("--commit", "-c", is_flag=True, help="Commit changes after saving")
 @click.option(
     "--message",

@@ -22,7 +22,7 @@ from .common import (
 from .interface import cli as main
 
 
-@main.command("encrypt", cls=AliasedCommand, aliases=["enc"])
+@main.command("encrypt", cls=AliasedCommand)
 @click.argument("action", type=click.Choice(["encrypt", "decrypt", "status"]))
 @click.argument("section", required=False, shell_complete=complete_sections)
 @click.option(

@@ -23,7 +23,7 @@ help_mod = importlib.import_module("dot_man.cli.help_cmd")
 
 HAPPY_PATH = list(HAPPY_PATH_COMMANDS)
 ADVANCED = ["encrypt", "template", "watch"]
-ALIASES = ["nav", "aud"]
+ALIASES = ["nav"]
 DEPRECATED = ["switch", "checkout"]
 
 
@@ -60,8 +60,14 @@ class TestHelpAllCommand:
     def test_help_all_lists_everything(self, runner):
         result = runner.invoke(cli, ["help-all"])
         assert result.exit_code == 0
-        for name in HAPPY_PATH + ADVANCED + ALIASES + DEPRECATED:
+        for name in HAPPY_PATH + ADVANCED + ALIASES:
             assert lists_command(result.output, name)
+
+    def test_help_all_hides_deprecated_shims(self, runner):
+        result = runner.invoke(cli, ["help-all"])
+        assert result.exit_code == 0
+        for name in DEPRECATED:
+            assert not lists_command(result.output, name)
 
     def test_help_all_includes_help_commands(self, runner):
         result = runner.invoke(cli, ["help-all"])

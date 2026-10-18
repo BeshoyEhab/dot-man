@@ -170,11 +170,10 @@ class TestDoctorHelp:
         assert "diagnostics" in result.output.lower()
         assert "health" in result.output.lower()
 
-    def test_doctor_alias(self, runner):
-        """'doc' alias resolves to the same command."""
+    def test_doctor_alias_removed(self, runner):
+        """The obscure 'doc' alias was removed in favour of 'doctor'."""
         result = runner.invoke(cli, ["doc", "--help"])
-        assert result.exit_code == 0
-        assert "diagnostics" in result.output.lower()
+        assert result.exit_code == 2
 
 
 # ---------------------------------------------------------------------------

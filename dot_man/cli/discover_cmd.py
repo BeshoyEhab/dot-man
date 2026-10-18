@@ -8,7 +8,7 @@ from .common import AliasedCommand, require_init
 from .interface import cli as main
 
 
-@main.command("discover", cls=AliasedCommand, aliases=["dis"])
+@main.command("discover", cls=AliasedCommand)
 @click.option(
     "--include-extended/--no-extended",
     default=True,

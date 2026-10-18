@@ -8,7 +8,7 @@ from .. import ui
 from ..config import GlobalConfig
 from ..core import GitManager
 from ..exceptions import DotManError
-from .common import AliasedCommand, error, require_init, success, warn
+from .common import AliasedCommand, ExitCode, error, require_init, success, warn
 from .interface import cli as main
 
 
@@ -143,11 +143,16 @@ def sync_branch():
         error(f"Sync branch failed: {e}")
 
 
-@main.command("sync", cls=AliasedCommand, aliases=["syn"])
+@main.command("sync", cls=AliasedCommand)
 @click.option("--push-only", is_flag=True, help="Only push, don't pull")
 @click.option("--pull-only", is_flag=True, help="Only pull, don't push")
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Show what would sync without changing anything",
+)
 @require_init
-def sync(push_only: bool, pull_only: bool):
+def sync(push_only: bool, pull_only: bool, dry_run: bool):
     """Sync with remote repository.
 
     Pulls changes from remote (with rebase), then pushes local changes.
@@ -157,6 +162,12 @@ def sync(push_only: bool, pull_only: bool):
     """
     from ..lock import FileLock
     from ..operations import LOCK_FILE
+
+    if push_only and pull_only:
+        error(
+            "--push-only and --pull-only are mutually exclusive",
+            exit_code=ExitCode.USAGE,
+        )
 
     try:
         with FileLock(LOCK_FILE):
@@ -168,6 +179,18 @@ def sync(push_only: bool, pull_only: bool):
             current = git.current_branch()
             ui.console.print(f"Syncing branch [bold]{current}[/bold] with remote...")
             ui.console.print()
+
+            if dry_run:
+                actions = []
+                if not push_only:
+                    actions.append("fetch + pull --rebase")
+                if not pull_only:
+                    actions.append("push")
+                ui.console.print(
+                    f"[dim]Dry run: would {' then '.join(actions)} "
+                    f"for branch '{current}'.[/dim]"
+                )
+                return
 
             # Pull first (unless push-only)
             if not push_only:

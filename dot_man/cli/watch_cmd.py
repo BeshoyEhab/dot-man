@@ -145,7 +145,7 @@ if _WATCHDOG_AVAILABLE:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-@main.command("watch", cls=AliasedCommand, aliases=["wat"])
+@main.command("watch", cls=AliasedCommand)
 @click.option(
     "--interval",
     "-i",

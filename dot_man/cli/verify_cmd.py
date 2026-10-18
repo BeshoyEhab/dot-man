@@ -10,7 +10,7 @@ from .common import AliasedCommand, require_init, success
 from .interface import cli as main
 
 
-@main.command("verify", cls=AliasedCommand, aliases=["ver"])
+@main.command("verify", cls=AliasedCommand)
 @click.option("--fix", is_flag=True, help="Attempt to fix issues automatically")
 @require_init
 def verify(fix: bool):

@@ -233,6 +233,19 @@ class TestInitCommand:
         # Repo dir still exists and git is valid
         assert (repo_dir / ".git").exists()
 
+    def test_init_force_warns_about_data_loss(self, clean_env):
+        """--force must still surface the destructive reinit warning (U2)."""
+        runner, _, repo_dir, _, _ = clean_env
+
+        first = runner.invoke(cli, ["init", "--force", "--no-wizard"])
+        assert first.exit_code == 0, first.output
+
+        second = runner.invoke(cli, ["init", "--force", "--no-wizard"])
+        assert second.exit_code == 0, second.output
+        assert "will be" in second.output
+        assert "deleted" in second.output
+        assert (repo_dir / ".git").exists()
+
     def test_init_twice_without_force_decline_aborts(self, clean_env):
         """Re-running without --force and declining must abort untouched.
 

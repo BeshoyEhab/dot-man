@@ -834,11 +834,10 @@ class TestEncryptAgeMethod:
 class TestEncryptCLIBasic:
     """Basic CLI tests for the encrypt command."""
 
-    def test_encrypt_alias(self):
-        """Test the 'enc' alias works."""
+    def test_encrypt_alias_removed(self):
+        """The obscure 'enc' alias was removed in favour of 'encrypt'."""
         result = CliRunner().invoke(cli, ["enc", "--help"])
-        assert result.exit_code == 0
-        assert "encrypt" in result.output.lower() or "decrypt" in result.output.lower()
+        assert result.exit_code == 2
 
     def test_encrypt_method_choices(self):
         """Test method choices appear in help."""

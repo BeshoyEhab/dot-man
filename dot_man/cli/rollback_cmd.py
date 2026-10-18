@@ -84,7 +84,7 @@ def _create_rollback_backup(ops) -> None:
         warn(f"Backup failed (continuing anyway): {exc}")
 
 
-@main.command("rollback", cls=AliasedCommand, aliases=["rol"])
+@main.command("rollback", cls=AliasedCommand)
 @click.argument("target", required=False, shell_complete=complete_commits)
 @click.option(
     "--list",

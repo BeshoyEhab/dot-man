@@ -2,7 +2,7 @@
 
 import os
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -196,15 +196,12 @@ class TestImportChezmoi:
         (source / ".bashrc").write_text("alias ll='ls -la'")
         (source / ".gitconfig").write_text("[user]\n\tname = Test")
 
-        git_mock = MagicMock()
-
         with patch("dot_man.cli.import_cmd.Path.home", return_value=home):
-            _import_chezmoi(str(source), False, git_mock)
+            touched = _import_chezmoi(str(source), False)
 
         assert (home / ".bashrc").read_text() == "alias ll='ls -la'"
         assert (home / ".gitconfig").read_text() == "[user]\n\tname = Test"
-        git_mock.add_all.assert_called_once()
-        git_mock.commit.assert_called_once_with("Import dotfiles from chezmoi")
+        assert set(touched) == {home / ".bashrc", home / ".gitconfig"}
 
     def test_imports_non_dot_files_to_config(self, tmp_path):
         """Files without dot prefix go to ~/.config/<path>."""
@@ -215,13 +212,10 @@ class TestImportChezmoi:
         source.mkdir()
         (source / "bashrc").write_text("alias ll='ls -la'")
 
-        git_mock = MagicMock()
-
         with patch("dot_man.cli.import_cmd.Path.home", return_value=home):
-            _import_chezmoi(str(source), False, git_mock)
+            _import_chezmoi(str(source), False)
 
         assert (home / ".config" / "bashrc").read_text() == "alias ll='ls -la'"
-        git_mock.add_all.assert_called_once()
 
     def test_preserves_subdirectory_structure(self, tmp_path):
         """Files in subdirectories keep relative path under .config."""
@@ -234,10 +228,8 @@ class TestImportChezmoi:
         sub.mkdir()
         (sub / "config.conf").write_text("setting=true")
 
-        git_mock = MagicMock()
-
         with patch("dot_man.cli.import_cmd.Path.home", return_value=home):
-            _import_chezmoi(str(source), False, git_mock)
+            _import_chezmoi(str(source), False)
 
         assert (
             home / ".config" / "subdir" / "config.conf"
@@ -252,14 +244,10 @@ class TestImportChezmoi:
         source.mkdir()
         (source / "bashrc").write_text("alias ll='ls -la'")
 
-        git_mock = MagicMock()
-
         with patch("dot_man.cli.import_cmd.Path.home", return_value=home):
-            _import_chezmoi(str(source), True, git_mock)
+            _import_chezmoi(str(source), True)
 
         assert not (home / ".config" / "bashrc").exists()
-        git_mock.add_all.assert_not_called()
-        git_mock.commit.assert_not_called()
 
     def test_error_when_source_not_found_by_detection(self, tmp_path):
         """Raises SystemExit when auto-detect finds no chezmoi dir."""
@@ -267,17 +255,15 @@ class TestImportChezmoi:
 
         home = tmp_path / "home"
         home.mkdir()
-        git_mock = MagicMock()
 
         with (
             patch("dot_man.cli.import_cmd.Path.home", return_value=home),
             patch("dot_man.cli.import_cmd._detect_chezmoi", return_value=None),
             pytest.raises(SystemExit) as exc_info,
         ):
-            _import_chezmoi(None, False, git_mock)
+            _import_chezmoi(None, False)
 
         assert exc_info.value.code == 1
-        git_mock.add_all.assert_not_called()
 
     def test_error_when_source_path_does_not_exist(self, tmp_path):
         """Raises SystemExit when the given path does not exist."""
@@ -286,13 +272,12 @@ class TestImportChezmoi:
         home = tmp_path / "home"
         home.mkdir()
         source = tmp_path / "nonexistent"
-        git_mock = MagicMock()
 
         with (
             patch("dot_man.cli.import_cmd.Path.home", return_value=home),
             pytest.raises(SystemExit) as exc_info,
         ):
-            _import_chezmoi(str(source), False, git_mock)
+            _import_chezmoi(str(source), False)
 
         assert exc_info.value.code == 1
 
@@ -310,13 +295,11 @@ class TestImportChezmoi:
         orig_mode = dest_parent.stat().st_mode
         dest_parent.chmod(0o444)
 
-        git_mock = MagicMock()
-
         with (
             patch("dot_man.cli.import_cmd.Path.home", return_value=home),
             patch("dot_man.cli.import_cmd.warn") as mock_warn,
         ):
-            _import_chezmoi(str(source), False, git_mock)
+            _import_chezmoi(str(source), False)
 
         assert mock_warn.called
         dest_parent.chmod(orig_mode)
@@ -330,16 +313,13 @@ class TestImportChezmoi:
         source.mkdir()
         (source / "bashrc").write_text("auto-detected")
 
-        git_mock = MagicMock()
-
         with (
             patch("dot_man.cli.import_cmd.Path.home", return_value=home),
             patch("dot_man.cli.import_cmd._detect_chezmoi", return_value=str(source)),
         ):
-            _import_chezmoi(None, False, git_mock)
+            _import_chezmoi(None, False)
 
         assert (home / ".config" / "bashrc").read_text() == "auto-detected"
-        git_mock.add_all.assert_called_once()
 
 
 class TestImportYadm:
@@ -355,15 +335,11 @@ class TestImportYadm:
         (source / ".bashrc").write_text("alias ll='ls -la'")
         (source / ".vimrc").write_text("set nu")
 
-        git_mock = MagicMock()
-
         with patch("dot_man.cli.import_cmd.Path.home", return_value=home):
-            _import_yadm(str(source), False, git_mock)
+            _import_yadm(str(source), False)
 
         assert (home / ".bashrc").read_text() == "alias ll='ls -la'"
         assert (home / ".vimrc").read_text() == "set nu"
-        git_mock.add_all.assert_called_once()
-        git_mock.commit.assert_called_once_with("Import dotfiles from yadm")
 
     def test_skips_files_ending_in_dot_git(self, tmp_path):
         """Files with .git extension are skipped."""
@@ -376,10 +352,8 @@ class TestImportYadm:
         # File ending in '.git' (e.g. config.git) should be skipped
         (source / "config.git").write_text("ref")
 
-        git_mock = MagicMock()
-
         with patch("dot_man.cli.import_cmd.Path.home", return_value=home):
-            _import_yadm(str(source), False, git_mock)
+            _import_yadm(str(source), False)
 
         assert (home / ".bashrc").read_text() == "alias ll='ls -la'"
         assert not (home / "config.git").exists()
@@ -396,10 +370,8 @@ class TestImportYadm:
         source.mkdir()
         (source / ".bashrc").write_text("new content")
 
-        git_mock = MagicMock()
-
         with patch("dot_man.cli.import_cmd.Path.home", return_value=home):
-            _import_yadm(str(source), False, git_mock)
+            _import_yadm(str(source), False)
 
         assert (home / ".bashrc").read_text() == "existing content"
 
@@ -412,14 +384,10 @@ class TestImportYadm:
         source.mkdir()
         (source / ".bashrc").write_text("alias ll='ls -la'")
 
-        git_mock = MagicMock()
-
         with patch("dot_man.cli.import_cmd.Path.home", return_value=home):
-            _import_yadm(str(source), True, git_mock)
+            _import_yadm(str(source), True)
 
         assert not (home / ".bashrc").exists()
-        git_mock.add_all.assert_not_called()
-        git_mock.commit.assert_not_called()
 
     def test_error_when_source_not_found_by_detection(self, tmp_path):
         """Raises SystemExit when auto-detect finds no yadm dir."""
@@ -427,14 +395,13 @@ class TestImportYadm:
 
         home = tmp_path / "home"
         home.mkdir()
-        git_mock = MagicMock()
 
         with (
             patch("dot_man.cli.import_cmd.Path.home", return_value=home),
             patch("dot_man.cli.import_cmd._detect_yadm", return_value=None),
             pytest.raises(SystemExit) as exc_info,
         ):
-            _import_yadm(None, False, git_mock)
+            _import_yadm(None, False)
 
         assert exc_info.value.code == 1
 
@@ -445,13 +412,12 @@ class TestImportYadm:
         home = tmp_path / "home"
         home.mkdir()
         source = tmp_path / "nonexistent"
-        git_mock = MagicMock()
 
         with (
             patch("dot_man.cli.import_cmd.Path.home", return_value=home),
             pytest.raises(SystemExit) as exc_info,
         ):
-            _import_yadm(str(source), False, git_mock)
+            _import_yadm(str(source), False)
 
         assert exc_info.value.code == 1
 
@@ -470,14 +436,10 @@ class TestImportStow:
         pkg.mkdir()
         (pkg / ".bashrc").write_text("alias ll='ls -la'")
 
-        git_mock = MagicMock()
-
         with patch("dot_man.cli.import_cmd.Path.home", return_value=home):
-            _import_stow(str(source), False, git_mock)
+            _import_stow(str(source), False)
 
         assert (home / ".bashrc").read_text() == "alias ll='ls -la'"
-        git_mock.add_all.assert_called_once()
-        git_mock.commit.assert_called_once()
 
     def test_imports_hidden_package_files_in_subdir(self, tmp_path):
         """Dot-prefixed subdirectories keep their full path under home."""
@@ -491,10 +453,8 @@ class TestImportStow:
         vim_dir.mkdir(parents=True)
         (vim_dir / "rc").write_text("set nu")
 
-        git_mock = MagicMock()
-
         with patch("dot_man.cli.import_cmd.Path.home", return_value=home):
-            _import_stow(str(source), False, git_mock)
+            _import_stow(str(source), False)
 
         # .vim starts with dot → dest = ~/.vim/rc
         assert (home / ".vim" / "rc").read_text() == "set nu"
@@ -511,10 +471,8 @@ class TestImportStow:
         pkg_dir.mkdir(parents=True)
         (pkg_dir / "config").write_text("bar")
 
-        git_mock = MagicMock()
-
         with patch("dot_man.cli.import_cmd.Path.home", return_value=home):
-            _import_stow(str(source), False, git_mock)
+            _import_stow(str(source), False)
 
         # i3 doesn't start with dot → dest = ~/.i3/config
         assert (home / ".i3" / "config").read_text() == "bar"
@@ -526,13 +484,12 @@ class TestImportStow:
         home = tmp_path / "home"
         source = tmp_path / "stow_source"
         source.mkdir()
-        git_mock = MagicMock()
 
         with (
             patch("dot_man.cli.import_cmd.Path.home", return_value=home),
             pytest.raises(SystemExit) as exc_info,
         ):
-            _import_stow(str(source), False, git_mock)
+            _import_stow(str(source), False)
 
         assert exc_info.value.code == 1
 
@@ -547,14 +504,10 @@ class TestImportStow:
         pkg.mkdir()
         (pkg / ".bashrc").write_text("alias ll='ls -la'")
 
-        git_mock = MagicMock()
-
         with patch("dot_man.cli.import_cmd.Path.home", return_value=home):
-            _import_stow(str(source), True, git_mock)
+            _import_stow(str(source), True)
 
         assert not (home / ".bashrc").exists()
-        git_mock.add_all.assert_not_called()
-        git_mock.commit.assert_not_called()
 
     def test_error_when_source_not_found_by_detection(self, tmp_path):
         """Raises SystemExit when auto-detect finds no stow dir."""
@@ -562,14 +515,13 @@ class TestImportStow:
 
         home = tmp_path / "home"
         home.mkdir()
-        git_mock = MagicMock()
 
         with (
             patch("dot_man.cli.import_cmd.Path.home", return_value=home),
             patch("dot_man.cli.import_cmd._detect_stow", return_value=None),
             pytest.raises(SystemExit) as exc_info,
         ):
-            _import_stow(None, False, git_mock)
+            _import_stow(None, False)
 
         assert exc_info.value.code == 1
 
@@ -586,10 +538,8 @@ class TestImportStow:
             pkg.mkdir()
             (pkg / f".{pkg_name}rc").write_text(f"{pkg_name} config")
 
-        git_mock = MagicMock()
-
         with patch("dot_man.cli.import_cmd.Path.home", return_value=home):
-            _import_stow(str(source), False, git_mock)
+            _import_stow(str(source), False)
 
         assert (home / ".bashrc").read_text() == "bash config"
         assert (home / ".vimrc").read_text() == "vim config"
@@ -622,8 +572,6 @@ class TestImportAll:
         pkg.mkdir()
         (pkg / ".bashrc").write_text("stow bashrc")
 
-        git_mock = MagicMock()
-
         with (
             patch("dot_man.cli.import_cmd.Path.home", return_value=home),
             patch(
@@ -639,12 +587,12 @@ class TestImportAll:
                 return_value=str(stow_src),
             ),
         ):
-            _import_all(None, False, git_mock)
+            touched = _import_all(None, False)
 
         assert (home / ".config" / "bashrc").read_text() == "chezmoi bashrc"
         assert (home / ".bashrc_write").read_text() == "yadm bashrc"
         assert (home / ".bashrc").read_text() == "stow bashrc"
-        assert git_mock.add_all.call_count == 3
+        assert len(touched) == 3
 
     def test_detects_and_imports_multiple_sources(self, tmp_path):
         """All detected sources are imported."""
@@ -659,8 +607,6 @@ class TestImportAll:
         yadm_src.mkdir()
         (yadm_src / ".bashrc").write_text("yadm bashrc")
 
-        git_mock = MagicMock()
-
         with (
             patch("dot_man.cli.import_cmd.Path.home", return_value=home),
             patch(
@@ -669,7 +615,7 @@ class TestImportAll:
             patch("dot_man.cli.import_cmd._detect_yadm", return_value=str(yadm_src)),
             patch("dot_man.cli.import_cmd._detect_stow", return_value=None),
         ):
-            _import_all(None, False, git_mock)
+            _import_all(None, False)
 
         assert (home / ".config" / "bashrc").read_text() == "chezmoi bashrc"
         assert (home / ".bashrc").read_text() == "yadm bashrc"
@@ -683,8 +629,6 @@ class TestImportAll:
         chezmoi_src.mkdir()
         (chezmoi_src / "bashrc").write_text("chezmoi bashrc")
 
-        git_mock = MagicMock()
-
         with (
             patch("dot_man.cli.import_cmd.Path.home", return_value=home),
             patch(
@@ -693,11 +637,9 @@ class TestImportAll:
             patch("dot_man.cli.import_cmd._detect_yadm", return_value=None),
             patch("dot_man.cli.import_cmd._detect_stow", return_value=None),
         ):
-            _import_all(None, True, git_mock)
+            _import_all(None, True)
 
         assert not (home / ".config" / "bashrc").exists()
-        git_mock.add_all.assert_not_called()
-        git_mock.commit.assert_not_called()
 
     def test_error_when_no_sources_detected(self, tmp_path):
         """Raises SystemExit when no sources are found."""
@@ -705,7 +647,6 @@ class TestImportAll:
 
         home = tmp_path / "home"
         home.mkdir()
-        git_mock = MagicMock()
 
         with (
             patch("dot_man.cli.import_cmd.Path.home", return_value=home),
@@ -714,7 +655,7 @@ class TestImportAll:
             patch("dot_man.cli.import_cmd._detect_stow", return_value=None),
             pytest.raises(SystemExit) as exc_info,
         ):
-            _import_all(None, False, git_mock)
+            _import_all(None, False)
 
         assert exc_info.value.code == 1
 
@@ -724,7 +665,6 @@ class TestImportAll:
 
         home = tmp_path / "home"
         home.mkdir()
-        git_mock = MagicMock()
 
         with (
             patch("dot_man.cli.import_cmd.Path.home", return_value=home),
@@ -733,7 +673,7 @@ class TestImportAll:
             patch("dot_man.cli.import_cmd._detect_stow", return_value=None),
             pytest.raises(SystemExit) as exc_info,
         ):
-            _import_all(None, True, git_mock)
+            _import_all(None, True)
 
         assert exc_info.value.code == 1
 
@@ -775,7 +715,9 @@ class TestImportCLIIntegration:
         source.mkdir()
         (source / "bashrc").write_text("alias ll='ls -la'")
 
-        result = runner.invoke(cli, ["import", "chezmoi", "--path", str(source)])
+        result = runner.invoke(
+            cli, ["import", "chezmoi", "--path", str(source), "--yes"]
+        )
 
         assert result.exit_code == 0, result.output
         assert "Imported" in result.output
@@ -799,7 +741,7 @@ class TestImportCLIIntegration:
         source.mkdir()
         (source / ".bashrc").write_text("alias ll='ls -la'")
 
-        result = runner.invoke(cli, ["import", "yadm", "--path", str(source)])
+        result = runner.invoke(cli, ["import", "yadm", "--path", str(source), "--yes"])
 
         assert result.exit_code == 0, result.output
         assert "Imported" in result.output
@@ -825,7 +767,7 @@ class TestImportCLIIntegration:
         pkg.mkdir()
         (pkg / ".bashrc").write_text("alias ll='ls -la'")
 
-        result = runner.invoke(cli, ["import", "stow", "--path", str(source)])
+        result = runner.invoke(cli, ["import", "stow", "--path", str(source), "--yes"])
 
         assert result.exit_code == 0, result.output
         assert "Imported" in result.output
@@ -857,7 +799,7 @@ class TestImportCLIIntegration:
             (home / sub).mkdir(parents=True)
         # Do NOT create .yadm.git or dotfiles — we want all detectors to return None
 
-        result = runner.invoke(cli, ["import", "all"])
+        result = runner.invoke(cli, ["import", "all", "--yes"])
 
         assert result.exit_code == 1
         assert "No dotfile manager sources detected" in result.output
@@ -875,7 +817,7 @@ class TestImportCLIIntegration:
         (home / ".yadm").mkdir(parents=True)
         (home / ".yadm" / ".gitconfig").write_text("[user]\n\tname = T")
 
-        result = runner.invoke(cli, ["import", "all"])
+        result = runner.invoke(cli, ["import", "all", "--yes"])
 
         assert result.exit_code == 0, result.output
         assert "Detected dotfile sources" in result.output
@@ -890,7 +832,7 @@ class TestImportCLIIntegration:
         chezmoi_dir.mkdir(parents=True)
         (chezmoi_dir / "bashrc").write_text("alias ll='ls -la'")
 
-        result = runner.invoke(cli, ["import", "all"])
+        result = runner.invoke(cli, ["import", "all", "--yes"])
 
         assert result.exit_code == 0, result.output
         assert "Detected dotfile sources" in result.output
@@ -912,7 +854,9 @@ class TestImportCLIIntegration:
         runner = integration_runner
         source = tmp_path / "nonexistent"
 
-        result = runner.invoke(cli, ["import", "chezmoi", "--path", str(source)])
+        result = runner.invoke(
+            cli, ["import", "chezmoi", "--path", str(source), "--yes"]
+        )
 
         assert result.exit_code == 1
         assert "does not exist" in result.output
@@ -921,7 +865,7 @@ class TestImportCLIIntegration:
         runner = integration_runner
         source = tmp_path / "nonexistent"
 
-        result = runner.invoke(cli, ["import", "stow", "--path", str(source)])
+        result = runner.invoke(cli, ["import", "stow", "--path", str(source), "--yes"])
 
         assert result.exit_code == 1
         assert "does not exist" in result.output
@@ -1010,3 +954,55 @@ class TestDryRunCounts:
 
         assert result.exit_code == 0, result.output
         assert "Would import 1 file from" in result.output
+
+
+class TestImportCommitBehaviour:
+    """U6 — import must not commit silently and must honour --yes/--no-commit."""
+
+    def _source(self, tmp_path):
+        source = tmp_path / "chezmoi"
+        source.mkdir()
+        (source / "bashrc").write_text("x")
+        return source
+
+    def test_no_commit_skips_commit(self, tmp_path, integration_runner):
+        source = self._source(tmp_path)
+
+        with patch("dot_man.cli.import_cmd.GitManager") as MockGit:
+            result = integration_runner.invoke(
+                cli, ["import", "chezmoi", "--path", str(source), "--no-commit"]
+            )
+
+        assert result.exit_code == 0, result.output
+        assert "Skipped commit" in result.output
+        MockGit.return_value.commit.assert_not_called()
+
+    def test_yes_commits(self, tmp_path, integration_runner):
+        source = self._source(tmp_path)
+
+        with patch("dot_man.cli.import_cmd.GitManager") as MockGit:
+            result = integration_runner.invoke(
+                cli, ["import", "chezmoi", "--path", str(source), "--yes"]
+            )
+
+        assert result.exit_code == 0, result.output
+        MockGit.return_value.commit.assert_called_once_with(
+            "Import dotfiles from chezmoi"
+        )
+
+    def test_declined_confirmation_leaves_uncommitted(
+        self, tmp_path, integration_runner
+    ):
+        source = self._source(tmp_path)
+
+        with (
+            patch("dot_man.cli.import_cmd.GitManager") as MockGit,
+            patch("dot_man.cli.import_cmd.ui.confirm", return_value=False),
+        ):
+            result = integration_runner.invoke(
+                cli, ["import", "chezmoi", "--path", str(source)]
+            )
+
+        assert result.exit_code == 0, result.output
+        assert "left uncommitted" in result.output
+        MockGit.return_value.commit.assert_not_called()

@@ -18,7 +18,7 @@ from .common import AliasedCommand, ExitCode, error, handle_exception, success, 
 from .interface import cli as main
 
 
-@main.command("init", cls=AliasedCommand, aliases=["ini"])
+@main.command("init", cls=AliasedCommand)
 @click.option("--force", is_flag=True, help="Reinitialize even if already exists")
 @click.option("--no-wizard", is_flag=True, help="Skip interactive setup wizard")
 @click.option(
@@ -51,12 +51,16 @@ def init(
     """
     # Pre-checks
     if not is_git_installed():
-        error("Git not found. Please install git first.", exit_code=2)
+        error("Git not found. Please install git first.", exit_code=ExitCode.USAGE)
 
     # "Already initialized" means an actual repo, not just the config dir —
     # the CLI group creates DOT_MAN_DIR on every run for logging.
-    if REPO_DIR.exists() and (REPO_DIR / ".git").exists() and not force:
-        if not ui.confirm(
+    if REPO_DIR.exists() and (REPO_DIR / ".git").exists():
+        if force:
+            ui.warn(
+                "Reinitializing with --force; existing dot-man data will be " "deleted."
+            )
+        elif not ui.confirm(
             "Repository already initialized. Reinitialize? (This will DELETE all data)"
         ):
             ui.info("Aborted.")

@@ -20,7 +20,7 @@ from .common import (
 from .interface import cli as main
 
 
-@main.command("export", cls=AliasedCommand, aliases=["exp"])
+@main.command("export", cls=AliasedCommand)
 @click.argument("format", type=click.Choice(["tar", "zip", "json"]))
 @click.argument("output", type=click.Path())
 @click.option(

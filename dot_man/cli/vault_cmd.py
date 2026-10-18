@@ -7,7 +7,7 @@ from .common import AliasedCommand, error, require_init, success, warn
 from .interface import cli as main
 
 
-@main.command("vault", cls=AliasedCommand, aliases=["vlt"])
+@main.command("vault", cls=AliasedCommand)
 @click.argument(
     "action",
     type=click.Choice(["rotate-key", "status"]),

@@ -99,6 +99,36 @@ def _dot_man_patches(dot_man_dir, repo_dir, backups_dir, global_toml, home):
 
 
 @pytest.fixture
+def uninitialized_runner(tmp_path):
+    """A CliRunner whose dot-man env is empty (no repo, no config).
+
+    Unlike ``integration_runner`` this does NOT run ``init``, so commands
+    guarded by ``require_init`` exercise their not-initialized path instead
+    of depending on the developer's real ``~/.config/dot-man``.
+    """
+    runner = CliRunner()
+
+    home = tmp_path / "home"
+    home.mkdir()
+    dot_man_dir = home / ".config" / "dot-man"
+    repo_dir = dot_man_dir / "repo"
+    backups_dir = dot_man_dir / "backups"
+    global_toml = dot_man_dir / "global.toml"
+
+    with ExitStack() as stack:
+        for p in _dot_man_patches(
+            dot_man_dir, repo_dir, backups_dir, global_toml, home
+        ):
+            stack.enter_context(p)
+
+        from dot_man.operations import reset_operations
+
+        reset_operations()
+
+        yield runner
+
+
+@pytest.fixture
 def integration_runner(tmp_path):
     """Setup runner with initialized repo context."""
     from dot_man.cli.interface import cli

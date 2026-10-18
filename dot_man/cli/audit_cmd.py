@@ -7,11 +7,18 @@ from ..constants import REPO_DIR
 from ..core import GitManager
 from ..exceptions import DotManError
 from ..secrets import PermanentRedactGuard, SecretGuard, SecretMatch, get_custom_scanner
-from .common import AliasedCommand, error, handle_exception, require_init, success
+from .common import (
+    AliasedCommand,
+    ExitCode,
+    error,
+    handle_exception,
+    require_init,
+    success,
+)
 from .interface import cli as main
 
 
-@main.command("audit", cls=AliasedCommand, aliases=["aud"])
+@main.command("audit", cls=AliasedCommand)
 @click.option(
     "--strict", is_flag=True, help="Exit with error if secrets found (for CI/CD)"
 )
@@ -153,7 +160,7 @@ def audit(strict: bool, fix: bool, history: bool):
                 success(f"Redacted secrets in {len(fixed_files)} files")
 
         if strict:
-            error("Secrets detected (strict mode)", exit_code=50)
+            error("Secrets detected (strict mode)", exit_code=ExitCode.AUDIT)
 
     except DotManError as e:
         error(str(e), e.exit_code)

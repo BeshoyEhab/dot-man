@@ -128,10 +128,10 @@ class TestDeployHelp:
         assert "--force" in result.output
         assert "--dry-run" in result.output
 
-    def test_deploy_alias(self, runner):
+    def test_dep_alias_removed(self, runner):
+        """The obscure 'dep' alias was removed in favour of 'deploy'."""
         result = runner.invoke(cli, ["dep", "--help"])
-        assert result.exit_code == 0
-        assert "deploy" in result.output
+        assert result.exit_code == 2
 
 
 # ---------------------------------------------------------------------------
@@ -142,10 +142,6 @@ class TestDeployHelp:
 class TestDeployWithoutInit:
     def test_deploy_without_init(self, runner):
         result = runner.invoke(cli, ["deploy", "main"])
-        assert result.exit_code != 0
-
-    def test_dep_without_init(self, runner):
-        result = runner.invoke(cli, ["dep", "main"])
         assert result.exit_code != 0
 
 

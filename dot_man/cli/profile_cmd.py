@@ -162,8 +162,14 @@ def profile_delete(name: str, force: bool):
 
 @profile.command("switch")
 @click.argument("name", shell_complete=complete_profiles)
+@click.option(
+    "--dry-run",
+    "-n",
+    is_flag=True,
+    help="Show what would happen without switching",
+)
 @require_init
-def profile_switch(name: str):
+def profile_switch(name: str, dry_run: bool):
     """Switch to a profile.
 
     This changes the current branch to match the profile and updates
@@ -172,6 +178,7 @@ def profile_switch(name: str):
     Examples:
         dot-man profile switch work
         dot-man profile switch server
+        dot-man profile switch work --dry-run
     """
     try:
         from ..operations import get_operations
@@ -195,6 +202,13 @@ def profile_switch(name: str):
             branch = name
 
         # Switch to the branch
+        if dry_run:
+            ui.console.print(
+                f"[dim]Dry run: would switch to profile '{name}' "
+                f"(branch '{branch}')[/dim]"
+            )
+            return
+
         ui.console.print(f"Switching to profile '{name}'...")
 
         # Update current profile
@@ -205,11 +219,19 @@ def profile_switch(name: str):
         # Try to switch to branch (if it exists)
         if branch in ops.git.list_branches():
             from .common import parse_branch_arg
-            from .switch_cmd import switch
+            from .navigate_cmd import _navigate_impl
 
-            parsed_branch = parse_branch_arg(branch)
-            ctx = click.Context(switch)
-            ctx.invoke(switch, branch=parsed_branch, dry_run=False, force=True)
+            _navigate_impl(
+                target=parse_branch_arg(branch),
+                dry_run=False,
+                force=True,
+                save_mode=None,
+                commit_message=None,
+                preview=False,
+                diff=False,
+                files_only=False,
+            )
+
         else:
             ui.console.print(
                 f"[yellow]Branch '{branch}' does not exist - profile saved but no branch switched[/yellow]"

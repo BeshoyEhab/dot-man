@@ -198,9 +198,8 @@ def config_set(key: str, value: str):
 
 @config.command("create")
 @click.option(
-    "--examples",
+    "--examples/--no-examples",
     "with_examples",
-    is_flag=True,
     default=True,
     help="Include commented examples in the config file (default: True)",
 )
@@ -230,9 +229,11 @@ def config_create(with_examples: bool, minimal: bool, force: bool):
 
         dotman_config = DotManConfig()
 
-        if minimal:
+        if minimal or not with_examples:
             dotman_config._data = {}
-            dotman_config.save()
+            dotman_config._doc = None
+            dotman_config._dirty = True
+            dotman_config.save(force=True)
             ui.console.print(f"Created minimal config at {config_path}")
         else:
             dotman_config.create_default()

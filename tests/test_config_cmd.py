@@ -252,6 +252,23 @@ class TestConfigCreate:
         assert result.exit_code == 0
         assert "minimal config" in result.output
 
+    def test_create_no_examples_flag_disables_examples(self, integration_runner):
+        """--no-examples must skip the commented examples (previously a no-op)."""
+        from dot_man.constants import DOT_MAN_TOML, REPO_DIR
+
+        path = REPO_DIR / DOT_MAN_TOML
+
+        with_examples = integration_runner.invoke(cli, ["config", "create", "--force"])
+        assert with_examples.exit_code == 0
+        assert "Uncomment an example" in path.read_text()
+
+        without_examples = integration_runner.invoke(
+            cli, ["config", "create", "--no-examples", "--force"]
+        )
+        assert without_examples.exit_code == 0
+        assert "minimal config" in without_examples.output
+        assert "Uncomment an example" not in path.read_text()
+
     def test_create_force_overwrite(self, integration_runner):
         integration_runner.invoke(cli, ["config", "create", "--force"])
         result = integration_runner.invoke(cli, ["config", "create", "--force"])

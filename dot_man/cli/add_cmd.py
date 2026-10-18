@@ -22,7 +22,7 @@ from .common import (
 from .interface import cli as main
 
 
-@main.command("add", cls=AliasedCommand, aliases=["add"])
+@main.command("add", cls=AliasedCommand)
 @click.argument("path", type=click.Path(exists=True))
 @click.option(
     "--section", "-s", help="Section name (default: auto-generated from path)"

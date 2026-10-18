@@ -19,7 +19,7 @@ from .common import (
 from .interface import cli as main
 
 
-@main.command("deploy", cls=AliasedCommand, aliases=["dep"])
+@main.command("deploy", cls=AliasedCommand)
 @click.argument("branch", shell_complete=complete_branches)
 @click.option("--force", is_flag=True, help="Skip confirmation prompt")
 @click.option("--dry-run", is_flag=True, help="Show what would be deployed")

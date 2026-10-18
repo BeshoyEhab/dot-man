@@ -1,5 +1,6 @@
 """Tests for 'dot-man discover' command."""
 
+import re
 from unittest.mock import patch
 
 from click.testing import CliRunner
@@ -17,12 +18,12 @@ class TestDiscoverHelp:
         assert result.exit_code == 0
         assert "discover" in result.output.lower()
 
-    def test_discover_aliases_in_help(self):
-        """Discover alias shows in help."""
+    def test_discover_alias_removed_from_help(self):
+        """The obscure 'dis' alias was removed; only 'discover' remains."""
         runner = CliRunner()
         result = runner.invoke(cli, ["discover", "--help"])
         assert result.exit_code == 0
-        assert "dis" in result.output
+        assert not re.search(r"(?m)^\s*dis\s", result.output)
 
     def test_discover_options_in_help(self):
         """Discover options appear in help."""
@@ -325,19 +326,14 @@ class TestDiscoverAdd:
             assert "Run 'dot-man status'" in result.output
 
 
-class TestDiscoverAlias:
-    """Test discover alias 'dis'."""
+class TestDiscoverAliasRemoved:
+    """The obscure 'dis' alias was removed."""
 
-    def test_discover_alias_works(self, integration_runner):
-        """The 'dis' alias invokes the same command."""
-        with patch("dot_man.cli.discover_cmd.ConfigDetector") as MockDetector:
-            MockDetector.detect_popular_configs.return_value = []
-            MockDetector.detect_quickshell_configs.return_value = []
+    def test_discover_alias_no_longer_resolves(self, integration_runner):
+        """The 'dis' alias must no longer invoke the command."""
+        result = integration_runner.invoke(cli, ["dis"])
 
-            result = integration_runner.invoke(cli, ["dis"])
-
-            assert result.exit_code == 0
-            assert "No dotfiles detected" in result.output
+        assert result.exit_code == 2
 
 
 class TestDiscoverIntegration:
