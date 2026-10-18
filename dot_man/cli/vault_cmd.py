@@ -1,5 +1,7 @@
 """Vault command for managing the secret vault."""
 
+import click
+
 from .. import ui
 from .common import error, require_init, success, warn
 from .interface import cli as main
@@ -20,10 +22,15 @@ def vault():
 
 
 @vault.command("rotate-key")
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Preview the rotation without re-encrypting anything",
+)
 @require_init
-def vault_rotate_key():
+def vault_rotate_key(dry_run: bool):
     """Generate a new encryption key and re-encrypt all secrets."""
-    _rotate_key()
+    _rotate_key(dry_run=dry_run)
 
 
 @vault.command("status")
@@ -33,7 +40,7 @@ def vault_status():
     _vault_status()
 
 
-def _rotate_key():
+def _rotate_key(dry_run: bool = False):
     """Rotate the vault encryption key."""
     from ..vault import SecretVault
 
@@ -43,6 +50,13 @@ def _rotate_key():
     count = len(vault._data.get("secrets", []))
     if count == 0:
         warn("Vault is empty — nothing to re-encrypt.")
+        return
+
+    if dry_run:
+        ui.console.print(
+            f"[dim]\\[dry-run] Would rotate the key and re-encrypt "
+            f"{count} secret(s).[/dim]"
+        )
         return
 
     ui.console.print(f"Found [cyan]{count}[/cyan] encrypted secret(s).")

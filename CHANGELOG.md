@@ -21,6 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   icons). Rules now use Rich's console-width layout instead of a hardcoded
   50/40, and `status` truncates paths with a cell-aware `ui.truncate_text`
   rather than a magic `[-32:]` slice.
+- **Uniform `--dry-run`** — `bootstrap` now previews every package-manager
+  command (including `--update`) without executing it, `audit --fix` previews
+  the redaction count without writing or committing, and `vault rotate-key`
+  previews the secret count without re-encrypting or prompting. `--dry-run`
+  already existed on `sync`, `profile switch`, `import`, `deploy`, `clean`,
+  `rollback`, and `save`.
 
 ### Security
 
@@ -59,6 +65,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`[dry-run]` marker rendered literally** — Rich parsed the literal
+  `[dry-run]` prefix as an unknown markup tag and silently dropped it, so
+  `watch --dry-run` never showed its intended marker. Brackets are escaped,
+  and the new `bootstrap`/`audit`/`vault` previews use the same escaped form.
 - **Navigate to a commit/tag now deploys and records the branch** — previously
   only branch navigation ran `deploy_all` and persisted `current_branch`;
   commit/tag navigation dropped you into a detached HEAD with the old files.
@@ -155,6 +165,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Diagnostics go to stderr** — `ui.warn`, `warn_if_dirty`, and
+  `handle_exception` now write to stderr, alongside `ui.error`. Stdout carries
+  data only, so `--json` output stays machine-parseable even when a command
+  warns or fails. Informational output (`ui.info`, `success`, `hint`,
+  `next_steps`) remains on stdout.
 - **Version is single-sourced** — `pyproject.toml` uses `dynamic = ["version"]`
   reading `dot_man.__version__`; the build requires `setuptools>=77` (SPDX
   `license = "MIT"`). The `cli/interface.py` / `cli/main.py` coverage omits were

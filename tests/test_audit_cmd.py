@@ -79,3 +79,56 @@ class TestAuditOptions:
         """Test --fix option is recognized."""
         result = runner.invoke(cli, ["audit", "--help"])
         assert "--fix" in result.output
+
+    def test_audit_dry_run_option(self, runner):
+        """Test --dry-run option is recognized."""
+        result = runner.invoke(cli, ["audit", "--help"])
+        assert "--dry-run" in result.output
+
+
+class TestAuditFixDryRun:
+    """--fix --dry-run previews redactions without touching anything."""
+
+    def _repo_with_secret(self, tmp_path):
+        from dot_man.secrets import SecretMatch, Severity
+
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        (repo / ".git").mkdir()
+        secret_file = repo / "creds.txt"
+        secret_file.write_text("token = 'super-secret-value'\n")
+        match = SecretMatch(
+            file=secret_file,
+            line_number=1,
+            line_content="token = 'super-secret-value'",
+            pattern_name="Generic Secret",
+            severity=Severity.MEDIUM,
+            matched_text="super-secret-value",
+        )
+        return repo, secret_file, match
+
+    def test_dry_run_leaves_files_and_history_untouched(self, tmp_path):
+        from dot_man.cli import audit_cmd
+
+        repo, secret_file, match = self._repo_with_secret(tmp_path)
+
+        with (
+            patch("dot_man.cli.common.DOT_MAN_DIR", repo),
+            patch("dot_man.cli.common.REPO_DIR", repo),
+            patch("dot_man.cli.audit_cmd.REPO_DIR", repo),
+            patch("dot_man.cli.audit_cmd.get_custom_scanner") as MockScanner,
+            patch("dot_man.cli.audit_cmd.SecretGuard") as MockGuard,
+            patch("dot_man.cli.audit_cmd.PermanentRedactGuard") as MockPerm,
+            patch("dot_man.cli.audit_cmd.GitManager") as MockGit,
+        ):
+            MockScanner.return_value.scan_directory.return_value = [match]
+            MockGuard.return_value.is_allowed.return_value = False
+            MockPerm.return_value.should_redact.return_value = False
+
+            result = CliRunner().invoke(audit_cmd.audit, ["--fix", "--dry-run"])
+
+        assert result.exit_code == 0, result.output
+        assert secret_file.read_text() == "token = 'super-secret-value'\n"
+        MockScanner.return_value.redact_content.assert_not_called()
+        MockGit.return_value.commit.assert_not_called()
+        assert "dry-run" in result.output.lower()

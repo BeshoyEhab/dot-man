@@ -116,11 +116,14 @@ def _is_safe_package_name(package: str) -> bool:
     return bool(_PACKAGE_NAME_RE.match(package))
 
 
-def _run_with_pm(pm: str, command_template: str, package: str) -> bool:
+def _run_with_pm(
+    pm: str, command_template: str, package: str, dry_run: bool = False
+) -> bool:
     """Run a package manager command. Returns True on success.
 
     The template is split into an argv list and executed without a shell, so
-    package names loaded from repo config cannot inject shell commands.
+    package names loaded from repo config cannot inject shell commands. When
+    ``dry_run`` is set the command is printed but never executed.
     """
     if package and not _is_safe_package_name(package):
         warn(f"Refusing to install unsafe package name: {package!r}")
@@ -129,6 +132,8 @@ def _run_with_pm(pm: str, command_template: str, package: str) -> bool:
     cmd = command_template.format(package=package)
     argv = cmd.split()
     ui.console.print(f"  [cyan]$ {' '.join(argv)}[/cyan]")
+    if dry_run:
+        return True
     try:
         result = subprocess.run(
             argv, capture_output=True, text=True, timeout=300, shell=False
@@ -156,10 +161,21 @@ def _run_with_pm(pm: str, command_template: str, package: str) -> bool:
     is_flag=True,
     help="List packages that would be installed without installing",
 )
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Show the commands that would run without installing anything",
+)
 @click.option("--pm", help="Package manager to use (auto-detected if not specified)")
 @click.option("--update", is_flag=True, help="Update package manager first")
 @click.argument("packages", nargs=-1)
-def bootstrap(list_only: bool, pm: str | None, update: bool, packages: tuple[str, ...]):
+def bootstrap(
+    list_only: bool,
+    dry_run: bool,
+    pm: str | None,
+    update: bool,
+    packages: tuple[str, ...],
+):
     """Install system packages via package managers.
 
     Detects your system package manager (brew, apt, dnf, pacman, etc.)
@@ -231,7 +247,7 @@ def bootstrap(list_only: bool, pm: str | None, update: bool, packages: tuple[str
     if update:
         ui.console.print()
         ui.console.print("[bold]Updating package manager...[/bold]")
-        _run_with_pm(pm, pm_info["update"], "")
+        _run_with_pm(pm, pm_info["update"], "", dry_run=dry_run)
 
     # Install packages
     installed = 0
@@ -242,7 +258,7 @@ def bootstrap(list_only: bool, pm: str | None, update: bool, packages: tuple[str
         ui.console.print(f"[bold]Installing {group}:[/bold]")
         for pkg in pkgs:
             ui.console.print(f"\n[bold]→ {pkg}[/bold]")
-            result = _run_with_pm(pm, pm_info["install"], pkg)
+            result = _run_with_pm(pm, pm_info["install"], pkg, dry_run=dry_run)
             if result:
                 installed += 1
             else:
@@ -250,6 +266,14 @@ def bootstrap(list_only: bool, pm: str | None, update: bool, packages: tuple[str
 
     # Summary
     ui.console.print()
+    if dry_run:
+        ui.console.print("[bold]\\[dry-run] Bootstrap preview:[/bold]")
+        ui.console.print(f"  {installed} package(s) would be installed")
+        if failed:
+            ui.console.print(f"  [red]{failed} package(s) rejected[/red]")
+        ui.console.print()
+        return
+
     ui.console.print("[bold]Bootstrap complete:[/bold]")
     ui.console.print(f"  [green]✓ {installed} installed[/green]")
     if failed:

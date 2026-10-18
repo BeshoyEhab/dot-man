@@ -1256,7 +1256,7 @@ class TestWizardQuickshellMultiChoice:
                 [(str(root), "Quickshell", "quickshell")], files
             )
 
-        out = capsys.readouterr().out
+        out = capsys.readouterr().err
         assert "Invalid selection" in out
         assert "Please enter a number" in out
         assert files == [(f"{root}/ii", "ii")]
@@ -1302,9 +1302,9 @@ class TestWizardSaveSummaryEdges:
         with patch("dot_man.ui.confirm", return_value=False):
             init_cmd._wizard_save_and_summarize(files, DotManConfig(), GitManager())
 
-        out = capsys.readouterr().out
-        assert "Could not add" in out
-        assert "... and 1 more" in out
+        captured = capsys.readouterr()
+        assert "Could not add" in captured.err
+        assert "... and 1 more" in captured.out
         content = (repo_dir / "dot-man.toml").read_text()
         assert "abssec" not in content
         assert "[sec5]" in content

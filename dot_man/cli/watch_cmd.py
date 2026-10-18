@@ -245,7 +245,7 @@ def watch(interval: float, commit: bool, message: str, dry_run: bool):
         def on_change(changed_files: list[Path]) -> None:
             if dry_run:
                 ui.console.print(
-                    f"[dim][dry-run] Would save: "
+                    f"[dim]\\[dry-run] Would save: "
                     f"{', '.join(str(f) for f in changed_files[:3])}"
                     f"{'...' if len(changed_files) > 3 else ''}[/dim]"
                 )

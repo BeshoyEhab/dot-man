@@ -149,6 +149,40 @@ class TestVaultRotateKey:
             assert result.exit_code == 1
 
 
+class TestVaultRotateKeyDryRun:
+    """--dry-run previews the rotation without re-encrypting or prompting."""
+
+    def test_dry_run_skips_rotation_and_confirmation(self, tmp_path):
+        from dot_man.cli import vault_cmd
+
+        repo = tmp_path / "repo"
+        repo.mkdir()
+        (repo / ".git").mkdir()
+
+        with (
+            patch("dot_man.cli.common.DOT_MAN_DIR", repo),
+            patch("dot_man.cli.common.REPO_DIR", repo),
+            patch("dot_man.vault.SecretVault") as MockVault,
+            patch("dot_man.cli.vault_cmd.ui.confirm") as mock_confirm,
+        ):
+            vault = MockVault.return_value
+            vault.load.return_value = None
+            vault._data = {"secrets": [{"branch": "main"}, {"branch": "work"}]}
+
+            result = CliRunner().invoke(vault_cmd.vault, ["rotate-key", "--dry-run"])
+
+        assert result.exit_code == 0, result.output
+        vault.rotate_key.assert_not_called()
+        mock_confirm.assert_not_called()
+        assert "dry-run" in result.output.lower()
+
+    def test_rotate_key_help_lists_dry_run(self):
+        result = CliRunner().invoke(vault_group, ["rotate-key", "--help"])
+
+        assert result.exit_code == 0, result.output
+        assert "--dry-run" in result.output
+
+
 class TestVaultCmdDispatch:
     """Test vault command dispatches to correct subcommand."""
 

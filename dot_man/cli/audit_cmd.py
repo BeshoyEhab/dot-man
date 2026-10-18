@@ -24,12 +24,17 @@ from .interface import cli as main
 )
 @click.option("--fix", is_flag=True, help="Automatically redact found secrets")
 @click.option(
+    "--dry-run",
+    is_flag=True,
+    help="With --fix, show what would be redacted without changing files",
+)
+@click.option(
     "--history",
     is_flag=True,
     help="Also scan git history and staged content (finds removed secrets)",
 )
 @require_init
-def audit(strict: bool, fix: bool, history: bool):
+def audit(strict: bool, fix: bool, dry_run: bool, history: bool):
     """Scan repository for accidentally committed secrets.
 
     Scans all files in the repository for API keys, passwords,
@@ -130,13 +135,20 @@ def audit(strict: bool, fix: bool, history: bool):
 
         if fix:
             ui.console.print()
+            # Working-tree findings only; historical blobs can't be edited.
+            fixable = [m for m in matches if not m.history_ref]
+            if dry_run:
+                ui.console.print(
+                    f"[dim]\\[dry-run] Would redact {len(fixable)} finding(s) "
+                    f"in the working tree.[/dim]"
+                )
+                return
             if not ui.confirm("Auto-redact all detected secrets?"):
                 ui.info("Aborted.")
                 return
 
             # Perform redaction (working-tree findings only; historical blobs
             # can't be edited in place).
-            fixable = [m for m in matches if not m.history_ref]
             if not fixable:
                 ui.info("Nothing to redact in the working tree.")
             else:

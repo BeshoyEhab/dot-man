@@ -2,7 +2,7 @@
 
 ## v1.5.0 - Current Stable ✅
 
-- ✅ Full coverage floor — every module ≥ 90% (2459 tests, 96% coverage)
+- ✅ Full coverage floor — every module ≥ 90% (2476 tests, 96% coverage)
 - ✅ Consistent exit codes — `ExitCode` enum, `sys.exit()` eliminated
 - ✅ Centralized error handling — `DotManGroup.invoke()` routes through `handle_exception()`
 - ✅ Two-level help — `help`/`--help` happy path, `help-all` everything, man page
@@ -36,7 +36,7 @@
 ## Coverage Focus
 
 Lowest-covered modules (source of truth: `TODO.md`, regenerated 2026-10-18): **none
-below 90%** — the floor sweep cleared every module (suite 2459 passing, 96% coverage).
+below 90%** — the floor sweep cleared every module (suite 2476 passing, 96% coverage).
 
 ---
 
@@ -62,7 +62,7 @@ below 90%** — the floor sweep cleared every module (suite 2459 passing, 96% co
 ## Completed Milestones
 
 ### v1.5.0 — Coverage Floor & UX Hardening (2026-10-09)
-- ✅ Full coverage floor — every module ≥ 90% (suite 2459 passing, 96% coverage)
+- ✅ Full coverage floor — every module ≥ 90% (suite 2476 passing, 96% coverage)
 - ✅ Consistent exit codes — `ExitCode` enum, `sys.exit()` eliminated
 - ✅ Centralized error handling — `DotManGroup.invoke()` routes through `handle_exception()`
 - ✅ Two-level help — `help`/`--help` happy path, `help-all` everything, man page

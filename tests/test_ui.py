@@ -46,7 +46,8 @@ class TestMessageHelpers:
 
         ui.warn("careful")
 
-        assert "careful" in capsys.readouterr().out
+        # Warnings are diagnostics: they belong on stderr, not stdout.
+        assert "careful" in capsys.readouterr().err
 
     def test_hint(self, capsys):
         from dot_man import ui

@@ -308,10 +308,13 @@ class TestSecretHandlerBranches:
 
         with patch("dot_man.ui.ask", return_value="4"):
             assert handler(match) == "REDACT"
-        assert "Will always redact this secret." in capsys.readouterr().out
+        # Warnings are diagnostics: they go to stderr.
+        assert "Will always redact this secret." in capsys.readouterr().err
 
         assert handler(match) == "REDACT"
-        assert not capsys.readouterr().out
+        captured = capsys.readouterr()
+        assert not captured.out
+        assert not captured.err
 
     def test_invalid_choice_defaults_to_redact(self, tmp_path, monkeypatch):
         handler = self._make_handler(tmp_path, monkeypatch)

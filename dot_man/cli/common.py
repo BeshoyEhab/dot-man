@@ -72,12 +72,12 @@ def warn_if_dirty(ops, current_branch: str) -> None:
     so uncommitted work is never abandoned silently.
     """
     if ops.git.is_dirty():
-        ui.console.print(
+        ui.error_console.print(
             f"[yellow]Warning:[/yellow] You have uncommitted changes on branch "
             f"[bold]{current_branch}[/bold]"
         )
-        ui.console.print("  These changes will NOT be saved.")
-        ui.console.print()
+        ui.error_console.print("  These changes will NOT be saved.")
+        ui.error_console.print()
 
 
 def handle_exception(exc: BaseException, context: str = "Operation") -> None:
@@ -89,16 +89,16 @@ def handle_exception(exc: BaseException, context: str = "Operation") -> None:
         return
 
     if isinstance(exc, KeyboardInterrupt):
-        ui.console.print()
+        ui.error_console.print()
         warn("Operation cancelled by user")
         raise SystemExit(ExitCode.INTERRUPTED)
 
     diagnostic = ErrorDiagnostic.from_exception(exc)
-    ui.console.print()
-    ui.console.print(f"[red bold]{diagnostic.title}[/red bold]")
-    ui.console.print(f"[red]{diagnostic.details}[/red]")
-    ui.console.print()
-    ui.console.print(f"[dim]💡 {diagnostic.suggestion}[/dim]")
+    ui.error_console.print()
+    ui.error_console.print(f"[red bold]{diagnostic.title}[/red bold]")
+    ui.error_console.print(f"[red]{diagnostic.details}[/red]")
+    ui.error_console.print()
+    ui.error_console.print(f"[dim]💡 {diagnostic.suggestion}[/dim]")
     raise SystemExit(ExitCode.ERROR)
 
 

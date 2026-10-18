@@ -151,11 +151,15 @@ def success(message: str) -> None:
 
 
 def warn(message: str) -> None:
-    """Print a warning message."""
+    """Print a warning message.
+
+    Warnings are diagnostics, so they go to stderr — stdout stays
+    reserved for data (and ``--json`` payloads).
+    """
     if _quiet:
         return
     marker = "[warning]\\[!][/warning]" if _plain else "[warning]⚠[/warning]"
-    console.print(f"{marker} {message}")
+    error_console.print(f"{marker} {message}")
 
 
 def error(message: str, exit_code: int = 1) -> None:

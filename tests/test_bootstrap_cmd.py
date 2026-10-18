@@ -227,7 +227,7 @@ class TestBootstrapCommand:
     def test_install_with_failures(self, runner):
         call_count = 0
 
-        def mock_run_with_pm(pm, template, pkg):
+        def mock_run_with_pm(pm, template, pkg, *args, **kwargs):
             nonlocal call_count
             call_count += 1
             return call_count != 2  # Second package fails
@@ -272,6 +272,72 @@ class TestBootstrapCommand:
             assert result.exit_code == 0
             assert "fish" in result.output
             assert "neovim" in result.output
+
+    def test_dry_run_previews_without_executing(self, runner):
+        """--dry-run shows the exact commands but runs nothing."""
+        with (
+            patch(
+                "dot_man.cli.bootstrap_cmd._load_bootstrap_packages",
+                return_value={},
+            ),
+            patch("dot_man.cli.bootstrap_cmd.subprocess.run") as mock_run,
+        ):
+            result = runner.invoke(
+                cli, ["bootstrap", "--pm", "apt", "--dry-run", "git"]
+            )
+
+        assert result.exit_code == 0, result.output
+        mock_run.assert_not_called()
+        assert "apt-get install -y git" in result.output
+        assert "dry-run" in result.output.lower()
+
+    def test_dry_run_with_update_previews_update(self, runner):
+        with (
+            patch(
+                "dot_man.cli.bootstrap_cmd._load_bootstrap_packages",
+                return_value={},
+            ),
+            patch("dot_man.cli.bootstrap_cmd.subprocess.run") as mock_run,
+        ):
+            result = runner.invoke(
+                cli, ["bootstrap", "--pm", "apt", "--dry-run", "--update", "git"]
+            )
+
+        assert result.exit_code == 0, result.output
+        mock_run.assert_not_called()
+        assert "apt-get update" in result.output
+
+    def test_dry_run_counts_preview_as_installable(self, runner):
+        with (
+            patch(
+                "dot_man.cli.bootstrap_cmd._load_bootstrap_packages",
+                return_value={},
+            ),
+            patch("dot_man.cli.bootstrap_cmd.subprocess.run") as mock_run,
+        ):
+            result = runner.invoke(
+                cli, ["bootstrap", "--pm", "apt", "--dry-run", "git", "curl"]
+            )
+
+        assert result.exit_code == 0, result.output
+        mock_run.assert_not_called()
+        assert "apt-get install -y git" in result.output
+        assert "apt-get install -y curl" in result.output
+
+    def test_dry_run_still_rejects_unsafe_package(self, runner):
+        with (
+            patch(
+                "dot_man.cli.bootstrap_cmd._load_bootstrap_packages",
+                return_value={},
+            ),
+            patch("dot_man.cli.bootstrap_cmd.subprocess.run") as mock_run,
+        ):
+            result = runner.invoke(
+                cli, ["bootstrap", "--pm", "apt", "--dry-run", "evil; rm -rf /"]
+            )
+
+        mock_run.assert_not_called()
+        assert "unsafe" in result.output.lower()
 
     def test_package_managers_dict_completeness(self):
         """Ensure all expected package managers are defined."""

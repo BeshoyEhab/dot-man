@@ -418,7 +418,8 @@ class TestDotManConfig:
         """
         dc = load_from_toml('[bad]\npaths = ["/tmp/f"]\nunknown_key = "oops"\n')
         assert "Unknown key 'unknown_key'" in caplog.text
-        assert "Unknown key 'unknown_key'" in capsys.readouterr().out
+        # The console warning is a diagnostic, so it goes to stderr.
+        assert "Unknown key 'unknown_key'" in capsys.readouterr().err
         s = dc.get_section("bad")
         assert s.paths == [Path("/tmp/f")]
 

@@ -295,9 +295,9 @@ deserves its own focused pass rather than a rushed edit:
 | Done | Item | Impact | Effort | Complexity | Location |
 |------|------|--------|--------|-----------|----------|
 | [x] | U1 Add global `--json`/`--quiet`/`--yes`/`--no-input`/`--no-color` | High | M | Med | `interface.py`, all `*_cmd.py` |
-| [ ] | U2 Uniform `--dry-run`/`--force`; `init --force` must warn | Med-High | M | Med | `init_cmd.py:22,58-65` |
+| [x] | U2 Uniform `--dry-run`/`--force`; `init --force` must warn | Med-High | M | Med | `init_cmd.py:22,58-65` |
 | [ ] | U3 Merge/remove overlapping commands + hide deprecated shims | Med | M | Med | `restore_cmd.py`, `revert_cmd.py`, `switch_cmd.py`, `log_cmd.py` |
-| [ ] | U4 Consistent diagnostics/streams/`ExitCode` everywhere | Med | M | Med | `common.py:96-100,30-43`, `audit_cmd.py:134` |
+| [x] | U4 Consistent diagnostics/streams/`ExitCode` everywhere | Med | M | Med | `common.py:96-100,30-43`, `audit_cmd.py:134` |
 | [x] | U5 Normalize subcommand styles (groups vs positional `Choice`) | Low-Med | M | Med | `encrypt_cmd.py:26`, `vault_cmd.py:11`, `hooks_cmd.py:11` |
 | [x] | U6 `import` commits all changes without confirm/dry-run | Med | S | Low | `import_cmd.py:217-219,269,339` |
 | [x] | U7 `profile switch` prints wrong deprecation warning | Low | S | Low | `profile_cmd.py:206-212` |
@@ -344,16 +344,24 @@ Rich auto-fitting tables; pair icons with text; add `--plain`.
 
 ### Status
 
-- **Done:** U1, U5–U11 (the global flags, the Low-effort UX fixes,
-  `import` commit confirmation, and the CLI group normalisation).
+- **Done:** U1–U2, U4–U11 (the global flags, the Low-effort UX fixes,
+  `import` commit confirmation, the CLI group normalisation, uniform
+  `--dry-run`, and diagnostics routing).
 - **Partial:** U3 (deprecated shims `switch`/`checkout`/`tag switch` are now
   `hidden=True`; the overlapping-command merge — `restore`/`revert -c`,
-  `show`/`log`, `backup restore`/`rollback` — is a design call, not done) and
-  U4 (magic exit codes replaced with named `ExitCode` members: `AUDIT = 50`,
-  `USAGE`; `error()` now defaults to `ExitCode.ERROR`; routing exception
-  diagnostics to stderr is not done). U2 so far: `init --force` warns, and
-  `--dry-run` added to `sync` + `profile switch`; `--dry-run` on `bootstrap`,
-  `audit --fix`, and `vault rotate-key` is not.
+  `show`/`log`, `backup restore`/`rollback` — is a design call, not done).
+- **U2:** `--dry-run` added to `bootstrap` (prints every package-manager
+  command, still rejects unsafe package names), `audit --fix` (prints the
+  redaction count; never writes or commits), and `vault rotate-key` (prints the
+  secret count; never re-encrypts or prompts). `sync`, `profile switch`, and
+  `import` already had it, and `init --force` warns before destroying data.
+- **U4:** warnings and uncaught-exception diagnostics now go to stderr
+  (`ui.warn`, `warn_if_dirty`, `handle_exception`), so stdout stays clean for
+  `--json`. Named `ExitCode` members and the default `ExitCode.ERROR` landed in
+  the earlier pass.
+- **Bug found while adding `--dry-run`:** Rich consumed the literal
+  `[dry-run]` marker as a markup tag, so the prefix silently never rendered in
+  `watch` (and would not have in the new commands). Escaped it everywhere.
 - **U6:** `import` now requires confirmation before committing, adds `--yes`
   (skip prompt) and `--no-commit`; helpers return the written paths and no
   longer commit internally. Note: imported files land in `$HOME` (outside the

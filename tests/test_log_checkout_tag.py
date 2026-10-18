@@ -218,9 +218,10 @@ class TestCheckoutReturnWording:
 
     def _printed(self, mock_ui):
         parts = []
-        for call in mock_ui.console.print.call_args_list:
-            for arg in call.args:
-                parts.append(str(getattr(arg, "renderable", arg)))
+        for console in (mock_ui.console, mock_ui.error_console):
+            for call in console.print.call_args_list:
+                for arg in call.args:
+                    parts.append(str(getattr(arg, "renderable", arg)))
         return " ".join(parts)
 
     def test_checkout_tag_return_wording(self):
