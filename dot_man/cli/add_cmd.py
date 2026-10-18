@@ -4,10 +4,9 @@ from pathlib import Path
 
 import click
 
-from .. import ui
+from .. import constants, ui
 from ..config import DotManConfig, GlobalConfig
 from ..config_detector import get_auto_hooks_for_config
-from ..constants import REPO_DIR
 from ..exceptions import DotManError
 from ..files import copy_directory, copy_file
 from ..hooks import run_hook
@@ -154,7 +153,7 @@ def add(
         dotman_config.save()
 
         # Copy content to repo
-        repo_dest = REPO_DIR / repo_base
+        repo_dest = constants.get_repo_dir() / repo_base
 
         if local_path.is_file():
             repo_dest = repo_dest / local_path.name

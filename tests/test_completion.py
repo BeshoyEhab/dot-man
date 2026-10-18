@@ -3,6 +3,7 @@ import sys
 
 import pytest
 
+from dot_man import constants
 from dot_man.cli import complete_branches
 from dot_man.cli.common import _clear_all_caches, _set_git_runner
 
@@ -21,7 +22,7 @@ def _isolated_completion_cache(tmp_path, monkeypatch):
     monkeypatch.setattr(
         mod, "COMPLETION_CACHE_FILE", tmp_path / "completion_cache.json"
     )
-    monkeypatch.setattr(mod, "REPO_DIR", tmp_path)
+    monkeypatch.setattr(constants, "REPO_DIR", tmp_path)
     _clear_all_caches()
     yield
     _clear_all_caches()

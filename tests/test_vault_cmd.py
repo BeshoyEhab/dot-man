@@ -13,7 +13,7 @@ class TestVaultStatus:
     def test_vault_status_empty(self, tmp_path):
         """Vault status with no vault file."""
         with (
-            patch("dot_man.vault.DOT_MAN_DIR", tmp_path),
+            patch("dot_man.constants.DOT_MAN_DIR", tmp_path),
             patch("dot_man.vault.SecretVault") as MockVault,
         ):
             vault = MockVault.return_value
@@ -32,7 +32,7 @@ class TestVaultStatus:
         key_file.write_bytes(b"test-key")
 
         with (
-            patch("dot_man.vault.DOT_MAN_DIR", tmp_path),
+            patch("dot_man.constants.DOT_MAN_DIR", tmp_path),
             patch("dot_man.vault.SecretVault") as MockVault,
         ):
             vault = MockVault.return_value
@@ -47,7 +47,7 @@ class TestVaultStatus:
     def test_vault_status_no_vault_file(self, tmp_path):
         """Vault status when vault file doesn't exist."""
         with (
-            patch("dot_man.vault.DOT_MAN_DIR", tmp_path),
+            patch("dot_man.constants.DOT_MAN_DIR", tmp_path),
             patch("dot_man.vault.SecretVault") as MockVault,
         ):
             vault = MockVault.return_value
@@ -67,7 +67,7 @@ class TestVaultStatus:
         backup_file.write_bytes(b"old-key")
 
         with (
-            patch("dot_man.vault.DOT_MAN_DIR", tmp_path),
+            patch("dot_man.constants.DOT_MAN_DIR", tmp_path),
             patch("dot_man.vault.SecretVault") as MockVault,
         ):
             vault = MockVault.return_value
@@ -160,8 +160,8 @@ class TestVaultRotateKeyDryRun:
         (repo / ".git").mkdir()
 
         with (
-            patch("dot_man.cli.common.DOT_MAN_DIR", repo),
-            patch("dot_man.cli.common.REPO_DIR", repo),
+            patch("dot_man.constants.DOT_MAN_DIR", repo),
+            patch("dot_man.constants.REPO_DIR", repo),
             patch("dot_man.vault.SecretVault") as MockVault,
             patch("dot_man.cli.vault_cmd.ui.confirm") as mock_confirm,
         ):

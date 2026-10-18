@@ -205,6 +205,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `dot-man hooks create pre switch`, `dot-man encrypt encrypt <section>`).
   The invocation strings are unchanged; `--method`/`--recipient` now live on
   the `encrypt`/`decrypt` subcommands rather than the parent.
+- **Paths are resolved at call time** — `REPO_DIR`, `DOT_MAN_DIR`,
+  `BACKUPS_DIR`, `GLOBAL_TOML`, and `LOCK_FILE` are no longer bound at import
+  by every consumer. `constants.get_repo_dir()` (and siblings) read the module
+  globals on each call, so environmental redirection is a single patch point.
+  Tests now patch only `dot_man.constants.*`; the ~25 per-module conftest
+  targets are gone. Deriving `LOCK_FILE` at call time also stops test runs
+  from writing a lock file into the real `~/.config/dot-man`.
 
 ## [1.5.0] - 2026-10-09
 

@@ -4,8 +4,8 @@ import os
 import shutil
 from pathlib import Path
 
-from .. import ui
-from ..constants import DOT_MAN_DIR, DOT_MAN_TOML, GLOBAL_TOML, REPO_DIR
+from .. import constants, ui
+from ..constants import DOT_MAN_TOML
 from .common import AliasedCommand, error, require_init, success
 from .interface import cli as main
 
@@ -86,26 +86,26 @@ def doctor():
 
     # 3. Repository checks
     ui.console.print("[bold]Repository[/bold]")
-    if DOT_MAN_DIR.exists():
-        check_pass("Config directory exists", str(DOT_MAN_DIR))
+    if constants.get_dot_man_dir().exists():
+        check_pass("Config directory exists", str(constants.get_dot_man_dir()))
     else:
         check_fail("Config directory missing", "Run 'dot-man init'")
 
-    if REPO_DIR.exists():
-        check_pass("Repository directory exists", str(REPO_DIR))
+    if constants.get_repo_dir().exists():
+        check_pass("Repository directory exists", str(constants.get_repo_dir()))
     else:
         check_fail("Repository directory missing", "Run 'dot-man init'")
 
     # Check .git directory
-    git_dir = REPO_DIR / ".git"
+    git_dir = constants.get_repo_dir() / ".git"
     if git_dir.exists():
         check_pass("Git repository initialized")
     else:
         check_fail("No .git directory in repo", "Repository may be corrupted")
 
     # Check repo permissions
-    if REPO_DIR.exists():
-        if os.access(REPO_DIR, os.R_OK | os.W_OK):
+    if constants.get_repo_dir().exists():
+        if os.access(constants.get_repo_dir(), os.R_OK | os.W_OK):
             check_pass("Repository permissions", "read/write OK")
         else:
             check_fail("Repository permissions", "Cannot read/write to repo directory")
@@ -115,8 +115,8 @@ def doctor():
     # 4. Configuration checks
     ui.console.print("[bold]Configuration[/bold]")
 
-    if GLOBAL_TOML.exists():
-        check_pass("Global config exists", str(GLOBAL_TOML))
+    if constants.get_global_toml().exists():
+        check_pass("Global config exists", str(constants.get_global_toml()))
     else:
         check_warn("No global config", "Will use defaults")
 

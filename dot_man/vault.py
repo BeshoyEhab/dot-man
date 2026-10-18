@@ -12,7 +12,7 @@ from typing import Any, Dict, Generator, Optional
 
 from cryptography.fernet import Fernet
 
-from .constants import DOT_MAN_DIR
+from . import constants
 from .exceptions import DotManError
 from .files import atomic_write_text
 from .lock import FileLock, LockError
@@ -49,7 +49,7 @@ class SecretVault:
     """
 
     def __init__(self):
-        self.config_dir = DOT_MAN_DIR
+        self.config_dir = constants.get_dot_man_dir()
         self.vault_file = self.config_dir / "vault.json"
         self.key_file = self.config_dir / ".key"
         self.lock_file_path = self.config_dir / ".vault.lock"

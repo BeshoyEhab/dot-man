@@ -25,8 +25,8 @@ def cfg_env(tmp_path):
         (repo_dir / "dot-man.toml").write_text(toml_content)
         global_toml = tmp_path / "global.toml"
         with (
-            patch("dot_man.global_config.GLOBAL_TOML", global_toml),
-            patch("dot_man.config.REPO_DIR", repo_dir),
+            patch("dot_man.constants.GLOBAL_TOML", global_toml),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
         ):
             gc = GlobalConfig()
             gc.create_default()

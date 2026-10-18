@@ -4,7 +4,7 @@ from types import ModuleType
 
 import click
 
-from .. import ui
+from .. import constants, ui
 from ..config import GlobalConfig
 from ..core import GitManager
 from ..exceptions import DotManError
@@ -161,7 +161,6 @@ def sync(push_only: bool, pull_only: bool, dry_run: bool):
     Example: dot-man sync
     """
     from ..lock import FileLock
-    from ..operations import LOCK_FILE
 
     if push_only and pull_only:
         error(
@@ -170,7 +169,7 @@ def sync(push_only: bool, pull_only: bool, dry_run: bool):
         )
 
     try:
-        with FileLock(LOCK_FILE):
+        with FileLock(constants.get_lock_file()):
             git = GitManager()
 
             if not git.has_remote():
@@ -233,8 +232,6 @@ def setup():
     import shutil
     import subprocess
 
-    from ..constants import REPO_DIR
-
     git = GitManager()
 
     if _setup_should_abort_existing(git):
@@ -245,7 +242,7 @@ def setup():
     gh_available = shutil.which("gh") is not None
 
     if gh_available:
-        if _setup_run_gh_flow(git, subprocess, str(REPO_DIR)):
+        if _setup_run_gh_flow(git, subprocess, str(constants.get_repo_dir())):
             return
 
     if not gh_available:

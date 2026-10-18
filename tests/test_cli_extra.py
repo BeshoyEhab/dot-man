@@ -25,14 +25,6 @@ class TestInitCommand:
             patch("dot_man.constants.REPO_DIR", dot_man_dir / "repo"),
             patch("dot_man.constants.BACKUPS_DIR", dot_man_dir / "backups"),
             patch("dot_man.constants.GLOBAL_TOML", dot_man_dir / "global.toml"),
-            patch("dot_man.global_config.GLOBAL_TOML", dot_man_dir / "global.toml"),
-            patch("dot_man.dotman_config.REPO_DIR", dot_man_dir / "repo"),
-            patch("dot_man.core.REPO_DIR", dot_man_dir / "repo"),
-            patch("dot_man.config.REPO_DIR", dot_man_dir / "repo"),
-            patch("dot_man.config.GLOBAL_TOML", dot_man_dir / "global.toml"),
-            patch("dot_man.cli.init_cmd.REPO_DIR", dot_man_dir / "repo"),
-            patch("dot_man.cli.init_cmd.DOT_MAN_DIR", dot_man_dir),
-            patch("dot_man.cli.interface.DOT_MAN_DIR", dot_man_dir),
             patch.dict(os.environ, {"HOME": str(home)}),
         ]
         with ExitStack() as stack:

@@ -47,18 +47,6 @@ def clean_env(tmp_path):
         patch("dot_man.constants.REPO_DIR", repo_dir),
         patch("dot_man.constants.BACKUPS_DIR", backups_dir),
         patch("dot_man.constants.GLOBAL_TOML", global_toml),
-        patch("dot_man.core.REPO_DIR", repo_dir),
-        patch("dot_man.config.REPO_DIR", repo_dir),
-        patch("dot_man.config.GLOBAL_TOML", global_toml),
-        patch("dot_man.global_config.GLOBAL_TOML", global_toml),
-        patch("dot_man.dotman_config.REPO_DIR", repo_dir),
-        patch("dot_man.operations.REPO_DIR", repo_dir),
-        patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir),
-        patch("dot_man.branch_ops.REPO_DIR", repo_dir),
-        patch("dot_man.status_ops.REPO_DIR", repo_dir),
-        patch("dot_man.cli.interface.DOT_MAN_DIR", dot_man_dir),
-        patch("dot_man.cli.common.DOT_MAN_DIR", dot_man_dir),
-        patch("dot_man.cli.common.REPO_DIR", repo_dir),
         patch.dict(os.environ, {"HOME": str(home)}),
     ]
 
@@ -124,25 +112,25 @@ class TestBranchHelp:
 
 
 class TestBranchWithoutInit:
-    def test_list_fails_without_init(self, runner):
-        """branch list without init shows welcome banner."""
+    def test_list_fails_without_init(self, runner, tmp_path):
+        """branch list without init is blocked by require_init."""
         with patch(
-            "dot_man.cli.common.DOT_MAN_DIR",
-            Path("/tmp/nonexistent-dot-man"),
+            "dot_man.constants.REPO_DIR",
+            tmp_path / "nonexistent-repo",
         ):
             result = runner.invoke(cli, ["branch", "list"])
         assert result.exit_code == 1
-        assert "Welcome" in result.output
+        assert "not initialized" in result.output.lower()
 
-    def test_delete_fails_without_init(self, runner):
-        """branch delete without init shows welcome banner."""
+    def test_delete_fails_without_init(self, runner, tmp_path):
+        """branch delete without init is blocked by require_init."""
         with patch(
-            "dot_man.cli.common.DOT_MAN_DIR",
-            Path("/tmp/nonexistent-dot-man"),
+            "dot_man.constants.REPO_DIR",
+            tmp_path / "nonexistent-repo",
         ):
             result = runner.invoke(cli, ["branch", "delete", "x"])
         assert result.exit_code == 1
-        assert "Welcome" in result.output
+        assert "not initialized" in result.output.lower()
 
 
 # ---------------------------------------------------------------------------
@@ -202,7 +190,7 @@ class TestBranchList:
         """branch list handles GlobalConfig.load failure gracefully."""
         runner, _, _, _ = clean_env
         with patch(
-            "dot_man.global_config.GLOBAL_TOML",
+            "dot_man.constants.GLOBAL_TOML",
             Path("/nonexistent/global.toml"),
         ):
             result = runner.invoke(cli, ["branch", "list"])

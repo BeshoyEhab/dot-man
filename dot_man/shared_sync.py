@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .constants import CONFIG_FILE_PRIORITY, RESERVED_TABLES
+from .exceptions import DotManError
 
 __all__ = ["GitPlumbing", "GitPlumbingError", "SharedSectionSync", "SharedSyncReport"]
 
@@ -38,7 +39,7 @@ def _parse_toml(text: str) -> dict | None:
         import tomli
 
         return tomli.loads(text)  # type: ignore[no-any-return]
-    except Exception:
+    except (ImportError, ValueError):
         return None
 
 
@@ -46,11 +47,14 @@ def _parse_yaml(text: str) -> dict | None:
     """Parse YAML text if pyyaml is installed, else None."""
     try:
         import yaml  # type: ignore[import-untyped]
-
-        data = yaml.safe_load(text)
-        return data if isinstance(data, dict) else None
-    except Exception:
+    except ImportError:
         return None
+
+    try:
+        data = yaml.safe_load(text)
+    except yaml.YAMLError:
+        return None
+    return data if isinstance(data, dict) else None
 
 
 class GitPlumbingError(RuntimeError):
@@ -154,7 +158,8 @@ class SharedSectionSync:
             for name in config.get_section_names():
                 try:
                     section = config.get_section(name)
-                except Exception:
+                except (KeyError, DotManError) as e:
+                    logging.debug("Skipping unreadable section %s: %s", name, e)
                     continue
                 if getattr(section, "shared", False):
                     names.append(name)

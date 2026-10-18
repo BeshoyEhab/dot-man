@@ -4,8 +4,8 @@ import os
 
 import click
 
-from .. import ui
-from ..constants import DOT_MAN_TOML, REPO_DIR
+from .. import constants, ui
+from ..constants import DOT_MAN_TOML
 from .common import AliasedCommand, require_init, success
 from .interface import cli as main
 
@@ -31,7 +31,7 @@ def verify(fix: bool):
 
     # 1. Check config file is valid TOML
     ui.console.print("[bold]Configuration[/bold]")
-    if (REPO_DIR / DOT_MAN_TOML).exists():
+    if (constants.get_repo_dir() / DOT_MAN_TOML).exists():
         try:
             sections = ops.get_sections()
             ui.console.print(
@@ -76,7 +76,7 @@ def verify(fix: bool):
                     )
 
                 # Check corresponding repo path
-                repo_path = section.get_repo_path(p, REPO_DIR)
+                repo_path = section.get_repo_path(p, constants.get_repo_dir())
                 if not repo_path.exists():
                     ui.console.print("    [dim]↳ Not yet saved to repo[/dim]")
     except Exception as e:
@@ -94,7 +94,7 @@ def verify(fix: bool):
             )
             for p in orphans[:10]:  # Show max 10
                 try:
-                    rel = p.relative_to(REPO_DIR)
+                    rel = p.relative_to(constants.get_repo_dir())
                     ui.console.print(f"    - {rel}")
                 except ValueError:
                     ui.console.print(f"    - {p.name}")

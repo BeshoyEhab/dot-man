@@ -2,8 +2,7 @@
 
 import click
 
-from .. import ui
-from ..constants import REPO_DIR
+from .. import constants, ui
 from ..core import GitManager
 from ..exceptions import DotManError
 from ..secrets import PermanentRedactGuard, SecretGuard, SecretMatch, get_custom_scanner
@@ -51,10 +50,10 @@ def audit(strict: bool, fix: bool, dry_run: bool, history: bool):
 
         ui.console.print("🔒 [bold]Security Audit[/bold]")
         ui.console.print()
-        ui.console.print(f"Scanning [cyan]{REPO_DIR}[/cyan]...")
+        ui.console.print(f"Scanning [cyan]{constants.get_repo_dir()}[/cyan]...")
         ui.console.print()
 
-        all_matches = list(scanner.scan_directory(REPO_DIR))
+        all_matches = list(scanner.scan_directory(constants.get_repo_dir()))
 
         if history:
             git = GitManager()
@@ -110,7 +109,7 @@ def audit(strict: bool, fix: bool, dry_run: bool, history: bool):
                         f"[dim]({match.history_ref})[/dim]"
                     )
                 else:
-                    rel_path = match.file.relative_to(REPO_DIR)
+                    rel_path = match.file.relative_to(constants.get_repo_dir())
                     ui.console.print(f"  File: [cyan]{rel_path}[/cyan]")
                 ui.console.print(
                     f"  Line {match.line_number}: {match.masked_line[:60]}..."

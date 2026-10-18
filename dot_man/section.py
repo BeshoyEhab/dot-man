@@ -3,6 +3,7 @@
 __all__ = ["Section", "VALID_SECTION_KEYS"]
 
 import inspect
+import logging
 import os
 from pathlib import Path
 from typing import Any, Optional
@@ -11,7 +12,7 @@ from . import constants as _constants
 from .constants import (
     DEFAULT_IGNORED_DIRECTORIES,
 )
-from .exceptions import ConfigValidationError
+from .exceptions import ConfigValidationError, DotManError
 from .hook_engine import HookContext, resolve_hook
 
 
@@ -204,7 +205,8 @@ class Section:
             global_config = GlobalConfig()
             global_config.load()
             return global_config.current_branch
-        except Exception:
+        except (OSError, DotManError) as e:
+            logging.debug("Could not resolve current branch for placeholder: %s", e)
             return "unknown"
 
     def get_repo_path(self, local_path: Path, repo_dir: Path) -> Path:

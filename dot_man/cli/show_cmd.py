@@ -4,7 +4,7 @@ import subprocess
 
 import click
 
-from ..constants import REPO_DIR
+from .. import constants
 from .common import complete_commits, error, require_init
 from .interface import cli as main
 
@@ -24,6 +24,6 @@ def show(commit: str):
     """
     try:
         git_args = ["git", "show", "--color=always", commit]
-        subprocess.run(git_args, cwd=REPO_DIR)
+        subprocess.run(git_args, cwd=constants.get_repo_dir())
     except Exception as e:
         error(str(e))

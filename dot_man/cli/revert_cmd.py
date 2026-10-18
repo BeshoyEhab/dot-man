@@ -4,7 +4,7 @@ from pathlib import Path
 
 import click
 
-from .. import ui
+from .. import constants, ui
 from ..exceptions import DotManError
 from .common import AliasedCommand, complete_commits, error, require_init, success
 from .interface import cli as main
@@ -31,7 +31,7 @@ def revert(path: Path, force: bool, commit: str | None):
         dot-man revert ~/.bashrc -c abc1234    # Restore from specific commit
     """
     try:
-        from ..constants import REPO_DIR
+
         from ..operations import get_operations
 
         ops = get_operations()
@@ -57,8 +57,8 @@ def revert(path: Path, force: bool, commit: str | None):
                     for tracked_path in section.paths:
                         if tracked_path.resolve() == target_path:
                             repo_rel = section.get_repo_path(
-                                tracked_path, REPO_DIR
-                            ).relative_to(REPO_DIR)
+                                tracked_path, constants.get_repo_dir()
+                            ).relative_to(constants.get_repo_dir())
                             break
                     if repo_rel is not None:
                         break

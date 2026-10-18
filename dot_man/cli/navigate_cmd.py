@@ -6,8 +6,7 @@ from pathlib import Path
 
 import click
 
-from .. import ui
-from ..constants import LOCK_FILE, REPO_DIR
+from .. import constants, ui
 from ..core import GitManager
 from ..files import compare_files
 from ..hooks import run_checkout_hooks, run_switch_hooks
@@ -98,7 +97,7 @@ def get_changed_sections(ops) -> list[str]:
         for section_name in ops.get_sections():
             section = ops.get_section(section_name)
             for local_path in section.paths:
-                repo_path = section.get_repo_path(local_path, REPO_DIR)
+                repo_path = section.get_repo_path(local_path, constants.get_repo_dir())
                 if repo_path.exists():
                     if not local_path.exists() or not compare_files(
                         repo_path, local_path
@@ -442,7 +441,7 @@ def _collect_deploy_hooks(ops):
     for section_name in ops.get_sections():
         section = ops.get_section(section_name)
         for local_path in section.paths:
-            repo_path = section.get_repo_path(local_path, REPO_DIR)
+            repo_path = section.get_repo_path(local_path, constants.get_repo_dir())
             if repo_path.exists():
                 will_change = not local_path.exists() or not compare_files(
                     repo_path, local_path
@@ -562,7 +561,7 @@ def _collect_dry_run_deploy_items(ops):
         if section.post_deploy:
             post_hooks.append(section.post_deploy)
         for local_path in section.paths:
-            repo_path = section.get_repo_path(local_path, REPO_DIR)
+            repo_path = section.get_repo_path(local_path, constants.get_repo_dir())
             if repo_path.exists():
                 if not local_path.exists() or not compare_files(repo_path, local_path):
                     method = (
@@ -753,7 +752,7 @@ def _handle_branch_navigate(
     # save_all/deploy_all take the same lock; FileLock is reentrant per thread.
     deployed_count = 0
     try:
-        with FileLock(LOCK_FILE):
+        with FileLock(constants.get_lock_file()):
             _save_before_navigate(
                 ops, current_branch, target_branch, save_mode, commit_message
             )

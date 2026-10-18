@@ -16,7 +16,7 @@ def hook_dirs(tmp_path):
     repo_hooks.mkdir(parents=True)
     global_hooks.mkdir(parents=True)
     with (
-        patch("dot_man.hook_engine.REPO_DIR", tmp_path / "repo"),
+        patch("dot_man.constants.REPO_DIR", tmp_path / "repo"),
         patch("dot_man.hook_engine.HOOKS_DIR", global_hooks),
     ):
         yield repo_hooks, global_hooks

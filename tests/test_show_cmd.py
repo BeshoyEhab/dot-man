@@ -5,8 +5,8 @@ from unittest.mock import patch
 import pytest
 from click.testing import CliRunner
 
+from dot_man import constants
 from dot_man.cli.interface import cli
-from dot_man.constants import REPO_DIR
 
 
 @pytest.fixture
@@ -31,13 +31,13 @@ def test_show_commit(mock_run, integration_runner):
     assert result.exit_code == 0
 
     mock_run.assert_called_once_with(
-        ["git", "show", "--color=always", "abc1234"], cwd=REPO_DIR
+        ["git", "show", "--color=always", "abc1234"], cwd=constants.get_repo_dir()
     )
 
 
 def test_show_without_init(runner, tmp_path):
     """Test show without initialization."""
-    with patch("dot_man.cli.common.REPO_DIR", tmp_path / "norepo"):
+    with patch("dot_man.constants.REPO_DIR", tmp_path / "norepo"):
         result = runner.invoke(cli, ["show", "HEAD"])
         assert result.exit_code != 0
         assert "not initialized" in result.output.lower()

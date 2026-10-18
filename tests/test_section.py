@@ -410,7 +410,7 @@ class TestResolveHook:
 
         with (
             patch("dot_man.constants.REPO_DIR", repo_dir),
-            patch("dot_man.global_config.GLOBAL_TOML", global_toml),
+            patch("dot_man.constants.GLOBAL_TOML", global_toml),
         ):
             section = Section(name="test", paths=[], repo_base="/test")
             assert Section._get_current_branch() == "work"

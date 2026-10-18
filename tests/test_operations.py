@@ -3,6 +3,8 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from dot_man import constants
+
 
 def _ops():
     """Plain operations instance (lazy properties, no IO on init)."""
@@ -94,10 +96,10 @@ class TestOperationsModuleExports:
         assert FileLock is not None
 
     def test_lock_file_exported(self):
-        """Test LOCK_FILE is exported from operations."""
-        from dot_man.operations import LOCK_FILE
+        """Test the lock file path comes from constants."""
+        from dot_man.constants import get_lock_file
 
-        assert LOCK_FILE is not None
+        assert get_lock_file().name == ".lock"
 
     def test_save_deploy_mixin_exported(self):
         """Test SaveDeployMixin is exported."""
@@ -166,7 +168,6 @@ class TestIterSectionPaths:
 
     def test_deleted_reported(self, tmp_path, monkeypatch):
         """Repo files missing locally yield DELETED; filters still apply."""
-        import dot_man.operations as ops_mod
 
         repo_root = tmp_path / "repo"
         repo_dir = repo_root / "nvim" / "nvim"
@@ -174,7 +175,7 @@ class TestIterSectionPaths:
         (repo_dir / "keep.md").write_text("keep")
         (repo_dir / "skip.tmp").write_text("skip")
         (repo_dir / "other.lua").write_text("other")
-        monkeypatch.setattr(ops_mod, "REPO_DIR", repo_root)
+        monkeypatch.setattr(constants, "REPO_DIR", repo_root)
 
         missing = tmp_path / "nope" / "nvim"
         missing.mkdir(parents=True)

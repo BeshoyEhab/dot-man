@@ -5,6 +5,7 @@ import sys
 import pytest
 from click.testing import CliRunner
 
+from dot_man import constants
 from dot_man.cli.interface import cli
 
 
@@ -21,7 +22,7 @@ def _isolated_completion_cache(tmp_path, monkeypatch):
     monkeypatch.setattr(
         mod, "COMPLETION_CACHE_FILE", tmp_path / "completion_cache.json"
     )
-    monkeypatch.setattr(mod, "REPO_DIR", tmp_path)
+    monkeypatch.setattr(constants, "REPO_DIR", tmp_path)
     from dot_man.cli.common import _clear_all_caches
 
     _clear_all_caches()
@@ -57,7 +58,7 @@ class TestSwitchEnhancements:
         """Switch should handle uninitialized state."""
         from unittest.mock import patch
 
-        with patch("dot_man.cli.common.REPO_DIR", tmp_path / "norepo"):
+        with patch("dot_man.constants.REPO_DIR", tmp_path / "norepo"):
             result = runner.invoke(cli, ["switch", "main"])
             assert result.exit_code == 1
 

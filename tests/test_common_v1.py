@@ -61,8 +61,8 @@ class TestRequireInit:
         fake_dir = tmp_path / "nonexistent"
         runner = CliRunner()
         with (
-            patch("dot_man.cli.common.DOT_MAN_DIR", fake_dir),
-            patch("dot_man.cli.common.REPO_DIR", fake_dir / "repo"),
+            patch("dot_man.constants.DOT_MAN_DIR", fake_dir),
+            patch("dot_man.constants.REPO_DIR", fake_dir / "repo"),
         ):
             result = runner.invoke(cli, ["status"])
             assert result.exit_code == 1
@@ -76,11 +76,29 @@ class TestRequireInit:
         # No .git directory
         runner = CliRunner()
         with (
-            patch("dot_man.cli.common.DOT_MAN_DIR", fake_dir),
-            patch("dot_man.cli.common.REPO_DIR", repo_dir),
+            patch("dot_man.constants.DOT_MAN_DIR", fake_dir),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
         ):
             result = runner.invoke(cli, ["status"])
             assert result.exit_code != 0
+
+    def test_require_init_banner_when_uninitialized(self, tmp_path):
+        """A guarded command invoked directly shows the first-run banner.
+
+        Invoking the subcommand directly (rather than through the root
+        group) skips the group callback that creates ``DOT_MAN_DIR``, so
+        ``require_init`` sees an uninitialized install.
+        """
+        from dot_man.cli.branch_cmd import branch_list
+
+        runner = CliRunner()
+        with patch(
+            "dot_man.constants.DOT_MAN_DIR",
+            tmp_path / "missing-dot-man",
+        ):
+            result = runner.invoke(branch_list, [])
+        assert result.exit_code == 1
+        assert "Welcome to dot-man" in result.output
 
 
 class TestCompletionCaching:
@@ -278,7 +296,7 @@ class TestSecretHandlerBranches:
     def _make_handler(tmp_path, monkeypatch):
         from dot_man.cli.common import get_secret_handler
 
-        monkeypatch.setattr("dot_man.secrets.DOT_MAN_DIR", tmp_path)
+        monkeypatch.setattr("dot_man.constants.DOT_MAN_DIR", tmp_path)
         return get_secret_handler()
 
     def test_choice_one_ignores(self, tmp_path, monkeypatch):

@@ -5,7 +5,7 @@ from pathlib import Path
 
 import click
 
-from .. import ui
+from .. import constants, ui
 from .common import (
     AliasedCommand,
     complete_branches,
@@ -42,8 +42,6 @@ def log(
     try:
         import subprocess
 
-        from ..constants import REPO_DIR
-
         if interactive:
             from ..tui_log import LogViewerApp
 
@@ -69,8 +67,12 @@ def log(
                 section = ops.get_section(section_name)
                 for tracked_path in section.paths:
                     if tracked_path.resolve() == target_file:
-                        repo_path = section.get_repo_path(tracked_path, REPO_DIR)
-                        git_args.extend(["--", str(repo_path.relative_to(REPO_DIR))])
+                        repo_path = section.get_repo_path(
+                            tracked_path, constants.get_repo_dir()
+                        )
+                        git_args.extend(
+                            ["--", str(repo_path.relative_to(constants.get_repo_dir()))]
+                        )
                         found = True
                         break
                 if found:
@@ -81,7 +83,7 @@ def log(
                 return
 
         # Let git handle the pager and standard output natively
-        subprocess.run(git_args, cwd=REPO_DIR)
+        subprocess.run(git_args, cwd=constants.get_repo_dir())
 
     except Exception as e:
         error(str(e))
@@ -114,8 +116,6 @@ def diff(file: Path | None, branch: str | None, staged: bool, rich: bool):
     try:
         import subprocess
 
-        from ..constants import REPO_DIR
-
         if rich:
             _show_rich_diff(file, branch, staged)
         else:
@@ -141,7 +141,9 @@ def diff(file: Path | None, branch: str | None, staged: bool, rich: bool):
                     section = ops.get_section(section_name)
                     for tracked_path in section.paths:
                         if tracked_path.resolve() == target_file:
-                            repo_path = section.get_repo_path(tracked_path, REPO_DIR)
+                            repo_path = section.get_repo_path(
+                                tracked_path, constants.get_repo_dir()
+                            )
                             git_args.extend(
                                 ["--no-index", str(repo_path), str(target_file)]
                             )
@@ -154,7 +156,7 @@ def diff(file: Path | None, branch: str | None, staged: bool, rich: bool):
                     error(f"File not tracked: {target_file}")
                     return
 
-            subprocess.run(git_args, cwd=REPO_DIR)
+            subprocess.run(git_args, cwd=constants.get_repo_dir())
 
     except Exception as e:
         error(str(e))
@@ -284,8 +286,6 @@ def _show_rich_diff(file: Path | None, branch: str | None, staged: bool):
     # the rich imports (which run first) are what failed.
     import subprocess
 
-    from ..constants import REPO_DIR
-
     try:
         from rich.console import Console
         from rich.syntax import Syntax
@@ -314,7 +314,9 @@ def _show_rich_diff(file: Path | None, branch: str | None, staged: bool):
                 section = ops.get_section(section_name)
                 for tracked_path in section.paths:
                     if tracked_path.resolve() == target_file:
-                        repo_path = section.get_repo_path(tracked_path, REPO_DIR)
+                        repo_path = section.get_repo_path(
+                            tracked_path, constants.get_repo_dir()
+                        )
                         git_args.extend(
                             ["--no-index", str(repo_path), str(target_file)]
                         )
@@ -327,7 +329,9 @@ def _show_rich_diff(file: Path | None, branch: str | None, staged: bool):
                 error(f"File not tracked: {target_file}")
                 return
 
-        result = subprocess.run(git_args, cwd=REPO_DIR, capture_output=True, text=True)
+        result = subprocess.run(
+            git_args, cwd=constants.get_repo_dir(), capture_output=True, text=True
+        )
 
         if result.stdout:
             syntax = Syntax(result.stdout, "diff", theme="monokai", line_numbers=True)
@@ -352,4 +356,4 @@ def _show_rich_diff(file: Path | None, branch: str | None, staged: bool):
 
             ops = get_operations()
             git_args.append(f"{branch}...{ops.current_branch}")
-        subprocess.run(git_args, cwd=REPO_DIR)
+        subprocess.run(git_args, cwd=constants.get_repo_dir())

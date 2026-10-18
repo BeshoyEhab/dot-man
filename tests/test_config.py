@@ -32,7 +32,7 @@ def _section_to_toml(data: dict) -> str:
 def global_cfg(tmp_path):
     """Create a GlobalConfig pointing at a temp directory."""
     toml_path = tmp_path / "global.toml"
-    with patch("dot_man.global_config.GLOBAL_TOML", toml_path):
+    with patch("dot_man.constants.GLOBAL_TOML", toml_path):
         gc = GlobalConfig()
         gc.create_default()
         gc.load()
@@ -105,7 +105,7 @@ class TestGlobalConfig:
 
     def test_save_persistence(self, tmp_path):
         toml_path = tmp_path / "global.toml"
-        with patch("dot_man.global_config.GLOBAL_TOML", toml_path):
+        with patch("dot_man.constants.GLOBAL_TOML", toml_path):
             gc = GlobalConfig()
             gc.create_default()
             gc.current_branch = "test-persist"
@@ -118,7 +118,7 @@ class TestGlobalConfig:
     def test_full_property_round_trip(self, tmp_path):
         """Every settable property must survive save → reload with its exact value."""
         toml_path = tmp_path / "global.toml"
-        with patch("dot_man.global_config.GLOBAL_TOML", toml_path):
+        with patch("dot_man.constants.GLOBAL_TOML", toml_path):
             gc = GlobalConfig()
             gc.create_default()
             gc.current_branch = "work"
@@ -140,7 +140,7 @@ class TestGlobalConfig:
 
     def test_load_missing_raises(self, tmp_path):
         toml_path = tmp_path / "nonexistent.toml"
-        with patch("dot_man.global_config.GLOBAL_TOML", toml_path):
+        with patch("dot_man.constants.GLOBAL_TOML", toml_path):
             gc = GlobalConfig()
             with pytest.raises(ConfigurationError):
                 gc.load()
@@ -321,8 +321,8 @@ update_strategy = "rename_old"
 
     global_toml = tmp_path / "global.toml"
     with (
-        patch("dot_man.global_config.GLOBAL_TOML", global_toml),
-        patch("dot_man.config.REPO_DIR", repo_dir),
+        patch("dot_man.constants.GLOBAL_TOML", global_toml),
+        patch("dot_man.constants.REPO_DIR", repo_dir),
     ):
         gc = GlobalConfig()
         gc.create_default()
@@ -348,9 +348,9 @@ def load_from_toml(tmp_path):
         repo_dir.mkdir(exist_ok=True)
         (repo_dir / "dot-man.toml").write_text(toml_content)
         stack.enter_context(
-            patch("dot_man.global_config.GLOBAL_TOML", tmp_path / "global.toml")
+            patch("dot_man.constants.GLOBAL_TOML", tmp_path / "global.toml")
         )
-        stack.enter_context(patch("dot_man.config.REPO_DIR", repo_dir))
+        stack.enter_context(patch("dot_man.constants.REPO_DIR", repo_dir))
         gc = GlobalConfig()
         gc.create_default()
         gc.load()
@@ -487,8 +487,8 @@ inherits = ["base"]
         repo_dir.mkdir()
         global_toml = tmp_path / "global.toml"
         with (
-            patch("dot_man.global_config.GLOBAL_TOML", global_toml),
-            patch("dot_man.config.REPO_DIR", repo_dir),
+            patch("dot_man.constants.GLOBAL_TOML", global_toml),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
         ):
             gc = GlobalConfig()
             gc.create_default()
@@ -500,7 +500,7 @@ inherits = ["base"]
     def test_load_missing_raises(self, tmp_path):
         repo_dir = tmp_path / "repo"
         repo_dir.mkdir()
-        with patch("dot_man.config.REPO_DIR", repo_dir):
+        with patch("dot_man.constants.REPO_DIR", repo_dir):
             dc = DotManConfig(repo_path=repo_dir)
             with pytest.raises(ConfigurationError):
                 dc.load()
@@ -542,8 +542,8 @@ class TestDotManConfigModulePath:
         repo_dir = tmp_path / "repo"
         repo_dir.mkdir()
         with (
-            patch("dot_man.global_config.GLOBAL_TOML", tmp_path / "global.toml"),
-            patch("dot_man.config.REPO_DIR", repo_dir),
+            patch("dot_man.constants.GLOBAL_TOML", tmp_path / "global.toml"),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
         ):
             config = ModuleDotManConfig(repo_dir)
             with pytest.raises(ConfigurationError):

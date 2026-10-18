@@ -114,11 +114,8 @@ else:
 
 import tomlkit
 
-from .constants import (
-    DEFAULT_BRANCH,
-    DEFAULT_IGNORED_DIRECTORIES,
-    GLOBAL_TOML,
-)
+from . import constants
+from .constants import DEFAULT_BRANCH, DEFAULT_IGNORED_DIRECTORIES
 from .exceptions import ConfigurationError
 
 
@@ -235,7 +232,7 @@ class GlobalConfig:
 
     def __init__(self):
         self._data: dict = {}
-        self._path = GLOBAL_TOML
+        self._path = constants.get_global_toml()
         self._doc: Any = None  # For preserving comments
         self._dirty: bool = False
 

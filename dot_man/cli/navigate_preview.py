@@ -2,8 +2,7 @@
 
 import subprocess
 
-from .. import ui
-from ..constants import REPO_DIR
+from .. import constants, ui
 from ..core import GitManager
 
 
@@ -37,7 +36,7 @@ def show_branch_diff_preview(ops, source: str, target: str, show_diff: bool = Fa
                 ui.console.print("[bold]📄 Full Diff:[/bold]")
                 subprocess.run(
                     ["git", "diff", "--color=always", f"{source}...{target}"],
-                    cwd=REPO_DIR,
+                    cwd=constants.get_repo_dir(),
                 )
         except Exception as e:
             ui.console.print(f"  [dim]Could not diff branches: {e}[/dim]")
@@ -90,7 +89,8 @@ def show_commit_diff(ops, commit_sha: str):
         ui.console.print()
 
         subprocess.run(
-            ["git", "show", "--color=always", commit_sha, "--"], cwd=REPO_DIR
+            ["git", "show", "--color=always", commit_sha, "--"],
+            cwd=constants.get_repo_dir(),
         )
     except Exception as e:
         ui.console.print(f"  [dim]Could not show commit diff: {e}[/dim]")

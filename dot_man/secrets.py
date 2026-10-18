@@ -24,7 +24,8 @@ from typing import Any, Callable, Iterable, Iterator, TypedDict
 
 from git import GitCommandError
 
-from .constants import DOT_MAN_DIR, SECRET_REDACTION_TEXT
+from . import constants
+from .constants import SECRET_REDACTION_TEXT
 from .utils import sha256_hex
 
 
@@ -61,7 +62,7 @@ class BaseSecretGuard:
         path: Path | None = None,
         default_filename: str = "secrets.json",
     ):
-        self.config_dir = config_dir or DOT_MAN_DIR
+        self.config_dir = config_dir or constants.get_dot_man_dir()
         self.list_path = path or (self.config_dir / default_filename)
         self._secrets: list[AllowedSecret] = self._load()
 

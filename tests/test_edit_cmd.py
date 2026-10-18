@@ -110,8 +110,8 @@ class TestEditCommand:
         global_toml = tmp_path / "home" / ".config" / "dot-man" / "global.toml"
 
         with (
-            patch("dot_man.cli.edit_cmd.REPO_DIR", repo_dir),
-            patch("dot_man.cli.edit_cmd.GLOBAL_TOML", global_toml),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
+            patch("dot_man.constants.GLOBAL_TOML", global_toml),
         ):
             result = integration_runner.invoke(cli, ["edit", "--raw"])
 
@@ -129,8 +129,8 @@ class TestEditCommand:
         global_toml = tmp_path / "home" / ".config" / "dot-man" / "global.toml"
 
         with (
-            patch("dot_man.cli.edit_cmd.REPO_DIR", repo_dir),
-            patch("dot_man.cli.edit_cmd.GLOBAL_TOML", global_toml),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
+            patch("dot_man.constants.GLOBAL_TOML", global_toml),
         ):
             result = integration_runner.invoke(
                 cli, ["edit", "--raw", "--editor", "vim"]
@@ -149,8 +149,8 @@ class TestEditCommand:
         global_toml = tmp_path / "home" / ".config" / "dot-man" / "global.toml"
 
         with (
-            patch("dot_man.cli.edit_cmd.REPO_DIR", repo_dir),
-            patch("dot_man.cli.edit_cmd.GLOBAL_TOML", global_toml),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
+            patch("dot_man.constants.GLOBAL_TOML", global_toml),
         ):
             result = integration_runner.invoke(cli, ["edit", "--raw", "--global"])
 
@@ -164,8 +164,9 @@ class TestEditCommand:
     ):
         """--raw errors when file doesn't exist."""
         missing = tmp_path / "nonexistent"
+        (missing / ".git").mkdir(parents=True)
 
-        with patch("dot_man.cli.edit_cmd.REPO_DIR", missing):
+        with patch("dot_man.constants.REPO_DIR", missing):
             result = integration_runner.invoke(cli, ["edit", "--raw"])
 
         assert result.exit_code == 1
@@ -189,8 +190,8 @@ class TestEditCommand:
         global_toml = tmp_path / "home" / ".config" / "dot-man" / "global.toml"
 
         with (
-            patch("dot_man.cli.edit_cmd.REPO_DIR", repo_dir),
-            patch("dot_man.cli.edit_cmd.GLOBAL_TOML", global_toml),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
+            patch("dot_man.constants.GLOBAL_TOML", global_toml),
         ):
             result = integration_runner.invoke(cli, ["edit"])
 
@@ -212,8 +213,8 @@ class TestEditCommand:
         global_toml = tmp_path / "home" / ".config" / "dot-man" / "global.toml"
 
         with (
-            patch("dot_man.cli.edit_cmd.REPO_DIR", repo_dir),
-            patch("dot_man.cli.edit_cmd.GLOBAL_TOML", global_toml),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
+            patch("dot_man.constants.GLOBAL_TOML", global_toml),
             patch("dot_man.utils.open_in_editor", return_value=True),
             patch("dot_man.utils.get_editor", return_value="nano"),
         ):
@@ -238,8 +239,8 @@ class TestEditCommand:
         global_toml = tmp_path / "home" / ".config" / "dot-man" / "global.toml"
 
         with (
-            patch("dot_man.cli.edit_cmd.REPO_DIR", repo_dir),
-            patch("dot_man.cli.edit_cmd.GLOBAL_TOML", global_toml),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
+            patch("dot_man.constants.GLOBAL_TOML", global_toml),
             patch("dot_man.utils.open_in_editor", return_value=True),
             patch("dot_man.utils.get_editor", return_value="nano"),
         ):
@@ -264,8 +265,8 @@ class TestEditCommand:
         global_toml = tmp_path / "home" / ".config" / "dot-man" / "global.toml"
 
         with (
-            patch("dot_man.cli.edit_cmd.REPO_DIR", repo_dir),
-            patch("dot_man.cli.edit_cmd.GLOBAL_TOML", global_toml),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
+            patch("dot_man.constants.GLOBAL_TOML", global_toml),
             patch("dot_man.utils.open_in_editor", return_value=True),
             patch("dot_man.utils.get_editor", return_value="nano"),
         ):
@@ -288,8 +289,8 @@ class TestEditCommand:
         global_toml = tmp_path / "home" / ".config" / "dot-man" / "global.toml"
 
         with (
-            patch("dot_man.cli.edit_cmd.REPO_DIR", repo_dir),
-            patch("dot_man.cli.edit_cmd.GLOBAL_TOML", global_toml),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
+            patch("dot_man.constants.GLOBAL_TOML", global_toml),
             patch("dot_man.utils.open_in_editor", return_value=True),
             patch("dot_man.utils.get_editor", return_value="nano"),
         ):
@@ -302,8 +303,8 @@ class TestEditCommand:
         fake_dir = tmp_path / "nonexistent"
         runner = CliRunner()
         with (
-            patch("dot_man.cli.common.DOT_MAN_DIR", fake_dir),
-            patch("dot_man.cli.common.REPO_DIR", fake_dir / "repo"),
+            patch("dot_man.constants.DOT_MAN_DIR", fake_dir),
+            patch("dot_man.constants.REPO_DIR", fake_dir / "repo"),
         ):
             result = runner.invoke(cli, ["edit"])
             assert result.exit_code == 1

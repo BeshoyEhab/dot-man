@@ -200,12 +200,12 @@ green.
 
 | Done | Item | Impact | Effort | Complexity | Location |
 |------|------|--------|--------|-----------|----------|
-| [ ] | A1 Branch-switch workflow duplicated (library vs CLI) | High | L | High | `branch_ops.py:98-222` vs `navigate_cmd.py:578-750` |
+| [x] | A1 Branch-switch workflow duplicated (library vs CLI) | High | L | High | `branch_ops.py:98-222` vs `navigate_cmd.py:578-750` |
 | [x] | A2 ~370 lines of dead `merge.py` machinery; buggy merge | Med | M | Med | `merge.py:44-427` |
 | [x] | A3 Five overlapping hook vocabularies | Med | M | Med | `constants.py:80`, `merge.py`, `config_detector.py` |
-| [ ] | A4 Global singleton + import-time path binding (patch wall) | Med | M | High | `operations.py:198-212`, `tests/conftest.py:56-98` |
+| [x] | A4 Global singleton + import-time path binding (patch wall) | Med | M | High | `operations.py:198-212`, `tests/conftest.py:56-98` |
 | [x] | A5 Section schema duplicated across 4+ places | Med | M | Med | `dotman_config.py:24-44`, `section.py:29-51,232-278` |
-| [ ] | A6 153 `except Exception` clauses hide real bugs | Med | M | Med | `core.py:278,335,374`, `secrets.py:566`, … |
+| [x] | A6 153 `except Exception` clauses hide real bugs | Med | M | Med | `core.py:278,335,374`, `secrets.py:566`, … |
 | [x] | A7 `iter_section_paths`/pattern logic duplicated 4+× | Low-Med | M | Med | `operations.py:111-193`, `save_deploy_ops.py:389`, `navigate_cmd.py:427,490` |
 | [x] | A8 Dead/stale TUI + non-existent coverage omits + `textual` weight | Low-Med | S | Low | `cli/tui_cmd.py`, `pyproject.toml:110-123` |
 | [x] | A9 Unreachable dead block in `_switch_to_branch` | Low | S | Low | `navigate_cmd.py:651-698` |
@@ -275,14 +275,47 @@ scoped, not exhaustive:
 - **A12** — `status`, `doctor`, and `rollback` command bodies now delegate to
   module-level render/backup helpers.
 
+### Status (deferred pass)
+
+Resolved in the deferred pass (`phase-3-deferred` branch):
+
+- **A1 — resolved, no code change needed.** The duplication is already gone:
+  `rg switch_branch` finds no matches; `save_all` (save_deploy_ops.py:590) and
+  `deploy_all` (:632) each exist once; `branch_ops.py` keeps only abstract
+  stubs plus `revert_file`/hook helpers; `cli/navigate_cmd.py` holds the single
+  save→switch→deploy pipeline. The plan sanctioned "delete the library method
+  after C1/C2", which is what happened.
+- **A4 — paths now read at call time.** `constants.get_dot_man_dir()`,
+  `get_repo_dir()`, `get_backups_dir()`, `get_global_toml()`, `get_lock_file()`
+  read the module globals on every call, and every consumer (core, config,
+  global_config, dotman_config, operations, save_deploy_ops, branch_ops,
+  status_ops, backups, hooks, hook_engine, vault, secrets, and the CLI
+  commands) uses them instead of `from .constants import REPO_DIR`.
+  `conftest` now patches only `dot_man.constants.*` (plus `hooks.HOOKS_DIR`,
+  which is still derived at import), down from ~25 consumer-namespace targets.
+  A latent bug is fixed too: `LOCK_FILE` is derived at call time, so the lock
+  no longer lands in the developer's real `~/.config/dot-man` during tests.
+  Tests that relied on the old per-module duplication (ambient `~/.config`
+  state) were made self-sufficient; the two pre-existing `TestBranchWithoutInit`
+  failures are also fixed.
+- **A6b — broad-handler sweep finished.** An AST audit found every
+  `except Exception` handler that swallows silently; all are deliberate
+  never-raise guards (completion providers, best-effort parse/IO fallbacks).
+  The four genuine offenders were narrowed and now log at debug:
+  `shared_sync._parse_toml` → `(ImportError, ValueError)`,
+  `_parse_yaml` → `ImportError` + `yaml.YAMLError`,
+  `SharedSectionSync.get_shared_section_names` inner load →
+  `(KeyError, DotManError)`, and `Section._get_current_branch` →
+  `(OSError, DotManError)`.
+
 Still open — deliberately deferred, each a high-complexity change that
 deserves its own focused pass rather than a rushed edit:
 
-- **A1** — unify the library `branch_ops` switch path with the CLI pipeline.
-- **A4** — replace import-time `REPO_DIR`/path binding with call-time accessors
-  or injected config (retires conftest's ~25 patch targets).
-- **A6b** — sweep the remaining broad `except Exception` handlers.
-- **A11** — replace the mixin trio with composition / a host `Protocol`.
+- **A11** — replace the mixin trio with composition / a host `Protocol`. The
+  host surface is implicit and duplicated as ~23 `@abstractmethod` stubs, and
+  `FakeOps` (a BranchMixin subclass) re-implements it in tests. A full
+  composition swap touches four test files (24 call sites) for low impact;
+  recommended as a dedicated change.
 
 ---
 

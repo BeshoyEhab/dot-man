@@ -16,7 +16,7 @@ import pytest
 class TestIsFirstRun:
     """Tests for is_first_run()."""
 
-    @patch("dot_man.cli.onboarding.DOT_MAN_DIR")
+    @patch("dot_man.constants.DOT_MAN_DIR")
     @patch("dot_man.cli.onboarding.SENTINEL")
     def test_no_directory(self, mock_sentinel, mock_dir):
         """Returns True when DOT_MAN_DIR doesn't exist."""
@@ -25,7 +25,7 @@ class TestIsFirstRun:
         mock_dir.exists.return_value = False
         assert is_first_run() is True
 
-    @patch("dot_man.cli.onboarding.DOT_MAN_DIR")
+    @patch("dot_man.constants.DOT_MAN_DIR")
     @patch("dot_man.cli.onboarding.SENTINEL")
     def test_dir_no_sentinel(self, mock_sentinel, mock_dir):
         """Returns True when dir exists but sentinel is missing."""
@@ -35,7 +35,7 @@ class TestIsFirstRun:
         mock_sentinel.exists.return_value = False
         assert is_first_run() is True
 
-    @patch("dot_man.cli.onboarding.DOT_MAN_DIR")
+    @patch("dot_man.constants.DOT_MAN_DIR")
     @patch("dot_man.cli.onboarding.SENTINEL")
     def test_not_first_run(self, mock_sentinel, mock_dir):
         """Returns False when sentinel exists."""
@@ -49,7 +49,7 @@ class TestIsFirstRun:
 class TestMarkOnboarded:
     """Tests for mark_onboarded()."""
 
-    @patch("dot_man.cli.onboarding.DOT_MAN_DIR")
+    @patch("dot_man.constants.DOT_MAN_DIR")
     @patch("dot_man.cli.onboarding.SENTINEL")
     def test_creates_sentinel(self, mock_sentinel, mock_dir):
         """Sentinel file is created with correct args."""
@@ -212,7 +212,7 @@ class TestRunInitDirect:
     @patch("dot_man.core.GitManager")
     @patch("dot_man.constants.BACKUPS_DIR")
     @patch("dot_man.constants.REPO_DIR")
-    @patch("dot_man.cli.onboarding.DOT_MAN_DIR")
+    @patch("dot_man.constants.DOT_MAN_DIR")
     @patch("dot_man.constants.FILE_PERMISSIONS", 0o700)
     @patch("dot_man.utils.is_git_installed", return_value=True)
     def test_full_init_success(

@@ -2,8 +2,7 @@
 
 import click
 
-from .. import ui
-from ..constants import REPO_DIR
+from .. import constants, ui
 from ..exceptions import DotManError
 from ..files import compare_files
 from ..hooks import run_hook
@@ -94,7 +93,7 @@ def save(
             section = ops.get_section(section_name)
             has_changes = False
             for local_path in section.paths:
-                repo_path = section.get_repo_path(local_path, REPO_DIR)
+                repo_path = section.get_repo_path(local_path, constants.get_repo_dir())
                 if repo_path.exists():
                     if not local_path.exists() or not compare_files(
                         repo_path, local_path

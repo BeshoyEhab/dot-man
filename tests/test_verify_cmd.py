@@ -13,11 +13,11 @@ class TestVerify:
     def test_verify_clean_repo(self, tmp_path):
         """Verify clean repository shows no issues."""
         repo_dir = tmp_path / "repo"
-        repo_dir.mkdir()
+        (repo_dir / ".git").mkdir(parents=True)
         (repo_dir / "dot-man.toml").write_text("[main]\npaths = []\n")
 
         with (
-            patch("dot_man.cli.verify_cmd.REPO_DIR", repo_dir),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
             patch("dot_man.cli.verify_cmd.DOT_MAN_TOML", "dot-man.toml"),
             patch("dot_man.operations.get_operations") as mock_ops,
         ):
@@ -33,10 +33,10 @@ class TestVerify:
     def test_verify_missing_config(self, tmp_path):
         """Verify warns when dot-man.toml is missing."""
         repo_dir = tmp_path / "repo"
-        repo_dir.mkdir()
+        (repo_dir / ".git").mkdir(parents=True)
 
         with (
-            patch("dot_man.cli.verify_cmd.REPO_DIR", repo_dir),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
             patch("dot_man.cli.verify_cmd.DOT_MAN_TOML", "dot-man.toml"),
             patch("dot_man.operations.get_operations") as mock_ops,
         ):
@@ -52,11 +52,11 @@ class TestVerify:
     def test_verify_config_parse_error(self, tmp_path):
         """Verify reports config parse errors."""
         repo_dir = tmp_path / "repo"
-        repo_dir.mkdir()
+        (repo_dir / ".git").mkdir(parents=True)
         (repo_dir / "dot-man.toml").write_text("{{invalid}}")
 
         with (
-            patch("dot_man.cli.verify_cmd.REPO_DIR", repo_dir),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
             patch("dot_man.cli.verify_cmd.DOT_MAN_TOML", "dot-man.toml"),
             patch("dot_man.operations.get_operations") as mock_ops,
         ):
@@ -72,7 +72,7 @@ class TestVerify:
     def test_verify_missing_tracked_path(self, tmp_path):
         """Verify reports missing tracked paths."""
         repo_dir = tmp_path / "repo"
-        repo_dir.mkdir()
+        (repo_dir / ".git").mkdir(parents=True)
         (repo_dir / "dot-man.toml").write_text("[main]\npaths = []\n")
 
         section = MagicMock()
@@ -80,7 +80,7 @@ class TestVerify:
         section.get_repo_path.return_value = tmp_path / "nonexistent_repo.txt"
 
         with (
-            patch("dot_man.cli.verify_cmd.REPO_DIR", repo_dir),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
             patch("dot_man.cli.verify_cmd.DOT_MAN_TOML", "dot-man.toml"),
             patch("dot_man.operations.get_operations") as mock_ops,
         ):
@@ -97,7 +97,7 @@ class TestVerify:
     def test_verify_broken_symlink(self, tmp_path):
         """Verify detects broken symlinks."""
         repo_dir = tmp_path / "repo"
-        repo_dir.mkdir()
+        (repo_dir / ".git").mkdir(parents=True)
         (repo_dir / "dot-man.toml").write_text("[main]\npaths = []\n")
 
         broken_link = tmp_path / "broken_link"
@@ -108,7 +108,7 @@ class TestVerify:
         section.get_repo_path.return_value = tmp_path / "repo_path"
 
         with (
-            patch("dot_man.cli.verify_cmd.REPO_DIR", repo_dir),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
             patch("dot_man.cli.verify_cmd.DOT_MAN_TOML", "dot-man.toml"),
             patch("dot_man.operations.get_operations") as mock_ops,
         ):
@@ -125,11 +125,11 @@ class TestVerify:
     def test_verify_orphaned_files(self, tmp_path):
         """Verify detects orphaned files."""
         repo_dir = tmp_path / "repo"
-        repo_dir.mkdir()
+        (repo_dir / ".git").mkdir(parents=True)
         (repo_dir / "dot-man.toml").write_text("[main]\npaths = []\n")
 
         with (
-            patch("dot_man.cli.verify_cmd.REPO_DIR", repo_dir),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
             patch("dot_man.cli.verify_cmd.DOT_MAN_TOML", "dot-man.toml"),
             patch("dot_man.operations.get_operations") as mock_ops,
         ):
@@ -149,11 +149,11 @@ class TestVerify:
     def test_verify_fix_orphans(self, tmp_path):
         """Verify --fix deletes orphaned files."""
         repo_dir = tmp_path / "repo"
-        repo_dir.mkdir()
+        (repo_dir / ".git").mkdir(parents=True)
         (repo_dir / "dot-man.toml").write_text("[main]\npaths = []\n")
 
         with (
-            patch("dot_man.cli.verify_cmd.REPO_DIR", repo_dir),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
             patch("dot_man.cli.verify_cmd.DOT_MAN_TOML", "dot-man.toml"),
             patch("dot_man.operations.get_operations") as mock_ops,
         ):
@@ -172,11 +172,11 @@ class TestVerify:
     def test_verify_dirty_repo(self, tmp_path):
         """Verify reports uncommitted changes."""
         repo_dir = tmp_path / "repo"
-        repo_dir.mkdir()
+        (repo_dir / ".git").mkdir(parents=True)
         (repo_dir / "dot-man.toml").write_text("[main]\npaths = []\n")
 
         with (
-            patch("dot_man.cli.verify_cmd.REPO_DIR", repo_dir),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
             patch("dot_man.cli.verify_cmd.DOT_MAN_TOML", "dot-man.toml"),
             patch("dot_man.operations.get_operations") as mock_ops,
         ):
@@ -194,11 +194,11 @@ class TestVerify:
     def test_verify_handles_section_check_error(self, tmp_path):
         """Verify handles errors during section checking."""
         repo_dir = tmp_path / "repo"
-        repo_dir.mkdir()
+        (repo_dir / ".git").mkdir(parents=True)
         (repo_dir / "dot-man.toml").write_text("[main]\npaths = []\n")
 
         with (
-            patch("dot_man.cli.verify_cmd.REPO_DIR", repo_dir),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
             patch("dot_man.cli.verify_cmd.DOT_MAN_TOML", "dot-man.toml"),
             patch("dot_man.operations.get_operations") as mock_ops,
         ):
@@ -214,11 +214,11 @@ class TestVerify:
     def test_verify_handles_orphan_check_error(self, tmp_path):
         """Verify handles errors during orphan check."""
         repo_dir = tmp_path / "repo"
-        repo_dir.mkdir()
+        (repo_dir / ".git").mkdir(parents=True)
         (repo_dir / "dot-man.toml").write_text("[main]\npaths = []\n")
 
         with (
-            patch("dot_man.cli.verify_cmd.REPO_DIR", repo_dir),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
             patch("dot_man.cli.verify_cmd.DOT_MAN_TOML", "dot-man.toml"),
             patch("dot_man.operations.get_operations") as mock_ops,
         ):
@@ -235,11 +235,11 @@ class TestVerify:
     def test_verify_handles_git_status_error(self, tmp_path):
         """Verify handles errors during git status check."""
         repo_dir = tmp_path / "repo"
-        repo_dir.mkdir()
+        (repo_dir / ".git").mkdir(parents=True)
         (repo_dir / "dot-man.toml").write_text("[main]\npaths = []\n")
 
         with (
-            patch("dot_man.cli.verify_cmd.REPO_DIR", repo_dir),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
             patch("dot_man.cli.verify_cmd.DOT_MAN_TOML", "dot-man.toml"),
             patch("dot_man.operations.get_operations") as mock_ops,
         ):
@@ -255,13 +255,13 @@ class TestVerify:
     def test_verify_orphans_more_than_10(self, tmp_path):
         """Verify shows 'and X more' for >10 orphans."""
         repo_dir = tmp_path / "repo"
-        repo_dir.mkdir()
+        (repo_dir / ".git").mkdir(parents=True)
         (repo_dir / "dot-man.toml").write_text("[main]\npaths = []\n")
 
         orphans = [repo_dir / f"orphan{i}.txt" for i in range(15)]
 
         with (
-            patch("dot_man.cli.verify_cmd.REPO_DIR", repo_dir),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
             patch("dot_man.cli.verify_cmd.DOT_MAN_TOML", "dot-man.toml"),
             patch("dot_man.operations.get_operations") as mock_ops,
         ):
@@ -283,7 +283,7 @@ class TestVerify:
 def _verify_run(tmp_path, section, fix=False, orphans=None, repo_files=None):
     """Common harness: patched ops + CliRunner invocation of verify."""
     repo_dir = tmp_path / "repo"
-    repo_dir.mkdir(exist_ok=True)
+    (repo_dir / ".git").mkdir(parents=True, exist_ok=True)
     (repo_dir / "dot-man.toml").write_text("[main]\npaths = []\n")
     if repo_files:
         for rel in repo_files:
@@ -292,7 +292,7 @@ def _verify_run(tmp_path, section, fix=False, orphans=None, repo_files=None):
             target.write_text("x")
 
     with (
-        patch("dot_man.cli.verify_cmd.REPO_DIR", repo_dir),
+        patch("dot_man.constants.REPO_DIR", repo_dir),
         patch("dot_man.cli.verify_cmd.DOT_MAN_TOML", "dot-man.toml"),
         patch("dot_man.operations.get_operations") as mock_ops,
     ):
@@ -394,7 +394,7 @@ class TestVerifyCoverageFloor:
         (repo_dir / "untracked.txt").write_text("new")
 
         with (
-            patch("dot_man.cli.verify_cmd.REPO_DIR", repo_dir),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
             patch("dot_man.cli.verify_cmd.DOT_MAN_TOML", "dot-man.toml"),
             patch("dot_man.operations.get_operations") as mock_ops,
         ):
@@ -419,12 +419,12 @@ class TestVerifyCoverageFloor:
         section.get_repo_path.return_value = tmp_path / "repo_path"
 
         with (
-            patch("dot_man.cli.verify_cmd.REPO_DIR", tmp_path / "repo"),
+            patch("dot_man.constants.REPO_DIR", tmp_path / "repo"),
             patch("dot_man.cli.verify_cmd.DOT_MAN_TOML", "dot-man.toml"),
             patch("dot_man.operations.get_operations") as mock_ops,
         ):
             repo_dir = tmp_path / "repo"
-            repo_dir.mkdir(exist_ok=True)
+            (repo_dir / ".git").mkdir(parents=True, exist_ok=True)
             (repo_dir / "dot-man.toml").write_text("[main]\npaths = []\n")
             orphan = repo_dir / "orphan.txt"
             orphan.write_text("orphan")

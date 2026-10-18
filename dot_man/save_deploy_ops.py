@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
-from .constants import LOCK_FILE, REPO_DIR
+from . import constants
 from .files import (
     atomic_write_text,
     backup_file,
@@ -405,7 +405,7 @@ class SaveDeployMixin:
                 if local_path in symlink_ignore:
                     continue
 
-            repo_path = section.get_repo_path(local_path, REPO_DIR)
+            repo_path = section.get_repo_path(local_path, constants.get_repo_dir())
 
             try:
                 if self._is_encrypted_section(section):
@@ -458,7 +458,7 @@ class SaveDeployMixin:
         final_excludes = self._build_final_excludes(section)
 
         for local_path in section.paths:
-            repo_path = section.get_repo_path(local_path, REPO_DIR)
+            repo_path = section.get_repo_path(local_path, constants.get_repo_dir())
 
             if local_path.is_symlink():
                 errors.append(
@@ -500,7 +500,7 @@ class SaveDeployMixin:
 
         for section in sections:
             for local_path in section.paths:
-                repo_path = section.get_repo_path(local_path, REPO_DIR)
+                repo_path = section.get_repo_path(local_path, constants.get_repo_dir())
 
                 if section.update_strategy == "ignore" and local_path.exists():
                     continue
@@ -596,7 +596,7 @@ class SaveDeployMixin:
         Save all sections from local to repo.
         Returns dict with keys: 'saved', 'secrets', 'errors', 'symlinks'
         """
-        with FileLock(LOCK_FILE):
+        with FileLock(constants.get_lock_file()):
             total_saved = 0
             all_secrets: list[SecretMatch] = []
             all_errors: list[str] = []
@@ -634,7 +634,7 @@ class SaveDeployMixin:
         Deploy all sections from repo to local (Two-Phase).
         Returns dict with keys: 'deployed', 'pre_hooks', 'post_hooks', 'errors'
         """
-        with FileLock(LOCK_FILE):
+        with FileLock(constants.get_lock_file()):
             sections = [self.get_section(name) for name in self.get_sections()]
             plan = self.scan_deployable_changes(sections)
             result = self.execute_deployment_plan(plan)

@@ -6,13 +6,8 @@ import logging
 from pathlib import Path
 from typing import Any, cast
 
-from . import ui
-from .constants import (
-    CONFIG_FILE_PRIORITY,
-    DOT_MAN_TOML,
-    REPO_DIR,
-    RESERVED_TABLES,
-)
+from . import constants, ui
+from .constants import CONFIG_FILE_PRIORITY, DOT_MAN_TOML, RESERVED_TABLES
 from .exceptions import ConfigurationError, ConfigValidationError
 from .global_config import (
     GlobalConfig,
@@ -30,7 +25,7 @@ class DotManConfig:
         self, repo_path: Path | None = None, global_config: GlobalConfig | None = None
     ):
         self._data: dict = {}
-        self._repo_path = repo_path or REPO_DIR
+        self._repo_path = repo_path or constants.get_repo_dir()
 
         # Find first existing config file in priority order
         config_files = [self._repo_path / f for f in CONFIG_FILE_PRIORITY]

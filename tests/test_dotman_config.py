@@ -12,7 +12,7 @@ class TestDotManConfigInit:
         """Test DotManConfig with default path."""
         from dot_man.dotman_config import DotManConfig
 
-        with patch("dot_man.dotman_config.REPO_DIR", tmp_path):
+        with patch("dot_man.constants.REPO_DIR", tmp_path):
             config = DotManConfig()
             assert config.repo_path == tmp_path
 
@@ -43,7 +43,7 @@ class TestDotManConfigLoad:
         from dot_man.dotman_config import DotManConfig
         from dot_man.exceptions import ConfigurationError
 
-        with patch("dot_man.dotman_config.REPO_DIR", tmp_path):
+        with patch("dot_man.constants.REPO_DIR", tmp_path):
             config = DotManConfig()
             with pytest.raises(ConfigurationError):
                 config.load()
@@ -56,7 +56,7 @@ class TestDotManConfigSave:
         """Test save with no document."""
         from dot_man.dotman_config import DotManConfig
 
-        with patch("dot_man.dotman_config.REPO_DIR", tmp_path):
+        with patch("dot_man.constants.REPO_DIR", tmp_path):
             config = DotManConfig()
             config.save()  # Should not raise
 

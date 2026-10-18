@@ -24,11 +24,7 @@ def mock_config(tmp_path):
 
     # Mock constants
     with (
-        patch("dot_man.cli.common.DOT_MAN_DIR", dot_man_dir),
-        patch("dot_man.cli.common.REPO_DIR", repo_dir),
-        patch("dot_man.cli.navigate_cmd.REPO_DIR", repo_dir),
-        patch("dot_man.operations.REPO_DIR", repo_dir),
-        patch("dot_man.config.REPO_DIR", repo_dir),
+        patch("dot_man.constants.DOT_MAN_DIR", dot_man_dir),
         patch("dot_man.constants.REPO_DIR", repo_dir),
     ):
         yield {

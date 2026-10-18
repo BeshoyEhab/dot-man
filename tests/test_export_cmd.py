@@ -26,8 +26,15 @@ def initialized(tmp_path):
     """Pretend dot-man is initialized so require_init passes."""
     dotman_dir = tmp_path / "config"
     dotman_dir.mkdir()
-    with patch("dot_man.cli.common.DOT_MAN_DIR", dotman_dir):
+    with patch("dot_man.constants.DOT_MAN_DIR", dotman_dir):
         yield dotman_dir
+
+
+def _init_empty_repo(tmp_path: Path) -> Path:
+    """Create an empty-but-valid repo tree so ``require_init`` passes."""
+    repo = tmp_path / "repo"
+    (repo / ".git").mkdir(parents=True, exist_ok=True)
+    return repo
 
 
 def _make_repo(tmp_path: Path) -> tuple[Path, GitManager, str]:
@@ -70,7 +77,7 @@ class TestExportArchive:
 
         with (
             patch("dot_man.operations.get_operations", return_value=ops),
-            patch("dot_man.cli.export_cmd.REPO_DIR", repo_dir),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
         ):
             result = runner.invoke(
                 cli, ["export", "tar", str(output), "--branch", "work"]
@@ -88,7 +95,7 @@ class TestExportArchive:
 
         with (
             patch("dot_man.operations.get_operations", return_value=ops),
-            patch("dot_man.cli.export_cmd.REPO_DIR", repo_dir),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
         ):
             result = runner.invoke(cli, ["export", "zip", str(output)])
 
@@ -102,7 +109,7 @@ class TestExportArchive:
 
         with (
             patch("dot_man.operations.get_operations", return_value=ops),
-            patch("dot_man.cli.export_cmd.REPO_DIR", repo_dir),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
         ):
             result = runner.invoke(cli, ["export", "tar", str(tmp_path / "backup")])
 
@@ -140,7 +147,7 @@ class TestExportJson:
         output = tmp_path / "manifest.json"
         with (
             patch("dot_man.operations.get_operations", return_value=ops),
-            patch("dot_man.cli.export_cmd.REPO_DIR", tmp_path / "repo"),
+            patch("dot_man.constants.REPO_DIR", _init_empty_repo(tmp_path)),
         ):
             result = runner.invoke(cli, ["export", "json", str(output)])
 
@@ -164,7 +171,7 @@ class TestExportJson:
         output = tmp_path / "manifest.json"
         with (
             patch("dot_man.operations.get_operations", return_value=ops),
-            patch("dot_man.cli.export_cmd.REPO_DIR", tmp_path / "repo"),
+            patch("dot_man.constants.REPO_DIR", _init_empty_repo(tmp_path)),
         ):
             runner.invoke(cli, ["export", "json", str(output)])
 
@@ -186,7 +193,7 @@ class TestExportJson:
         output = tmp_path / "manifest.json"
         with (
             patch("dot_man.operations.get_operations", return_value=ops),
-            patch("dot_man.cli.export_cmd.REPO_DIR", tmp_path / "repo"),
+            patch("dot_man.constants.REPO_DIR", _init_empty_repo(tmp_path)),
         ):
             result = runner.invoke(
                 cli, ["export", "json", str(output), "--include-secrets"]

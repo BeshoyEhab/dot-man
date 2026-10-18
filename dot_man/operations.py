@@ -18,16 +18,16 @@ import os
 from pathlib import Path
 from typing import Iterator, Optional, TypedDict
 
+from . import constants
 from .backups import BackupManager
 from .branch_ops import BranchMixin
 from .config import DotManConfig, GlobalConfig, Section
-from .constants import REPO_DIR
 from .core import GitManager
 from .files import get_file_status, matches_patterns
 from .lock import FileLock  # noqa: F401 (re-exported for test_lock.py)
 
 # Import mixins
-from .save_deploy_ops import LOCK_FILE, SaveDeployMixin  # noqa: F401 (re-exported)
+from .save_deploy_ops import SaveDeployMixin
 from .status_ops import StatusMixin
 from .vault import SecretVault
 
@@ -121,7 +121,7 @@ class DotManOperations(SaveDeployMixin, BranchMixin, StatusMixin):
             (local_path, repo_path, status)
         """
         for local_path in section.paths:
-            repo_path = section.get_repo_path(local_path, REPO_DIR)
+            repo_path = section.get_repo_path(local_path, constants.get_repo_dir())
 
             if local_path.is_dir():
                 # For directories, iterate over files inside

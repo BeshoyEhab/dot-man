@@ -2,7 +2,7 @@
 
 import click
 
-from .. import ui
+from .. import constants, ui
 from .common import error, require_init, success, warn
 from .interface import cli as main
 
@@ -74,15 +74,15 @@ def _rotate_key(dry_run: bool = False):
 
 def _vault_status():
     """Show vault statistics."""
-    from ..constants import DOT_MAN_DIR
+
     from ..vault import SecretVault
 
     vault = SecretVault()
     vault.load()
 
-    key_file = DOT_MAN_DIR / ".key"
-    vault_file = DOT_MAN_DIR / "vault.json"
-    backup_file = DOT_MAN_DIR / ".key.bak"
+    key_file = constants.get_dot_man_dir() / ".key"
+    vault_file = constants.get_dot_man_dir() / "vault.json"
+    backup_file = constants.get_dot_man_dir() / ".key.bak"
 
     count = len(vault._data.get("secrets", []))
 

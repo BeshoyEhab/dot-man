@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from git import GitCommandError
 
-from .constants import REPO_DIR
+from . import constants
 from .exceptions import DotManError
 from .files import atomic_write_text, copy_file
 from .hook_engine import (
@@ -86,13 +86,13 @@ class BranchMixin:
             section = self.get_section(section_name)
             if path in section.paths:
                 target_section = section
-                repo_source = section.get_repo_path(path, REPO_DIR)
+                repo_source = section.get_repo_path(path, constants.get_repo_dir())
                 break
 
             for p in section.paths:
                 if p.is_dir() and p in path.parents:
                     target_section = section
-                    repo_source = section.get_repo_path(path, REPO_DIR)
+                    repo_source = section.get_repo_path(path, constants.get_repo_dir())
                     break
 
             if target_section:

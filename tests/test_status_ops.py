@@ -71,7 +71,7 @@ class TestAudit:
             secrets_filter=False,
         )
         ops = FakeOps(sections={"nvim": section}, current_branch="main")
-        with patch("dot_man.status_ops.REPO_DIR", tmp_path):
+        with patch("dot_man.constants.REPO_DIR", tmp_path):
             result = ops.audit()
             assert result == []
 
@@ -90,7 +90,7 @@ class TestAudit:
             secrets_filter=True,
         )
         ops = FakeOps(sections={"test": section}, current_branch="main")
-        with patch("dot_man.status_ops.REPO_DIR", tmp_path):
+        with patch("dot_man.constants.REPO_DIR", tmp_path):
             result = ops.audit()
             section_name, matches = result[0]
             assert section_name == "test"
@@ -148,7 +148,7 @@ class TestGetDetailedStatus:
             secrets_filter=False,
         )
         ops = FakeOps(sections={"bash": section}, current_branch="main")
-        with patch("dot_man.status_ops.REPO_DIR", tmp_path / "repo"):
+        with patch("dot_man.constants.REPO_DIR", tmp_path / "repo"):
             items = list(ops.get_detailed_status())
             assert len(items) == 1
             assert items[0]["section"] == "bash"
@@ -187,7 +187,7 @@ class TestGetDetailedStatus:
             current_branch="main",
             repo_dir=repo,
         )
-        with patch("dot_man.status_ops.REPO_DIR", repo):
+        with patch("dot_man.constants.REPO_DIR", repo):
             items = list(ops.get_detailed_status())
             sections = {i["section"] for i in items}
             assert "bash" in sections
@@ -225,7 +225,7 @@ class TestGetStatusSummary:
             secrets_filter=False,
         )
         ops = FakeOps(sections={"bash": section}, current_branch="main")
-        with patch("dot_man.status_ops.REPO_DIR", repo):
+        with patch("dot_man.constants.REPO_DIR", repo):
             summary = ops.get_status_summary()
             assert summary["sections"] == 1
             assert summary["total_paths"] == 1
@@ -256,7 +256,7 @@ class TestGetOrphanedFiles:
             secrets_filter=False,
         )
         ops = FakeOps(sections={"bash": section}, current_branch="main")
-        with patch("dot_man.status_ops.REPO_DIR", repo_dir):
+        with patch("dot_man.constants.REPO_DIR", repo_dir):
             orphans = ops.get_orphaned_files()
             assert tracked_file not in orphans
 
@@ -278,7 +278,7 @@ class TestGetOrphanedFiles:
             secrets_filter=False,
         )
         ops = FakeOps(sections={"bash": section}, current_branch="main")
-        with patch("dot_man.status_ops.REPO_DIR", repo_dir):
+        with patch("dot_man.constants.REPO_DIR", repo_dir):
             orphans = ops.get_orphaned_files()
             assert any("orphan.txt" in str(o) for o in orphans)
 
@@ -290,7 +290,7 @@ class TestGetOrphanedFiles:
         (repo_dir / "dot-man.toml").write_text("[test]")
 
         ops = FakeOps(sections={}, current_branch="main")
-        with patch("dot_man.status_ops.REPO_DIR", repo_dir):
+        with patch("dot_man.constants.REPO_DIR", repo_dir):
             orphans = ops.get_orphaned_files()
             assert not any(".gitignore" in str(o) for o in orphans)
             assert not any("dot-man.toml" in str(o) for o in orphans)
@@ -310,7 +310,7 @@ class TestCleanOrphanedFiles:
         orphan.write_text("orphan")
 
         ops = FakeOps(sections={}, current_branch="main")
-        with patch("dot_man.status_ops.REPO_DIR", repo_dir):
+        with patch("dot_man.constants.REPO_DIR", repo_dir):
             result = ops.clean_orphaned_files(dry_run=True)
             assert orphan in result
             assert orphan.exists()
@@ -323,7 +323,7 @@ class TestCleanOrphanedFiles:
         orphan.write_text("orphan")
 
         ops = FakeOps(sections={}, current_branch="main")
-        with patch("dot_man.status_ops.REPO_DIR", repo_dir):
+        with patch("dot_man.constants.REPO_DIR", repo_dir):
             result = ops.clean_orphaned_files(dry_run=False)
             assert orphan in result
             assert not orphan.exists()
@@ -336,7 +336,7 @@ class TestCleanOrphanedFiles:
         nested.write_text("orphan")
 
         ops = FakeOps(sections={}, current_branch="main")
-        with patch("dot_man.status_ops.REPO_DIR", repo_dir):
+        with patch("dot_man.constants.REPO_DIR", repo_dir):
             ops.clean_orphaned_files(dry_run=False)
             assert not nested.exists()
             assert not nested.parent.exists()
@@ -350,7 +350,7 @@ class TestCleanOrphanedFiles:
 
         ops = FakeOps(sections={}, current_branch="main")
         with (
-            patch("dot_man.status_ops.REPO_DIR", repo_dir),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
             patch(
                 "dot_man.status_ops.Path.unlink",
                 side_effect=OSError("Permission denied"),
@@ -406,7 +406,7 @@ def test_audit_scans_directory_sections(tmp_path):
         secrets_filter=True,
     )
     ops = FakeOps(sections={"d": section}, current_branch="main")
-    with patch("dot_man.status_ops.REPO_DIR", tmp_path):
+    with patch("dot_man.constants.REPO_DIR", tmp_path):
         results = ops.audit()
 
     assert len(results) == 1
@@ -436,14 +436,14 @@ def test_pre_push_non_strict_asks_confirm(tmp_path):
     )
 
     with (
-        patch("dot_man.status_ops.REPO_DIR", tmp_path),
+        patch("dot_man.constants.REPO_DIR", tmp_path),
         patch("dot_man.ui.confirm", return_value=False) as mock_confirm,
     ):
         assert ops.pre_push_audit() is False
         mock_confirm.assert_called_once()
 
     with (
-        patch("dot_man.status_ops.REPO_DIR", tmp_path),
+        patch("dot_man.constants.REPO_DIR", tmp_path),
         patch("dot_man.ui.confirm", return_value=True),
     ):
         assert ops.pre_push_audit() is True
@@ -467,7 +467,7 @@ def test_orphans_explicit_repo_path_section(tmp_path):
         secrets_filter=False,
     )
     ops = FakeOps(sections={"solo": section}, current_branch="main")
-    with patch("dot_man.status_ops.REPO_DIR", repo_dir):
+    with patch("dot_man.constants.REPO_DIR", repo_dir):
         orphans = ops.get_orphaned_files()
 
     assert repo_dir / "orphan.txt" in orphans
@@ -492,7 +492,7 @@ def test_orphans_directory_section_not_orphaned(tmp_path):
         secrets_filter=False,
     )
     ops = FakeOps(sections={"app": section}, current_branch="main")
-    with patch("dot_man.status_ops.REPO_DIR", repo_dir):
+    with patch("dot_man.constants.REPO_DIR", repo_dir):
         orphans = ops.get_orphaned_files()
 
     assert repo_dir / "orphan.txt" in orphans
@@ -517,7 +517,7 @@ def test_clean_rmdir_oserror_stops_descent(tmp_path):
         secrets_filter=False,
     )
     ops = FakeOps(sections={"keep": section}, current_branch="main")
-    with patch("dot_man.status_ops.REPO_DIR", repo_dir):
+    with patch("dot_man.constants.REPO_DIR", repo_dir):
         deleted = ops.clean_orphaned_files(dry_run=False)
 
     assert (mixed / "orphan.txt") in deleted

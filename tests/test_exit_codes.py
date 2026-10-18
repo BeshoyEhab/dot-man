@@ -137,10 +137,8 @@ class TestDoctorFailureExit:
         repo_dir.mkdir(parents=True)
         (repo_dir / ".git").mkdir()
         with (
-            patch("dot_man.cli.common.DOT_MAN_DIR", dot_man_dir),
-            patch("dot_man.cli.common.REPO_DIR", repo_dir),
-            patch("dot_man.cli.doctor_cmd.DOT_MAN_DIR", dot_man_dir),
-            patch("dot_man.cli.doctor_cmd.REPO_DIR", repo_dir),
+            patch("dot_man.constants.DOT_MAN_DIR", dot_man_dir),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
             patch(
                 "dot_man.operations.get_operations",
                 side_effect=RuntimeError("ops boom"),

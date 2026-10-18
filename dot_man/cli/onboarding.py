@@ -14,13 +14,13 @@ from rich.prompt import Confirm, Prompt
 from rich.rule import Rule
 from rich.text import Text
 
-from ..constants import DOT_MAN_DIR
+from .. import constants
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Sentinel / detection
 # ──────────────────────────────────────────────────────────────────────────────
 
-SENTINEL = DOT_MAN_DIR / ".onboarded"
+SENTINEL = constants.get_dot_man_dir() / ".onboarded"
 
 _console = Console()
 
@@ -33,14 +33,14 @@ def is_first_run() -> bool:
       - the directory exists but the .onboarded sentinel is missing
         (e.g. the user deleted it to replay the onboarding flow).
     """
-    if not DOT_MAN_DIR.exists():
+    if not constants.get_dot_man_dir().exists():
         return True
     return not SENTINEL.exists()
 
 
 def mark_onboarded() -> None:
     """Write the sentinel file so the onboarding flow never re-fires."""
-    DOT_MAN_DIR.mkdir(parents=True, exist_ok=True)
+    constants.get_dot_man_dir().mkdir(parents=True, exist_ok=True)
     SENTINEL.touch()
 
 
@@ -139,7 +139,7 @@ def _run_init_direct() -> bool:
     try:
         from .. import ui
         from ..config import DotManConfig, GlobalConfig
-        from ..constants import BACKUPS_DIR, FILE_PERMISSIONS, REPO_DIR
+        from ..constants import FILE_PERMISSIONS
         from ..core import GitManager
         from ..utils import is_git_installed
 
@@ -148,10 +148,10 @@ def _run_init_direct() -> bool:
             return False
 
         # Create directories
-        DOT_MAN_DIR.mkdir(parents=True, exist_ok=True)
-        DOT_MAN_DIR.chmod(FILE_PERMISSIONS)
-        REPO_DIR.mkdir(parents=True, exist_ok=True)
-        BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
+        constants.get_dot_man_dir().mkdir(parents=True, exist_ok=True)
+        constants.get_dot_man_dir().chmod(FILE_PERMISSIONS)
+        constants.get_repo_dir().mkdir(parents=True, exist_ok=True)
+        constants.get_backups_dir().mkdir(parents=True, exist_ok=True)
 
         # Git init
         git = GitManager()

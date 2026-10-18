@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from dot_man import constants
 from dot_man.cli.common import _clear_all_caches, _set_git_runner, complete_sections
 
 comp = importlib.import_module("dot_man.cli.completions")
@@ -21,7 +22,7 @@ def _isolated_completion_cache(tmp_path, monkeypatch):
     monkeypatch.setattr(
         comp, "COMPLETION_CACHE_FILE", tmp_path / "completion_cache.json"
     )
-    monkeypatch.setattr(comp, "REPO_DIR", tmp_path)
+    monkeypatch.setattr(constants, "REPO_DIR", tmp_path)
     _clear_all_caches()
     yield
     _clear_all_caches()
@@ -104,7 +105,7 @@ paths = ["~/.config/kitty"]
 """,
         )
 
-        with patch("dot_man.dotman_config.REPO_DIR", repo_dir):
+        with patch("dot_man.constants.REPO_DIR", repo_dir):
             _clear_all_caches()
             result = complete_sections(None, None, "")
             assert "nvim" in result
@@ -126,7 +127,7 @@ paths = ["~/.config/neovim"]
 """,
         )
 
-        with patch("dot_man.dotman_config.REPO_DIR", repo_dir):
+        with patch("dot_man.constants.REPO_DIR", repo_dir):
             _clear_all_caches()
             result = complete_sections(None, None, "ki")
             assert result == ["kitty"]
@@ -144,7 +145,7 @@ paths = ["~/.config/nvim"]
 """,
         )
 
-        with patch("dot_man.dotman_config.REPO_DIR", repo_dir):
+        with patch("dot_man.constants.REPO_DIR", repo_dir):
             _clear_all_caches()
             result = complete_sections(None, None, "z")
             assert result == []
@@ -153,7 +154,7 @@ paths = ["~/.config/nvim"]
         """complete_sections should return empty list when no sections."""
         repo_dir = self._make_config(tmp_path, "")
 
-        with patch("dot_man.dotman_config.REPO_DIR", repo_dir):
+        with patch("dot_man.constants.REPO_DIR", repo_dir):
             _clear_all_caches()
             result = complete_sections(None, None, "")
             assert result == []
@@ -163,7 +164,7 @@ paths = ["~/.config/nvim"]
         repo_dir = tmp_path / ".dot-man" / "repo"
         repo_dir.mkdir(parents=True)
 
-        with patch("dot_man.dotman_config.REPO_DIR", repo_dir):
+        with patch("dot_man.constants.REPO_DIR", repo_dir):
             _clear_all_caches()
             result = complete_sections(None, None, "")
             assert result == []
@@ -229,7 +230,7 @@ class TestCompletionFileCache:
 
     def test_missing_repo_dir_returns_empty(self, tmp_path, clean_completion_state):
         """_get_completion_cache should return {} when REPO_DIR is absent."""
-        with patch.object(comp, "REPO_DIR", tmp_path / "nope"):
+        with patch.object(constants, "REPO_DIR", tmp_path / "nope"):
             assert comp._get_completion_cache() == {}
 
     def test_loads_fresh_cache_file(self, tmp_path, clean_completion_state):
@@ -237,7 +238,7 @@ class TestCompletionFileCache:
         cache_file = tmp_path / "completion_cache.json"
         cache_file.write_text('{"branches": ["cached-branch"]}')
         with (
-            patch.object(comp, "REPO_DIR", tmp_path),
+            patch.object(constants, "REPO_DIR", tmp_path),
             patch.object(comp, "COMPLETION_CACHE_FILE", cache_file),
         ):
             assert comp._get_completion_cache() == {"branches": ["cached-branch"]}
@@ -247,7 +248,7 @@ class TestCompletionFileCache:
         cache_file = tmp_path / "completion_cache.json"
         cache_file.write_text("not json{{{")
         with (
-            patch.object(comp, "REPO_DIR", tmp_path),
+            patch.object(constants, "REPO_DIR", tmp_path),
             patch.object(comp, "COMPLETION_CACHE_FILE", cache_file),
         ):
             assert comp._get_completion_cache() == {}
@@ -256,7 +257,7 @@ class TestCompletionFileCache:
         """_get_completion_cache should prefer fresh in-memory data."""
         cache_file = tmp_path / "completion_cache.json"
         with (
-            patch.object(comp, "REPO_DIR", tmp_path),
+            patch.object(constants, "REPO_DIR", tmp_path),
             patch.object(comp, "COMPLETION_CACHE_FILE", cache_file),
         ):
             comp._save_completion_cache({"branches": ["mem"]})
@@ -264,7 +265,7 @@ class TestCompletionFileCache:
 
     def test_save_skips_write_when_repo_missing(self, tmp_path, clean_completion_state):
         """_save_completion_cache should keep memory cache without repo dir."""
-        with patch.object(comp, "REPO_DIR", tmp_path / "nope"):
+        with patch.object(constants, "REPO_DIR", tmp_path / "nope"):
             comp._save_completion_cache({"a": 1})
             assert comp._memory_cache == {"a": 1}
 
@@ -273,7 +274,7 @@ class TestCompletionFileCache:
         blocker = tmp_path / "blocker"
         blocker.write_text("x")
         with (
-            patch.object(comp, "REPO_DIR", tmp_path),
+            patch.object(constants, "REPO_DIR", tmp_path),
             patch.object(
                 comp,
                 "COMPLETION_CACHE_FILE",
@@ -329,7 +330,7 @@ class TestCompleteNavigateItems:
         """Current branch should carry the 'current branch' help text."""
         cache_file = tmp_path / "cache.json"
         with (
-            patch.object(comp, "REPO_DIR", tmp_path),
+            patch.object(constants, "REPO_DIR", tmp_path),
             patch.object(comp, "COMPLETION_CACHE_FILE", cache_file),
         ):
             comp._set_git_runner(make_navigate_runner())
@@ -352,7 +353,7 @@ class TestCompleteNavigateItems:
 
         cache_file = tmp_path / "cache.json"
         with (
-            patch.object(comp, "REPO_DIR", tmp_path),
+            patch.object(constants, "REPO_DIR", tmp_path),
             patch.object(comp, "COMPLETION_CACHE_FILE", cache_file),
         ):
             comp._save_completion_cache(
@@ -376,7 +377,7 @@ class TestCompleteNavigateItems:
         """Tag items should show the short commit hash in help."""
         cache_file = tmp_path / "cache.json"
         with (
-            patch.object(comp, "REPO_DIR", tmp_path),
+            patch.object(constants, "REPO_DIR", tmp_path),
             patch.object(comp, "COMPLETION_CACHE_FILE", cache_file),
         ):
             comp._set_git_runner(
@@ -407,7 +408,7 @@ class TestCompleteNavigateItems:
 
         cache_file = tmp_path / "cache.json"
         with (
-            patch.object(comp, "REPO_DIR", tmp_path),
+            patch.object(constants, "REPO_DIR", tmp_path),
             patch.object(comp, "COMPLETION_CACHE_FILE", cache_file),
         ):
             comp._set_git_runner(runner)
@@ -421,7 +422,7 @@ class TestCompleteNavigateItems:
         log = "abc1234def5678 Fix the thing that was broken\n"
         cache_file = tmp_path / "cache.json"
         with (
-            patch.object(comp, "REPO_DIR", tmp_path),
+            patch.object(constants, "REPO_DIR", tmp_path),
             patch.object(comp, "COMPLETION_CACHE_FILE", cache_file),
         ):
             comp._set_git_runner(make_navigate_runner(log=log))
@@ -435,7 +436,7 @@ class TestCompleteNavigateItems:
         log = "lonelytoken\nabc1234def5678 Real message here\n"
         cache_file = tmp_path / "cache.json"
         with (
-            patch.object(comp, "REPO_DIR", tmp_path),
+            patch.object(constants, "REPO_DIR", tmp_path),
             patch.object(comp, "COMPLETION_CACHE_FILE", cache_file),
         ):
             comp._set_git_runner(make_navigate_runner(log=log))
@@ -446,7 +447,7 @@ class TestCompleteNavigateItems:
         """branch@tag inputs should complete tags scoped to that branch."""
         cache_file = tmp_path / "cache.json"
         with (
-            patch.object(comp, "REPO_DIR", tmp_path),
+            patch.object(constants, "REPO_DIR", tmp_path),
             patch.object(comp, "COMPLETION_CACHE_FILE", cache_file),
         ):
             comp._set_git_runner(
@@ -477,7 +478,7 @@ class TestCompleteTagsCommitsErrors:
         """complete_tags should serve cached tags without git."""
         cache_file = tmp_path / "cache.json"
         with (
-            patch.object(comp, "REPO_DIR", tmp_path),
+            patch.object(constants, "REPO_DIR", tmp_path),
             patch.object(comp, "COMPLETION_CACHE_FILE", cache_file),
         ):
             comp._save_completion_cache({"tags": ["v1.0", "v2.0"]})
@@ -516,7 +517,7 @@ class TestCompleteTagsCommitsErrors:
 
         cache_file = tmp_path / "cache.json"
         with (
-            patch.object(comp, "REPO_DIR", tmp_path),
+            patch.object(constants, "REPO_DIR", tmp_path),
             patch.object(comp, "COMPLETION_CACHE_FILE", cache_file),
         ):
             comp._save_completion_cache({"commits_all": ["abc1234", "def5678"]})

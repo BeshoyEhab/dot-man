@@ -8,8 +8,7 @@ from typing import Callable
 
 import click
 
-from .. import ui
-from ..constants import DOT_MAN_DIR, REPO_DIR
+from .. import constants, ui
 from ..core import GitManager
 from ..secrets import PermanentRedactGuard, SecretGuard, SecretMatch
 from .completions import (  # noqa: F401 — re-exports for backward compat
@@ -221,7 +220,7 @@ def require_init(func):
 
     @wraps(func)
     def wrapper(*args, **kwargs):
-        if not DOT_MAN_DIR.exists():
+        if not constants.get_dot_man_dir().exists():
             ui.console.print()
             ui.print_banner("🎯 Welcome to dot-man!")
             ui.console.print()
@@ -267,7 +266,10 @@ def require_init(func):
             ui.console.print()
             raise SystemExit(ExitCode.ERROR)
 
-        if not REPO_DIR.exists() or not (REPO_DIR / ".git").exists():
+        if (
+            not constants.get_repo_dir().exists()
+            or not (constants.get_repo_dir() / ".git").exists()
+        ):
             error("Repository not initialized. Run 'dot-man init' first.", exit_code=1)
 
         return func(*args, **kwargs)

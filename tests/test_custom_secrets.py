@@ -1,7 +1,7 @@
 """Tests for custom secret patterns."""
 
+from dot_man import constants
 from dot_man.cli.interface import cli
-from dot_man.constants import REPO_DIR
 from dot_man.operations import get_operations
 from dot_man.secrets import (
     Severity,
@@ -154,7 +154,7 @@ def test_cli_audit_with_custom_patterns(integration_runner):
     ops.global_config.save()
 
     # Write a file containing a secret inside the repo directory
-    secret_file = REPO_DIR / "secret_data.txt"
+    secret_file = constants.get_repo_dir() / "secret_data.txt"
     secret_file.write_text("Here is my internal_id_token_ab12cd34 code.")
 
     # Run audit command via runner

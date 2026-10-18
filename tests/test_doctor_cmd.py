@@ -7,7 +7,6 @@ specific failure / warning branches.
 """
 
 import os
-import shutil
 from contextlib import ExitStack
 from pathlib import Path
 from unittest.mock import patch
@@ -53,28 +52,16 @@ def doctor_env(tmp_path):
         patch("dot_man.constants.BACKUPS_DIR", backups_dir),
         patch("dot_man.constants.GLOBAL_TOML", global_toml),
         # --- layer that every sub-module might re-bind ---
-        patch("dot_man.core.REPO_DIR", repo_dir),
-        patch("dot_man.config.REPO_DIR", repo_dir),
-        patch("dot_man.config.GLOBAL_TOML", global_toml),
-        patch("dot_man.global_config.GLOBAL_TOML", global_toml),
-        patch("dot_man.dotman_config.REPO_DIR", repo_dir),
-        patch("dot_man.operations.REPO_DIR", repo_dir),
-        patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir),
-        patch("dot_man.branch_ops.REPO_DIR", repo_dir),
-        patch("dot_man.status_ops.REPO_DIR", repo_dir),
-        patch("dot_man.backups.BACKUPS_DIR", backups_dir),
+        patch("dot_man.constants.REPO_DIR", repo_dir),
+        patch("dot_man.constants.GLOBAL_TOML", global_toml),
+        patch("dot_man.constants.BACKUPS_DIR", backups_dir),
         # --- CLI-layer patches ---
-        patch("dot_man.cli.interface.DOT_MAN_DIR", dot_man_dir),
-        patch("dot_man.cli.init_cmd.REPO_DIR", repo_dir),
-        patch("dot_man.cli.init_cmd.DOT_MAN_DIR", dot_man_dir),
-        patch("dot_man.cli.add_cmd.REPO_DIR", repo_dir),
-        patch("dot_man.cli.navigate_cmd.REPO_DIR", repo_dir),
-        patch("dot_man.cli.common.DOT_MAN_DIR", dot_man_dir),
-        patch("dot_man.cli.common.REPO_DIR", repo_dir),
+        patch("dot_man.constants.DOT_MAN_DIR", dot_man_dir),
+        patch("dot_man.constants.REPO_DIR", repo_dir),
         # --- critical: doctor_cmd gets its own copies ---
-        patch("dot_man.cli.doctor_cmd.DOT_MAN_DIR", dot_man_dir),
-        patch("dot_man.cli.doctor_cmd.REPO_DIR", repo_dir),
-        patch("dot_man.cli.doctor_cmd.GLOBAL_TOML", global_toml),
+        patch("dot_man.constants.DOT_MAN_DIR", dot_man_dir),
+        patch("dot_man.constants.REPO_DIR", repo_dir),
+        patch("dot_man.constants.GLOBAL_TOML", global_toml),
         # DOT_MAN_TOML is a plain string in constants → patch to a Path
         # so that .exists() works as intended.
         patch("dot_man.cli.doctor_cmd.DOT_MAN_TOML", dotman_toml),
@@ -126,23 +113,9 @@ def clean_env(tmp_path):
         patch("dot_man.constants.REPO_DIR", repo_dir),
         patch("dot_man.constants.BACKUPS_DIR", backups_dir),
         patch("dot_man.constants.GLOBAL_TOML", global_toml),
-        patch("dot_man.core.REPO_DIR", repo_dir),
-        patch("dot_man.config.REPO_DIR", repo_dir),
-        patch("dot_man.config.GLOBAL_TOML", global_toml),
-        patch("dot_man.global_config.GLOBAL_TOML", global_toml),
-        patch("dot_man.dotman_config.REPO_DIR", repo_dir),
-        patch("dot_man.operations.REPO_DIR", repo_dir),
-        patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir),
-        patch("dot_man.branch_ops.REPO_DIR", repo_dir),
-        patch("dot_man.status_ops.REPO_DIR", repo_dir),
-        patch("dot_man.backups.BACKUPS_DIR", backups_dir),
-        patch("dot_man.cli.interface.DOT_MAN_DIR", dot_man_dir),
-        patch("dot_man.cli.doctor_cmd.DOT_MAN_DIR", dot_man_dir),
-        patch("dot_man.cli.doctor_cmd.REPO_DIR", repo_dir),
-        patch("dot_man.cli.doctor_cmd.GLOBAL_TOML", global_toml),
         patch("dot_man.cli.doctor_cmd.DOT_MAN_TOML", dotman_toml),
-        patch("dot_man.cli.common.DOT_MAN_DIR", dot_man_dir),
-        patch("dot_man.cli.common.REPO_DIR", repo_dir),
+        patch("dot_man.constants.DOT_MAN_DIR", dot_man_dir),
+        patch("dot_man.constants.REPO_DIR", repo_dir),
         patch.dict(os.environ, {"HOME": str(home)}),
     ]
 
@@ -185,7 +158,7 @@ class TestDoctorWithoutInit:
     def test_doctor_fails_without_init(self, runner, tmp_path):
         """Doctor without init should exit with code 1."""
         fake_dir = tmp_path / "nonexistent" / "dot-man"
-        with patch("dot_man.cli.common.DOT_MAN_DIR", fake_dir):
+        with patch("dot_man.constants.DOT_MAN_DIR", fake_dir):
             result = runner.invoke(cli, ["doctor"])
         assert result.exit_code == 1
         assert "init" in result.output.lower() or "error" in result.output.lower()
@@ -421,59 +394,40 @@ class TestDoctorRemote:
 
 
 class TestDoctorDirectoryIssues:
+    """The doctor body must report a missing path.
+
+    ``require_init`` guards the command, so the body only sees a bad path
+    when its own view of ``constants`` differs from the guard's.  Patching
+    the ``dot_man.cli.doctor_cmd.constants`` reference simulates that
+    without disturbing ``require_init``.
+    """
+
     def test_config_dir_missing_body_check(self, doctor_env):
-        """When DOT_MAN_DIR is missing inside doctor body (require_init already
-        passed because it uses common's binding), the check should fail."""
+        """A missing config dir inside the doctor body fails the check."""
         runner, dot_man_dir, _, _ = doctor_env
-        # Patch the class-level method; for DOT_MAN_DIR we need it to
-        # be True for require_init (which uses common.DOT_MAN_DIR) and
-        # False for the body check (which uses doctor_cmd.DOT_MAN_DIR).
-        # The simplest way: change which path doctor_cmd sees.
-        with patch(
-            "dot_man.cli.doctor_cmd.DOT_MAN_DIR",
-            dot_man_dir / "nonexistent",
-        ):
+        with patch("dot_man.cli.doctor_cmd.constants") as c:
+            c.get_dot_man_dir.return_value = dot_man_dir / "nonexistent"
             result = runner.invoke(cli, ["doctor"])
         assert result.exit_code == 1
         assert "Config directory missing" in result.output
 
     def test_repo_dir_missing_body_check(self, doctor_env):
-        """When REPO_DIR is missing inside doctor body, check fails."""
+        """A missing repo dir inside the doctor body fails the check."""
         runner, _, repo_dir, _ = doctor_env
-        with patch(
-            "dot_man.cli.doctor_cmd.REPO_DIR",
-            repo_dir / "nonexistent",
-        ):
+        with patch("dot_man.cli.doctor_cmd.constants") as c:
+            c.get_repo_dir.return_value = repo_dir / "nonexistent"
             result = runner.invoke(cli, ["doctor"])
         assert result.exit_code == 1
         assert "Repository directory missing" in result.output
 
     def test_no_dot_git_body_check(self, doctor_env):
-        """When .git is missing inside doctor body, check fails.
-
-        ``require_init`` uses ``common.REPO_DIR`` while the doctor body uses
-        ``doctor_cmd.REPO_DIR``.  We point the former at a fake init tree
-        (with ``.git``) and keep the latter at the real repo (without any
-        ``.git`` after we remove it).
-        """
-        runner, dot_man_dir, repo_dir, _ = doctor_env
-
-        # Remove .git from the real repo so the doctor body sees it missing
-        git_dir = repo_dir / ".git"
-        shutil.rmtree(git_dir)
-
-        # Create a fake init structure that has .git for require_init
-        fake_dir = repo_dir.parent / "fake-dot-man"
-        fake_repo = fake_dir / "repo"
-        fake_repo.mkdir(parents=True)
-        (fake_repo / ".git").mkdir()
-
-        with (
-            patch("dot_man.cli.common.DOT_MAN_DIR", fake_dir),
-            patch("dot_man.cli.common.REPO_DIR", fake_repo),
-        ):
+        """A repo dir without ``.git`` inside the doctor body fails."""
+        runner, _, repo_dir, _ = doctor_env
+        no_git = repo_dir.parent / "no-git-repo"
+        no_git.mkdir(parents=True, exist_ok=True)
+        with patch("dot_man.cli.doctor_cmd.constants") as c:
+            c.get_repo_dir.return_value = no_git
             result = runner.invoke(cli, ["doctor"])
-
         assert result.exit_code == 1
         assert "No .git directory" in result.output
 

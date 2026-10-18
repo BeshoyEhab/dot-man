@@ -64,7 +64,7 @@ class TestEncryptedSave:
         repo_plain = section.get_repo_path(secret, repo)
 
         with (
-            patch("dot_man.save_deploy_ops.REPO_DIR", repo),
+            patch("dot_man.constants.REPO_DIR", repo),
             patch("dot_man.encryption.EncryptionManager", FakeEncryptionManager),
         ):
             saved, _secrets, errors, _symlinks = FakeOps().save_section(section)
@@ -87,7 +87,7 @@ class TestEncryptedDeploy:
         encrypted.write_bytes(b"ENC:PRIVATE KEY")
 
         with (
-            patch("dot_man.save_deploy_ops.REPO_DIR", repo),
+            patch("dot_man.constants.REPO_DIR", repo),
             patch("dot_man.encryption.EncryptionManager", FakeEncryptionManager),
         ):
             deployed, _changed, errors = FakeOps().deploy_section(section)
@@ -103,7 +103,7 @@ class TestEncryptedDeploy:
         section = _section(secret)
 
         with (
-            patch("dot_man.save_deploy_ops.REPO_DIR", repo),
+            patch("dot_man.constants.REPO_DIR", repo),
             patch("dot_man.encryption.EncryptionManager", FakeEncryptionManager),
         ):
             deployed, _changed, errors = FakeOps().deploy_section(section)
@@ -122,7 +122,7 @@ class TestEncryptedDeploy:
         encrypted.parent.mkdir(parents=True, exist_ok=True)
         encrypted.write_bytes(b"ENC:PRIVATE KEY")
 
-        with patch("dot_man.save_deploy_ops.REPO_DIR", repo):
+        with patch("dot_man.constants.REPO_DIR", repo):
             plan = FakeOps().scan_deployable_changes([section])
 
         assert plan["sections_to_deploy"]
@@ -156,7 +156,7 @@ class TestEncryptionErrors:
         section = _section(secret)
 
         with (
-            patch("dot_man.save_deploy_ops.REPO_DIR", repo),
+            patch("dot_man.constants.REPO_DIR", repo),
             patch("dot_man.encryption.EncryptionManager", FailingEncryptionManager),
         ):
             saved, _secrets, errors, _symlinks = FakeOps().save_section(section)
@@ -175,7 +175,7 @@ class TestEncryptionErrors:
         encrypted.write_bytes(b"ENC:PRIVATE KEY")
 
         with (
-            patch("dot_man.save_deploy_ops.REPO_DIR", repo),
+            patch("dot_man.constants.REPO_DIR", repo),
             patch("dot_man.encryption.EncryptionManager", FailingEncryptionManager),
         ):
             deployed, _changed, errors = FakeOps().deploy_section(section)

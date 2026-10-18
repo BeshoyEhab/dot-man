@@ -72,39 +72,19 @@ def mock_dot_man_dir(tmp_path):
 def _dot_man_patches(dot_man_dir, repo_dir, backups_dir, global_toml, home):
     """Return every patch that redirects dot-man's global paths to a temp env.
 
-    Modules that do ``from dot_man.constants import REPO_DIR`` (or similar)
-    bind the value at import time, so each consumer's namespace must be
-    patched here. Adding a new consumer = one line in this list.
+    Consumers read paths at call time through ``constants.get_*()``, so
+    patching the source attributes on ``dot_man.constants`` redirects all of
+    them at once. Only modules that still bind a path at import time (e.g.
+    ``dot_man.hooks.HOOKS_DIR``) need their own entry here.
     """
     return [
-        # Constants (the single source all other modules should read from)
+        # Single source of truth: every accessor reads these module globals.
         patch("dot_man.constants.DOT_MAN_DIR", dot_man_dir),
         patch("dot_man.constants.REPO_DIR", repo_dir),
         patch("dot_man.constants.BACKUPS_DIR", backups_dir),
         patch("dot_man.constants.GLOBAL_TOML", global_toml),
-        # Core / config / global config
-        patch("dot_man.core.REPO_DIR", repo_dir),
-        patch("dot_man.config.REPO_DIR", repo_dir),
-        patch("dot_man.config.GLOBAL_TOML", global_toml),
-        patch("dot_man.global_config.GLOBAL_TOML", global_toml),
-        patch("dot_man.dotman_config.REPO_DIR", repo_dir),
-        # Operation mixins
-        patch("dot_man.operations.REPO_DIR", repo_dir),
-        patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir),
-        patch("dot_man.branch_ops.REPO_DIR", repo_dir),
-        patch("dot_man.status_ops.REPO_DIR", repo_dir),
-        patch("dot_man.backups.BACKUPS_DIR", backups_dir),
+        # Derived at import time by modules that expose their own constant.
         patch("dot_man.hooks.HOOKS_DIR", dot_man_dir / "hooks"),
-        patch("dot_man.hooks.DOT_MAN_DIR", dot_man_dir),
-        # CLI command modules
-        patch("dot_man.cli.interface.DOT_MAN_DIR", dot_man_dir),
-        patch("dot_man.cli.init_cmd.REPO_DIR", repo_dir),
-        patch("dot_man.cli.init_cmd.DOT_MAN_DIR", dot_man_dir),
-        patch("dot_man.cli.add_cmd.REPO_DIR", repo_dir),
-        patch("dot_man.cli.navigate_cmd.REPO_DIR", repo_dir),
-        patch("dot_man.cli.clean_cmd.REPO_DIR", repo_dir),
-        patch("dot_man.cli.common.DOT_MAN_DIR", dot_man_dir),
-        patch("dot_man.cli.common.REPO_DIR", repo_dir),
         # Environment
         patch.dict(os.environ, {"HOME": str(home)}),
         patch(

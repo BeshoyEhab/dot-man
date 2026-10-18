@@ -8,8 +8,7 @@ from typing import Any
 
 import click
 
-from .. import ui
-from ..constants import REPO_DIR
+from .. import constants, ui
 from .common import (
     AliasedCommand,
     complete_branches,
@@ -156,6 +155,10 @@ def _export_json(ops, output: str, branch: str, include_secrets: bool) -> None:
 def _repo_relative_path(section, path: Path) -> str:
     """Return the path a local file maps to inside the repository."""
     try:
-        return str(section.get_repo_path(path, REPO_DIR).relative_to(REPO_DIR))
+        return str(
+            section.get_repo_path(path, constants.get_repo_dir()).relative_to(
+                constants.get_repo_dir()
+            )
+        )
     except (AttributeError, ValueError):
         return str(path)

@@ -8,8 +8,7 @@ import logging
 
 import click
 
-from .. import __version__, ui
-from ..constants import DOT_MAN_DIR
+from .. import __version__, constants, ui
 from .common import DotManGroup
 
 
@@ -66,13 +65,13 @@ def cli(
     and GNU Stow.
     """
     # Ensure config dir exists for logs
-    if not DOT_MAN_DIR.exists():
+    if not constants.get_dot_man_dir().exists():
         try:
-            DOT_MAN_DIR.mkdir(parents=True, exist_ok=True)
+            constants.get_dot_man_dir().mkdir(parents=True, exist_ok=True)
         except OSError:
             pass  # Init command will handle main creation
 
-    log_file = DOT_MAN_DIR / "dot-man.log"
+    log_file = constants.get_dot_man_dir() / "dot-man.log"
     level = logging.DEBUG if (debug or verbose) else logging.INFO
 
     # Configure file logging

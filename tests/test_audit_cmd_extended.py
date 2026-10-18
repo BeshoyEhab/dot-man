@@ -33,8 +33,8 @@ def patch_dot_man_dir(tmp_path):
     repo_dir.mkdir()
     (repo_dir / ".git").mkdir()
     with (
-        patch("dot_man.cli.common.DOT_MAN_DIR", dot_man_dir),
-        patch("dot_man.cli.common.REPO_DIR", repo_dir),
+        patch("dot_man.constants.DOT_MAN_DIR", dot_man_dir),
+        patch("dot_man.constants.REPO_DIR", repo_dir),
     ):
         yield
 
@@ -66,7 +66,7 @@ class TestAuditClean:
     """Test audit with no secrets found."""
 
     def test_no_secrets_found(self, runner, clean_repo):
-        with patch("dot_man.cli.audit_cmd.REPO_DIR", clean_repo):
+        with patch("dot_man.constants.REPO_DIR", clean_repo):
             with patch("dot_man.cli.audit_cmd.get_custom_scanner") as mock_scanner:
                 mock_scanner.return_value.scan_directory.return_value = []
                 result = runner.invoke(cli, ["audit"])
@@ -75,7 +75,7 @@ class TestAuditClean:
 
     def test_allowed_secrets_filtered(self, runner, clean_repo):
         """Secrets in the allow-list should not be reported."""
-        with patch("dot_man.cli.audit_cmd.REPO_DIR", clean_repo):
+        with patch("dot_man.constants.REPO_DIR", clean_repo):
             with patch("dot_man.cli.audit_cmd.get_custom_scanner") as mock_scanner:
                 match = make_match(repo_dir=clean_repo, filename="test.txt")
                 mock_scanner.return_value.scan_directory.return_value = [match]
@@ -90,7 +90,7 @@ class TestAuditWithSecrets:
     """Test audit when secrets are found."""
 
     def test_secrets_grouped_by_severity(self, runner, clean_repo):
-        with patch("dot_man.cli.audit_cmd.REPO_DIR", clean_repo):
+        with patch("dot_man.constants.REPO_DIR", clean_repo):
             with patch("dot_man.cli.audit_cmd.get_custom_scanner") as mock_scanner:
                 critical = make_match(
                     repo_dir=clean_repo,
@@ -121,7 +121,7 @@ class TestAuditWithSecrets:
         assert "2 secrets" in result.output
 
     def test_recommendations_shown(self, runner, clean_repo):
-        with patch("dot_man.cli.audit_cmd.REPO_DIR", clean_repo):
+        with patch("dot_man.constants.REPO_DIR", clean_repo):
             with patch("dot_man.cli.audit_cmd.get_custom_scanner") as mock_scanner:
                 mock_scanner.return_value.scan_directory.return_value = [
                     make_match(repo_dir=clean_repo)
@@ -140,7 +140,7 @@ class TestAuditStrict:
     """Test --strict flag."""
 
     def test_strict_exits_with_error(self, runner, clean_repo):
-        with patch("dot_man.cli.audit_cmd.REPO_DIR", clean_repo):
+        with patch("dot_man.constants.REPO_DIR", clean_repo):
             with patch("dot_man.cli.audit_cmd.get_custom_scanner") as mock_scanner:
                 mock_scanner.return_value.scan_directory.return_value = [
                     make_match(repo_dir=clean_repo)
@@ -156,7 +156,7 @@ class TestAuditStrict:
         assert "strict mode" in result.output.lower()
 
     def test_strict_clean_exits_zero(self, runner, clean_repo):
-        with patch("dot_man.cli.audit_cmd.REPO_DIR", clean_repo):
+        with patch("dot_man.constants.REPO_DIR", clean_repo):
             with patch("dot_man.cli.audit_cmd.get_custom_scanner") as mock_scanner:
                 mock_scanner.return_value.scan_directory.return_value = []
                 result = runner.invoke(cli, ["audit", "--strict"])
@@ -174,7 +174,7 @@ class TestAuditFix:
             content="api_key = 'sk-secret123'",
         )
 
-        with patch("dot_man.cli.audit_cmd.REPO_DIR", clean_repo):
+        with patch("dot_man.constants.REPO_DIR", clean_repo):
             with patch("dot_man.cli.audit_cmd.get_custom_scanner") as mock_scanner:
                 mock_scanner.return_value.scan_directory.return_value = [match]
                 mock_scanner.return_value.redact_content.return_value = (
@@ -194,7 +194,7 @@ class TestAuditFix:
         assert result.exit_code == 0
 
     def test_fix_aborted_by_user(self, runner, clean_repo):
-        with patch("dot_man.cli.audit_cmd.REPO_DIR", clean_repo):
+        with patch("dot_man.constants.REPO_DIR", clean_repo):
             with patch("dot_man.cli.audit_cmd.get_custom_scanner") as mock_scanner:
                 mock_scanner.return_value.scan_directory.return_value = [
                     make_match(repo_dir=clean_repo)
@@ -235,7 +235,7 @@ class TestAuditExceptions:
         assert result.exit_code == 7
 
     def test_permanently_redacted_secrets_are_filtered(self, runner, clean_repo):
-        with patch("dot_man.cli.audit_cmd.REPO_DIR", clean_repo):
+        with patch("dot_man.constants.REPO_DIR", clean_repo):
             with patch("dot_man.cli.audit_cmd.get_custom_scanner") as mock_scanner:
                 mock_scanner.return_value.scan_directory.return_value = [
                     make_match(repo_dir=clean_repo)
@@ -251,7 +251,7 @@ class TestAuditExceptions:
         assert "No secrets detected" in result.output
 
     def test_history_matches_displayed(self, runner, clean_repo):
-        with patch("dot_man.cli.audit_cmd.REPO_DIR", clean_repo):
+        with patch("dot_man.constants.REPO_DIR", clean_repo):
             with patch("dot_man.cli.audit_cmd.get_custom_scanner") as mock_scanner:
                 historical = make_match(repo_dir=clean_repo, filename="old.txt")
                 historical.history_ref = "abc1234"

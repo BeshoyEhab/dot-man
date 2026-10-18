@@ -5,9 +5,9 @@ from pathlib import Path
 import click
 import questionary
 
-from .. import ui
+from .. import constants, ui
 from ..config import GlobalConfig
-from ..constants import DOT_MAN_TOML, GLOBAL_TOML, REPO_DIR
+from ..constants import DOT_MAN_TOML
 from ..exceptions import DotManError
 from .common import AliasedCommand, error, require_init, success, warn
 from .interface import cli as main
@@ -44,8 +44,8 @@ def edit(editor: str | None, edit_global: bool, raw: bool):
 def _edit_resolve_target(edit_global: bool):
     """Resolve target file path and description."""
     if edit_global:
-        return GLOBAL_TOML, "global configuration"
-    return REPO_DIR / DOT_MAN_TOML, "dot-man.toml"
+        return constants.get_global_toml(), "global configuration"
+    return constants.get_repo_dir() / DOT_MAN_TOML, "dot-man.toml"
 
 
 def _edit_run_interactive(target: Path, desc: str, editor: str | None):

@@ -8,10 +8,10 @@ import time
 
 import click
 
-from ..constants import REPO_DIR
+from .. import constants
 
 COMPLETION_CACHE_TTL = 10
-COMPLETION_CACHE_FILE = REPO_DIR / ".dotman" / "completion_cache.json"
+COMPLETION_CACHE_FILE = constants.get_repo_dir() / ".dotman" / "completion_cache.json"
 
 _git_runner = None
 _memory_cache: dict | None = None
@@ -27,7 +27,7 @@ def _set_git_runner(runner):
     _git_runner = runner
 
 
-def _run_git(args, cwd=REPO_DIR, timeout=2):
+def _run_git(args, cwd=constants.get_repo_dir(), timeout=2):
     """Run git command, using custom runner if set."""
     if _git_runner is not None:
         return _git_runner(args, cwd, timeout)
@@ -52,7 +52,7 @@ def _get_completion_cache() -> dict:
         return _memory_cache
 
     try:
-        if not REPO_DIR.exists():
+        if not constants.get_repo_dir().exists():
             _memory_cache = {}
             _memory_cache_time = time.time()
             return _memory_cache
@@ -77,7 +77,7 @@ def _save_completion_cache(data: dict) -> None:
     _memory_cache_time = time.time()
 
     try:
-        if not REPO_DIR.exists():
+        if not constants.get_repo_dir().exists():
             return
         COMPLETION_CACHE_FILE.parent.mkdir(parents=True, exist_ok=True)
         COMPLETION_CACHE_FILE.write_text(json.dumps(data))

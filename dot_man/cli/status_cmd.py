@@ -8,8 +8,7 @@ import click
 from rich.panel import Panel
 from rich.table import Table
 
-from .. import ui
-from ..constants import REPO_DIR
+from .. import constants, ui
 from ..exceptions import DotManError
 from ..secrets import get_custom_scanner
 from .common import AliasedCommand, error, handle_exception, require_init, warn
@@ -39,7 +38,7 @@ def _render_repo_panel(branch: str, remote: str) -> None:
     info_table.add_column()
     info_table.add_row("Current Branch:", f"[bold]{branch}[/bold]")
     info_table.add_row("Remote:", remote)
-    info_table.add_row("Repository:", str(REPO_DIR))
+    info_table.add_row("Repository:", str(constants.get_repo_dir()))
 
     ui.console.print(
         Panel(
@@ -59,7 +58,7 @@ def _render_status_json(
     output = {
         "branch": branch,
         "remote": remote_url,
-        "repository": str(REPO_DIR),
+        "repository": str(constants.get_repo_dir()),
         "sections": sections_list,
         "summary": summary,
     }

@@ -30,21 +30,9 @@ def clean_env(tmp_path):
         patch("dot_man.constants.REPO_DIR", repo_dir),
         patch("dot_man.constants.BACKUPS_DIR", backups_dir),
         patch("dot_man.constants.GLOBAL_TOML", global_toml),
-        patch("dot_man.core.REPO_DIR", repo_dir),
-        patch("dot_man.config.REPO_DIR", repo_dir),
-        patch("dot_man.config.GLOBAL_TOML", global_toml),
-        patch("dot_man.global_config.GLOBAL_TOML", global_toml),
-        patch("dot_man.dotman_config.REPO_DIR", repo_dir),
-        patch("dot_man.operations.REPO_DIR", repo_dir),
-        patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir),
-        patch("dot_man.branch_ops.REPO_DIR", repo_dir),
-        patch("dot_man.status_ops.REPO_DIR", repo_dir),
-        patch("dot_man.cli.interface.DOT_MAN_DIR", dot_man_dir),
-        patch("dot_man.cli.common.DOT_MAN_DIR", dot_man_dir),
-        patch("dot_man.cli.common.REPO_DIR", repo_dir),
         # add_cmd binds REPO_DIR at import: without this, add copies
         # files into the real repo instead of the sandbox.
-        patch("dot_man.cli.add_cmd.REPO_DIR", repo_dir),
+        patch("dot_man.constants.REPO_DIR", repo_dir),
         patch.dict(os.environ, {"HOME": str(home)}),
     ]
 

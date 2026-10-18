@@ -8,7 +8,7 @@ from abc import abstractmethod
 from pathlib import Path
 from typing import Any, Iterator
 
-from .constants import REPO_DIR
+from . import constants
 from .secrets import SecretMatch, get_custom_scanner
 
 logger = logging.getLogger(__name__)
@@ -49,7 +49,7 @@ class StatusMixin:
             section_matches: list[SecretMatch] = []
 
             for local_path in section.paths:
-                repo_path = section.get_repo_path(local_path, REPO_DIR)
+                repo_path = section.get_repo_path(local_path, constants.get_repo_dir())
 
                 if repo_path.is_file():
                     matches = list(scanner.scan_file(repo_path))
@@ -157,14 +157,14 @@ class StatusMixin:
         repo_files: set[Path] = set()
         internal_files = {".gitignore", "dot-man.toml"}
 
-        for root, dirs, files in os.walk(REPO_DIR):
+        for root, dirs, files in os.walk(constants.get_repo_dir()):
             root_path = Path(root)
 
             if ".git" in dirs:
                 dirs.remove(".git")
 
             for file in files:
-                if file in internal_files and root_path == REPO_DIR:
+                if file in internal_files and root_path == constants.get_repo_dir():
                     continue
 
                 path = root_path / file
@@ -176,12 +176,12 @@ class StatusMixin:
             section = self.get_section(section_name)
 
             if section.repo_path:
-                full_repo_path = REPO_DIR / section.repo_path
+                full_repo_path = constants.get_repo_dir() / section.repo_path
                 if full_repo_path.exists():
                     tracked_files.add(full_repo_path)
 
             for local_path in section.paths:
-                repo_path = section.get_repo_path(local_path, REPO_DIR)
+                repo_path = section.get_repo_path(local_path, constants.get_repo_dir())
 
                 if repo_path.exists():
                     if repo_path.is_file():
@@ -215,7 +215,10 @@ class StatusMixin:
                         deleted.append(orphan)
 
                         parent = orphan.parent
-                        while parent != REPO_DIR and parent != REPO_DIR.parent:
+                        while (
+                            parent != constants.get_repo_dir()
+                            and parent != constants.get_repo_dir().parent
+                        ):
                             try:
                                 parent.rmdir()
                                 parent = parent.parent

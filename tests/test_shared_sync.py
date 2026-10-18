@@ -344,6 +344,12 @@ class TestParseYamlFloor:
 
         assert _parse_yaml("just a string") is None
 
+    def test_invalid_yaml_returns_none(self):
+        from dot_man.shared_sync import _parse_yaml
+
+        # Unbalanced flow mapping → yaml.YAMLError, swallowed to None.
+        assert _parse_yaml("{a: [1, 2\n") is None
+
     def test_missing_yaml_module_returns_none(self):
         import sys
         from unittest.mock import patch as _patch

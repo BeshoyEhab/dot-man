@@ -144,3 +144,34 @@ FILE_PERMISSIONS = 0o700  # Secure directory permissions
 
 # Lock file to prevent concurrent operations
 LOCK_FILE = DOT_MAN_DIR / ".lock"
+
+
+# ============================================================================
+# Path accessors (read at call time so monkeypatching the module
+# attributes above redirects every consumer).
+# ============================================================================
+
+
+def get_dot_man_dir() -> Path:
+    """Return the current dot-man data directory."""
+    return DOT_MAN_DIR
+
+
+def get_repo_dir() -> Path:
+    """Return the current dot-man git repository directory."""
+    return REPO_DIR
+
+
+def get_backups_dir() -> Path:
+    """Return the current backups directory."""
+    return BACKUPS_DIR
+
+
+def get_global_toml() -> Path:
+    """Return the current global configuration file path."""
+    return GLOBAL_TOML
+
+
+def get_lock_file() -> Path:
+    """Return the current lock file path (derived from DOT_MAN_DIR)."""
+    return DOT_MAN_DIR / ".lock"

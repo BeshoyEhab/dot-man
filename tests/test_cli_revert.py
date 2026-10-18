@@ -15,16 +15,16 @@ def test_revert_file(temp_home, mock_dot_man_dir, monkeypatch):
     monkeypatch.setattr("dot_man.constants.DOT_MAN_DIR", mock_dot_man_dir)
     monkeypatch.setattr("dot_man.constants.REPO_DIR", mock_dot_man_dir / "repo")
     # Patch consumers of REPO_DIR
-    monkeypatch.setattr("dot_man.config.REPO_DIR", mock_dot_man_dir / "repo")
+    monkeypatch.setattr("dot_man.constants.REPO_DIR", mock_dot_man_dir / "repo")
     monkeypatch.setattr(
-        "dot_man.global_config.GLOBAL_TOML", mock_dot_man_dir / "global.toml"
+        "dot_man.constants.GLOBAL_TOML", mock_dot_man_dir / "global.toml"
     )
-    monkeypatch.setattr("dot_man.dotman_config.REPO_DIR", mock_dot_man_dir / "repo")
-    monkeypatch.setattr("dot_man.operations.REPO_DIR", mock_dot_man_dir / "repo")
-    monkeypatch.setattr("dot_man.save_deploy_ops.REPO_DIR", mock_dot_man_dir / "repo")
-    monkeypatch.setattr("dot_man.branch_ops.REPO_DIR", mock_dot_man_dir / "repo")
-    monkeypatch.setattr("dot_man.status_ops.REPO_DIR", mock_dot_man_dir / "repo")
-    monkeypatch.setattr("dot_man.cli.init_cmd.REPO_DIR", mock_dot_man_dir / "repo")
+    monkeypatch.setattr("dot_man.constants.REPO_DIR", mock_dot_man_dir / "repo")
+    monkeypatch.setattr("dot_man.constants.REPO_DIR", mock_dot_man_dir / "repo")
+    monkeypatch.setattr("dot_man.constants.REPO_DIR", mock_dot_man_dir / "repo")
+    monkeypatch.setattr("dot_man.constants.REPO_DIR", mock_dot_man_dir / "repo")
+    monkeypatch.setattr("dot_man.constants.REPO_DIR", mock_dot_man_dir / "repo")
+    monkeypatch.setattr("dot_man.constants.REPO_DIR", mock_dot_man_dir / "repo")
 
     # Init
     result = runner.invoke(main_cli, ["init", "--no-wizard", "--force"])
@@ -70,16 +70,16 @@ def test_revert_untracked_file(temp_home, mock_dot_man_dir, monkeypatch):
     monkeypatch.setattr("dot_man.constants.DOT_MAN_DIR", mock_dot_man_dir)
     monkeypatch.setattr("dot_man.constants.REPO_DIR", mock_dot_man_dir / "repo")
     # Patch consumers of REPO_DIR
-    monkeypatch.setattr("dot_man.config.REPO_DIR", mock_dot_man_dir / "repo")
+    monkeypatch.setattr("dot_man.constants.REPO_DIR", mock_dot_man_dir / "repo")
     monkeypatch.setattr(
-        "dot_man.global_config.GLOBAL_TOML", mock_dot_man_dir / "global.toml"
+        "dot_man.constants.GLOBAL_TOML", mock_dot_man_dir / "global.toml"
     )
-    monkeypatch.setattr("dot_man.dotman_config.REPO_DIR", mock_dot_man_dir / "repo")
-    monkeypatch.setattr("dot_man.operations.REPO_DIR", mock_dot_man_dir / "repo")
-    monkeypatch.setattr("dot_man.save_deploy_ops.REPO_DIR", mock_dot_man_dir / "repo")
-    monkeypatch.setattr("dot_man.branch_ops.REPO_DIR", mock_dot_man_dir / "repo")
-    monkeypatch.setattr("dot_man.status_ops.REPO_DIR", mock_dot_man_dir / "repo")
-    monkeypatch.setattr("dot_man.cli.init_cmd.REPO_DIR", mock_dot_man_dir / "repo")
+    monkeypatch.setattr("dot_man.constants.REPO_DIR", mock_dot_man_dir / "repo")
+    monkeypatch.setattr("dot_man.constants.REPO_DIR", mock_dot_man_dir / "repo")
+    monkeypatch.setattr("dot_man.constants.REPO_DIR", mock_dot_man_dir / "repo")
+    monkeypatch.setattr("dot_man.constants.REPO_DIR", mock_dot_man_dir / "repo")
+    monkeypatch.setattr("dot_man.constants.REPO_DIR", mock_dot_man_dir / "repo")
+    monkeypatch.setattr("dot_man.constants.REPO_DIR", mock_dot_man_dir / "repo")
 
     # Init
     runner.invoke(main_cli, ["init", "--no-wizard", "--force"])
@@ -101,16 +101,16 @@ def test_revert_interactive_abort(temp_home, mock_dot_man_dir, monkeypatch):
     monkeypatch.setattr("dot_man.constants.DOT_MAN_DIR", mock_dot_man_dir)
     monkeypatch.setattr("dot_man.constants.REPO_DIR", mock_dot_man_dir / "repo")
     # Patch consumers of REPO_DIR
-    monkeypatch.setattr("dot_man.config.REPO_DIR", mock_dot_man_dir / "repo")
+    monkeypatch.setattr("dot_man.constants.REPO_DIR", mock_dot_man_dir / "repo")
     monkeypatch.setattr(
-        "dot_man.global_config.GLOBAL_TOML", mock_dot_man_dir / "global.toml"
+        "dot_man.constants.GLOBAL_TOML", mock_dot_man_dir / "global.toml"
     )
-    monkeypatch.setattr("dot_man.dotman_config.REPO_DIR", mock_dot_man_dir / "repo")
-    monkeypatch.setattr("dot_man.operations.REPO_DIR", mock_dot_man_dir / "repo")
-    monkeypatch.setattr("dot_man.save_deploy_ops.REPO_DIR", mock_dot_man_dir / "repo")
-    monkeypatch.setattr("dot_man.branch_ops.REPO_DIR", mock_dot_man_dir / "repo")
-    monkeypatch.setattr("dot_man.status_ops.REPO_DIR", mock_dot_man_dir / "repo")
-    monkeypatch.setattr("dot_man.cli.init_cmd.REPO_DIR", mock_dot_man_dir / "repo")
+    monkeypatch.setattr("dot_man.constants.REPO_DIR", mock_dot_man_dir / "repo")
+    monkeypatch.setattr("dot_man.constants.REPO_DIR", mock_dot_man_dir / "repo")
+    monkeypatch.setattr("dot_man.constants.REPO_DIR", mock_dot_man_dir / "repo")
+    monkeypatch.setattr("dot_man.constants.REPO_DIR", mock_dot_man_dir / "repo")
+    monkeypatch.setattr("dot_man.constants.REPO_DIR", mock_dot_man_dir / "repo")
+    monkeypatch.setattr("dot_man.constants.REPO_DIR", mock_dot_man_dir / "repo")
 
     runner.invoke(main_cli, ["init", "--no-wizard", "--force"])
 

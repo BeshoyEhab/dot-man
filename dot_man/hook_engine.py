@@ -10,10 +10,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import constants, ui
-from .constants import DOT_MAN_DIR, REPO_DIR
 from .exceptions import ConfigurationError
 
-HOOKS_DIR = DOT_MAN_DIR / "hooks"
+HOOKS_DIR = constants.get_dot_man_dir() / "hooks"
 
 HOOK_FILE_PATTERN = re.compile(r"(?<![\w/:\\])file:([^\s;|&\"']+)")
 HOOK_FILE_ESCAPE_PATTERN = re.compile(r"\\(file:[^\s;|&\"']+)")
@@ -151,7 +150,7 @@ def find_hook_script(name: str) -> Path | None:
 
     Names escaping the hooks directory never match.
     """
-    for hooks_dir in (REPO_DIR / "hooks", HOOKS_DIR):
+    for hooks_dir in (constants.get_repo_dir() / "hooks", HOOKS_DIR):
         if not hooks_dir.is_dir():
             continue
         candidate = hooks_dir / name
@@ -172,7 +171,7 @@ def resolve_hook(hook: str | None, context: HookContext) -> str | None:
     for name, value in context.placeholders().items():
         if value:
             resolved = resolved.replace("{" + name + "}", value)
-    searched = [REPO_DIR / "hooks", HOOKS_DIR]
+    searched = [constants.get_repo_dir() / "hooks", HOOKS_DIR]
 
     def _replace(match: re.Match[str]) -> str:
         script = match.group(1)

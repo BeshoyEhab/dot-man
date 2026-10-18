@@ -82,7 +82,7 @@ class TestRevertFile:
             name="test", paths=[local], repo_base="bashrc", secrets_filter=False
         )
         ops = FakeOps(sections={"test": section})
-        with patch("dot_man.branch_ops.REPO_DIR", tmp_path):
+        with patch("dot_man.constants.REPO_DIR", tmp_path):
             result = ops.revert_file(local)
         assert result is False
 
@@ -101,7 +101,7 @@ class TestRevertFile:
         )
         ops = FakeOps(sections={"bash": section})
 
-        with patch("dot_man.branch_ops.REPO_DIR", tmp_path):
+        with patch("dot_man.constants.REPO_DIR", tmp_path):
             result = ops.revert_file(local)
         assert result is True
         assert local.read_text() == "repo version"
@@ -125,7 +125,7 @@ class TestRevertFile:
         )
         ops = FakeOps(sections={"bash": section}, vault=vault)
 
-        with patch("dot_man.branch_ops.REPO_DIR", tmp_path):
+        with patch("dot_man.constants.REPO_DIR", tmp_path):
             result = ops.revert_file(local)
         assert result is True
         assert local.read_text() == "password = real_secret"
@@ -148,7 +148,7 @@ class TestRevertFile:
         )
         ops = FakeOps(sections={"bash": section}, vault=vault)
 
-        with patch("dot_man.branch_ops.REPO_DIR", tmp_path):
+        with patch("dot_man.constants.REPO_DIR", tmp_path):
             result = ops.revert_file(local)
         assert result is True
 
@@ -173,7 +173,7 @@ class TestRevertFile:
         )
         ops = FakeOps(sections={"config": section})
 
-        with patch("dot_man.branch_ops.REPO_DIR", tmp_path):
+        with patch("dot_man.constants.REPO_DIR", tmp_path):
             result = ops.revert_file(local)
         assert result is True
         assert local.read_text() == "repo version"

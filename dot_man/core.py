@@ -10,7 +10,8 @@ from typing import Iterator
 from git import GitCommandError, Repo
 from git.exc import InvalidGitRepositoryError
 
-from .constants import GIT_IGNORE_PATTERNS, REPO_DIR
+from . import constants
+from .constants import GIT_IGNORE_PATTERNS
 from .exceptions import (
     BranchNotFoundError,
     GitOperationError,
@@ -22,7 +23,7 @@ class GitManager:
     """Wrapper for git operations on the dot-man repository."""
 
     def __init__(self, repo_path: Path | None = None):
-        self._repo_path = repo_path or REPO_DIR
+        self._repo_path = repo_path or constants.get_repo_dir()
         self._repo: Repo | None = None
 
     @property

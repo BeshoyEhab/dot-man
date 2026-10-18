@@ -77,7 +77,7 @@ def clean_env(tmp_path):
     global_toml = dot_man_dir / "global.toml"
 
     # Init-specific extras not present in the shared registry.
-    extras = [patch("dot_man.cli.init_cmd.BACKUPS_DIR", backups_dir)]
+    extras = [patch("dot_man.constants.BACKUPS_DIR", backups_dir)]
 
     with ExitStack() as stack:
         for p in (

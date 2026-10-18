@@ -370,7 +370,7 @@ class TestGlobalConfigMore:
 
         config_file = tmp_path / "global.toml"
         config_file.write_text("[defaults]\nsecrets_filter = true\n")
-        monkeypatch.setattr("dot_man.global_config.GLOBAL_TOML", config_file)
+        monkeypatch.setattr("dot_man.constants.GLOBAL_TOML", config_file)
         config = GlobalConfig()
         defaults = config.get_defaults()
         assert isinstance(defaults, dict)
@@ -381,7 +381,7 @@ class TestGlobalConfigMore:
 
         config_file = tmp_path / "global.toml"
         config_file.write_text("")
-        monkeypatch.setattr("dot_man.global_config.GLOBAL_TOML", config_file)
+        monkeypatch.setattr("dot_man.constants.GLOBAL_TOML", config_file)
         config = GlobalConfig()
         template = config.get_template("nonexistent")
         assert template is None
@@ -392,7 +392,7 @@ class TestGlobalConfigMore:
 
         config_file = tmp_path / "global.toml"
         config_file.write_text("")
-        monkeypatch.setattr("dot_man.global_config.GLOBAL_TOML", config_file)
+        monkeypatch.setattr("dot_man.constants.GLOBAL_TOML", config_file)
         config = GlobalConfig()
         templates = config.get_all_templates()
         assert isinstance(templates, dict)
@@ -403,7 +403,7 @@ class TestGlobalConfigMore:
 
         config_file = tmp_path / "global.toml"
         config_file.write_text("")
-        monkeypatch.setattr("dot_man.global_config.GLOBAL_TOML", config_file)
+        monkeypatch.setattr("dot_man.constants.GLOBAL_TOML", config_file)
         config = GlobalConfig()
         assert config.switch_default_behavior == "save"
 

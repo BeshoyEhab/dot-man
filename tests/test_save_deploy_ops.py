@@ -117,7 +117,7 @@ class TestSaveSection:
         vault = MagicMock(spec=SecretVault)
         ops = FakeOps(vault=vault, current_branch="main")
         repo_dir = tmp_path / "repo"
-        with patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir):
+        with patch("dot_man.constants.REPO_DIR", repo_dir):
             saved, secrets, errors, symlinks = ops.save_section(section)
             assert saved == 1
             assert secrets == []
@@ -162,7 +162,7 @@ class TestSaveSection:
                 "dot_man.save_deploy_ops.copy_file",
                 side_effect=mock_copy_file,
             ),
-            patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
         ):
             saved, secrets, errors, symlinks = ops.save_section(section)
             assert saved == 1
@@ -220,7 +220,7 @@ class TestSaveSection:
         )
         ops = FakeOps(current_branch="main")
         repo_dir = tmp_path / "repo"
-        with patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir):
+        with patch("dot_man.constants.REPO_DIR", repo_dir):
             saved, secrets, errors, symlinks = ops.save_section(section)
             assert saved == 1
             assert symlinks == [local]
@@ -245,7 +245,7 @@ class TestSaveSection:
         )
         ops = FakeOps(current_branch="main")
         repo_dir = tmp_path / "repo"
-        with patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir):
+        with patch("dot_man.constants.REPO_DIR", repo_dir):
             saved, secrets, errors, symlinks = ops.save_section(
                 section, symlink_ignore={local}
             )
@@ -278,7 +278,7 @@ class TestSaveSection:
         )
         ops = FakeOps(current_branch="main")
         repo_dir = tmp_path / "repo"
-        with patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir):
+        with patch("dot_man.constants.REPO_DIR", repo_dir):
             saved, secrets, errors, symlinks = ops.save_section(
                 section, symlink_ignore={local1}
             )
@@ -323,7 +323,7 @@ class TestDeploySection:
         )
         ops = FakeOps(current_branch="main")
         with (
-            patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
             patch("dot_man.save_deploy_ops.compare_files", return_value=False),
         ):
             deployed, had_changes, errors = ops.deploy_section(section)
@@ -347,7 +347,7 @@ class TestDeploySection:
         )
         ops = FakeOps(current_branch="main")
         with (
-            patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
             patch("dot_man.save_deploy_ops.compare_files", return_value=False),
         ):
             deployed, had_changes, errors = ops.deploy_section(section)
@@ -367,7 +367,7 @@ class TestDeploySection:
             update_strategy="ignore",
         )
         ops = FakeOps(current_branch="main")
-        with patch("dot_man.save_deploy_ops.REPO_DIR", tmp_path):
+        with patch("dot_man.constants.REPO_DIR", tmp_path):
             deployed, had_changes, errors = ops.deploy_section(section)
             assert deployed == 0
 
@@ -388,7 +388,7 @@ class TestDeploySection:
         )
         ops = FakeOps(current_branch="main")
         with (
-            patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
             patch("dot_man.save_deploy_ops.compare_files", return_value=False),
         ):
             with patch("dot_man.save_deploy_ops.backup_file") as mock_backup:
@@ -415,7 +415,7 @@ class TestDeploySection:
                 "dot_man.save_deploy_ops.copy_file",
                 side_effect=PermissionError("Permission denied"),
             ),
-            patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
             patch("dot_man.save_deploy_ops.compare_files", return_value=False),
         ):
             deployed, had_changes, errors = ops.deploy_section(section)
@@ -444,7 +444,7 @@ class TestDeploySection:
         )
         ops = FakeOps(current_branch="main")
         with (
-            patch("dot_man.save_deploy_ops.REPO_DIR", tmp_path / "repo"),
+            patch("dot_man.constants.REPO_DIR", tmp_path / "repo"),
             patch("dot_man.save_deploy_ops.compare_files", return_value=False),
         ):
             deployed, had_changes, errors = ops.deploy_section(section)
@@ -473,7 +473,7 @@ class TestDeploySection:
         )
         ops = FakeOps(current_branch="main")
         with (
-            patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
             patch("dot_man.save_deploy_ops.compare_files", return_value=False),
         ):
             deployed, had_changes, errors = ops.deploy_section(section)
@@ -500,7 +500,7 @@ class TestScanDeployableChanges:
         )
         ops = FakeOps(current_branch="main")
         with (
-            patch("dot_man.save_deploy_ops.REPO_DIR", tmp_path),
+            patch("dot_man.constants.REPO_DIR", tmp_path),
             patch("dot_man.save_deploy_ops.compare_files", return_value=True),
         ):
             plan = ops.scan_deployable_changes([section])
@@ -523,7 +523,7 @@ class TestScanDeployableChanges:
         )
         ops = FakeOps(current_branch="main")
         with (
-            patch("dot_man.save_deploy_ops.REPO_DIR", tmp_path),
+            patch("dot_man.constants.REPO_DIR", tmp_path),
             patch("dot_man.save_deploy_ops.compare_files", return_value=False),
         ):
             plan = ops.scan_deployable_changes([section])
@@ -549,7 +549,7 @@ class TestScanDeployableChanges:
         )
         ops = FakeOps(current_branch="main")
         with (
-            patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
             patch("dot_man.save_deploy_ops.compare_files", return_value=False),
         ):
             plan = ops.scan_deployable_changes([section])
@@ -569,7 +569,7 @@ class TestScanDeployableChanges:
             update_strategy="ignore",
         )
         ops = FakeOps(current_branch="main")
-        with patch("dot_man.save_deploy_ops.REPO_DIR", tmp_path):
+        with patch("dot_man.constants.REPO_DIR", tmp_path):
             plan = ops.scan_deployable_changes([section])
             assert plan["sections_to_deploy"] == []
 
@@ -674,7 +674,7 @@ class TestSaveAll:
         vault = MagicMock(spec=SecretVault)
         ops = FakeOps(vault=vault, current_branch="main", sections={"test": section})
         repo_dir = tmp_path / "repo"
-        with patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir):
+        with patch("dot_man.constants.REPO_DIR", repo_dir):
             result = ops.save_all(symlink_ignore={local1})
             assert result["saved"] == 1
             assert local1 in result["symlinks"]
@@ -823,7 +823,7 @@ class TestDeployRepoPathFailures:
         )
         ops = FakeOps(current_branch="main")
         with (
-            patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
             patch("dot_man.save_deploy_ops.compare_files", return_value=False),
         ):
             deployed, had_changes, errors = ops.deploy_section(section)
@@ -853,7 +853,7 @@ class TestDeployRepoPathFailures:
         )
         ops = FakeOps(vault=vault, current_branch="main")
         with (
-            patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
             patch("dot_man.save_deploy_ops.compare_files", return_value=False),
         ):
             deployed, _, errors = ops.deploy_section(section)
@@ -875,7 +875,7 @@ class TestDeployRepoPathFailures:
         )
 
         with (
-            patch("dot_man.save_deploy_ops.REPO_DIR", tmp_path / "repo"),
+            patch("dot_man.constants.REPO_DIR", tmp_path / "repo"),
             patch(
                 "dot_man.save_deploy_ops.copy_directory",
                 return_value=(0, 3, []),
@@ -983,7 +983,7 @@ class TestWrappedHandlerFloor:
                 "dot_man.save_deploy_ops.copy_file",
                 side_effect=self._mock_copy(match),
             ),
-            patch("dot_man.save_deploy_ops.REPO_DIR", tmp_path / "repo"),
+            patch("dot_man.constants.REPO_DIR", tmp_path / "repo"),
         ):
             saved, secrets, errors, _ = ops.save_section(
                 section, secret_handler=handler
@@ -1014,7 +1014,7 @@ class TestWrappedHandlerFloor:
                 "dot_man.save_deploy_ops.copy_file",
                 side_effect=recording_copy,
             ),
-            patch("dot_man.save_deploy_ops.REPO_DIR", tmp_path / "repo"),
+            patch("dot_man.constants.REPO_DIR", tmp_path / "repo"),
         ):
             saved, _, errors, _ = ops.save_section(section)
 
@@ -1035,7 +1035,7 @@ class TestSaveDirectorySection:
             name="cfgdir", paths=[local], repo_base="cfgdir", secrets_filter=False
         )
         ops = FakeOps(current_branch="main")
-        with patch("dot_man.save_deploy_ops.REPO_DIR", tmp_path / "repo"):
+        with patch("dot_man.constants.REPO_DIR", tmp_path / "repo"):
             saved, secrets, errors, _ = ops.save_section(section)
 
         assert saved >= 2
@@ -1054,7 +1054,7 @@ class TestSaveDirectorySection:
         )
         ops = FakeOps(current_branch="main")
         with (
-            patch("dot_man.save_deploy_ops.REPO_DIR", tmp_path / "repo"),
+            patch("dot_man.constants.REPO_DIR", tmp_path / "repo"),
             patch(
                 "dot_man.save_deploy_ops.copy_directory",
                 return_value=(1, 2, []),
@@ -1081,7 +1081,7 @@ class TestPlanScanExecuteFloor:
         )
         ops = FakeOps(current_branch="main")
         with (
-            patch("dot_man.save_deploy_ops.REPO_DIR", repo_dir),
+            patch("dot_man.constants.REPO_DIR", repo_dir),
             patch(
                 "dot_man.save_deploy_ops.compare_files",
                 side_effect=OSError("stat broken"),
@@ -1116,7 +1116,7 @@ class TestPlanScanExecuteFloor:
         }
 
         with (
-            patch("dot_man.save_deploy_ops.REPO_DIR", tmp_path / "repo"),
+            patch("dot_man.constants.REPO_DIR", tmp_path / "repo"),
             patch("dot_man.save_deploy_ops.backup_file") as mock_backup,
         ):
             result = ops.execute_deployment_plan(plan)
@@ -1165,7 +1165,7 @@ class TestPlanScanExecuteFloor:
                 "dot_man.save_deploy_ops.copy_file",
                 side_effect=TestWrappedHandlerFloor._mock_copy(match),
             ),
-            patch("dot_man.save_deploy_ops.REPO_DIR", tmp_path / "repo"),
+            patch("dot_man.constants.REPO_DIR", tmp_path / "repo"),
         ):
             saved, secrets, errors, _ = ops.save_section(
                 section, secret_handler=lambda m: "IGNORE"

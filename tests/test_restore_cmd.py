@@ -56,7 +56,7 @@ def test_restore_commit(mock_confirm, mock_get_ops, integration_runner, tmp_path
 
 def test_restore_without_init(runner, tmp_path):
     """Test restore without initialization."""
-    with patch("dot_man.cli.common.REPO_DIR", tmp_path / "norepo"):
+    with patch("dot_man.constants.REPO_DIR", tmp_path / "norepo"):
         result = runner.invoke(cli, ["restore", "~/.bashrc", "HEAD"])
         assert result.exit_code != 0
         assert "not initialized" in result.output.lower()

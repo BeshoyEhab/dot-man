@@ -6,6 +6,8 @@ from types import SimpleNamespace
 
 import pytest
 
+from dot_man import constants
+
 # `dot_man.cli.main` is shadowed by the `main` function on the package, so
 # fetch the module object from importlib rather than attribute access.
 main_mod = importlib.import_module("dot_man.cli.main")
@@ -77,7 +79,7 @@ class TestMainVersion:
         import dot_man.cli.onboarding as onboarding
 
         fresh = tmp_path / "dot-man"
-        monkeypatch.setattr(onboarding, "DOT_MAN_DIR", fresh)
+        monkeypatch.setattr(constants, "DOT_MAN_DIR", fresh)
         monkeypatch.setattr(onboarding, "SENTINEL", fresh / ".onboarded")
         monkeypatch.setattr(completion_engine, "maybe_run_completion", lambda: None)
         monkeypatch.setattr(completions_cmd, "run_install", lambda: None)

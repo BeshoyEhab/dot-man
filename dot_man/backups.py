@@ -7,7 +7,8 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
-from .constants import BACKUPS_DIR, MAX_BACKUPS
+from . import constants
+from .constants import MAX_BACKUPS
 from .exceptions import BackupError
 
 
@@ -15,7 +16,7 @@ class BackupManager:
     """Manages local safety snapshots."""
 
     def __init__(self, backups_dir: Path | None = None, max_backups: int | None = None):
-        self.backups_dir = backups_dir or BACKUPS_DIR
+        self.backups_dir = backups_dir or constants.get_backups_dir()
         self.max_backups = max_backups or MAX_BACKUPS
         # Ensure backups directory exists
         self.backups_dir.mkdir(parents=True, exist_ok=True)

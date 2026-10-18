@@ -5,7 +5,7 @@ import json
 import click
 from rich.table import Table
 
-from .. import ui
+from .. import constants, ui
 from ..config import GlobalConfig
 from ..exceptions import ConfigurationError
 from .common import complete_config_keys, error, require_init, success
@@ -216,9 +216,9 @@ def config_create(with_examples: bool, minimal: bool, force: bool):
     """Create or regenerate the dot-man.toml configuration file."""
     try:
         from ..config import DotManConfig
-        from ..constants import DOT_MAN_TOML, REPO_DIR
+        from ..constants import DOT_MAN_TOML
 
-        config_path = REPO_DIR / DOT_MAN_TOML
+        config_path = constants.get_repo_dir() / DOT_MAN_TOML
 
         if config_path.exists() and not force:
             if not ui.confirm(

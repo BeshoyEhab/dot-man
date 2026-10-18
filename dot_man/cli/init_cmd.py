@@ -7,10 +7,10 @@ from pathlib import Path
 
 import click
 
-from .. import ui
+from .. import constants, ui
 from ..config import DotManConfig, GlobalConfig
 from ..config_detector import ConfigDetector, get_auto_hooks_for_config
-from ..constants import BACKUPS_DIR, DOT_MAN_DIR, FILE_PERMISSIONS, REPO_DIR
+from ..constants import FILE_PERMISSIONS
 from ..core import GitManager
 from ..utils import is_git_installed
 from . import status_cmd
@@ -55,7 +55,10 @@ def init(
 
     # "Already initialized" means an actual repo, not just the config dir —
     # the CLI group creates DOT_MAN_DIR on every run for logging.
-    if REPO_DIR.exists() and (REPO_DIR / ".git").exists():
+    if (
+        constants.get_repo_dir().exists()
+        and (constants.get_repo_dir() / ".git").exists()
+    ):
         if force:
             ui.warn(
                 "Reinitializing with --force; existing dot-man data will be " "deleted."
@@ -66,14 +69,14 @@ def init(
             ui.info("Aborted.")
             raise SystemExit(ExitCode.ERROR)
 
-        shutil.rmtree(DOT_MAN_DIR)
+        shutil.rmtree(constants.get_dot_man_dir())
 
     try:
         # Create directory structure
-        DOT_MAN_DIR.mkdir(parents=True, exist_ok=True)
-        DOT_MAN_DIR.chmod(FILE_PERMISSIONS)
-        REPO_DIR.mkdir(parents=True, exist_ok=True)
-        BACKUPS_DIR.mkdir(parents=True, exist_ok=True)
+        constants.get_dot_man_dir().mkdir(parents=True, exist_ok=True)
+        constants.get_dot_man_dir().chmod(FILE_PERMISSIONS)
+        constants.get_repo_dir().mkdir(parents=True, exist_ok=True)
+        constants.get_backups_dir().mkdir(parents=True, exist_ok=True)
 
         # Handle import from existing repo
         if import_path:
@@ -116,7 +119,7 @@ def init(
                 logging.debug("Failed to get current branch from source repo")
 
             # Copy entire repo including .git
-            shutil.copytree(source_path, REPO_DIR, dirs_exist_ok=True)
+            shutil.copytree(source_path, constants.get_repo_dir(), dirs_exist_ok=True)
 
             # Initialize git to get the repo object
             git = GitManager()

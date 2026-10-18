@@ -10,7 +10,7 @@ from dot_man.cli.tag_cmd import tag
 def _mock_init():
     """Return context managers for requiring init."""
     return (
-        patch("dot_man.cli.common.DOT_MAN_DIR"),
+        patch("dot_man.constants.DOT_MAN_DIR"),
         patch("dot_man.operations.get_operations"),
     )
 
@@ -21,7 +21,7 @@ class TestTagList:
     def test_list_no_tags(self):
         """List tags when none exist."""
         with (
-            patch("dot_man.cli.common.DOT_MAN_DIR") as mock_dir,
+            patch("dot_man.constants.DOT_MAN_DIR") as mock_dir,
             patch("dot_man.operations.get_operations") as mock_ops,
         ):
             mock_dir.exists.return_value = True
@@ -36,7 +36,7 @@ class TestTagList:
     def test_list_with_tags(self):
         """List tags shows each tag with commit SHA."""
         with (
-            patch("dot_man.cli.common.DOT_MAN_DIR") as mock_dir,
+            patch("dot_man.constants.DOT_MAN_DIR") as mock_dir,
             patch("dot_man.operations.get_operations") as mock_ops,
         ):
             mock_dir.exists.return_value = True
@@ -66,7 +66,7 @@ class TestTagCreate:
     def test_create_at_head(self):
         """Create tag at HEAD."""
         with (
-            patch("dot_man.cli.common.DOT_MAN_DIR") as mock_dir,
+            patch("dot_man.constants.DOT_MAN_DIR") as mock_dir,
             patch("dot_man.operations.get_operations") as mock_ops,
         ):
             mock_dir.exists.return_value = True
@@ -82,7 +82,7 @@ class TestTagCreate:
     def test_create_annotated_tag(self):
         """Create annotated tag with message."""
         with (
-            patch("dot_man.cli.common.DOT_MAN_DIR") as mock_dir,
+            patch("dot_man.constants.DOT_MAN_DIR") as mock_dir,
             patch("dot_man.operations.get_operations") as mock_ops,
         ):
             mock_dir.exists.return_value = True
@@ -98,7 +98,7 @@ class TestTagCreate:
     def test_create_invalid_commit(self):
         """Create tag with invalid commit fails."""
         with (
-            patch("dot_man.cli.common.DOT_MAN_DIR") as mock_dir,
+            patch("dot_man.constants.DOT_MAN_DIR") as mock_dir,
             patch("dot_man.operations.get_operations") as mock_ops,
         ):
             mock_dir.exists.return_value = True
@@ -127,7 +127,7 @@ class TestTagDelete:
     def test_delete_with_force(self):
         """Delete tag with --force skips confirmation."""
         with (
-            patch("dot_man.cli.common.DOT_MAN_DIR") as mock_dir,
+            patch("dot_man.constants.DOT_MAN_DIR") as mock_dir,
             patch("dot_man.operations.get_operations") as mock_ops,
         ):
             mock_dir.exists.return_value = True
@@ -142,7 +142,7 @@ class TestTagDelete:
     def test_delete_not_found(self):
         """Delete tag that doesn't exist fails."""
         with (
-            patch("dot_man.cli.common.DOT_MAN_DIR") as mock_dir,
+            patch("dot_man.constants.DOT_MAN_DIR") as mock_dir,
             patch("dot_man.operations.get_operations") as mock_ops,
         ):
             mock_dir.exists.return_value = True
@@ -169,7 +169,7 @@ class TestTagSwitch:
     def test_switch_to_tag(self):
         """Switch to a valid tag."""
         with (
-            patch("dot_man.cli.common.DOT_MAN_DIR") as mock_dir,
+            patch("dot_man.constants.DOT_MAN_DIR") as mock_dir,
             patch("dot_man.operations.get_operations") as mock_ops,
         ):
             mock_dir.exists.return_value = True
@@ -184,7 +184,7 @@ class TestTagSwitch:
     def test_switch_tag_not_found(self):
         """Switch to non-existent tag fails."""
         with (
-            patch("dot_man.cli.common.DOT_MAN_DIR") as mock_dir,
+            patch("dot_man.constants.DOT_MAN_DIR") as mock_dir,
             patch("dot_man.operations.get_operations") as mock_ops,
         ):
             mock_dir.exists.return_value = True
@@ -207,7 +207,7 @@ class TestTagSwitch:
     def test_switch_checks_out_tag_commit(self):
         """Tag switch resolves the tag to its commit, not a branch head."""
         with (
-            patch("dot_man.cli.common.DOT_MAN_DIR") as mock_dir,
+            patch("dot_man.constants.DOT_MAN_DIR") as mock_dir,
             patch("dot_man.operations.get_operations") as mock_ops,
         ):
             mock_dir.exists.return_value = True
@@ -229,7 +229,7 @@ class TestTagSwitch:
         deprecated alias must not regress it.
         """
         with (
-            patch("dot_man.cli.common.DOT_MAN_DIR") as mock_dir,
+            patch("dot_man.constants.DOT_MAN_DIR") as mock_dir,
             patch("dot_man.operations.get_operations") as mock_ops,
         ):
             mock_dir.exists.return_value = True
@@ -253,7 +253,7 @@ class TestTagSwitch:
     def test_switch_shows_deprecation(self):
         """Tag switch points at navigate until v2.0 removal."""
         with (
-            patch("dot_man.cli.common.DOT_MAN_DIR") as mock_dir,
+            patch("dot_man.constants.DOT_MAN_DIR") as mock_dir,
             patch("dot_man.operations.get_operations") as mock_ops,
         ):
             mock_dir.exists.return_value = True

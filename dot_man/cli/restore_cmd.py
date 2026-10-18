@@ -4,7 +4,7 @@ from pathlib import Path
 
 import click
 
-from .. import ui
+from .. import constants, ui
 from ..exceptions import DotManError
 from .common import AliasedCommand, complete_commits, error, require_init, success
 from .interface import cli as main
@@ -25,7 +25,7 @@ def restore(file: Path, commit: str, force: bool):
         dot-man restore ~/.bashrc abc1234
     """
     try:
-        from ..constants import REPO_DIR
+
         from ..operations import get_operations
 
         ops = get_operations()
@@ -38,7 +38,9 @@ def restore(file: Path, commit: str, force: bool):
             section = ops.get_section(section_name)
             for tracked_path in section.paths:
                 if tracked_path.resolve() == target_path:
-                    repo_path = section.get_repo_path(tracked_path, REPO_DIR)
+                    repo_path = section.get_repo_path(
+                        tracked_path, constants.get_repo_dir()
+                    )
                     found = True
                     break
             if found:
@@ -54,7 +56,7 @@ def restore(file: Path, commit: str, force: bool):
 
         try:
             # We use the relative path of the file inside the repo
-            repo_rel_path = repo_path.relative_to(REPO_DIR)
+            repo_rel_path = repo_path.relative_to(constants.get_repo_dir())
             file_content = ops.git.repo.git.show(f"{commit}:{repo_rel_path}")
 
             if not force:

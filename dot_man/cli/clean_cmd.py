@@ -2,8 +2,7 @@
 
 import click
 
-from .. import ui
-from ..constants import REPO_DIR
+from .. import constants, ui
 from .common import AliasedCommand, error, require_init, success
 from .interface import cli as main
 
@@ -82,7 +81,7 @@ def clean(
                 for p in orphaned_files:
                     # Show path relative to repo
                     try:
-                        rel_path = p.relative_to(REPO_DIR)
+                        rel_path = p.relative_to(constants.get_repo_dir())
                         ui.console.print(f"  - {rel_path}")
                     except ValueError:
                         ui.console.print(f"  - {p.name}")

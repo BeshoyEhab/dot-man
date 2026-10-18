@@ -10,9 +10,9 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from .operations import DotManOperations
 
-from .constants import DOT_MAN_DIR
+from . import constants
 
-HOOKS_DIR = DOT_MAN_DIR / "hooks"
+HOOKS_DIR = constants.get_dot_man_dir() / "hooks"
 
 
 HOOK_COMMANDS = [
@@ -77,7 +77,7 @@ def run_hook(
     hook_env = {
         "DOTMAN_HOOK_COMMAND": command,
         "DOTMAN_HOOK_PHASE": phase,
-        "DOTMAN_HOOK_DIR": str(DOT_MAN_DIR),
+        "DOTMAN_HOOK_DIR": str(constants.get_dot_man_dir()),
         "PATH": os.environ.get("PATH", ""),
         "HOME": os.environ.get("HOME", ""),
         "SHELL": os.environ.get("SHELL", "/bin/sh"),
@@ -90,7 +90,7 @@ def run_hook(
         result = subprocess.run(
             [str(hook_path)],
             env=hook_env,
-            cwd=cwd or DOT_MAN_DIR,
+            cwd=cwd or constants.get_dot_man_dir(),
             capture_output=True,
             text=True,
             timeout=30,
@@ -198,7 +198,7 @@ def create_hook(command: str, phase: str) -> Path:
 # Environment variables available:
 #   DOTMAN_HOOK_COMMAND={command}
 #   DOTMAN_HOOK_PHASE={phase}
-#   DOTMAN_HOOK_DIR={DOT_MAN_DIR}
+#   DOTMAN_HOOK_DIR={constants.get_dot_man_dir()}
 
 set -e
 
