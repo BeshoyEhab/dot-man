@@ -1,42 +1,57 @@
 # Development Roadmap
 
-## v1.5.0 - Current Stable ✅
+## v1.6.0 - Current Stable ✅ (2026-10-19)
 
-- ✅ Full coverage floor — every module ≥ 90% (2476 tests, 96% coverage)
-- ✅ Consistent exit codes — `ExitCode` enum, `sys.exit()` eliminated
-- ✅ Centralized error handling — `DotManGroup.invoke()` routes through `handle_exception()`
-- ✅ Two-level help — `help`/`--help` happy path, `help-all` everything, man page
-- ✅ Hook scripts directory — `file:<script> [args]` in section hooks
-- ✅ Decorator-driven completion engine
-- ✅ Shell completions for all commands (bash, zsh, fish)
-- ✅ Custom secret patterns
-- ✅ Symlink deploy mode
-- ✅ Quickshell hook aliases
-- ✅ Template substitution & conditionals
-- ✅ Vault key rotation
-- ✅ Full documentation site (mkdocs Material)
+### Correctness & Security
 
----
-
-## v1.6.0 - Next Release (Planned)
+- ✅ Audit sweep — 15 correctness fixes (navigate to a commit/tag now deploys
+  and records state, atomic config writes, `create_symlink` data-loss guard,
+  `export` flags honored, `status --json` emits valid JSON, …)
+- ✅ 13 security fixes — no `shell=True` in `bootstrap`, shell-quoted hook
+  placeholders, encryption wired into save/deploy, secret masking, `repo_path`
+  containment, vault key hardening, and `audit --history`
+- ✅ Restore is byte-exact — `restore`/`revert --commit` no longer drop the
+  trailing newline
 
 ### CLI Experience
 
 - ✅ Global flags — `--quiet`/`--yes`/`--no-input`/`--no-color`/`--json`/`--plain`
+- ✅ Uniform `--dry-run` across mutating commands
 - ✅ `encrypt`/`vault`/`hooks` normalized to Click groups
 - ✅ Terminal-width-aware output and plain mode
 - ✅ `import` asks before committing (`--yes`/`--no-commit`)
+- ✅ Diagnostics go to stderr; stdout carries data only
+
+### Architecture
+
+- ✅ Paths resolved at call time (`constants.get_*`) — a single patch point
+- ✅ Silent exception handlers narrowed and logged
+- ✅ Overlapping commands consolidated — `log --commit`, `rollback --backup`,
+  `revert --commit`
+- ✅ Version single-sourced from `dot_man.__version__`
+
+### Deprecated (removed in v2.0)
+
+- `switch`, `checkout`, `tag switch` → `navigate`
+- `restore <file> <sha>` → `revert <file> --commit <sha>`
+- `show <sha>` → `log --commit <sha>`
+- `backup restore <id>` → `rollback --backup <id>`
+
+---
+
+## v1.7.0 - Next Release (Planned)
 
 ### Extensibility
 
-- [ ] Plugin API — extension mechanism for third-party tools (parked)
+- [ ] Plugin API — extension mechanism for third-party tools (parked) — also the
+  target for removing the v1.6.0 deprecated shims in v2.0
 
 ---
 
 ## Coverage Focus
 
-Lowest-covered modules (source of truth: `TODO.md`, regenerated 2026-10-18): **none
-below 90%** — the floor sweep cleared every module (suite 2476 passing, 96% coverage).
+Lowest-covered modules (source of truth: `TODO.md`, regenerated 2026-10-19): **none
+below 90%** — the floor sweep cleared every module (suite 2490 passing, 96% coverage).
 
 ---
 

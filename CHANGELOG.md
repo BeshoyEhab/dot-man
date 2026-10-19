@@ -5,7 +5,7 @@ All notable changes to dot-man will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.6.0] - 2026-10-19
 
 ### Added
 
@@ -145,6 +145,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   never raises and `masked_line` never leaks a match).
 - **Real clone/push/pull end-to-end test** — a bare remote, a push, a clone,
   a commit on the clone, and a final pull that fetches the change.
+
+### Deprecated
+
+All shims below are **deprecated as of 1.6.0**: they still work and print a
+warning, but are hidden from `help`/`help-all` and will be **removed in
+v2.0** (majors remove APIs; minors only add deprecation notices).
+
+- **`switch <target>`** — use `navigate <target>` (alias `nav`).
+- **`checkout <target>`** — use `navigate <target>`.
+- **`tag switch <tag>`** — use `navigate <tag>`.
+- **`restore <file> <sha>`** — use `revert <file> --commit <sha>`.
+- **`show <sha>`** — use `log --commit <sha>` (or `log -C <sha>`).
+- **`backup restore <id>`** — use `rollback --backup <id>`.
 
 ### Removed
 

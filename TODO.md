@@ -1,6 +1,6 @@
 # TODO
 
-**Status:** v1.5.0 · 2476 tests passing · coverage 96% · docs site live
+**Status:** v1.6.0 · 2490 tests passing · coverage 96% · docs site live
 
 ---
 
@@ -64,7 +64,7 @@ Lowest-covered modules (regenerated 2026-10-09): **none below 90%**.
 - [x] **Reduce nesting in `save_deploy_ops.py`** — hoisted `deploy_item` closure to a method (`deploy_section` was already flat)
 - [x] **Reduce `type: ignore` count** — 13 → 3 (Literal encryption chain, `BaseException` diagnostics, None-guard, `dict[str, Any]`; kept 3 legitimate third-party ones)
 - [x] **Test isolation fixes** — `add` and completion tests no longer write into the real repo (`add_cmd.REPO_DIR`, completion cache redirects)
-- [ ] **Remove deprecated `switch` + `checkout` shims** (`switch_cmd.py`, `log_cmd.py`) in v2.0 — policy: majors remove/change APIs, minors only add deprecation notices; `navigate` is canonical
+- [ ] **Remove deprecated shims** (`switch`, `checkout`, `tag switch`, `restore`, `show`, `backup restore`) in v2.0 — deprecated as of 1.6.0 (see `CHANGELOG.md`); policy: majors remove/change APIs, minors only add deprecation notices; `navigate` / `log --commit` / `rollback --backup` / `revert --commit` are canonical
 
 ---
 
@@ -79,6 +79,14 @@ Lowest-covered modules (regenerated 2026-10-09): **none below 90%**.
 ---
 
 ## ✅ Recently Completed
+
+### v1.6.0 (2026-10-19)
+
+- [x] **Audit sweep** — 15 correctness fixes (commit/tag navigate deploys + records state, atomic config writes, symlink data-loss guard, `export` flags, `status --json`), 13 security fixes (no `shell=True`, quoted hook placeholders, encryption wired into save/deploy, `audit --history`), narrowed silent handlers
+- [x] **CLI/UX** — global `--quiet`/`--yes`/`--no-input`/`--no-color`/`--json`/`--plain`, uniform `--dry-run`, width-aware output, diagnostics to stderr, `encrypt`/`vault`/`hooks` as Click groups
+- [x] **Architecture** — paths resolved at call time (`constants.get_*`), version single-sourced, overlapping commands consolidated (`log --commit`, `rollback --backup`, `revert --commit`)
+- [x] **Deprecations** — `switch`, `checkout`, `tag switch`, `restore`, `show`, `backup restore` (hidden, warn, removed in v2.0)
+- [x] **Restore byte-exact** — `restore`/`revert --commit` no longer truncate the trailing newline
 
 ### v1.5.0
 

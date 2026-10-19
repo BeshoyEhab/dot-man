@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from dot_man import constants
+from dot_man import __version__, constants
 
 # `dot_man.cli.main` is shadowed by the `main` function on the package, so
 # fetch the module object from importlib rather than attribute access.
@@ -89,7 +89,7 @@ class TestMainVersion:
             main_mod.main()
 
         assert exc.value.code == 0
-        assert "1.5.0" in capsys.readouterr().out
+        assert f"version {__version__}" in capsys.readouterr().out
         assert not fresh.exists()
 
 

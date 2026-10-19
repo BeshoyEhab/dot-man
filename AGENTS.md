@@ -13,7 +13,7 @@ or priorities shift (see "AI Autonomy" at the bottom).
 (work, personal, minimal, server).
 
 - **Language**: Python 3.10+ · **CLI**: Click · **Tests**: pytest · **Packages**: `uv`
-- **Version**: 1.5.0 · **Tests**: 2476 passing · **Coverage**: 96% · **Docs**: mkdocs Material on GitHub Pages
+- **Version**: 1.6.0 · **Tests**: 2490 passing · **Coverage**: 96% · **Docs**: mkdocs Material on GitHub Pages
 - **CI**: GitHub Actions with `uv` (`uv.lock` committed); pre-commit runs Black, ruff, mypy; `uv build` in the publish workflow
 
 Canonical command vocabulary: **`navigate`** (alias `nav`) switches
@@ -299,8 +299,15 @@ on_activate = "qs -c ii &"
 1. **Coverage polish (optional)** — floor is met (every module ≥90%); push the 90% tail
    (`secrets`, `exceptions`, `global_config`, `template_cmd`, `rollback_cmd`,
    `completion_engine`) toward 95% if asked
-2. **v2.0 removals** — `switch`/`checkout` shims (kept with warnings until then)
+2. **v2.0 removals** — the six shims deprecated in 1.6.0: `switch`,
+   `checkout`, `tag switch`, `restore`, `show`, `backup restore` (they warn
+   and stay functional until then)
 3. **Parked** — Plugin API (too big; revisit on request)
+
+Completed in v1.6.0 (see TODO.md): correctness/security audit sweep, CLI
+global flags + uniform `--dry-run`, call-time path accessors, command
+consolidation (`log --commit`, `rollback --backup`, `revert --commit`),
+deprecation notices, byte-exact restore.
 
 Completed in v1.5.0 (see TODO.md): simplification & real-world usability track,
 full coverage floor, global hook schema + template vars in config values.

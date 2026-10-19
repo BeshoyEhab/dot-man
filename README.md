@@ -211,7 +211,7 @@ These apply to every command and come before the subcommand:
 | `dot-man log --commit abc123` | Full diff for one commit |
 | `dot-man tag create v1.0` | Create a tag |
 | `dot-man tag list` | List all tags |
-| `dot-man tag switch v1.0` | Checkout a tag |
+| `dot-man navigate v1.0` | Deploy a tagged snapshot |
 | `dot-man rollback` | Roll back to previous commit |
 | `dot-man rollback -n 3` | Roll back 3 commits |
 | `dot-man rollback --backup <id>` | Restore a safety backup snapshot |
@@ -260,6 +260,20 @@ These apply to every command and come before the subcommand:
 | `dot-man verify` | Validate repo integrity |
 | `dot-man backup create` | Create a manual backup |
 | `dot-man rollback --backup <id>` | Restore a backup (replaces `backup restore`) |
+
+### Deprecated
+
+These still work and print a warning, but are hidden from help and **removed
+in v2.0**. Use the canonical command on the right.
+
+| Deprecated | Use instead |
+|------------|-------------|
+| `dot-man switch <target>` | `dot-man navigate <target>` (`nav`) |
+| `dot-man checkout <target>` | `dot-man navigate <target>` |
+| `dot-man tag switch <tag>` | `dot-man navigate <tag>` |
+| `dot-man restore <file> <sha>` | `dot-man revert <file> --commit <sha>` |
+| `dot-man show <sha>` | `dot-man log --commit <sha>` |
+| `dot-man backup restore <id>` | `dot-man rollback --backup <id>` |
 
 ---
 
@@ -441,10 +455,10 @@ System variables (`{{HOSTNAME}}`, `{{USER}}`, `{{SHELL}}`, etc.) are auto-popula
 
 | Metric | Value |
 |--------|-------|
-| Version | `1.5.0` |
+| Version | `1.6.0` |
 | Python | `3.10 · 3.11 · 3.12 · 3.13` |
 | Platforms | Linux, macOS |
-| Test Coverage | 96% (2476 tests) |
+| Test Coverage | 96% (2490 tests) |
 | Commands | 30+ |
 | PyPI | [`dotman-git`](https://pypi.org/project/dotman-git/) |
 

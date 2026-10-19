@@ -113,17 +113,18 @@ The following are NOT stable and may change without notice:
 
 When features are deprecated:
 
-1. **Deprecation warning** - Shown for 2 MINOR versions
-2. **Removal** - Removed in next MAJOR version
+1. **Announcement** — deprecated in a MINOR release; the command keeps
+   working and prints a warning (and is hidden from `help`/`help-all`)
+2. **Removal** — removed in the next MAJOR version
 
-Example:
+Example (the `switch` shim):
 ```
-# v1.2.0
-$ dot-man switch
+# v1.6.0 — deprecated, still functional
+$ dot-man switch work
 Warning: 'switch' is deprecated. Use 'navigate' instead.
 
-# v1.3.0 (2 minor versions later)
-$ dot-man switch
+# v2.0.0 — removed
+$ dot-man switch work
 Error: 'switch' has been removed. Use 'navigate'.
 ```
 
