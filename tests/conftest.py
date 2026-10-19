@@ -39,6 +39,41 @@ def _reset_ui_global_flags():
 # =============================================================================
 
 
+@pytest.fixture(autouse=True)
+def _isolate_dot_man_env(tmp_path, monkeypatch):
+    """Give every test a private, initialized-looking dot-man sandbox.
+
+    Without this, commands guarded by ``require_init`` read the developer's
+    real ``~/.config/dot-man/repo``; the suite then passes on a machine where
+    dot-man is installed and fails in CI (empty ``HOME``). Redirecting every
+    path per test makes the result independent of the host.
+
+    The sandbox looks initialized (``repo/.git`` exists) because that is the
+    state most tests assert against; tests that need the uninitialized path
+    use ``uninitialized_runner``, which overrides these values.
+    """
+    from dot_man import constants, hooks
+    from dot_man.operations import reset_operations
+
+    home = tmp_path / "isolated-home"
+    dot_man_dir = home / ".config" / "dot-man"
+    repo_dir = dot_man_dir / "repo"
+    backups_dir = dot_man_dir / "backups"
+    (repo_dir / ".git").mkdir(parents=True)
+    backups_dir.mkdir()
+
+    monkeypatch.setattr(constants, "DOT_MAN_DIR", dot_man_dir)
+    monkeypatch.setattr(constants, "REPO_DIR", repo_dir)
+    monkeypatch.setattr(constants, "BACKUPS_DIR", backups_dir)
+    monkeypatch.setattr(constants, "GLOBAL_TOML", dot_man_dir / "global.toml")
+    monkeypatch.setattr(hooks, "HOOKS_DIR", dot_man_dir / "hooks")
+    monkeypatch.setenv("HOME", str(home))
+
+    reset_operations()
+    yield
+    reset_operations()
+
+
 @pytest.fixture
 def temp_home(tmp_path):
     """Create a temporary home directory."""

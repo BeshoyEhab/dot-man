@@ -133,6 +133,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Tests
 
+- **Hermetic test isolation** — every test now runs in a private
+  `~/.config/dot-man` sandbox with a temporary `HOME` and an
+  initialized-looking `repo/.git`. Commands guarded by `require_init`
+  previously resolved the developer's real repo, so 58 tests stayed green
+  locally but failed in CI (empty `HOME`) and blocked the release; the suite
+  now passes identically on both.
 - **Vacuous exit-code assertions removed** — every `exit_code in (0, 1)` was
   replaced with the exact expected code. The config-dependent command tests
   now create a real default global config (so the commands actually run)
