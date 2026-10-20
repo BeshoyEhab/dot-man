@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **macOS CI suspended pending investigation** — the `macos-latest` job added
+  for 1.6.0 never passed: it is ~100x slower than Linux (~28 minutes for 17%
+  of the suite), hit GitHub's 6-hour limit on two consecutive pushes, and
+  showed one unreproduced failure in `test_branch_list_after_switch`. It is
+  removed from the matrix until it can be debugged on a real macOS machine
+  (suspect global git config: LFS/filter/fsmonitor); a TODO tracks re-adding it.
 - **CI caps test runtime** — the test job now has a 30-minute limit and runs
   `pytest-timeout` (180s per test), so a hung test fails with a traceback
   instead of silently consuming the 6-hour job limit. The macOS job, added in

@@ -65,6 +65,7 @@ Lowest-covered modules (regenerated 2026-10-09): **none below 90%**.
 - [x] **Reduce `type: ignore` count** — 13 → 3 (Literal encryption chain, `BaseException` diagnostics, None-guard, `dict[str, Any]`; kept 3 legitimate third-party ones)
 - [x] **Test isolation fixes** — `add` and completion tests no longer write into the real repo (`add_cmd.REPO_DIR`, completion cache redirects)
 - [ ] **Remove deprecated shims** (`switch`, `checkout`, `tag switch`, `restore`, `show`, `backup restore`) in v2.0 — deprecated as of 1.6.0 (see `CHANGELOG.md`); policy: majors remove/change APIs, minors only add deprecation notices; `navigate` / `log --commit` / `rollback --backup` / `revert --commit` are canonical
+- [ ] **Re-add macOS CI** — the `macos-latest` job added for 1.6.0 never passed: ~100x slower than Linux (28 min for 17% of the suite), 6h job-limit hits on two pushes, and one unreproduced failure in `test_branch_list_after_switch`. Removed from the matrix; re-add after checking the runner's global git config (`filter.lfs`, `core.fsmonitor`, hooks) and timing a single `git commit` on a real macOS runner
 
 ---
 
