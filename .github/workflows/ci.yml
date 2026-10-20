@@ -16,6 +16,7 @@ concurrency:
 jobs:
   test:
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -45,6 +46,7 @@ jobs:
           --cov=dot_man
           --cov-report=term-missing
           --cov-fail-under=95
+          --timeout=180
           -q
 
   lint:

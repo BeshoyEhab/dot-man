@@ -5,6 +5,15 @@ All notable changes to dot-man will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **CI caps test runtime** — the test job now has a 30-minute limit and runs
+  `pytest-timeout` (180s per test), so a hung test fails with a traceback
+  instead of silently consuming the 6-hour job limit. The macOS job, added in
+  1.6.0, has been hitting that limit; this makes the culprit diagnosable.
+
 ## [1.6.0] - 2026-10-19
 
 ### Added
